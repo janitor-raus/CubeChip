@@ -24,7 +24,7 @@ void SystemInterface::stopWorker() noexcept {
 }
 
 void SystemInterface::threadEntry(StopToken token) {
-	SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_TIME_CRITICAL);
+	SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 	static thread_local thread_affinity::Manager thread{ 15, 0b11ull };
 
 	Pacer->setLimiter(getBaseSystemFramerate()); // will need adjustment later

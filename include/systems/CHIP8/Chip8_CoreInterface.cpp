@@ -194,7 +194,7 @@ Str* Chip8_CoreInterface::makeOverlayData() {
 		{ { 1.5e6f, 1.0e6f, 0.6e6f, 0.3e6f, 1.0e5f } };
 
 	const auto frameTime{ Pacer->getElapsedMicrosSince() / 1000.0f };
-	const auto timePhase{ std::min(frameTime * 1.025f / Pacer->getFramespan(), 2.0f) };
+	const auto timePhase{ std::min(frameTime * 1.03f / Pacer->getFramespan(), 2.0f) };
 	const auto newStride{ ez::peak_mirror_fold(u32(timePhase / 0.2f), cpf.size()) };
 	const auto cycleBias{ cpf[newStride] * std::cos(timePhase * f32(std::numbers::pi / 2)) };
 
