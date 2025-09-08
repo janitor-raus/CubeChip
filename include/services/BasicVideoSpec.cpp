@@ -78,9 +78,9 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings) noexcept {
 
 	ez::Rect deco{};
 
-	if (SDL_Unique<SDL_Window> dummy{ SDL_CreateWindow(
+	if (auto dummy{ sdl::make_unique(SDL_CreateWindow(
 		nullptr, 64, 64, SDL_WINDOW_UTILITY | SDL_WINDOW_HIDDEN
-	) }) {
+	)) }) {
 		#ifndef __APPLE__
 		constexpr auto away{ -(1 << 15) };
 		SDL_SetWindowPosition(dummy, away, away);
@@ -153,7 +153,7 @@ void BasicVideoSpec::normalizeRectToDisplay(ez::Rect& rect, ez::Rect& deco, bool
 	bool rectIntersectsDisplay{};
 	
 	// 1: fetch all eligible display IDs
-	SDL_Unique<SDL_DisplayID> displays{ SDL_GetDisplays(&numDisplays) };
+	auto displays{ sdl::make_unique(SDL_GetDisplays(&numDisplays)) };
 	if (!displays || numDisplays <= 0) [[unlikely]]
 		{ rect = Settings::defaults; return; }
 

@@ -39,7 +39,7 @@ public:
 	T& operator*()  const noexcept { return *mPtr; }
 
 	constexpr operator T*()   const noexcept { return mPtr.get(); }
-	constexpr operator bool() const noexcept { return static_cast<bool>(mPtr); }
+	constexpr operator bool() const noexcept { return bool(mPtr); }
 
 	constexpr void swap(FriendlyUnique& other) noexcept { mPtr.swap(other.mPtr); }
 };

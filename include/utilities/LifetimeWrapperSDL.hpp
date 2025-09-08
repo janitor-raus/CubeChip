@@ -10,11 +10,23 @@
 
 /*==================================================================*/
 
+#define USE_FRIENDLY_UNIQUE
+
 template <typename T>
 struct SDL_Deleter;
 
-template <typename T>
-using SDL_Unique = FriendlyUnique<T, SDL_Deleter<T>>;
+#ifdef USE_FRIENDLY_UNIQUE
+	#include "FriendlyUnique.hpp"
+
+	template <typename T>
+	using SDL_Unique = FriendlyUnique<T, SDL_Deleter<T>>;
+#else
+	#include <memory>
+	template <typename T>
+	using SDL_Unique = std::unique_ptr<T, SDL_Deleter<T>>;
+#endif // USE_FRIENDLY_UNIQUE
+
+/*==================================================================*/
 
 struct SDL_Window;
 template <> struct SDL_Deleter<SDL_Window>
@@ -43,3 +55,12 @@ template <> struct SDL_Deleter<char>
 
 template <> struct SDL_Deleter<const char>
 	{ void operator()(const char*) const noexcept; };
+
+/*==================================================================*/
+
+namespace sdl {
+	template <typename T>
+	[[nodiscard]] constexpr
+	auto make_unique(T* ptr) noexcept
+		{ return SDL_Unique<T>(ptr); }
+}
