@@ -174,15 +174,15 @@ protected:
 	void copyFontToMemory(void* dest, size_type size) noexcept;
 	void copyColorsToCore(void* dest) noexcept;
 
-	virtual void handlePreFrameInterrupt() noexcept;
-	virtual void handleEndFrameInterrupt() noexcept;
+	        void handlePreFrameInterrupt() noexcept;
+	        void handleEndFrameInterrupt() noexcept;
 
-	virtual void handleTimerTick() noexcept;
+	        void handleTimerTick() noexcept;
 	virtual void instructionLoop() noexcept = 0;
 
 	virtual void nextInstruction() noexcept;
 	virtual void skipInstruction() noexcept;
-	virtual void performProgJump(u32 next) noexcept;
+	        void performProgJump(u32 next) noexcept;
 	virtual void prepDisplayArea(Resolution mode) = 0;
 
 	virtual void renderAudioData() = 0;

@@ -147,6 +147,19 @@ void BasicVideoSpec::showErrorBox(const char* const title) noexcept {
 	);
 }
 
+f32 BasicVideoSpec::getDisplayRefreshRate(SDL_DisplayID display) noexcept {
+	if (const auto* mode{ SDL_GetCurrentDisplayMode(display) }) {
+		if (mode->refresh_rate_denominator > 0) {
+			return f32(mode->refresh_rate_numerator) /
+				f32(mode->refresh_rate_denominator);
+		} else {
+			return (mode->refresh_rate > 0.0f)
+				? mode->refresh_rate : 60.0f;
+		}
+	}
+	return 60.0f;
+}
+
 void BasicVideoSpec::normalizeRectToDisplay(ez::Rect& rect, ez::Rect& deco, bool first_run) noexcept {
 	auto numDisplays{  0 }; // count of displays SDL found
 	auto bestDisplay{ -1 }; // index of display our window will use

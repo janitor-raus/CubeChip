@@ -73,14 +73,14 @@ namespace EzMaths {
 			: Point(point), Frame(frame)
 		{}
 
-		constexpr auto getPoint() const noexcept
+		constexpr auto as_point() const noexcept
 			{ return Point(x, y); }
 
-		constexpr auto getFrame() const noexcept
+		constexpr auto as_frame() const noexcept
 			{ return Frame(w, h); }
 
 		constexpr auto center() const noexcept
-			{ return half() + getPoint(); }
+			{ return half() + as_point(); }
 	};
 
 	// Lightweight, unprotected Weight class with 8-bit integer precision.

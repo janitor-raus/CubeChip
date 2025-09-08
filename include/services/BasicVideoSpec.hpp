@@ -133,6 +133,7 @@ public:
 /*==================================================================*/
 
 public:
+	f32  getDisplayRefreshRate(SDL_DisplayID display) noexcept;
 	void normalizeRectToDisplay(ez::Rect& rect, ez::Rect& deco, bool first_run) noexcept;
 
 /*==================================================================*/
