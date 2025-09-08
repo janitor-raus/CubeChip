@@ -27,7 +27,7 @@ class CHIP8_MODERN final : public Chip8_CoreInterface {
 	static constexpr s32 cInstSpeedLo{ 11 };
 
 private:
-	std::array<u8, cScreenSizeX * cScreenSizeY>
+	FixedMap2D<u8, cScreenSizeX, cScreenSizeY>
 		mDisplayBuffer{};
 
 	std::array<u8, cTotalMemory + cSafezoneOOB>

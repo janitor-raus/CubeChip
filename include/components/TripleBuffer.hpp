@@ -76,13 +76,13 @@ private:
 	Buffer mReadBuffer;
 	Buffer mSwapBuffer;
 
-	std::shared_mutex mReadLock;
-	std::shared_mutex mWorkLock;
-	Atom<Dimensions>  mDimensions{};
+	mutable std::shared_mutex mReadLock;
+	mutable std::shared_mutex mWorkLock;
+	Atom<Dimensions> mDimensions{};
 
-	alignas(HDIS) Buffer* mpWork{ &mWorkBuffer };
-	alignas(HDIS) Buffer* mpRead{ &mReadBuffer };
-	alignas(HDIS) AtomBuf mpSwap{ &mSwapBuffer };
+	mutable alignas(HDIS) Buffer* mpWork{ &mWorkBuffer };
+	mutable alignas(HDIS) Buffer* mpRead{ &mReadBuffer };
+	mutable alignas(HDIS) AtomBuf mpSwap{ &mSwapBuffer };
 
 private:
 	static constexpr std::uintptr_t sNewDataFlag{ 1 };
@@ -91,7 +91,7 @@ private:
 		return reinterpret_cast<std::uintptr_t>(ptr) & sNewDataFlag;
 	}
 
-	constexpr Buffer* addFlag(Buffer* ptr) noexcept {
+	constexpr Buffer* addFlag(Buffer* ptr) const noexcept {
 		auto new_ptr{ reinterpret_cast<std::uintptr_t>(ptr) };
 		return reinterpret_cast<Buffer*>(new_ptr | sNewDataFlag);
 	}
@@ -130,7 +130,7 @@ public:
 	 *
 	 * @note Acquires exclusive locks for both read and work buffers.
 	 */
-	void resize(size_type buffer_size) {
+	void resize(size_type buffer_size) noexcept {
 		std::unique_lock read_lock{ mReadLock };
 		std::unique_lock work_lock{ mWorkLock };
 
@@ -154,7 +154,7 @@ private:
 
 
 private:
-	T1* acquireReadBuffer() noexcept {
+	T1* acquireReadBuffer() const noexcept {
 		if (getFlag(mpSwap.load(mo::acquire))) {
 			mpRead = subFlag(mpSwap.exchange(mpRead, mo::acq_rel));
 		}
@@ -172,7 +172,7 @@ public:
 	 * @note Acquires a shared lock on the read buffer.
 	 */
 	[[nodiscard]]
-	auto copy(size_type count = 0u) {
+	auto copy(size_type count = 0u) noexcept {
 		std::shared_lock lock{ mReadLock };
 		const auto new_count{ clamp_count(count) };
 		return ::allocate_n<T1>(count ? count : size()) \
@@ -191,7 +191,7 @@ public:
 	 * @note Acquires a shared lock on the read buffer.
 	 */
 	template <typename T2>
-	void read(T2* output, size_type count = 0)
+	void read(T2* output, size_type count = 0) const
 		noexcept(std::is_nothrow_convertible_v<T1, T2>)
 		requires(std::is_trivially_copyable_v<T2> && std::is_convertible_v<T1, T2>)
 	{
@@ -209,7 +209,7 @@ public:
 	 * @note Acquires a shared lock on the read buffer.
 	 */
 	template <IsContiguousContainer T2>
-	void read(T2& output)
+	void read(T2& output) const
 		noexcept(std::is_nothrow_convertible_v<T1, ValueType<T2>>)
 		requires(std::is_trivially_copyable_v<ValueType<T2>> && std::is_convertible_v<T1, ValueType<T2>>)
 	{

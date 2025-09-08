@@ -115,7 +115,7 @@ SDL_AppResult SDL_AppIterate(void *pHost) {
 SDL_AppResult SDL_AppEvent(void *pHost, SDL_Event *event) {
 	auto* Host{ static_cast<FrontendHost*>(pHost) };
 
-	return static_cast<SDL_AppResult>(Host->processEvents(event));
+	return SDL_AppResult(Host->processEvents(event));
 }
 
 /*==================================================================*/

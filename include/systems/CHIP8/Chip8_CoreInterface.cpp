@@ -190,16 +190,16 @@ void Chip8_CoreInterface::mainSystemLoop() {
 }
 
 Str* Chip8_CoreInterface::makeOverlayData() {
-	static constexpr std::array<f32, 5> cpf
+	static constexpr std::array<f32, 5> stride
 		{ { 1.5e6f, 1.0e6f, 0.6e6f, 0.3e6f, 1.0e5f } };
 
 	const auto frameTime{ Pacer->getElapsedMicrosSince() / 1000.0f };
-	const auto timePhase{ std::min(frameTime * 1.03f / Pacer->getFramespan(), 2.0f) };
-	const auto newStride{ ez::peak_mirror_fold(u32(timePhase / 0.2f), cpf.size()) };
-	const auto cycleBias{ cpf[newStride] * std::cos(timePhase * f32(std::numbers::pi / 2)) };
+	const auto timePhase{ std::min(frameTime * 1.030f / Pacer->getFramespan(), 2.0f) };
+	const auto newStride{ ez::peak_mirror_fold(u32(timePhase / 0.2f), stride.size()) };
+	const auto cycleStep{ stride[newStride] * std::cos(timePhase * f32(std::numbers::pi / 2)) };
 
 	if (mInterrupt == Interrupt::CLEAR) [[likely]]
-		{ ::assign_cast_add(mTargetCPF, cycleBias); }
+		{ ::assign_cast_add(mTargetCPF, cycleStep); }
 
 	*getOverlayDataBuffer() = fmt::format(
 		" ::  MIPS:{:8.2f}\n{}",

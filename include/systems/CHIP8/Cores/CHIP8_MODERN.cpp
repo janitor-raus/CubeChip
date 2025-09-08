@@ -396,7 +396,7 @@ void CHIP8_MODERN::renderVideoData() {
 			case 0b10000000:
 				if (Quirk.wrapSprite) { X %= cScreenSizeX; }
 				if (X < cScreenSizeX) {
-					if (!((mDisplayBuffer[Y * cScreenSizeX + X] ^= 0x8) & 0x8))
+					if (!((mDisplayBuffer(X, Y) ^= 0x8) & 0x8))
 						[[unlikely]] { mRegisterV[0xF] = 1; }
 				}
 				return;
@@ -408,7 +408,7 @@ void CHIP8_MODERN::renderVideoData() {
 
 				for (auto B{ 0 }; B < 8; ++B, ++X %= cScreenSizeX) {
 					if (DATA & 0x80 >> B) {
-						if (!((mDisplayBuffer[Y * cScreenSizeX + X] ^= 0x8) & 0x8))
+						if (!((mDisplayBuffer(X, Y) ^= 0x8) & 0x8))
 							[[unlikely]] { mRegisterV[0xF] = 1; }
 					}
 					if (!Quirk.wrapSprite && X == cScreenSizeX - 1) { return; }
