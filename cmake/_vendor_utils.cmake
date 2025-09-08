@@ -40,7 +40,9 @@ function(fetch_and_vendor GIT_REPO GIT_TAG NEED_SHALLOW DEST_DIR ADD_SUBDIRECTOR
 		message(FATAL_ERROR "FetchContent failed for ${LIB_NAME}, cannot proceed with vendor copy.")
 	endif()
 
+	unset(FETCH_HASH)
 	hash_directory("${${LIB_NAME}_SOURCE_DIR}" FETCH_HASH)
+	unset(VENDOR_HASH)
 	hash_directory("${DEST_DIR}" VENDOR_HASH)
 
 	if(FETCH_HASH STREQUAL VENDOR_HASH)
@@ -50,6 +52,7 @@ function(fetch_and_vendor GIT_REPO GIT_TAG NEED_SHALLOW DEST_DIR ADD_SUBDIRECTOR
 		file(REMOVE_RECURSE "${DEST_DIR}")
 		file(COPY "${${LIB_NAME}_SOURCE_DIR}/" DESTINATION "${DEST_DIR}")
 
+		unset(NEW_HASH)
 		hash_directory("${DEST_DIR}" NEW_HASH)
 		if(NOT NEW_HASH STREQUAL FETCH_HASH)
 			message(FATAL_ERROR "Vendor copy failed or incomplete for ${LIB_NAME}!")
