@@ -51,34 +51,13 @@ class alignas(HDIS) TripleBuffer {
 	using size_type = std::size_t;
 
 private:
-	struct alignas(sizeof(unsigned) * 2) Dimensions {
-		unsigned w{}, h{};
-
-		constexpr Dimensions() noexcept = default;
-		constexpr Dimensions(unsigned width, unsigned height) noexcept
-			: w{ width }, h{ height }
-		{}
-
-		constexpr auto isRect() const noexcept { return w > 1 && h > 1; }
-		constexpr size_type size() const noexcept
-			{ return w * h; }
-	};
-
-public:
-	void setDimensions(unsigned width, unsigned height) noexcept
-		{ mDimensions.store(Dimensions(width, height), mo::release); }
-
-	Dimensions getDimensions() const noexcept
-		{ return mDimensions.load(mo::acquire); }
-
-private:
 	Buffer mWorkBuffer;
 	Buffer mReadBuffer;
 	Buffer mSwapBuffer;
 
 	mutable std::shared_mutex mReadLock;
 	mutable std::shared_mutex mWorkLock;
-	Atom<Dimensions> mDimensions{};
+	size_type mSize{};
 
 	mutable alignas(HDIS) Buffer* mpWork{ &mWorkBuffer };
 	mutable alignas(HDIS) Buffer* mpRead{ &mReadBuffer };
@@ -104,24 +83,21 @@ private:
 /*==================================================================*/
 
 public:
-	TripleBuffer(unsigned w, unsigned h) noexcept
-		: mWorkBuffer{ ::allocate_n<T1>(w * h).as_value().release() }
-		, mReadBuffer{ ::allocate_n<T1>(w * h).as_value().release() }
-		, mSwapBuffer{ ::allocate_n<T1>(w * h).as_value().release() }
-		, mDimensions{ mWorkBuffer && mReadBuffer && mSwapBuffer \
-			? Dimensions(w, h) : Dimensions() }
+	TripleBuffer(size_type buffer_size) noexcept
+		: mWorkBuffer{ ::allocate_n<T1>(buffer_size).as_value().release() }
+		, mReadBuffer{ ::allocate_n<T1>(buffer_size).as_value().release() }
+		, mSwapBuffer{ ::allocate_n<T1>(buffer_size).as_value().release() }
+		, mSize{ mWorkBuffer && mReadBuffer && mSwapBuffer ? buffer_size : 0 }
 	{}
 
-	TripleBuffer(unsigned buffer_size = 0u) noexcept
-		: TripleBuffer(buffer_size, 1u)
-	{}
+	TripleBuffer() noexcept : TripleBuffer(0) {} // XXX temporary default constructor
 
 	TripleBuffer(const TripleBuffer&) = delete;
 	TripleBuffer(TripleBuffer&&)      = delete;
 	TripleBuffer& operator=(const TripleBuffer&) = delete;
 	TripleBuffer& operator=(TripleBuffer&&)      = delete;
 
-	auto size() const noexcept { return getDimensions().size(); }
+	auto size() const noexcept { return mSize; }
 
 	/**
 	 * @brief Resizes all internal buffers of the TripleBuffer to the specified size.
@@ -137,8 +113,7 @@ public:
 		mWorkBuffer.reset(); mWorkBuffer = ::allocate_n<T1>(buffer_size).as_value().release();
 		mReadBuffer.reset(); mReadBuffer = ::allocate_n<T1>(buffer_size).as_value().release();
 		mSwapBuffer.reset(); mSwapBuffer = ::allocate_n<T1>(buffer_size).as_value().release();
-		mDimensions = mWorkBuffer && mReadBuffer && mSwapBuffer \
-			? Dimensions(unsigned(buffer_size), 1u) : Dimensions();
+		mSize = mWorkBuffer && mReadBuffer && mSwapBuffer ? buffer_size : 0;
 		mpWork = &mWorkBuffer;
 		mpRead = &mReadBuffer;
 		mpSwap = &mSwapBuffer;

@@ -47,7 +47,7 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings) noexcept {
 		return;
 	}
 
-	mViewportScaleMode = settings.viewport.filtering < 0 ? 0 : settings.viewport.filtering % 3;
+	mViewportScaleMode = std::max(0, settings.viewport.filtering % 3);
 
 	mIntegerScaling    = settings.viewport.int_scale;
 	mUsingScanlines    = settings.viewport.scanlines;
