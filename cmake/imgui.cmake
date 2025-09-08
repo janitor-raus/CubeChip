@@ -3,7 +3,7 @@ set(VENDOR_DIR "${PROJECT_VENDOR_DIR}/imgui")
 
 fetch_and_vendor(
 	"https://github.com/ocornut/imgui.git"
-	"docking"
+	"docking" TRUE
 	"${VENDOR_DIR}" FALSE
 )
 

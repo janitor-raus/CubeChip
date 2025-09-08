@@ -9,6 +9,6 @@ set(SDL_STATIC ON CACHE BOOL "Build a static version of the library" FORCE)
 
 fetch_and_vendor(
 	"https://github.com/libsdl-org/SDL.git"
-	"release-3.2.18"
+	"release-3.2.18" TRUE
 	"${PROJECT_VENDOR_DIR}/sdl3" TRUE
 )

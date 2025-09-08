@@ -21,7 +21,7 @@ endfunction()
 
 # ==================================================================================== #
 
-function(fetch_and_vendor GIT_REPO GIT_TAG DEST_DIR ADD_SUBDIRECTORY_AT_DEST)
+function(fetch_and_vendor GIT_REPO GIT_TAG NEED_SHALLOW DEST_DIR ADD_SUBDIRECTORY_AT_DEST)
 
 	get_filename_component(LIB_NAME "${DEST_DIR}" NAME)
 
@@ -30,7 +30,7 @@ function(fetch_and_vendor GIT_REPO GIT_TAG DEST_DIR ADD_SUBDIRECTORY_AT_DEST)
 		${LIB_NAME}
 		GIT_REPOSITORY ${GIT_REPO}
 		GIT_TAG        ${GIT_TAG}
-		GIT_SHALLOW    TRUE
+		GIT_SHALLOW    ${NEED_SHALLOW}
 		GIT_PROGRESS   TRUE
 	)
 	FetchContent_Populate(${LIB_NAME})
