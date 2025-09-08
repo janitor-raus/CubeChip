@@ -5,7 +5,7 @@
 */
 
 #include "BYTEPUSHER_STANDARD.hpp"
-#if defined(ENABLE_BYTEPUSHER_STANDARD) && defined(ENABLE_BYTEPUSHER_STANDARD)
+#if defined(ENABLE_BYTEPUSHER_SYSTEM) && defined(ENABLE_BYTEPUSHER_STANDARD)
 
 #include "BasicVideoSpec.hpp"
 #include "GlobalAudioBase.hpp"

@@ -11,6 +11,8 @@
 
 #include "GameBoy_CoreInterface.hpp"
 
+#ifdef ENABLE_GAMEBOY_SYSTEM
+
 /*==================================================================*/
 
 GameBoy_CoreInterface::GameBoy_CoreInterface() noexcept {
@@ -73,3 +75,5 @@ void GameBoy_CoreInterface::copyGameToMemory(u8* dest) noexcept {
 		dest
 	);
 }
+
+#endif

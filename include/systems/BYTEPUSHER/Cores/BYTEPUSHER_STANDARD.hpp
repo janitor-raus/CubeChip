@@ -9,7 +9,7 @@
 #include "../BytePusher_CoreInterface.hpp"
 
 #define ENABLE_BYTEPUSHER_STANDARD
-#if defined(ENABLE_BYTEPUSHER_STANDARD) && defined(ENABLE_BYTEPUSHER_SYSTEM)
+#if defined(ENABLE_BYTEPUSHER_SYSTEM) && defined(ENABLE_BYTEPUSHER_STANDARD)
 
 /*==================================================================*/
 

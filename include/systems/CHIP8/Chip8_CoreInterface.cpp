@@ -12,6 +12,8 @@
 
 #include "Chip8_CoreInterface.hpp"
 
+#ifdef ENABLE_CHIP8_SYSTEM
+
 /*==================================================================*/
 
 Chip8_CoreInterface::Chip8_CoreInterface() noexcept {
@@ -347,3 +349,5 @@ void Chip8_CoreInterface::copyColorsToCore(void* dest) noexcept {
 }
 
 /*==================================================================*/
+
+#endif
