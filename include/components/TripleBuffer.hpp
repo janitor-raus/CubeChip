@@ -46,9 +46,10 @@
 template <typename T1>
 	requires (std::is_trivially_copyable_v<T1>)
 class alignas(HDIS) TripleBuffer {
-	using Buffer    = AlignedUniqueArray<T1>;
-	using AtomBuf   = Atom<Buffer*>;
-	using size_type = std::size_t;
+	using value_type = T1;
+	using Buffer     = AlignedUniqueArray<T1>;
+	using AtomBuf    = Atom<Buffer*>;
+	using size_type  = std::size_t;
 
 private:
 	Buffer mWorkBuffer;
@@ -59,9 +60,9 @@ private:
 	mutable std::shared_mutex mWorkLock;
 	size_type mSize{};
 
-	mutable alignas(HDIS) Buffer* mpWork{ &mWorkBuffer };
-	mutable alignas(HDIS) Buffer* mpRead{ &mReadBuffer };
-	mutable alignas(HDIS) AtomBuf mpSwap{ &mSwapBuffer };
+	alignas(HDIS) mutable Buffer* mpWork{ &mWorkBuffer };
+	alignas(HDIS) mutable Buffer* mpRead{ &mReadBuffer };
+	alignas(HDIS) mutable AtomBuf mpSwap{ &mSwapBuffer };
 
 private:
 	static constexpr std::uintptr_t sNewDataFlag{ 1 };
