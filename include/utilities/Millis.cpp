@@ -25,14 +25,23 @@ long long Millis::since(long long past_millis) noexcept {
 	return now() - past_millis;
 }
 
-void Millis::sleep(unsigned long long millis) noexcept {
+void Millis::sleep_for(unsigned long long millis) noexcept {
+	std::this_thread::sleep_for(std::chrono::milliseconds(millis));
+}
+
+void Millis::sleeplock_for(double millis) noexcept {
 	using namespace std::chrono;
 
-	if (millis >= 2) {
-		std::this_thread::sleep_for(milliseconds(millis - 2));
-	} else {
-		auto target{ steady_clock::now() + milliseconds(millis) };
-		do { std::this_thread::yield(); }
-		while (steady_clock::now() < target);
+	const auto target{ steady_clock::now() + duration_cast
+		<nanoseconds>(duration<double, std::milli>(millis)) };
+
+	while (true) {
+		const auto cur_time{ steady_clock::now() };
+		if (cur_time >= target) { return; }
+
+		if (target - cur_time >= microseconds(2300)) // avg sleep duration 99.5% < 2.3ms
+			{ std::this_thread::sleep_for(milliseconds(1)); }
+		else
+			{ std::this_thread::yield(); }
 	}
 }

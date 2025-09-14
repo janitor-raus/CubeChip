@@ -23,5 +23,6 @@ namespace Millis {
 	/**
 	 * @brief Sleeps/spins the current thread for X milliseconds.
 	 */
-	void sleep(unsigned long long millis) noexcept;
+	void sleep_for(unsigned long long millis) noexcept;
+	void sleeplock_for(double millis) noexcept;
 };
