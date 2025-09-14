@@ -129,9 +129,9 @@ namespace EzMaths {
 /*==================================================================*/
 
 namespace EzMaths {
-	template <std::integral T> requires (std::is_signed_v<T>)
+	template <typename T> requires (std::is_signed_v<T>)
 	inline constexpr T abs(T x) noexcept
-		{ return x < 0 ? -x : x; }
+		{ return x < T(0) ? -x : x; }
 
 	// simple constexpr-enabled fmod, internally allows s32-width division
 	template <std::floating_point T>
