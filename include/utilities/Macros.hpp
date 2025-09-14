@@ -22,3 +22,15 @@
 
 #define CONCAT_TOKENS_INTERNAL(x, y) x##y
 #define CONCAT_TOKENS(x, y) CONCAT_TOKENS_INTERNAL(x, y)
+
+/*==================================================================*/
+
+#define CASE_xNF(n) case (n+0x00): case (n+0x01): case (n+0x02): case (n+0x03): \
+					case (n+0x04): case (n+0x05): case (n+0x06): case (n+0x07): \
+					case (n+0x08): case (n+0x09): case (n+0x0A): case (n+0x0B): \
+					case (n+0x0C): case (n+0x0D): case (n+0x0E): case (n+0x0F)
+
+#define CASE_xFN(n) case (n+0x00): case (n+0x10): case (n+0x20): case (n+0x30): \
+					case (n+0x40): case (n+0x50): case (n+0x60): case (n+0x70): \
+					case (n+0x80): case (n+0x90): case (n+0xA0): case (n+0xB0): \
+					case (n+0xC0): case (n+0xD0): case (n+0xE0): case (n+0xF0)
