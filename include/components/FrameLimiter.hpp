@@ -12,7 +12,6 @@
 
 class FrameLimiter final {
 	using chrono = std::chrono::steady_clock::time_point;
-	using millis = std::chrono::milliseconds;
 	using uint64 = unsigned long long;
 
 	bool   initTimeCheck{}; // forces timestamp update on first check only
@@ -52,7 +51,7 @@ public:
 
 /*==================================================================*/
 
-	bool checkTime();
+	bool checkTime() noexcept;
 
 	auto getElapsedMillisSince() const noexcept {
 		using namespace std::chrono;

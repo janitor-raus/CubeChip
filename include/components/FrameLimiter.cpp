@@ -24,7 +24,8 @@ void FrameLimiter::setLimiter(float framerate, bool firstpass, bool lostframe) n
 
 /*==================================================================*/
 
-bool FrameLimiter::checkTime() {
+bool FrameLimiter::checkTime() noexcept {
+	using millis = std::chrono::milliseconds;
 	if (isValidFrame()) { return true; }
 
 	if (getRemainder() >= 2.3f)
