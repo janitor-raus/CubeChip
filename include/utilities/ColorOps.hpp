@@ -213,7 +213,7 @@ struct alignas(4) RGBA {
 };
 
 // Shifts an (A)RGB color to RGBA color
-constexpr RGBA operator"" _rgb(unsigned long long value) noexcept
+constexpr RGBA operator""_rgb(unsigned long long value) noexcept
 	{ return RGBA::Packed(value << 8); }
 
 
