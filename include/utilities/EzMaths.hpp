@@ -10,6 +10,8 @@
 #include <concepts>
 #include <algorithm>
 
+#include "Macros.hpp"
+
 /*==================================================================*/
 
 #if defined(__cpp_constexpr) && (__cpp_constexpr >= 202211L)
@@ -204,5 +206,31 @@ namespace EzMaths {
 		return  data <<  1 | data;
 	}
 }
+
+/*==================================================================*/
+
+PRECISE_FP_BEGIN
+namespace EzMaths{
+	class EMA {
+		f32 alpha{};
+		f32 value{};
+
+	public:
+		constexpr EMA() : value{ std::numeric_limits<f32>::quiet_NaN() } {}
+
+		constexpr void set_alpha(f32 v) noexcept
+			{ alpha = 2.0f / std::max(v, 0.0f); }
+
+		constexpr void add(f32 v) noexcept {
+			if (value != value) [[unlikely]] { value = v; }
+			else { value = alpha * v + (1 - alpha) * value; }
+		}
+
+		constexpr f32 avg() const noexcept { return value; }
+	};
+}
+PRECISE_FP_END
+
+/*==================================================================*/
 
 namespace ez = EzMaths;
