@@ -13,9 +13,33 @@
 #elif defined(__GNUC__)
 	#define SUGGEST_VECTORIZABLE_LOOP _Pragma("GCC ivdep")
 #elif defined(_MSC_VER)
-	#define SUGGEST_VECTORIZABLE_LOOP _Pragma("loop(ivdep)")
+	#define SUGGEST_VECTORIZABLE_LOOP __pragma(loop(ivdep))
 #else
 	#define SUGGEST_VECTORIZABLE_LOOP
+#endif
+
+/*==================================================================*/
+
+#if defined(_MSC_VER)
+
+	#define PRECISE_FP_BEGIN \
+		__pragma(float_control(precise, on, push)) \
+
+	#define PRECISE_FP_END \
+		__pragma(float_control(pop))
+
+#elif defined(__clang__) || defined(__GNUC__)
+
+	#define PRECISE_FP_BEGIN \
+		_Pragma("GCC push_options") \
+		_Pragma("GCC optimize(\"-fno-fast-math\")")
+
+	#define PRECISE_FP_END \
+		_Pragma("GCC pop_options")
+
+#else
+	#define PRECISE_FP_BEGIN
+	#define PRECISE_FP_END
 #endif
 
 /*==================================================================*/
