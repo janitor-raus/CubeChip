@@ -28,6 +28,21 @@ protected:
 
 	std::vector<SimpleKeyMapping> mCustomBinds;
 
+	struct TriBCD {
+		// 2 = hundreds | 1 = tens | 0 = ones
+		u8 digit[3];
+
+		constexpr TriBCD(u32 value) noexcept {
+			::assign_cast(digit[2], value * 0x51EB851Full >> 37);
+			::assign_cast(temp_val, value - digit[2] * 100);
+			::assign_cast(digit[1], temp_val * 0xCCCDull >> 19);
+			::assign_cast(digit[0], temp_val - digit[1] * 10);
+		}
+
+private:
+		u32 temp_val;
+	};
+
 private:
 	u32  mTickLast{};
 	u32  mTickSpan{};
@@ -82,6 +97,8 @@ protected:
 		FINAL, // end state, all is well
 		ERROR, // end state, error occured
 	};
+
+	bool hasInterrupt() const noexcept { return mInterrupt != Interrupt::CLEAR; }
 
 	enum class Resolution {
 		ERROR,
