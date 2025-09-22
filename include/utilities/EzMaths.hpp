@@ -168,6 +168,11 @@ namespace EzMaths {
 		return u8(((x * (y | y << 8)) + 0x8080u) >> 16);
 	}
 
+	inline constexpr u8 fixedScale8(u8 x, u16 y) noexcept {
+		const u32 result{ (x * (y * 257u) + 0x8080u) >> 16 };
+		return u8(result > 255 ? 255 : result);
+	}
+
 	inline constexpr u8 fixedLerp8(u8 x, u8 y, Weight w) noexcept {
 		return u8(fixedMul8(x, u8(255 - w)) + fixedMul8(y, w));
 	}

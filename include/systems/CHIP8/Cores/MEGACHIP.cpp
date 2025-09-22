@@ -374,23 +374,12 @@ void MEGACHIP::scrollDisplayRT() {
 
 void MEGACHIP::initializeFontColors() noexcept {
 	for (auto i{ 0 }; i < 10; ++i) {
-		//const auto mult{ 1.0f - 0.045f * i };
-		//const auto R{ 0xFF * mult * 1.03f };
-		//const auto G{ 0xFF * mult * 1.14f };
-		//const auto B{ 0xFF * mult * 1.21f };
-		//
-		//mFontColor[i] = {
-		//	static_cast<u8>(std::min(std::round(R), 255.0f)),
-		//	static_cast<u8>(std::min(std::round(G), 255.0f)),
-		//	static_cast<u8>(std::min(std::round(B), 255.0f)),
-		//};
-
 		const auto mult{ 255 - 11 * i };
 		
 		mFontColor[i] = RGBA{
-			ez::fixedMul8(0xFF, u8(std::min(mult * 264, 255))),
-			ez::fixedMul8(0xFF, u8(std::min(mult * 291, 255))),
-			ez::fixedMul8(0xFF, u8(std::min(mult * 309, 255))),
+			ez::fixedScale8(mult, 264),
+			ez::fixedScale8(mult, 291),
+			ez::fixedScale8(mult, 309),
 		};
 	}
 }
