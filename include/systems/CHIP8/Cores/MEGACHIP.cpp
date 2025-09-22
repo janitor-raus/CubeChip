@@ -534,6 +534,7 @@ void MEGACHIP::scrollBuffersRT() {
 	void MEGACHIP::instruction_0010() noexcept {
 		triggerInterrupt(Interrupt::FRAME);
 		prepDisplayArea(Resolution::LO);
+		scrapAllVideoBuffers();
 	}
 	void MEGACHIP::instruction_0011() noexcept {
 		triggerInterrupt(Interrupt::FRAME);
@@ -809,24 +810,13 @@ void MEGACHIP::scrollBuffersRT() {
 				for (auto colN{ 7 }, offsetX{ originX }; colN >= 0; --colN)
 				{
 					if (octoPixelBatch >> colN & 0x1)
-					{
-						auto& collideCoord{ mCollisionMap(offsetX, offsetY) };
-						auto& backbufCoord{ mBackgroundBuffer(offsetX, offsetY) };
+						{ mBackgroundBuffer(offsetX, offsetY) = mFontColor[rowN]; }
 
-						if (collideCoord) [[unlikely]] {
-							collideCoord = 0;
-							backbufCoord = 0;
-							mRegisterV[0xF] = 1;
-						} else {
-							collideCoord = 0xFF;
-							backbufCoord = mFontColor[rowN];
-						}
-					}
-					if (!Quirk.wrapSprite && offsetX == (cScreenMegaX - 1)) { break; }
-					else { ++offsetX &= (cScreenMegaX - 1); }
+					if (!Quirk.wrapSprite && offsetX == (cScreenMegaX - 1))
+						{ break; } else { ++offsetX &= (cScreenMegaX - 1); }
 				}
-				if (!Quirk.wrapSprite && offsetY == (cScreenMegaX - 1)) { break; }
-				else { ++offsetY &= (cScreenMegaX - 1); }
+				if (!Quirk.wrapSprite && offsetY == (cScreenMegaX - 1))
+					{ break; } else { ++offsetY &= (cScreenMegaX - 1); }
 			}
 			return;
 
@@ -853,11 +843,11 @@ void MEGACHIP::scrollBuffersRT() {
 						backbufCoord = RGBA::compositeBlend(mColorPalette(sourceColorIdx), \
 							backbufCoord, mBlendFunc, u8(mTexture.opacity));
 					}
-					if (!Quirk.wrapSprite && offsetX == (cScreenMegaX - 1)) { break; }
-					else { ++offsetX &= (cScreenMegaX - 1); }
+					if (!Quirk.wrapSprite && offsetX == (cScreenMegaX - 1))
+						{ break; } else { ++offsetX &= (cScreenMegaX - 1); }
 				}
-				if (!Quirk.wrapSprite && offsetY == (cScreenMegaY - 1)) { break; }
-				else { ++offsetY %= cScreenMegaY; }
+				if (!Quirk.wrapSprite && offsetY == (cScreenMegaY - 1))
+					{ break; } else { ++offsetY %= cScreenMegaY; }
 			}
 		} else {
 			if (isLargerDisplay()) {
@@ -938,7 +928,7 @@ void MEGACHIP::scrollBuffersRT() {
 		triggerInterrupt(Interrupt::INPUT);
 		mInputReg = &mRegisterV[X];
 		if (isManualRefresh()) [[unlikely]]
-			{ flushAllVideoBuffers(); }
+			{ BVS->displayBuffer.write(mBackgroundBuffer); }
 	}
 	void MEGACHIP::instruction_Fx15(s32 X) noexcept {
 		mDelayTimer = mRegisterV[X];
