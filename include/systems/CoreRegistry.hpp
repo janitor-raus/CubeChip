@@ -78,7 +78,11 @@ static auto CONCAT_TOKENS(sCoreRegID_, __COUNTER__) = \
 
 class CoreRegistry {
 	using Registrations = std::unordered_map<Str, CoreRegList>;
-	static inline Registrations sRegistry{};
+	static Registrations& getRegistry() noexcept {
+		static Registrations sRegistry{};
+		return sRegistry;
+	}
+
 	static inline CoreRegList   sEligible{};
 	static inline CoreDetails   sCurrentCore{};
 
