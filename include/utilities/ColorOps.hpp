@@ -85,7 +85,7 @@ struct alignas(4) RGBA {
 			{ return src; }
 
 		/*------------------------ LIGHTENING MODES ------------------------*/
-		
+
 		[[nodiscard]] static constexpr
 		u8 Lighten(u8 src, u8 dst) noexcept
 			{ return std::max(src, dst); }
@@ -121,19 +121,19 @@ struct alignas(4) RGBA {
 			{ return u8(std::max(src + dst - MAX, MIN)); }
 
 		/*-------------------------- OTHER MODES ---------------------------*/
-		
+
 		[[nodiscard]] static constexpr
 		u8 Average(u8 src, u8 dst) noexcept
 			{ return u8((src + dst + 1) >> 1); }
-		
+
 		[[nodiscard]] static constexpr
 		u8 Difference(u8 src, u8 dst) noexcept
 			{ return u8(ez::abs(src - dst)); }
-		
+
 		[[nodiscard]] static constexpr
 		u8 Negation(u8 src, u8 dst) noexcept
 			{ return x8(ez::abs(MAX - (src + dst))); }
-				
+
 		[[nodiscard]] static constexpr
 		u8 Overlay(u8 src, u8 dst) noexcept {
 			return src < 128
@@ -149,7 +149,7 @@ struct alignas(4) RGBA {
 		u8 Reflect(u8 src, u8 dst) noexcept
 			{ return Glow(dst, src); }
 	};
-	
+
 	// Channel blend function type alias
 	using BlendFunc = u8(*)(u8 src, u8 dst) noexcept;
 
@@ -322,7 +322,7 @@ inline constexpr HSV to_HSV(RGBA in) noexcept {
 	const auto maxV{ std::max({ in.R, in.G, in.B }) };
 	const auto minV{ std::min({ in.R, in.G, in.B }) };
 	const auto diff{ maxV - minV };
-	
+
 	if (diff == 0)
 		{ return HSV(0, 0, maxV); }
 
@@ -396,7 +396,7 @@ inline CONSTEXPR_MATH RGBA to_RGBA(OKLAB in) noexcept {
 	const auto R{ +4.07674 * L - 3.30771 * M + 0.23097 * S };
 	const auto G{ -1.26844 * L + 2.60976 * M - 0.34132 * S };
 	const auto B{ -0.00439 * L - 0.70342 * M + 1.70758 * S };
-	
+
 	return RGBA(
 		RGBA::u8(ez::round(255.0 * OKLAB::gamma_inv(R))),
 		RGBA::u8(ez::round(255.0 * OKLAB::gamma_inv(G))),

@@ -15,7 +15,7 @@ enum class BLOG {
 	INFO,  // Events that are innocuous and informational.
 	WARN,  // Events that are unexpected and warrant attention.
 	ERROR, // Events that resulted in a predictable/recoverable error.
-	CRIT,  // Events that resulted in unrecoverable failure.
+	FATAL,  // Events that resulted in unrecoverable failure.
 	DEBUG, // Events meant for debugging purposes.
 };
 

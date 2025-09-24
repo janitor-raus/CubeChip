@@ -169,8 +169,7 @@ namespace EzMaths {
 	}
 
 	inline constexpr u8 fixedScale8(u8 x, u16 y) noexcept {
-		const u32 result{ (x * (y * 257u) + 0x8080u) >> 16 };
-		return u8(result > 255 ? 255 : result);
+		return u8(std::min((x * y * 257u + 0x8080u) >> 16, 255u));
 	}
 
 	inline constexpr u8 fixedLerp8(u8 x, u8 y, Weight w) noexcept {

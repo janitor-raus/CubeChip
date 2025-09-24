@@ -67,7 +67,7 @@ private:
 	Str  sHomePath{};
 	Str  sConfPath{};
 
-	static void triggerCriticalError(const char* error) noexcept;
+	static void triggerFatalError(const char* error) noexcept;
 	static bool isLocationWritable(const char* path) noexcept;
 	bool setHomePath(StrV override, bool portable, StrV org, StrV app) noexcept;
 

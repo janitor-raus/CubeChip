@@ -56,8 +56,8 @@ StrV BasicLogger::getSeverity(BLOG type) const noexcept {
 		case BLOG::ERROR:
 			return "ERROR";
 
-		case BLOG::CRIT:
-			return "CRIT";
+		case BLOG::FATAL:
+			return "FATAL";
 
 		case BLOG::DEBUG:
 			return "DEBUG";

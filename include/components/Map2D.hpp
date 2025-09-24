@@ -91,7 +91,7 @@ public:
 		, pData{ ::allocate_n<T>(size()).as_value().release() }
 	{}
 	#pragma endregion
-	
+
 	#pragma region Copy/Move Ctor
 	constexpr Map2D(self&& other) noexcept
 		: mCols{ std::exchange(other.mCols, 0) }
@@ -114,7 +114,7 @@ public:
 		if (this != &other && size() == other.size()) {
 			std::copy(EXEC_POLICY(unseq)
 				other.begin(), other.end(), begin());
-			
+
 			mCols = other.mCols;
 			mRows = other.mRows;
 		}
@@ -128,7 +128,7 @@ public:
 	 * @brief Copies data from another contiguous container. As much
 	 *        as it can fit or pull.
 	 * @returns Self reference for method chaining.
-	 * 
+	 *
 	 * @param[in] other :: Contiguous container to copy from.
 	 */
 	template <IsContiguousContainer Object>
@@ -138,7 +138,7 @@ public:
 		return *this;
 	}
 	#pragma endregion
-	
+
 	#pragma region linearCopy() :: C-style Array
 	/**
 	 * @brief Copies data from array pointer of the same type. As much
@@ -147,7 +147,7 @@ public:
 	 *
 	 * @param[in] other :: Pointer to array of data.
 	 * @param[in] size  :: Amount of elements to copy (optional).
-	 * 
+	 *
 	 * @warning Cannot check if target array has sufficient data.
 	 */
 	template <size_type N>
@@ -157,15 +157,15 @@ public:
 		return *this;
 	}
 	#pragma endregion
-	
+
 	#pragma region resize()
 	/**
 	 * @brief Resizes the matrix to new dimensions. Defaults to resizeDirty()
 	 * @return Self reference for method chaining.
-	 * 
+	 *
 	 * @param[in] rows   :: Total rows of the new matrix.    (min: 1)
 	 * @param[in] cols   :: Total columns of the new matrix. (min: 1)
-	 * 
+	 *
 	 * @warning A 'rows'/'cols' of 0 will default to current size.
 	 */
 	constexpr self& resize(size_type rows, size_type cols) {
@@ -184,7 +184,7 @@ public:
 
 		auto pCopy{ ::allocate_n<T>(rows * cols).as_value().release() };
 		if (!pCopy) { return *this; }
-		
+
 		for (size_type row{ 0u }; row < minRows; ++row) {
 			const auto srcIdx{ pData.get() + row * lenX() };
 			const auto dstIdx{ pCopy.get() + row * cols };
@@ -199,7 +199,7 @@ public:
 		return *this;
 	}
 	#pragma endregion
-	
+
 	#pragma region resizeClean()
 	constexpr self& resizeClean(size_type cols, size_type rows) {
 		mCols = axis_size(cols);
@@ -268,7 +268,7 @@ public:
 		return *this;
 	}
 	#pragma endregion
-	
+
 	#pragma region rotate()
 	/**
 	 * @brief Rotates the matrix's data in a given direction.
@@ -307,7 +307,7 @@ public:
 		return *this;
 	}
 	#pragma endregion
-	
+
 	#pragma region shift()
 	/**
 	 * @brief Shifts the matrix's data in a given direction. Combines the
@@ -324,7 +324,7 @@ public:
 		return rotate(cols, rows).initialize(cols, rows, value);
 	}
 	#pragma endregion
-	
+
 	#pragma region reverse()
 	/**
 	 * @brief Reverses the matrix's data.
@@ -336,7 +336,7 @@ public:
 		return *this;
 	}
 	#pragma endregion
-	
+
 	#pragma region flipY()
 	/**
 	 * @brief Reverses the matrix's data in row order.
@@ -355,7 +355,7 @@ public:
 		return *this;
 	}
 	#pragma endregion
-	
+
 	#pragma region flipX()
 	/**
 	 * @brief Reverses the matrix's data in column order.
@@ -370,7 +370,7 @@ public:
 		return *this;
 	}
 	#pragma endregion
-	
+
 	#pragma region transpose()
 	/**
 	 * @brief Transposes the matrix's data. Works with rectangular dimensions.
@@ -428,7 +428,7 @@ public:
 		assert(idx < size() && "Map2D.operator[] index out of bounds");
 		return data()[idx];
 	}
-	
+
 	constexpr reference operator()(size_type col, size_type row) {
 		assert(col < lenX() && "Map2D.operator() col out of bounds");
 		assert(row < lenY() && "Map2D.operator() row out of bounds");
@@ -569,7 +569,7 @@ public:
 			other.begin(), other.end(), begin());
 		return *this;
 	}
-	constexpr self& operator=(const self_flip& other) { // flipped 
+	constexpr self& operator=(const self_flip& other) { // flipped
 		std::copy(EXEC_POLICY(unseq)
 			other.begin(), other.end(), begin());
 		return *this;

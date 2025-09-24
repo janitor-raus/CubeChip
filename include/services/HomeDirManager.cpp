@@ -34,10 +34,10 @@ HomeDirManager::HomeDirManager(
 	sConfPath = (Path{ sHomePath } / configName).string();
 }
 
-void HomeDirManager::triggerCriticalError(const char* error) noexcept {
-	blog.newEntry(BLOG::CRIT, error);
+void HomeDirManager::triggerFatalError(const char* error) noexcept {
+	blog.newEntry(BLOG::FATAL, error);
 	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING,
-		"Critical Initialization Error", error, nullptr);
+		"Fatal Initialization Error", error, nullptr);
 }
 
 bool HomeDirManager::isLocationWritable(const char* path) noexcept {
@@ -61,7 +61,7 @@ bool HomeDirManager::setHomePath(StrV overrideHome, bool forcePortable, StrV org
 			sHomePath = overrideHome;
 			return true;
 		} else {
-			triggerCriticalError("Home path override failure: cannot write to location!");
+			triggerFatalError("Home path override failure: cannot write to location!");
 			return false;
 		}
 	}
@@ -72,7 +72,7 @@ bool HomeDirManager::setHomePath(StrV overrideHome, bool forcePortable, StrV org
 			sHomePath = ::getBasePath();
 			return true;
 		} else {
-			triggerCriticalError("Forced portable mode failure: cannot write to location!");
+			triggerFatalError("Forced portable mode failure: cannot write to location!");
 			return false;
 		}
 	}
@@ -97,7 +97,7 @@ bool HomeDirManager::setHomePath(StrV overrideHome, bool forcePortable, StrV org
 		sHomePath = ::getHomePath();
 		return true;
 	} else {
-		triggerCriticalError("Failed to determine Home path: cannot write to location!");
+		triggerFatalError("Failed to determine Home path: cannot write to location!");
 		return false;
 	}
 }
@@ -150,7 +150,7 @@ HomeDirManager* HomeDirManager::initialize(
 
 const Path* HomeDirManager::addSystemDir(const Path& sub, const Path& sys) noexcept {
 	if (sub.empty()) { return nullptr; }
-	
+
 	const auto newDirPath{ sHomePath / sys / sub };
 
 	const auto it{ std::find_if(EXEC_POLICY(unseq)
