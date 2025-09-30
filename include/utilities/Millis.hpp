@@ -14,10 +14,13 @@ namespace Millis {
 	 */
 	[[nodiscard]]
 	long long now() noexcept;
+	[[nodiscard]]
+	long long raw() noexcept;
 
 	/**
 	 * @brief Returns the difference between now() and past_millis in milliseconds.
 	 */
+	[[nodiscard]]
 	long long since(long long past_millis) noexcept;
 
 	/**

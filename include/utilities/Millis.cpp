@@ -21,6 +21,10 @@ long long Millis::now() noexcept {
 		(std::chrono::steady_clock::now() - sInitialApplicationTimestamp).count();
 }
 
+long long Millis::raw() noexcept {
+	return (std::chrono::steady_clock::now() - sInitialApplicationTimestamp).count();
+}
+
 long long Millis::since(long long past_millis) noexcept {
 	return now() - past_millis;
 }
