@@ -17,13 +17,14 @@
 #include "AtomSharedPtr.hpp"
 #include "ExecPolicy.hpp"
 #include "Thread.hpp"
+#include "Millis.hpp"
 
 #include "AssignCast.hpp"
 #include "ArrayOps.hpp"
 #include "Map2D.hpp"
 #include "AudioDevice.hpp"
 #include "Voice.hpp"
-#include "FrameLimiter.hpp"
+#include "SimpleTimer.hpp"
 #include "BasicInput.hpp"
 #include "Well512.hpp"
 
@@ -33,7 +34,7 @@
 
 /*==================================================================*/
 
-enum EmuState {
+enum EmuState : u8 {
 	NORMAL = 0x00, // normal operation
 	HIDDEN = 0x01, // window is hidden
 	PAUSED = 0x02, // paused by hotkey
@@ -56,10 +57,20 @@ class GlobalAudioBase;
 
 /*==================================================================*/
 
-class SystemInterface {
+class alignas(HDIS) SystemInterface {
 
-	Thread mCoreThread;
-	
+	Thread mSystemThread;
+	Thread mTimingThread;
+
+	Atom<u32> mGlobalState{ EmuState::NORMAL };
+
+protected:
+	Atom<bool> mNextFrame{};
+	Atom<bool> mStopFrame{};
+
+	SimpleTimer mTimer{};
+
+private:
 	Str mOverlayDataBuffer{};
 	AtomSharedPtr<Str>
 		mOverlayData{ nullptr };
@@ -73,7 +84,6 @@ protected:
 	static inline BasicVideoSpec* BVS{};
 
 	Well512*       RNG{};
-	FrameLimiter*  Pacer{};
 	BasicKeyboard* Input{};
 
 public:
@@ -81,12 +91,14 @@ public:
 	void stopWorker() noexcept;
 
 protected:
-	void threadEntry(StopToken token);
+	void systemThreadEntry(StopToken token);
+	void timingThreadEntry(StopToken token);
 
-	s32 mTargetCPF{};
 	Atom<f32> mBaseSystemFramerate{};
 	Atom<f32> mFramerateMultiplier{ 1.0f };
-	Atom<u32> mGlobalState{ EmuState::NORMAL };
+
+	u32 mBenchedFrames{};
+	u32 mElapsedFrames{};
 
 protected:
 	SystemInterface() noexcept;
@@ -109,7 +121,9 @@ public:
 
 	void setSystemState(EmuState state) noexcept { mGlobalState.store(state, mo::release); }
 	auto getSystemState()         const noexcept { return mGlobalState.load(mo::acquire);  }
-	bool isSystemRunning()        const noexcept { return !(getSystemState() & EmuState::NOT_RUNNING); }
+
+	bool hasSystemState(EmuState state) const noexcept { return !!(getSystemState() & state); }
+	bool isSystemRunning()              const noexcept { return !(getSystemState() & EmuState::NOT_RUNNING); }
 
 	virtual s32 getMaxDisplayW() const noexcept = 0;
 	virtual s32 getMaxDisplayH() const noexcept = 0;
@@ -125,17 +139,21 @@ public:    f32  getRealSystemFramerate() const noexcept;
 
 
 protected:
+	void setStopFrame(bool state) noexcept { mStopFrame.store(state, mo::relaxed); }
+	auto getStopFrame()     const noexcept { return mStopFrame.load(mo::relaxed);  }
+
 	void setViewportSizes(bool cond, u32 W, u32 H, u32 mult, u32 ppad) noexcept;
 
 	void setDisplayBorderColor(u32 color) noexcept;
 
 	virtual void mainSystemLoop() = 0;
-	
+	virtual void initializeSystem() noexcept = 0;
+
 	/**
 	 * @brief Save the Overlay data buffer contents to the public-facing buffer as a final step.
 	 * @param[in] data :: A pointer to a string object, typically the return of getOverlayDataBuffer().
 	 */
-	/*   */ void saveOverlayData(const Str* data);
+	/*___*/ void saveOverlayData(const Str* data);
 	/**
 	 * @brief Overridable method dedicated to assembling the string of Overlay data.
 	 */

@@ -8,16 +8,15 @@
 #if defined(ENABLE_CHIP8_SYSTEM) && defined(ENABLE_MEGACHIP)
 
 #include "BasicVideoSpec.hpp"
-#include "GlobalAudioBase.hpp"
 #include "CoreRegistry.hpp"
 
 REGISTER_CORE(MEGACHIP, ".mc8")
 
 /*==================================================================*/
 
-MEGACHIP::MEGACHIP() {
+void MEGACHIP::initializeSystem() noexcept {
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
-	copyFontToMemory(mMemoryBank.data(), 0xB4);
+	copyFontToMemory(mMemoryBank.data(), 180);
 
 	setViewportSizes(true, cScreenMegaX, cScreenMegaY, cResSizeMult, 2);
 	setBaseSystemFramerate(cRefreshRate);
@@ -26,54 +25,45 @@ MEGACHIP::MEGACHIP() {
 	mVoices[VOICE::BUZZER].userdata = &mAudioTimers[VOICE::BUZZER];
 
 	mCurrentPC = cStartOffset;
-	
+
 	prepDisplayArea(Resolution::LO);
-	
 }
 
-/*==================================================================*/
+void MEGACHIP::handleCycleLoop() noexcept
+	{ LOOP_DISPATCH(instructionLoop); }
 
-void MEGACHIP::instructionLoop() noexcept {
+template <typename Lambda>
+void MEGACHIP::instructionLoop(Lambda&& condition) noexcept {
+	for (mCycleCount = 0; condition(); ++mCycleCount) {
+		const auto HI{ mMemoryBank[mCurrentPC++] };
+		const auto LO{ mMemoryBank[mCurrentPC++] };
 
-	auto cycleCount{ 0 };
-	for (; cycleCount < mTargetCPF; ++cycleCount) {
-		const auto HI{ mMemoryBank[mCurrentPC + 0u] };
-		const auto LO{ mMemoryBank[mCurrentPC + 1u] };
-		nextInstruction();
+		#define _NNN (HI << 8 | LO)
+		#define _X (HI & 0xF)
+		#define Y_ (LO >> 4)
+		#define _N (LO & 0xF)
 
-		switch (HI >> 4) {
-			case 0x0:
+		switch (HI) {
+			CASE_xNF(0x00):
 				if (isManualRefresh()) {
-					switch (HI << 8 | LO) {
+					switch (_NNN) {
 						case 0x0010:
 							instruction_0010();
 							break;
 						case 0x0700:
 							instruction_0700();
 							break;
-						case 0x0600: case 0x0601: case 0x0602: case 0x0603:
-						case 0x0604: case 0x0605: case 0x0606: case 0x0607:
-						case 0x0608: case 0x0609: case 0x060A: case 0x060B:
-						case 0x060C: case 0x060D: case 0x060E: case 0x060F:
-							instruction_060N(LO & 0xF);
+						CASE_xNF(0x0600):
+							instruction_060N(_N);
 							break;
-						case 0x0800: case 0x0801: case 0x0802: case 0x0803:
-						case 0x0804: case 0x0805: case 0x0806: case 0x0807:
-						case 0x0808: case 0x0809: case 0x080A: case 0x080B:
-						case 0x080C: case 0x080D: case 0x080E: case 0x080F:
-							instruction_080N(LO & 0xF);
+						CASE_xNF(0x0800):
+							instruction_080N(_N);
 							break;
-						/* padded */ case 0x00B1: case 0x00B2: case 0x00B3:
-						case 0x00B4: case 0x00B5: case 0x00B6: case 0x00B7:
-						case 0x00B8: case 0x00B9: case 0x00BA: case 0x00BB:
-						case 0x00BC: case 0x00BD: case 0x00BE: case 0x00BF:
-							instruction_00BN(LO & 0xF);
+						CASE_xNF(0x00B0):
+							instruction_00BN(_N);
 							break;
-						/* padded */ case 0x00C1: case 0x00C2: case 0x00C3:
-						case 0x00C4: case 0x00C5: case 0x00C6: case 0x00C7:
-						case 0x00C8: case 0x00C9: case 0x00CA: case 0x00CB:
-						case 0x00CC: case 0x00CD: case 0x00CE: case 0x00CF:
-							instruction_00CN(LO & 0xF);
+						CASE_xNF(0x00C0):
+							instruction_00CN(_N);
 							break;
 						case 0x00E0:
 							instruction_00E0();
@@ -91,7 +81,7 @@ void MEGACHIP::instructionLoop() noexcept {
 							instruction_00FD();
 							break;
 						default:
-							switch (HI & 0xF) {
+							switch (_X) {
 								case 0x01:
 									instruction_01NN(LO);
 									break;
@@ -114,176 +104,175 @@ void MEGACHIP::instructionLoop() noexcept {
 								default: instructionError(HI, LO);
 							}
 					}
-				} else {
-					switch (HI << 8 | LO) {
-						case 0x0011:
-							instruction_0011();
-							break;
-						/* padded */ case 0x00B1: case 0x00B2: case 0x00B3:
-						case 0x00B4: case 0x00B5: case 0x00B6: case 0x00B7:
-						case 0x00B8: case 0x00B9: case 0x00BA: case 0x00BB:
-						case 0x00BC: case 0x00BD: case 0x00BE: case 0x00BF:
-							instruction_00BN(LO & 0xF);
-							break;
-						/* padded */ case 0x00C1: case 0x00C2: case 0x00C3:
-						case 0x00C4: case 0x00C5: case 0x00C6: case 0x00C7:
-						case 0x00C8: case 0x00C9: case 0x00CA: case 0x00CB:
-						case 0x00CC: case 0x00CD: case 0x00CE: case 0x00CF:
-							instruction_00CN(LO & 0xF);
-							break;
-						case 0x00E0:
-							instruction_00E0();
-							break;
-						case 0x00EE:
-							instruction_00EE();
-							break;
-						case 0x00FB:
-							instruction_00FB();
-							break;
-						case 0x00FC:
-							instruction_00FC();
-							break;
-						case 0x00FD:
-							instruction_00FD();
-							break;
-						case 0x00FE:
-							instruction_00FE();
-							break;
-						case 0x00FF:
-							instruction_00FF();
-							break;
-						[[unlikely]]
-						default: instructionError(HI, LO);
+				}
+				else {
+					if (_X) [[unlikely]] {
+						instructionError(HI, LO);
+					} else {
+						switch (LO) {
+							case 0x11:
+								instruction_0011();
+								break;
+							CASE_xNF0(0xB0):
+								instruction_00BN(_N);
+								break;
+							CASE_xNF0(0xC0):
+								instruction_00CN(_N);
+								break;
+							case 0xE0:
+								instruction_00E0();
+								break;
+							case 0xEE:
+								instruction_00EE();
+								break;
+							case 0xFB:
+								instruction_00FB();
+								break;
+							case 0xFC:
+								instruction_00FC();
+								break;
+							case 0xFD:
+								instruction_00FD();
+								break;
+							case 0xFE:
+								instruction_00FE();
+								break;
+							case 0xFF:
+								instruction_00FF();
+								break;
+							[[unlikely]]
+							default: instructionError(HI, LO);
+						}
 					}
 				}
 				break;
-			case 0x1:
-				instruction_1NNN(HI << 8 | LO);
+			CASE_xNF(0x10):
+				instruction_1NNN(_NNN);
 				break;
-			case 0x2:
-				instruction_2NNN(HI << 8 | LO);
+			CASE_xNF(0x20):
+				instruction_2NNN(_NNN);
 				break;
-			case 0x3:
-				instruction_3xNN(HI & 0xF, LO);
+			CASE_xNF(0x30):
+				instruction_3xNN(_X, LO);
 				break;
-			case 0x4:
-				instruction_4xNN(HI & 0xF, LO);
+			CASE_xNF(0x40):
+				instruction_4xNN(_X, LO);
 				break;
-			case 0x5:
-				if (LO & 0xF) [[unlikely]] {
+			CASE_xNF(0x50):
+				if (_N) [[unlikely]] {
 					instructionError(HI, LO);
 				} else {
-					instruction_5xy0(HI & 0xF, LO >> 4);
+					instruction_5xy0(_X, Y_);
 				}
 				break;
-			case 0x6:
-				instruction_6xNN(HI & 0xF, LO);
+			CASE_xNF(0x60):
+				instruction_6xNN(_X, LO);
 				break;
-			case 0x7:
-				instruction_7xNN(HI & 0xF, LO);
+			CASE_xNF(0x70):
+				instruction_7xNN(_X, LO);
 				break;
-			case 0x8:
-				switch (LO & 0xF) {
-					case 0x0:
-						instruction_8xy0(HI & 0xF, LO >> 4);
+			CASE_xNF(0x80):
+				switch (LO) {
+					CASE_xFN(0x0):
+						instruction_8xy0(_X, Y_);
 						break;
-					case 0x1:
-						instruction_8xy1(HI & 0xF, LO >> 4);
+					CASE_xFN(0x1):
+						instruction_8xy1(_X, Y_);
 						break;
-					case 0x2:
-						instruction_8xy2(HI & 0xF, LO >> 4);
+					CASE_xFN(0x2):
+						instruction_8xy2(_X, Y_);
 						break;
-					case 0x3:
-						instruction_8xy3(HI & 0xF, LO >> 4);
+					CASE_xFN(0x3):
+						instruction_8xy3(_X, Y_);
 						break;
-					case 0x4:
-						instruction_8xy4(HI & 0xF, LO >> 4);
+					CASE_xFN(0x4):
+						instruction_8xy4(_X, Y_);
 						break;
-					case 0x5:
-						instruction_8xy5(HI & 0xF, LO >> 4);
+					CASE_xFN(0x5):
+						instruction_8xy5(_X, Y_);
 						break;
-					case 0x7:
-						instruction_8xy7(HI & 0xF, LO >> 4);
+					CASE_xFN(0x7):
+						instruction_8xy7(_X, Y_);
 						break;
-					case 0x6:
-						instruction_8xy6(HI & 0xF, LO >> 4);
+					CASE_xFN(0x6):
+						instruction_8xy6(_X, Y_);
 						break;
-					case 0xE:
-						instruction_8xyE(HI & 0xF, LO >> 4);
+					CASE_xFN(0xE):
+						instruction_8xyE(_X, Y_);
 						break;
 					[[unlikely]]
 					default: instructionError(HI, LO);
 				}
 				break;
-			case 0x9:
-				if (LO & 0xF) [[unlikely]] {
+			CASE_xNF(0x90):
+				if (_N) [[unlikely]] {
 					instructionError(HI, LO);
 				} else {
-					instruction_9xy0(HI & 0xF, LO >> 4);
+					instruction_9xy0(_X, Y_);
 				}
 				break;
-			case 0xA:
-				instruction_ANNN(HI << 8 | LO);
+			CASE_xNF(0xA0):
+				instruction_ANNN(_NNN);
 				break;
-			case 0xB:
-				instruction_BXNN(HI & 0xF, HI << 8 | LO);
+			CASE_xNF(0xB0):
+				instruction_BXNN(_X, _NNN);
 				break;
-			case 0xC:
-				instruction_CxNN(HI & 0xF, LO);
+			CASE_xNF(0xC0):
+				instruction_CxNN(_X, LO);
 				break;
 			[[likely]]
-			case 0xD:
-				instruction_DxyN(HI & 0xF, LO >> 4, LO & 0xF);
+			CASE_xNF(0xD0):
+				instruction_DxyN(_X, Y_, _N);
 				break;
-			case 0xE:
+			CASE_xNF(0xE0):
 				switch (LO) {
 					case 0x9E:
-						instruction_Ex9E(HI & 0xF);
+						instruction_Ex9E(_X);
 						break;
 					case 0xA1:
-						instruction_ExA1(HI & 0xF);
+						instruction_ExA1(_X);
 						break;
 					[[unlikely]]
 					default: instructionError(HI, LO);
 				}
 				break;
-			case 0xF:
+			CASE_xNF(0xF0):
 				switch (LO) {
 					case 0x07:
-						instruction_Fx07(HI & 0xF);
+						instruction_Fx07(_X);
 						break;
 					case 0x0A:
-						instruction_Fx0A(HI & 0xF);
+						instruction_Fx0A(_X);
 						break;
 					case 0x15:
-						instruction_Fx15(HI & 0xF);
+						instruction_Fx15(_X);
 						break;
 					case 0x18:
-						instruction_Fx18(HI & 0xF);
+						instruction_Fx18(_X);
 						break;
 					case 0x1E:
-						instruction_Fx1E(HI & 0xF);
+						instruction_Fx1E(_X);
 						break;
 					case 0x29:
-						instruction_Fx29(HI & 0xF);
+						instruction_Fx29(_X);
 						break;
 					case 0x30:
-						instruction_Fx30(HI & 0xF);
+						instruction_Fx30(_X);
 						break;
 					case 0x33:
-						instruction_Fx33(HI & 0xF);
+						instruction_Fx33(_X);
 						break;
 					case 0x55:
-						instruction_FN55(HI & 0xF);
+						instruction_FN55(_X);
 						break;
 					case 0x65:
-						instruction_FN65(HI & 0xF);
+						instruction_FN65(_X);
 						break;
 					case 0x75:
-						instruction_FN75(HI & 0xF);
+						instruction_FN75(_X);
 						break;
 					case 0x85:
-						instruction_FN85(HI & 0xF);
+						instruction_FN85(_X);
 						break;
 						[[unlikely]]
 					default: instructionError(HI, LO);
@@ -374,8 +363,8 @@ void MEGACHIP::scrollDisplayRT() {
 
 void MEGACHIP::initializeFontColors() noexcept {
 	for (auto i{ 0 }; i < 10; ++i) {
-		const auto mult{ 255 - 11 * i };
-		
+		const auto mult{ u8(std::max(0, 255 - 11 * i)) };
+
 		mFontColor[i] = RGBA{
 			ez::fixedScale8(mult, 264),
 			ez::fixedScale8(mult, 291),
@@ -548,8 +537,8 @@ void MEGACHIP::scrollBuffersRT() {
 		mTrack.reset();
 	}
 	void MEGACHIP::instruction_01NN(s32 NN) noexcept {
-		mRegisterI = (NN << 16) | NNNN();
-		nextInstruction();
+		setIndexRegister((NN << 16) | NNNN());
+		::assign_cast_add(mCurrentPC, 2);
 	}
 	void MEGACHIP::instruction_02NN(s32 NN) noexcept {
 		for (auto pos{ 0 }, byte{ 0 }; pos < NN; byte += 4) {
@@ -717,7 +706,7 @@ void MEGACHIP::scrollBuffersRT() {
 	#pragma region A instruction branch
 
 	void MEGACHIP::instruction_ANNN(s32 NNN) noexcept {
-		::assign_cast(mRegisterI, NNN & 0xFFF);
+		setIndexRegister(NNN);
 	}
 
 	#pragma endregion
@@ -937,25 +926,22 @@ void MEGACHIP::scrollBuffersRT() {
 		startVoiceAt(VOICE::BUZZER, mRegisterV[X] + (mRegisterV[X] == 1));
 	}
 	void MEGACHIP::instruction_Fx1E(s32 X) noexcept {
-		mRegisterI = mRegisterI + mRegisterV[X];
+		incIndexRegister(mRegisterV[X]);
 	}
 	void MEGACHIP::instruction_Fx29(s32 X) noexcept {
-		mTexture.fontOffset = mRegisterI =
-			(mRegisterV[X] & 0xF) * 5 + cSmallFontOffset;
+		setIndexRegister((mRegisterV[X] & 0xF) * 5 + cSmallFontOffset);
+		mTexture.fontOffset = mRegisterI;
 	}
 	void MEGACHIP::instruction_Fx30(s32 X) noexcept {
-		mTexture.fontOffset = mRegisterI =
-			(mRegisterV[X] & 0xF) * 10 + cLargeFontOffset;
+		setIndexRegister((mRegisterV[X] & 0xF) * 10 + cLargeFontOffset);
+		mTexture.fontOffset = mRegisterI;
 	}
 	void MEGACHIP::instruction_Fx33(s32 X) noexcept {
-		const auto N__{ mRegisterV[X] * 0x51EB851Full >> 37 };
-		const auto _NN{ mRegisterV[X] - N__ * 100 };
-		const auto _N_{ _NN * 0xCCCDull >> 19 };
-		const auto __N{ _NN - _N_ * 10 };
+		const TriBCD bcd{ mRegisterV[X] };
 
-		writeMemoryI(N__, 0);
-		writeMemoryI(_N_, 1);
-		writeMemoryI(__N, 2);
+		writeMemoryI(bcd.digit[2], 0);
+		writeMemoryI(bcd.digit[1], 1);
+		writeMemoryI(bcd.digit[0], 2);
 	}
 	void MEGACHIP::instruction_FN55(s32 N) noexcept {
 		for (auto idx{ 0 }; idx <= N; ++idx)

@@ -5,8 +5,6 @@
 */
 
 #include "HomeDirManager.hpp"
-#include "BasicVideoSpec.hpp"
-#include "GlobalAudioBase.hpp"
 #include "BasicLogger.hpp"
 #include "SimpleFileIO.hpp"
 
@@ -62,8 +60,7 @@ void Chip8_CoreInterface::loadPresetBinds() {
 bool Chip8_CoreInterface::keyPressed(u8* keyReg) noexcept {
 	if (!std::size(mCustomBinds)) { return false; }
 
-	const auto mTickCurr{ u32(Pacer->getValidFrameCounter()) };
-	if (mTickCurr >= mTickLast + mTickSpan)
+	if (mElapsedFrames >= mTickLast + mTickSpan)
 		[[unlikely]] { mKeysPrev &= ~mKeysLoop; }
 
 	/**/const auto pressKeys{ mKeysCurr & ~mKeysPrev };
@@ -72,7 +69,7 @@ bool Chip8_CoreInterface::keyPressed(u8* keyReg) noexcept {
 		const auto validKeys{ pressDiff ? pressDiff : mKeysLoop };
 
 		mKeysLock |= validKeys;
-		mTickLast  = mTickCurr;
+		mTickLast  = mElapsedFrames;
 		mTickSpan  = validKeys != mKeysLoop ? 20 : 5;
 		mKeysLoop  = validKeys & ~(validKeys - 1);
 		::assign_cast(*keyReg, std::countr_zero(mKeysLoop));
@@ -95,12 +92,10 @@ void Chip8_CoreInterface::handlePreFrameInterrupt() noexcept {
 	switch (mInterrupt)
 	{
 		case Interrupt::CLEAR:
-			mTargetCPF *= mTargetCPF < 0 ? -1 : 1;
 			return;
 
 		case Interrupt::FRAME:
 			mInterrupt = Interrupt::CLEAR;
-			mTargetCPF *= mTargetCPF < 0 ? -1 : 1;
 			return;
 
 		case Interrupt::SOUND:
@@ -113,11 +108,10 @@ void Chip8_CoreInterface::handlePreFrameInterrupt() noexcept {
 		case Interrupt::DELAY:
 			if (mDelayTimer) { return; }
 			mInterrupt = Interrupt::CLEAR;
-			mTargetCPF *= mTargetCPF < 0 ? -1 : 1;
 			return;
 
 		default:
-			break;
+			return;
 	}
 }
 
@@ -127,7 +121,6 @@ void Chip8_CoreInterface::handleEndFrameInterrupt() noexcept {
 		case Interrupt::INPUT:
 			if (keyPressed(mInputReg)) {
 				mInterrupt = Interrupt::CLEAR;
-				mTargetCPF *= mTargetCPF < 0 ? -1 : 1;
 				startVoiceAt(VOICE::BUZZER, 2);
 			}
 			return;
@@ -147,7 +140,7 @@ void Chip8_CoreInterface::handleEndFrameInterrupt() noexcept {
 			return;
 
 		default:
-			break;
+			return;
 	}
 }
 
@@ -158,12 +151,8 @@ void Chip8_CoreInterface::handleTimerTick() noexcept {
 		{ timer.dec(); }
 }
 
-void Chip8_CoreInterface::nextInstruction() noexcept {
-	mCurrentPC += 2;
-}
-
 void Chip8_CoreInterface::skipInstruction() noexcept {
-	mCurrentPC += 2;
+	::assign_cast_add(mCurrentPC, 2);
 }
 
 void Chip8_CoreInterface::performProgJump(u32 next) noexcept {
@@ -176,14 +165,11 @@ void Chip8_CoreInterface::performProgJump(u32 next) noexcept {
 /*==================================================================*/
 
 void Chip8_CoreInterface::mainSystemLoop() {
-	if (!isSystemRunning())
-		[[unlikely]] { return; }
-
 	updateKeyStates();
 
 	handleTimerTick();
 	handlePreFrameInterrupt();
-	instructionLoop();
+	handleCycleLoop();
 	handleEndFrameInterrupt();
 
 	renderAudioData();
@@ -192,27 +178,21 @@ void Chip8_CoreInterface::mainSystemLoop() {
 }
 
 Str* Chip8_CoreInterface::makeOverlayData() {
-	static constexpr std::array<f32, 5> stride
-		{ { 1.5e6f, 1.0e6f, 0.6e6f, 0.3e6f, 1.0e5f } };
+	static thread_local ez::EMA suavemente{};
 
-	const auto frameTime{ Pacer->getElapsedMicrosSince() / 1000.0f };
-	const auto timePhase{ std::min(frameTime * 1.030f / Pacer->getFramespan(), 2.0f) };
-	const auto newStride{ ez::peak_mirror_fold(u32(timePhase / 0.2f), stride.size()) };
-	const auto cycleStep{ stride[newStride] * std::cos(timePhase * f32(std::numbers::pi / 2)) };
-
-	if (mInterrupt == Interrupt::CLEAR) [[likely]]
-		{ ::assign_cast_add(mTargetCPF, cycleStep); }
+	suavemente.set_alpha(getRealSystemFramerate());
+	suavemente.add(mCycleCount * getRealSystemFramerate() / 1e6f);
 
 	*getOverlayDataBuffer() = fmt::format(
-		" ::  MIPS:{:8.2f}\n{}",
-		mTargetCPF * getRealSystemFramerate() / 1'000'000.0f,
+		" ::  MIPS:{:8.2f} (frame: {})\n{}",
+		suavemente.avg(), mBenchedFrames,
 		*SystemInterface::makeOverlayData()
 	);
 	return getOverlayDataBuffer();
 }
 
 void Chip8_CoreInterface::pushOverlayData() {
-	if (getSystemState() & EmuState::BENCH) [[likely]]
+	if (hasSystemState(EmuState::BENCH)) [[likely]]
 		{ saveOverlayData(makeOverlayData()); }
 	else { SystemInterface::pushOverlayData(); }
 }
@@ -220,7 +200,7 @@ void Chip8_CoreInterface::pushOverlayData() {
 /*==================================================================*/
 
 void Chip8_CoreInterface::startVoice(s32 duration, s32 tone) noexcept {
-	thread_local auto voice_index{ 0 };
+	 auto voice_index{ 0 };
 	startVoiceAt(voice_index, duration, tone);
 	if (duration) { ++voice_index %= VOICE::COUNT - 1; }
 }
@@ -269,8 +249,8 @@ void Chip8_CoreInterface::instructionError(u32 HI, u32 LO) {
 }
 
 void Chip8_CoreInterface::triggerInterrupt(Interrupt type) noexcept {
+	mStopFrame.store(true, mo::relaxed);
 	mInterrupt = type;
-	mTargetCPF = mTargetCPF < 0 ? mTargetCPF : -mTargetCPF;
 }
 
 /*==================================================================*/

@@ -8,20 +8,17 @@
 #if defined(ENABLE_CHIP8_SYSTEM) && defined(ENABLE_SCHIP_MODERN)
 
 #include "BasicVideoSpec.hpp"
-#include "GlobalAudioBase.hpp"
 #include "CoreRegistry.hpp"
 
 REGISTER_CORE(SCHIP_MODERN, ".sc8")
 
 /*==================================================================*/
 
-SCHIP_MODERN::SCHIP_MODERN()
-	: mDisplayBuffer{ {cScreenSizeX, cScreenSizeY} }
-{
+void SCHIP_MODERN::initializeSystem() noexcept {
 	::fill_n(mMemoryBank, cTotalMemory, cSafezoneOOB, 0xFF);
 
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
-	copyFontToMemory(mMemoryBank.data(), 0xF0);
+	copyFontToMemory(mMemoryBank.data(), 240);
 
 	mDisplay.set(cScreenSizeX, cScreenSizeY);
 	setViewportSizes(true, cScreenSizeX, cScreenSizeY, cResSizeMult, 2);
@@ -36,24 +33,25 @@ SCHIP_MODERN::SCHIP_MODERN()
 	mTargetCPF = cInstSpeedLo;
 }
 
-/*==================================================================*/
+void SCHIP_MODERN::handleCycleLoop() noexcept
+	{ LOOP_DISPATCH(instructionLoop); }
 
-void SCHIP_MODERN::instructionLoop() noexcept {
+template <typename Lambda>
+void SCHIP_MODERN::instructionLoop(Lambda&& condition) noexcept {
+	for (mCycleCount = 0; condition(); ++mCycleCount) {
+		const auto HI{ mMemoryBank[mCurrentPC++] };
+		const auto LO{ mMemoryBank[mCurrentPC++] };
 
-	auto cycleCount{ 0 };
-	for (; cycleCount < mTargetCPF; ++cycleCount) {
-		const auto HI{ mMemoryBank[mCurrentPC + 0u] };
-		const auto LO{ mMemoryBank[mCurrentPC + 1u] };
-		nextInstruction();
+		#define _NNN (HI << 8 | LO)
+		#define _X (HI & 0xF)
+		#define Y_ (LO >> 4)
+		#define _N (LO & 0xF)
 
-		switch (HI >> 4) {
-			case 0x0:
-				switch (HI << 8 | LO) {
-					case 0x00C0: case 0x00C1: case 0x00C2: case 0x00C3:
-					case 0x00C4: case 0x00C5: case 0x00C6: case 0x00C7:
-					case 0x00C8: case 0x00C9: case 0x00CA: case 0x00CB:
-					case 0x00CC: case 0x00CD: case 0x00CE: case 0x00CF:
-						instruction_00CN(LO & 0xF);
+		switch (HI) {
+			case 0x00:
+				switch (LO) {
+					CASE_xNF0(0xC0):
+						instruction_00CN(_N);
 						break;
 					case 0x00E0:
 						instruction_00E0();
@@ -80,135 +78,135 @@ void SCHIP_MODERN::instructionLoop() noexcept {
 					default: instructionError(HI, LO);
 				}
 				break;
-			case 0x1:
-				instruction_1NNN(HI << 8 | LO);
+			CASE_xNF(0x10):
+				instruction_1NNN(_NNN);
 				break;
-			case 0x2:
-				instruction_2NNN(HI << 8 | LO);
+			CASE_xNF(0x20):
+				instruction_2NNN(_NNN);
 				break;
-			case 0x3:
-				instruction_3xNN(HI & 0xF, LO);
+			CASE_xNF(0x30):
+				instruction_3xNN(_X, LO);
 				break;
-			case 0x4:
-				instruction_4xNN(HI & 0xF, LO);
+			CASE_xNF(0x40):
+				instruction_4xNN(_X, LO);
 				break;
-			case 0x5:
-				if (LO & 0xF) [[unlikely]] {
+			CASE_xNF(0x50):
+				if (_N) [[unlikely]] {
 					instructionError(HI, LO);
 				} else {
-					instruction_5xy0(HI & 0xF, LO >> 4);
+					instruction_5xy0(_X, Y_);
 				}
 				break;
-			case 0x6:
-				instruction_6xNN(HI & 0xF, LO);
+			CASE_xNF(0x60):
+				instruction_6xNN(_X, LO);
 				break;
-			case 0x7:
-				instruction_7xNN(HI & 0xF, LO);
+			CASE_xNF(0x70):
+				instruction_7xNN(_X, LO);
 				break;
-			case 0x8:
-				switch (LO & 0xF) {
-					case 0x0:
-						instruction_8xy0(HI & 0xF, LO >> 4);
+			CASE_xNF(0x80):
+				switch (LO) {
+					CASE_xFN(0x0):
+						instruction_8xy0(_X, Y_);
 						break;
-					case 0x1:
-						instruction_8xy1(HI & 0xF, LO >> 4);
+					CASE_xFN(0x1):
+						instruction_8xy1(_X, Y_);
 						break;
-					case 0x2:
-						instruction_8xy2(HI & 0xF, LO >> 4);
+					CASE_xFN(0x2):
+						instruction_8xy2(_X, Y_);
 						break;
-					case 0x3:
-						instruction_8xy3(HI & 0xF, LO >> 4);
+					CASE_xFN(0x3):
+						instruction_8xy3(_X, Y_);
 						break;
-					case 0x4:
-						instruction_8xy4(HI & 0xF, LO >> 4);
+					CASE_xFN(0x4):
+						instruction_8xy4(_X, Y_);
 						break;
-					case 0x5:
-						instruction_8xy5(HI & 0xF, LO >> 4);
+					CASE_xFN(0x5):
+						instruction_8xy5(_X, Y_);
 						break;
-					case 0x7:
-						instruction_8xy7(HI & 0xF, LO >> 4);
+					CASE_xFN(0x7):
+						instruction_8xy7(_X, Y_);
 						break;
-					case 0x6:
-						instruction_8xy6(HI & 0xF, LO >> 4);
+					CASE_xFN(0x6):
+						instruction_8xy6(_X, Y_);
 						break;
-					case 0xE:
-						instruction_8xyE(HI & 0xF, LO >> 4);
+					CASE_xFN(0xE):
+						instruction_8xyE(_X, Y_);
 						break;
 					[[unlikely]]
 					default: instructionError(HI, LO);
 				}
 				break;
-			case 0x9:
-				if (LO & 0xF) [[unlikely]] {
+			CASE_xNF(0x90):
+				if (_N) [[unlikely]] {
 					instructionError(HI, LO);
 				} else {
-					instruction_9xy0(HI & 0xF, LO >> 4);
+					instruction_9xy0(_X, Y_);
 				}
 				break;
-			case 0xA:
-				instruction_ANNN(HI << 8 | LO);
+			CASE_xNF(0xA0):
+				instruction_ANNN(_NNN);
 				break;
-			case 0xB:
-				instruction_BNNN(HI << 8 | LO);
+			CASE_xNF(0xB0):
+				instruction_BNNN(_NNN);
 				break;
-			case 0xC:
-				instruction_CxNN(HI & 0xF, LO);
+			CASE_xNF(0xC0):
+				instruction_CxNN(_X, LO);
 				break;
 			[[likely]]
-			case 0xD:
-				instruction_DxyN(HI & 0xF, LO >> 4, LO & 0xF);
+			CASE_xNF(0xD0):
+				instruction_DxyN(_X, Y_, _N);
 				break;
-			case 0xE:
+			CASE_xNF(0xE0):
 				switch (LO) {
 					case 0x9E:
-						instruction_Ex9E(HI & 0xF);
+						instruction_Ex9E(_X);
 						break;
 					case 0xA1:
-						instruction_ExA1(HI & 0xF);
+						instruction_ExA1(_X);
 						break;
 					[[unlikely]]
 					default: instructionError(HI, LO);
 				}
 				break;
-			case 0xF:
+			CASE_xNF(0xF0):
 				switch (LO) {
 					case 0x07:
-						instruction_Fx07(HI & 0xF);
+						instruction_Fx07(_X);
 						break;
 					case 0x0A:
-						instruction_Fx0A(HI & 0xF);
+						instruction_Fx0A(_X);
 						break;
 					case 0x15:
-						instruction_Fx15(HI & 0xF);
+						instruction_Fx15(_X);
 						break;
 					case 0x18:
-						instruction_Fx18(HI & 0xF);
+						instruction_Fx18(_X);
 						break;
 					case 0x1E:
-						instruction_Fx1E(HI & 0xF);
+						instruction_Fx1E(_X);
 						break;
 					case 0x29:
-						instruction_Fx29(HI & 0xF);
+						instruction_Fx29(_X);
 						break;
 					case 0x30:
-						instruction_Fx30(HI & 0xF);
+						instruction_Fx30(_X);
 						break;
 					case 0x33:
-						instruction_Fx33(HI & 0xF);
+						instruction_Fx33(_X);
 						break;
 					case 0x55:
-						instruction_FN55(HI & 0xF);
+						instruction_FN55(_X);
 						break;
 					case 0x65:
-						instruction_FN65(HI & 0xF);
+						instruction_FN65(_X);
 						break;
 					case 0x75:
-						instruction_FN75(HI & 0xF);
+						instruction_FN75(_X);
 						break;
 					case 0x85:
-						instruction_FN85(HI & 0xF);
+						instruction_FN85(_X);
 						break;
-						[[unlikely]]
+					[[unlikely]]
 					default: instructionError(HI, LO);
 				}
 				break;
@@ -256,7 +254,7 @@ void SCHIP_MODERN::prepDisplayArea(const Resolution mode) {
 	const auto H{ isLargerDisplay() ? cScreenSizeY * 2 : cScreenSizeY };
 
 	mDisplay.set(W, H);
-	
+
 	mDisplayBuffer[0].resizeClean(W, H);
 };
 
@@ -390,16 +388,16 @@ void SCHIP_MODERN::scrollDisplayRT() {
 	#pragma region 8 instruction branch
 
 	void SCHIP_MODERN::instruction_8xy0(s32 X, s32 Y) noexcept {
-		mRegisterV[X] = mRegisterV[Y];
+		::assign_cast(mRegisterV[X], mRegisterV[Y]);
 	}
 	void SCHIP_MODERN::instruction_8xy1(s32 X, s32 Y) noexcept {
-		mRegisterV[X] |= mRegisterV[Y];
+		::assign_cast_or(mRegisterV[X], mRegisterV[Y]);
 	}
 	void SCHIP_MODERN::instruction_8xy2(s32 X, s32 Y) noexcept {
-		mRegisterV[X] &= mRegisterV[Y];
+		::assign_cast_and(mRegisterV[X], mRegisterV[Y]);
 	}
 	void SCHIP_MODERN::instruction_8xy3(s32 X, s32 Y) noexcept {
-		mRegisterV[X] ^= mRegisterV[Y];
+		::assign_cast_xor(mRegisterV[X], mRegisterV[Y]);
 	}
 	void SCHIP_MODERN::instruction_8xy4(s32 X, s32 Y) noexcept {
 		const auto sum{ mRegisterV[X] + mRegisterV[Y] };
@@ -446,7 +444,7 @@ void SCHIP_MODERN::scrollDisplayRT() {
 	#pragma region A instruction branch
 
 	void SCHIP_MODERN::instruction_ANNN(s32 NNN) noexcept {
-		::assign_cast(mRegisterI, NNN & 0xFFF);
+		setIndexRegister(NNN);
 	}
 
 	#pragma endregion
@@ -577,33 +575,28 @@ void SCHIP_MODERN::scrollDisplayRT() {
 		startVoice(mRegisterV[X] + (mRegisterV[X] == 1));
 	}
 	void SCHIP_MODERN::instruction_Fx1E(s32 X) noexcept {
-		mRegisterI = (mRegisterI + mRegisterV[X]) & 0xFFF;
+		incIndexRegister(mRegisterV[X]);
 	}
 	void SCHIP_MODERN::instruction_Fx29(s32 X) noexcept {
-		mRegisterI = (mRegisterV[X] & 0xF) * 5 + cSmallFontOffset;
+		setIndexRegister((mRegisterV[X] & 0xF) * 5 + cSmallFontOffset);
 	}
 	void SCHIP_MODERN::instruction_Fx30(s32 X) noexcept {
-		mRegisterI = (mRegisterV[X] & 0xF) * 10 + cLargeFontOffset;
+		setIndexRegister((mRegisterV[X] & 0xF) * 10 + cLargeFontOffset);
 	}
 	void SCHIP_MODERN::instruction_Fx33(s32 X) noexcept {
-		const auto N__{ mRegisterV[X] * 0x51EB851Full >> 37 };
-		const auto _NN{ mRegisterV[X] - N__ * 100 };
-		const auto _N_{ _NN * 0xCCCDull >> 19 };
-		const auto __N{ _NN - _N_ * 10 };
+		const TriBCD bcd{ mRegisterV[X] };
 
-		writeMemoryI(N__, 0);
-		writeMemoryI(_N_, 1);
-		writeMemoryI(__N, 2);
+		writeMemoryI(bcd.digit[2], 0);
+		writeMemoryI(bcd.digit[1], 1);
+		writeMemoryI(bcd.digit[0], 2);
 	}
 	void SCHIP_MODERN::instruction_FN55(s32 N) noexcept {
 		for (auto idx{ 0 }; idx <= N; ++idx) { writeMemoryI(mRegisterV[idx], idx); }
-		mRegisterI = !Quirk.idxRegNoInc ? (mRegisterI + N + 1) & 0xFFF : mRegisterI;
-		//if (!Quirk.idxRegNoInc) [[likely]] { mRegisterI = (mRegisterI + N + 1) & 0xFFF; }
+		if (!Quirk.idxRegNoInc) [[likely]] { incIndexRegister(N + 1); }
 	}
 	void SCHIP_MODERN::instruction_FN65(s32 N) noexcept {
 		for (auto idx{ 0 }; idx <= N; ++idx) { mRegisterV[idx] = readMemoryI(idx); }
-		mRegisterI = !Quirk.idxRegNoInc ? (mRegisterI + N + 1) & 0xFFF : mRegisterI;
-		//if (!Quirk.idxRegNoInc) [[likely]] { mRegisterI = (mRegisterI + N + 1) & 0xFFF; }
+		if (!Quirk.idxRegNoInc) [[likely]] { incIndexRegister(N + 1); }
 	}
 	void SCHIP_MODERN::instruction_FN75(s32 N) noexcept {
 		setPermaRegs(N + 1);

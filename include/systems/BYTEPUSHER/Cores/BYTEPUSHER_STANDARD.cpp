@@ -8,14 +8,13 @@
 #if defined(ENABLE_BYTEPUSHER_SYSTEM) && defined(ENABLE_BYTEPUSHER_STANDARD)
 
 #include "BasicVideoSpec.hpp"
-#include "GlobalAudioBase.hpp"
 #include "CoreRegistry.hpp"
 
 REGISTER_CORE(BYTEPUSHER_STANDARD, ".BytePusher")
 
 /*==================================================================*/
 
-BYTEPUSHER_STANDARD::BYTEPUSHER_STANDARD() {
+void BYTEPUSHER_STANDARD::initializeSystem() noexcept {
 	copyGameToMemory(mMemoryBank.data());
 
 	setDisplayBorderColor(cBitsColor[0]);
@@ -35,7 +34,7 @@ void BYTEPUSHER_STANDARD::instructionLoop() noexcept {
 
 	::assign_cast(mMemoryBank[0], inputStates >> 0x8);
 	::assign_cast(mMemoryBank[1], inputStates & 0xFF);
-	
+
 	auto cycleCount{ 0 };
 	for (; cycleCount < 0x10000; ++cycleCount) {
 		mMemoryBank[readData<3>(progPointer + 3)] =

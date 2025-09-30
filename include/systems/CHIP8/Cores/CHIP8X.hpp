@@ -30,7 +30,8 @@ class CHIP8X final : public Chip8_CoreInterface {
 	static constexpr u32 cMaxDisplayH{ 32 };
 
 private:
-	Map2D<u32> mColoredBuffer{ cScreenSizeX >> 3, cScreenSizeY };
+	FixedMap2D<u32, (cScreenSizeX >> 3), cScreenSizeY>
+		mColoredBuffer{};
 
 	u32 mBackgroundColor{ 0x00 };
 	u32 mColorResolution{ 0xFC };
@@ -58,11 +59,11 @@ private:
 	void drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept;
 
 public:
-	CHIP8X();
+	CHIP8X() {}
 
 	static constexpr bool validateProgram(
 		const char* fileData,
-		const size_type   fileSize
+		const size_type fileSize
 	) noexcept {
 		if (!fileData || !fileSize) { return false; }
 		return fileSize + cGameLoadPos <= cTotalMemory;
@@ -72,7 +73,11 @@ public:
 	s32 getMaxDisplayH() const noexcept override { return cMaxDisplayH; }
 
 private:
-	void instructionLoop() noexcept override;
+	void initializeSystem() noexcept override;
+	void handleCycleLoop() noexcept override;
+
+	template <typename Lambda>
+	void instructionLoop(Lambda&& condition) noexcept;
 
 	void renderAudioData() override;
 	void renderVideoData() override;
@@ -133,7 +138,7 @@ private:
 
 	// 5XY0 - skip next instruction if VX == VY
 	void instruction_5xy0(s32 X, s32 Y) noexcept;
-	// 5XY0 - set VX to added lo/hi nibbles of VX and VY
+	// 5XY1 - set VX to added lo/hi nibbles of VX and VY
 	void instruction_5xy1(s32 X, s32 Y) noexcept;
 
 	#pragma endregion

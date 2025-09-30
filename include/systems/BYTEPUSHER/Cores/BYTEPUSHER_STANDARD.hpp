@@ -49,7 +49,7 @@ private:
 	void renderVideoData() override;
 
 public:
-	BYTEPUSHER_STANDARD();
+	BYTEPUSHER_STANDARD() {}
 
 	static constexpr bool validateProgram(
 		const char* fileData,
@@ -61,6 +61,9 @@ public:
 
 	s32 getMaxDisplayW() const noexcept override { return cScreenSizeX; }
 	s32 getMaxDisplayH() const noexcept override { return cScreenSizeY; }
+
+private:
+	void initializeSystem() noexcept override;
 };
 
 #endif

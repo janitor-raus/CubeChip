@@ -6,6 +6,7 @@
 
 #include "ThreadAffinity.hpp"
 #include "BasicVideoSpec.hpp"
+#include "FrameLimiter.hpp"
 #include "BasicLogger.hpp"
 
 #include "SystemInterface.hpp"
@@ -13,25 +14,61 @@
 /*==================================================================*/
 
 void SystemInterface::startWorker() noexcept {
-	if (mCoreThread.joinable()) { return; }
-	mCoreThread = Thread([this](StopToken token) { threadEntry(token); });
-}
-
-void SystemInterface::stopWorker() noexcept {
-	if (mCoreThread.joinable()) {
-		mCoreThread.request_stop();
-		mCoreThread.join();
+	if (!mSystemThread.joinable()) {
+		mSystemThread = Thread([this](StopToken token) { systemThreadEntry(token); });
+	}
+	if (!mTimingThread.joinable()) {
+		mTimingThread = Thread([this](StopToken token) { timingThreadEntry(token); });
 	}
 }
 
-void SystemInterface::threadEntry(StopToken token) {
-	SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
-	static thread_local thread_affinity::Manager thread{ 15, 0b11ull };
+void SystemInterface::stopWorker() noexcept {
+	if (mSystemThread.joinable()) {
+		mSystemThread.request_stop();
+		mSystemThread.join();
+	}
+	if (mTimingThread.joinable()) {
+		mTimingThread.request_stop();
+		mTimingThread.join();
+	}
+}
 
-	Pacer->setLimiter(getBaseSystemFramerate()); // will need adjustment later
+void SystemInterface::systemThreadEntry(StopToken token) {
+	SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
+	thread_affinity::set_affinity(~0b11ull);
+	initializeSystem();
+
 	while (!token.stop_requested()) [[likely]] {
-		if (Pacer->checkTime()) { mainSystemLoop(); }
-		thread.refresh_affinity();
+		if (mNextFrame.exchange(false, mo::acq_rel)) [[likely]] {
+
+			mElapsedFrames += 1;
+			if (hasSystemState(EmuState::BENCH)) [[likely]]
+				{ mBenchedFrames += 1; }
+			else
+				{ mBenchedFrames = 0; }
+
+			mTimer.start();
+			mainSystemLoop();
+			blog.newEntry<BLOG::INFO>("Frame Time: {:.3f} ms", mTimer.get_elapsed_millis());
+		} else {
+			Millis::sleep_for(1);
+		}
+	}
+}
+
+void SystemInterface::timingThreadEntry(StopToken token) {
+	SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
+	thread_affinity::set_affinity(0b11ull);
+
+	FrameLimiter Pacer;
+
+	while (!token.stop_requested()) [[likely]] {
+		if (Pacer.checkTime()) {
+			if (!isSystemRunning()) { continue; }
+			Pacer.setLimiter(getRealSystemFramerate());
+			mStopFrame.store(true, mo::release);
+			mNextFrame.store(true, mo::release);
+		}
 	}
 }
 
@@ -39,10 +76,8 @@ SystemInterface::SystemInterface() noexcept
 	: mOverlayData{ std::make_shared<Str>() }
 {
 	static thread_local auto pRNG  { std::make_unique<Well512>()       };
-	static thread_local auto pPacer{ std::make_unique<FrameLimiter>()  };
 	static thread_local auto pInput{ std::make_unique<BasicKeyboard>() };
 	RNG   = pRNG.get();
-	Pacer = pPacer.get();
 	Input = pInput.get();
 }
 
@@ -78,24 +113,22 @@ void SystemInterface::saveOverlayData(const Str* data) {
 }
 
 Str* SystemInterface::makeOverlayData() {
-	const auto frameMS{ Pacer->getElapsedMillisLast() };
-	const auto elapsed{ Pacer->getElapsedMicrosSince() / 1000.0f };
+	const auto framerate{ getRealSystemFramerate() };
+	const auto frametime{ mTimer.get_elapsed_millis() };
+	const auto framespan{ 1000.0f / framerate };
 
 	*getOverlayDataBuffer() = fmt::format(
 		"Framerate:{:9.3f} fps |{:9.3f}ms\n"
-		"Frametime:{:9.3f} ms ({:3.2f}%)\n",
-		frameMS <= 0.0f ? getRealSystemFramerate()
-			: std::round(1000.0f / frameMS * 100.0f) / 100.0f,
-		frameMS, elapsed, elapsed / Pacer->getFramespan() * 100.0f
+		"Frametime:{:9.3f} ms ({:>6.2f}%)\n",
+		framerate, framespan, frametime,
+		frametime / framespan * 100
 	);
 
 	return getOverlayDataBuffer();
 }
 
 void SystemInterface::pushOverlayData() {
-	if (Pacer->getValidFrameCounter() & 0x1) [[likely]] {
-		saveOverlayData(SystemInterface::makeOverlayData());
-	}
+	saveOverlayData(SystemInterface::makeOverlayData());
 }
 
 Str SystemInterface::copyOverlayData() const noexcept {

@@ -45,11 +45,11 @@ private:
 	}
 
 public:
-	CHIP8_MODERN();
+	CHIP8_MODERN() {}
 
 	static constexpr bool validateProgram(
 		const char* fileData,
-		const size_type   fileSize
+		const size_type fileSize
 	) noexcept {
 		if (!fileData || !fileSize) { return false; }
 		return fileSize + cGameLoadPos <= cTotalMemory;
@@ -59,7 +59,11 @@ public:
 	s32 getMaxDisplayH() const noexcept override { return cScreenSizeY; }
 
 private:
-	void instructionLoop() noexcept override;
+	void initializeSystem() noexcept override;
+	void handleCycleLoop() noexcept override;
+
+	template <typename Lambda>
+	void instructionLoop(Lambda&& condition) noexcept;
 
 	void renderAudioData() override;
 	void renderVideoData() override;

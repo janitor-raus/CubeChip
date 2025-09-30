@@ -21,14 +21,15 @@ class SCHIP_LEGACY final : public Chip8_CoreInterface {
 	static constexpr f32 cRefreshRate{ 64.0f };
 
 	static constexpr s32 cResSizeMult{   4 };
-	static constexpr s32 cDisplayResW{ 128 };
-	static constexpr s32 cDisplayResH{  64 };
+	static constexpr s32 cScreenSizeX{ 128 };
+	static constexpr s32 cScreenSizeY{  64 };
 	static constexpr s32 cInstSpeedHi{  45 };
 	static constexpr s32 cInstSpeedLo{  32 };
 
 /*==================================================================*/
 
-	Map2D<u8> mDisplayBuffer[1];
+	FixedMap2D<u8, cScreenSizeX, cScreenSizeY>
+		mDisplayBuffer;
 
 	std::array<u8, cTotalMemory + cSafezoneOOB>
 		mMemoryBank{};
@@ -47,21 +48,25 @@ class SCHIP_LEGACY final : public Chip8_CoreInterface {
 /*==================================================================*/
 
 public:
-	SCHIP_LEGACY();
+	SCHIP_LEGACY() {}
 
 	static constexpr bool validateProgram(
 		const char* fileData,
-		const size_type   fileSize
+		const size_type fileSize
 	) noexcept {
 		if (!fileData || !fileSize) { return false; }
 		return fileSize + cGameLoadPos <= cTotalMemory;
 	}
 
-	s32 getMaxDisplayW() const noexcept override { return cDisplayResW; }
-	s32 getMaxDisplayH() const noexcept override { return cDisplayResH; }
+	s32 getMaxDisplayW() const noexcept override { return cScreenSizeX; }
+	s32 getMaxDisplayH() const noexcept override { return cScreenSizeY; }
 
 private:
-	void instructionLoop() noexcept override;
+	void initializeSystem() noexcept override;
+	void handleCycleLoop() noexcept override;
+
+	template <typename Lambda>
+	void instructionLoop(Lambda&& condition) noexcept;
 
 	void renderAudioData() override;
 	void renderVideoData() override;

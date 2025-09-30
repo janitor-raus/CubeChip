@@ -14,7 +14,7 @@
 /*==================================================================*/
 
 class Chip8_CoreInterface : public SystemInterface {
-	
+
 protected:
 	enum STREAM : u32 { MAIN };
 	enum VOICE : u32 {
@@ -28,7 +28,7 @@ protected:
 
 	std::vector<SimpleKeyMapping> mCustomBinds;
 
-	struct TriBCD {
+	struct TriBCD final {
 		// 2 = hundreds | 1 = tens | 0 = ones
 		u8 digit[3];
 
@@ -39,7 +39,7 @@ protected:
 			::assign_cast(digit[0], temp_val - digit[1] * 10);
 		}
 
-private:
+	private:
 		u32 temp_val;
 	};
 
@@ -122,9 +122,11 @@ protected:
 
 /*==================================================================*/
 
+	u32 mTargetCPF{};
+	u32 mCycleCount{};
 	Interrupt mInterrupt{};
 
-	struct DisplayRes {
+	struct DisplayRes final {
 		s32 W{}, H{};
 		constexpr s32 pixels() const noexcept { return W * H; }
 		constexpr void clear() noexcept { W = H = 0; }
@@ -133,6 +135,15 @@ protected:
 
 	u32 mCurrentPC{};
 	u32 mRegisterI{};
+
+	virtual u32 incIndexRegister(u32 value) noexcept
+		{ return mRegisterI = (mRegisterI + value) & 0xFFF; }
+
+	virtual u32 decIndexRegister(u32 value) noexcept
+		{ return mRegisterI = (mRegisterI - value) & 0xFFF; }
+
+	virtual u32 setIndexRegister(u32 value) noexcept
+		{ return mRegisterI = value & 0xFFF; }
 
 	u8* mInputReg{};
 
@@ -148,9 +159,10 @@ protected:
 	std::array<u8, 16>
 		mRegisterV{};
 
-	u64 : (8 * 8); // padding
+	//u64 : (8 * 8); // padding
 	u64 : (8 * 8); // padding
 
+	alignas(64)
 	std::array<u32, 16>
 		mStackBank{};
 
@@ -173,7 +185,6 @@ protected:
 /*==================================================================*/
 
 	void instructionError(u32 HI, u32 LO);
-
 	void triggerInterrupt(Interrupt type) noexcept;
 
 private:
@@ -191,28 +202,37 @@ protected:
 	void copyFontToMemory(void* dest, size_type size) noexcept;
 	void copyColorsToCore(void* dest) noexcept;
 
-	        void handlePreFrameInterrupt() noexcept;
-	        void handleEndFrameInterrupt() noexcept;
+	/*   */ void handlePreFrameInterrupt() noexcept;
+	/*   */ void handleEndFrameInterrupt() noexcept;
 
-	        void handleTimerTick() noexcept;
-	virtual void instructionLoop() noexcept = 0;
+	/*   */ void handleTimerTick() noexcept;
+	virtual void handleCycleLoop() noexcept = 0;
 
-	virtual void nextInstruction() noexcept;
 	virtual void skipInstruction() noexcept;
-	        void performProgJump(u32 next) noexcept;
+	/*   */ void performProgJump(u32 next) noexcept;
 	virtual void prepDisplayArea(Resolution mode) = 0;
 
 	virtual void renderAudioData() = 0;
 	virtual void renderVideoData() = 0;
 
+#define LOOP_DISPATCH(LOOP_FUNCTION)					\
+	if (hasSystemState(EmuState::BENCH)) [[likely]] {	\
+		setStopFrame(hasInterrupt());					\
+		LOOP_FUNCTION([this]() noexcept					\
+			{ return !mStopFrame.load(mo::acquire); });	\
+	} else {											\
+		LOOP_FUNCTION([this]() noexcept					\
+			{ return !hasInterrupt() && mCycleCount < mTargetCPF; }); \
+	}													\
+
 protected:
 	Chip8_CoreInterface() noexcept;
 
 public:
-	void mainSystemLoop() override;
+	void mainSystemLoop() override final;
 
-	Str* makeOverlayData() override;
-	void pushOverlayData() override;
+	Str* makeOverlayData() override final;
+	void pushOverlayData() override final;
 
 protected:
 	static constexpr auto cSmallFontOffset{ 0x00 };

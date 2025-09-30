@@ -8,18 +8,17 @@
 #if defined(ENABLE_CHIP8_SYSTEM) && defined(ENABLE_CHIP8_MODERN)
 
 #include "BasicVideoSpec.hpp"
-#include "GlobalAudioBase.hpp"
 #include "CoreRegistry.hpp"
 
 REGISTER_CORE(CHIP8_MODERN, ".ch8")
 
 /*==================================================================*/
 
-CHIP8_MODERN::CHIP8_MODERN() {
+void CHIP8_MODERN::initializeSystem() noexcept {
 	::fill_n(mMemoryBank, cTotalMemory, cSafezoneOOB, 0xFF);
 
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
-	copyFontToMemory(mMemoryBank.data(), cLargeFontOffset);
+	copyFontToMemory(mMemoryBank.data(), 80);
 
 	mDisplay.set(cScreenSizeX, cScreenSizeY);
 	setViewportSizes(true, cScreenSizeX, cScreenSizeY, cResSizeMult, 2);
@@ -34,147 +33,151 @@ CHIP8_MODERN::CHIP8_MODERN() {
 	mTargetCPF = Quirk.waitVblank ? cInstSpeedHi : cInstSpeedLo;
 }
 
-/*==================================================================*/
+void CHIP8_MODERN::handleCycleLoop() noexcept
+	{ LOOP_DISPATCH(instructionLoop); }
 
-void CHIP8_MODERN::instructionLoop() noexcept {
+template <typename Lambda>
+void CHIP8_MODERN::instructionLoop(Lambda&& condition) noexcept {
+	for (mCycleCount = 0; condition(); ++mCycleCount) {
+		const auto HI{ mMemoryBank[mCurrentPC++] };
+		const auto LO{ mMemoryBank[mCurrentPC++] };
 
-	auto cycleCount{ 0 };
-	for (; cycleCount < mTargetCPF; ++cycleCount) {
-		const auto HI{ mMemoryBank[mCurrentPC + 0u] };
-		const auto LO{ mMemoryBank[mCurrentPC + 1u] };
-		nextInstruction();
+		#define _NNN (HI << 8 | LO)
+		#define _X (HI & 0xF)
+		#define Y_ (LO >> 4)
+		#define _N (LO & 0xF)
 
-		switch (HI >> 4) {
-			case 0x0:
-				switch (HI << 8 | LO) {
-					case 0x00E0:
+		switch (HI) {
+			case 0x00:
+				switch (LO) {
+					case 0xE0:
 						instruction_00E0();
 						break;
-					case 0x00EE:
+					case 0xEE:
 						instruction_00EE();
 						break;
 					[[unlikely]]
 					default: instructionError(HI, LO);
 				}
 				break;
-			case 0x1:
-				instruction_1NNN(HI << 8 | LO);
+			CASE_xNF(0x10):
+				instruction_1NNN(_NNN);
 				break;
-			case 0x2:
-				instruction_2NNN(HI << 8 | LO);
+			CASE_xNF(0x20):
+				instruction_2NNN(_NNN);
 				break;
-			case 0x3:
-				instruction_3xNN(HI & 0xF, LO);
+			CASE_xNF(0x30):
+				instruction_3xNN(_X, LO);
 				break;
-			case 0x4:
-				instruction_4xNN(HI & 0xF, LO);
+			CASE_xNF(0x40):
+				instruction_4xNN(_X, LO);
 				break;
-			case 0x5:
-				if (LO & 0xF) [[unlikely]] {
+			CASE_xNF(0x50):
+				if (_N) [[unlikely]] {
 					instructionError(HI, LO);
 				} else {
-					instruction_5xy0(HI & 0xF, LO >> 4);
+					instruction_5xy0(_X, Y_);
 				}
 				break;
-			case 0x6:
-				instruction_6xNN(HI & 0xF, LO);
+			CASE_xNF(0x60):
+				instruction_6xNN(_X, LO);
 				break;
-			case 0x7:
-				instruction_7xNN(HI & 0xF, LO);
+			CASE_xNF(0x70):
+				instruction_7xNN(_X, LO);
 				break;
-			case 0x8:
-				switch (LO & 0xF) {
-					case 0x0:
-						instruction_8xy0(HI & 0xF, LO >> 4);
+			CASE_xNF(0x80):
+				switch (LO) {
+					CASE_xFN(0x0):
+						instruction_8xy0(_X, Y_);
 						break;
-					case 0x1:
-						instruction_8xy1(HI & 0xF, LO >> 4);
+					CASE_xFN(0x1):
+						instruction_8xy1(_X, Y_);
 						break;
-					case 0x2:
-						instruction_8xy2(HI & 0xF, LO >> 4);
+					CASE_xFN(0x2):
+						instruction_8xy2(_X, Y_);
 						break;
-					case 0x3:
-						instruction_8xy3(HI & 0xF, LO >> 4);
+					CASE_xFN(0x3):
+						instruction_8xy3(_X, Y_);
 						break;
-					case 0x4:
-						instruction_8xy4(HI & 0xF, LO >> 4);
+					CASE_xFN(0x4):
+						instruction_8xy4(_X, Y_);
 						break;
-					case 0x5:
-						instruction_8xy5(HI & 0xF, LO >> 4);
+					CASE_xFN(0x5):
+						instruction_8xy5(_X, Y_);
 						break;
-					case 0x7:
-						instruction_8xy7(HI & 0xF, LO >> 4);
+					CASE_xFN(0x7):
+						instruction_8xy7(_X, Y_);
 						break;
-					case 0x6:
-						instruction_8xy6(HI & 0xF, LO >> 4);
+					CASE_xFN(0x6):
+						instruction_8xy6(_X, Y_);
 						break;
-					case 0xE:
-						instruction_8xyE(HI & 0xF, LO >> 4);
+					CASE_xFN(0xE):
+						instruction_8xyE(_X, Y_);
 						break;
 					[[unlikely]]
 					default: instructionError(HI, LO);
 				}
 				break;
-			case 0x9:
-				if (LO & 0xF) [[unlikely]] {
+			CASE_xNF(0x90):
+				if (_N) [[unlikely]] {
 					instructionError(HI, LO);
 				} else {
-					instruction_9xy0(HI & 0xF, LO >> 4);
+					instruction_9xy0(_X, Y_);
 				}
 				break;
-			case 0xA:
-				instruction_ANNN(HI << 8 | LO);
+			CASE_xNF(0xA0):
+				instruction_ANNN(_NNN);
 				break;
-			case 0xB:
-				instruction_BNNN(HI << 8 | LO);
+			CASE_xNF(0xB0):
+				instruction_BNNN(_NNN);
 				break;
-			case 0xC:
-				instruction_CxNN(HI & 0xF, LO);
+			CASE_xNF(0xC0):
+				instruction_CxNN(_X, LO);
 				break;
 			[[likely]]
-			case 0xD:
-				instruction_DxyN(HI & 0xF, LO >> 4, LO & 0xF);
+			CASE_xNF(0xD0):
+				instruction_DxyN(_X, Y_, _N);
 				break;
-			case 0xE:
+			CASE_xNF(0xE0):
 				switch (LO) {
 					case 0x9E:
-						instruction_Ex9E(HI & 0xF);
+						instruction_Ex9E(_X);
 						break;
 					case 0xA1:
-						instruction_ExA1(HI & 0xF);
+						instruction_ExA1(_X);
 						break;
 					[[unlikely]]
 					default: instructionError(HI, LO);
 				}
 				break;
-			case 0xF:
+			CASE_xNF(0xF0):
 				switch (LO) {
 					case 0x07:
-						instruction_Fx07(HI & 0xF);
+						instruction_Fx07(_X);
 						break;
 					case 0x0A:
-						instruction_Fx0A(HI & 0xF);
+						instruction_Fx0A(_X);
 						break;
 					case 0x15:
-						instruction_Fx15(HI & 0xF);
+						instruction_Fx15(_X);
 						break;
 					case 0x18:
-						instruction_Fx18(HI & 0xF);
+						instruction_Fx18(_X);
 						break;
 					case 0x1E:
-						instruction_Fx1E(HI & 0xF);
+						instruction_Fx1E(_X);
 						break;
 					case 0x29:
-						instruction_Fx29(HI & 0xF);
+						instruction_Fx29(_X);
 						break;
 					case 0x33:
-						instruction_Fx33(HI & 0xF);
+						instruction_Fx33(_X);
 						break;
 					case 0x55:
-						instruction_FN55(HI & 0xF);
+						instruction_FN55(_X);
 						break;
 					case 0x65:
-						instruction_FN65(HI & 0xF);
+						instruction_FN65(_X);
 						break;
 					[[unlikely]]
 					default: instructionError(HI, LO);
@@ -357,7 +360,7 @@ void CHIP8_MODERN::renderVideoData() {
 	#pragma region A instruction branch
 
 	void CHIP8_MODERN::instruction_ANNN(s32 NNN) noexcept {
-		::assign_cast(mRegisterI, NNN & 0xFFF);
+		setIndexRegister(NNN);
 	}
 
 	#pragma endregion
@@ -438,7 +441,7 @@ void CHIP8_MODERN::renderVideoData() {
 				{
 					drawByte(pX + 0, pY, readMemoryI(I + 0));
 					drawByte(pX + 8, pY, readMemoryI(I + 1));
-					
+
 					if (!Quirk.wrapSprite && pY == cScreenSizeY - 1) { break; }
 				}
 				break;
@@ -487,31 +490,25 @@ void CHIP8_MODERN::renderVideoData() {
 		startVoice(mRegisterV[X] + (mRegisterV[X] == 1));
 	}
 	void CHIP8_MODERN::instruction_Fx1E(s32 X) noexcept {
-		::assign_cast_add(mRegisterI, mRegisterV[X]);
-		::assign_cast_and(mRegisterI, 0xFFF);
+		incIndexRegister(mRegisterV[X]);
 	}
 	void CHIP8_MODERN::instruction_Fx29(s32 X) noexcept {
-		::assign_cast(mRegisterI, (mRegisterV[X] & 0xF) * 5 + cSmallFontOffset);
+		setIndexRegister((mRegisterV[X] & 0xF) * 5 + cSmallFontOffset);
 	}
 	void CHIP8_MODERN::instruction_Fx33(s32 X) noexcept {
-		const auto N__{ mRegisterV[X] * 0x51EB851Full >> 37 };
-		const auto _NN{ mRegisterV[X] - N__ * 100 };
-		const auto _N_{ _NN * 0xCCCDull >> 19 };
-		const auto __N{ _NN - _N_ * 10 };
+		const TriBCD bcd{ mRegisterV[X] };
 
-		writeMemoryI(N__, 0);
-		writeMemoryI(_N_, 1);
-		writeMemoryI(__N, 2);
+		writeMemoryI(bcd.digit[2], 0);
+		writeMemoryI(bcd.digit[1], 1);
+		writeMemoryI(bcd.digit[0], 2);
 	}
 	void CHIP8_MODERN::instruction_FN55(s32 N) noexcept {
 		for (auto idx{ 0 }; idx <= N; ++idx) { writeMemoryI(mRegisterV[idx], idx); }
-		mRegisterI = !Quirk.idxRegNoInc ? (mRegisterI + N + 1) & 0xFFF : mRegisterI;
-		//if (!Quirk.idxRegNoInc) [[likely]] { mRegisterI = (mRegisterI + N + 1) & 0xFFF; }
+		if (!Quirk.idxRegNoInc) [[likely]] { incIndexRegister(N + 1); }
 	}
 	void CHIP8_MODERN::instruction_FN65(s32 N) noexcept {
 		for (auto idx{ 0 }; idx <= N; ++idx) { mRegisterV[idx] = readMemoryI(idx); }
-		mRegisterI = !Quirk.idxRegNoInc ? (mRegisterI + N + 1) & 0xFFF : mRegisterI;
-		//if (!Quirk.idxRegNoInc) [[likely]] { mRegisterI = (mRegisterI + N + 1) & 0xFFF; }
+		if (!Quirk.idxRegNoInc) [[likely]] { incIndexRegister(N + 1); }
 	}
 
 	#pragma endregion

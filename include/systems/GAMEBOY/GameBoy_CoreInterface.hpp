@@ -47,7 +47,7 @@ protected:
 	GameBoy_CoreInterface() noexcept;
 
 public:
-	void mainSystemLoop() override;
+	void mainSystemLoop() override final;
 };
 
 #endif

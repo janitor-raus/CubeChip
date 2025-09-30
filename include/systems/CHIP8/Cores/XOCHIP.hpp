@@ -210,16 +210,32 @@ private:
 		return mMemoryBank[mRegisterI + pos];
 	}
 
+	u32 incIndexRegister(u32 value) noexcept override final
+		{ return mRegisterI = (mRegisterI + value) & 0xFFFF; }
+
+	u32 decIndexRegister(u32 value) noexcept override final
+		{ return mRegisterI = (mRegisterI - value) & 0xFFFF; }
+
+	u32 setIndexRegister(u32 value) noexcept override final
+		{ return mRegisterI = value & 0xFFFF; }
+
 /*==================================================================*/
 
 	auto NNNN() const noexcept { return mMemoryBank[mCurrentPC] << 8 | mMemoryBank[mCurrentPC + 1]; }
 
 public:
-	XOCHIP();
+	XOCHIP()
+		: mDisplayBuffer{
+			{cScreenSizeX, cScreenSizeY},
+			{cScreenSizeX, cScreenSizeY},
+			{cScreenSizeX, cScreenSizeY},
+			{cScreenSizeX, cScreenSizeY},
+		}
+	{}
 
 	static constexpr bool validateProgram(
 		const char* fileData,
-		const size_type   fileSize
+		const size_type fileSize
 	) noexcept {
 		if (!fileData || !fileSize) { return false; }
 		return fileSize + cGameLoadPos <= cTotalMemory;
@@ -229,7 +245,11 @@ public:
 	s32 getMaxDisplayH() const noexcept override { return cMaxDisplayH; }
 
 private:
-	void instructionLoop() noexcept override;
+	void initializeSystem() noexcept override;
+	void handleCycleLoop() noexcept override;
+
+	template <typename Lambda>
+	void instructionLoop(Lambda&& condition) noexcept;
 
 	void renderAudioData() override;
 	void renderVideoData() override;
