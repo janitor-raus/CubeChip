@@ -29,7 +29,7 @@ bool CoreRegistry::validateProgramByType(const char* fileData, size_type fileSiz
 	const auto matchingCores{ findEligibleCores(fileType) };
 
 	if (!matchingCores || matchingCores->empty()) {
-		blog.newEntry(BLOG::WARN,
+		blog.newEntry<BLOG::WARN>(
 			"Unable to match Program to an existing System variant!");
 		return false;
 	} else {
@@ -41,7 +41,7 @@ bool CoreRegistry::validateProgramByType(const char* fileData, size_type fileSiz
 		}
 
 		if (sEligible.empty()) {
-			blog.newEntry(BLOG::WARN,
+			blog.newEntry<BLOG::WARN>(
 				"Program rejected by all eligible System variants!");
 			return false;
 		} else {
@@ -64,7 +64,7 @@ bool CoreRegistry::registerCore(CoreConstructor&& ctor, ProgramTester&& tester, 
 	for (const auto& ext : reg.fileExtensions) {
 		try { getRegistry()[ext].push_back(reg); }
 		catch (const std::exception& e) {
-			blog.newEntry(BLOG::ERROR,
+			blog.newEntry<BLOG::ERROR>(
 				"Exception triggered trying to register Emulator Core! [{}]", e.what());
 			return false;
 		}
@@ -84,7 +84,7 @@ SystemInterface* CoreRegistry::constructCore(size_type idx) noexcept {
 		sCurrentCore = sEligible[idx];
 		return sCurrentCore.constructCore();
 	} catch (const std::exception& e) {
-		blog.newEntry(BLOG::ERROR,
+		blog.newEntry<BLOG::ERROR>(
 			"Exception triggered trying to construct Emulator Core! [{}]", e.what());
 		return nullptr;
 	}
@@ -96,10 +96,10 @@ void CoreRegistry::loadProgramDB(const Path& dbPath) noexcept {
 
 	if (!loadJsonFromFile(checkPath, sProgramDB)) {
 		sProgramDB.clear();
-		blog.newEntry(BLOG::WARN,
+		blog.newEntry<BLOG::WARN>(
 			"Failed to load ProgramDB: \"{}\"", checkPath.string());
 	} else {
-		blog.newEntry(BLOG::INFO,
+		blog.newEntry<BLOG::INFO>(
 			"Successfully loaded ProgramDB: \"{}\"", checkPath.string());
 	}
 }
@@ -110,7 +110,7 @@ bool CoreRegistry::loadJsonFromFile(const Path& path, Json& output) noexcept {
 			output = Json::parse(jsonData->begin(), jsonData->end());
 			return true;
 		} catch (const Json::parse_error& e) {
-			blog.newEntry(BLOG::ERROR,
+			blog.newEntry<BLOG::ERROR>(
 				"Exception triggered trying to parse JSON file: \"{}\" [{}]", path.string(), e.what());
 		}
 	}

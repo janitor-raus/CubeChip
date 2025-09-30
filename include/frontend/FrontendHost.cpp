@@ -73,12 +73,12 @@ void FrontendHost::replaceCore() {
 
 void FrontendHost::loadGameFile(const Path& gameFile) {
 	BVS->raiseMainWindow();
-	blog.newEntry(BLOG::INFO, "Attempting to load: \"{}\"", gameFile.string());
+	blog.newEntry<BLOG::INFO>("Attempting to load: \"{}\"", gameFile.string());
 	if (HDM->validateGameFile(gameFile)) {
-		blog.newEntry(BLOG::INFO, "File has been accepted!");
+		blog.newEntry<BLOG::INFO>("File has been accepted!");
 		replaceCore();
 	} else {
-		blog.newEntry(BLOG::INFO, "Path has been rejected!");
+		blog.newEntry<BLOG::INFO>("Path has been rejected!");
 	}
 }
 
@@ -126,7 +126,7 @@ bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forc
 
 	GAB = GlobalAudioBase::initialize(GAB_settings);
 	if (GAB->getStatus() == GlobalAudioBase::STATUS::NO_AUDIO)
-		{ blog.newEntry(BLOG::WARN, "Audio Subsystem is not available!"); }
+		{ blog.newEntry<BLOG::WARN>("Audio Subsystem is not available!"); }
 
 	BVS = BasicVideoSpec::initialize(BVS_settings);
 	if (!BVS) { return false; }
@@ -224,6 +224,7 @@ void FrontendHost::checkForHotkeys() {
 
 void FrontendHost::toggleSystemLimiter() noexcept {
 	if (!mSystemCore) { return; }
+
 	if (mUnlimited) {
 		mSystemCore->addSystemState(EmuState::BENCH);
 	} else {

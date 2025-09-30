@@ -18,7 +18,7 @@ public:
 	virtual ~AudioStreamingFilter() = default;
 
 	virtual void setCoefficient(float sampleRate, float cutoffFreq) noexcept = 0;
-	
+
 	template <typename T>
 		requires (std::is_integral_v<T> || std::is_floating_point_v<T>)
 	T process(T sample) noexcept
@@ -36,7 +36,7 @@ UniqueFilter make_stream_filter(Args&&... args)
 
 /*==================================================================*/
 
-class LowPassFilter : public AudioStreamingFilter {
+class LowPassFilter final : public AudioStreamingFilter {
 	float mLastSampleI{};
 	float mCoefficient{};
 
@@ -50,7 +50,7 @@ public:
 
 /*==================================================================*/
 
-class HighPassFilter : public AudioStreamingFilter {
+class HighPassFilter final : public AudioStreamingFilter {
 	float mLastSampleI{};
 	float mLastSampleO{};
 	float mCoefficient{};

@@ -6,8 +6,9 @@
 
 #pragma once
 
-#include "Typedefs.hpp"
-#include "SimpleRingBuffer.hpp"
+#include <fmt/format.h>
+#include <string>
+#include <cstddef>
 
 /*==================================================================*/
 
@@ -15,7 +16,7 @@ enum class BLOG {
 	INFO,  // Events that are innocuous and informational.
 	WARN,  // Events that are unexpected and warrant attention.
 	ERROR, // Events that resulted in a predictable/recoverable error.
-	FATAL,  // Events that resulted in unrecoverable failure.
+	FATAL, // Events that resulted in unrecoverable failure.
 	DEBUG, // Events meant for debugging purposes.
 };
 
@@ -23,16 +24,9 @@ enum class BLOG {
 	#pragma region BasicLogger Singleton Class
 
 class BasicLogger final {
-	SimpleRingBuffer<Str, 512>
-		mLogBuffer;
-
-	Path mLogPath{};
-
 	BasicLogger() noexcept = default;
 	BasicLogger(const BasicLogger&) = delete;
 	BasicLogger& operator=(const BasicLogger&) = delete;
-
-	StrV getSeverity(BLOG type) const noexcept;
 
 public:
 	static auto* initialize() noexcept {
@@ -40,20 +34,24 @@ public:
 		return &self;
 	}
 
-	bool initLogFile(const Str& filename, const Path& directory) noexcept;
+	bool initLogFile(const std::string& filename, const std::string& directory) noexcept;
 
 private:
-	void writeEntry(BLOG type, const Str& message);
+	template <BLOG LOG_SEVERITY>
+	void writeEntry(const std::string& message);
 
 public:
-	template <typename... Args>
-	void newEntry(BLOG type, const Str& message, Args&&... args) {
+	template <BLOG LOG_SEVERITY, typename... Args>
+	void newEntry(const std::string& message, Args&&... args) {
 		if constexpr (sizeof...(Args) == 0) {
-			writeEntry(type, message);
+			writeEntry<LOG_SEVERITY>(message);
 		} else {
-			writeEntry(type, fmt::vformat(message, fmt::make_format_args(args...)));
+			writeEntry<LOG_SEVERITY>(fmt::vformat(message, fmt::make_format_args(args...)));
 		}
 	}
+
+	// here we have a method whose job will be in the cpp to flush N messages from the static TU ringbuffer to the log file.
+	void flushToDisk(std::size_t count = 0) noexcept;
 };
 
 	#pragma endregion

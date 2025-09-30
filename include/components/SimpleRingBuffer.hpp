@@ -130,7 +130,7 @@ public:
 	}
 
 	/**
-	 * @brief Retrieve a copy of a value from the internal buffer. The index is relative to the 
+	 * @brief Retrieve a copy of a value from the internal buffer. The index is relative to the
 	 *        the most recent push() call, with 0 being the most recent entry.
 	 * @param[in] index :: Offset relative to the most recent entry.
 	 * @note This method is thread-safe, but may return stale data due to its non-blocking nature.

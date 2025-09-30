@@ -125,4 +125,5 @@ void SDL_AppQuit(void *pHost, SDL_AppResult) {
 		auto* Host{ static_cast<FrontendHost*>(pHost) };
 		Host->quitApplication();
 	}
+	blog.flushToDisk();
 }

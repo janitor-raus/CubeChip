@@ -13,9 +13,6 @@
 #include <filesystem>
 #include <string_view>
 
-#define FMT_HEADER_ONLY
-#include <fmt/format.h>
-
 /*==================================================================*/
 
 using f64 = double;

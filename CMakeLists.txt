@@ -64,6 +64,8 @@ target_sources("${PROJECT_NAME}" PRIVATE ${SYSTEM_BYTEPUSHER_HEADERS} ${SYSTEM_B
 target_sources("${PROJECT_NAME}" PRIVATE ${SYSTEM_GAMEBOY_HEADERS}    ${SYSTEM_GAMEBOY_SOURCES})
 
 target_compile_features("${PROJECT_NAME}" PRIVATE cxx_std_20)
+target_compile_definitions("${PROJECT_NAME}" PRIVATE FMT_HEADER_ONLY)
+
 target_include_directories(
 	"${PROJECT_NAME}" PRIVATE
 	"${PROJECT_INCLUDE_DIR}/shims"
@@ -92,9 +94,9 @@ if(WIN32)
 
 	if (CMAKE_SYSTEM_VERSION VERSION_LESS "10.0.22000.0")
 		message(WARNING "Windows SDK version is lower than 22000. Some features may be disabled.")
-		add_definitions(-DOLD_WINDOWS_SDK)
+		target_compile_definitions("${PROJECT_NAME}" PRIVATE OLD_WINDOWS_SDK)
 	endif()
-	
+
 	target_link_libraries(
 		"${PROJECT_NAME}"
 		PRIVATE

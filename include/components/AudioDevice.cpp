@@ -37,7 +37,7 @@ bool AudioDevice::addAudioStream(
 		, &spec, nullptr, nullptr) };
 
 	if (!ptr) {
-		blog.newEntry(BLOG::WARN, "Failed to open audio stream: {}", SDL_GetError());
+		blog.newEntry<BLOG::WARN>("Failed to open audio stream: {}", SDL_GetError());
 		return false;
 	}
 
