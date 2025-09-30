@@ -53,7 +53,7 @@ public:
 
 	static constexpr bool validateProgram(
 		const char* fileData,
-		const size_type   fileSize
+		const size_type fileSize
 	) noexcept {
 		if (!fileData || !fileSize) { return false; }
 		return fileSize <= cTotalMemory;

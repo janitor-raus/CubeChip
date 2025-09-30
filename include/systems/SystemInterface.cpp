@@ -6,6 +6,7 @@
 
 #include "ThreadAffinity.hpp"
 #include "BasicVideoSpec.hpp"
+#include "BasicLogger.hpp"
 
 #include "SystemInterface.hpp"
 

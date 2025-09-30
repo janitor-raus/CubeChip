@@ -4,10 +4,8 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "FrameLimiter.hpp"
 #include "BasicInput.hpp"
 #include "HomeDirManager.hpp"
-#include "GlobalAudioBase.hpp"
 
 #include "GameBoy_CoreInterface.hpp"
 

@@ -34,7 +34,7 @@ private:
 	class MMU {
 	public:
 
-	
+
 	std::array<u8, cTotalMemory> mMemoryBanks{};
 
 		/* Memory Map */
@@ -117,7 +117,7 @@ private:
 		u8& mWY   { mInOutBank[0x4A] }; // Window Y pos
 		u8& mWX   { mInOutBank[0x4B] }; // Window X pos + 7
 		u8& mKEY1 { mInOutBank[0x4D] }; // Prepare speed switch
-		
+
 		u8& mVBK  { mInOutBank[0x4F] }; // VRAM bank
 		u8& mBOOT { mInOutBank[0x50] }; // Boot ROM enable
 		u8& mHDMA1{ mInOutBank[0x51] }; // VRAM DMA src hi
@@ -161,7 +161,7 @@ private:
 
 	void setJOYP(u32 addr, u32 value) noexcept {
 		if (addr != 0xFF00) {
-			blog.newEntry(BLOG::WARN, "JoyPad cannot write to 0x{:04X}", addr);
+			blog.newEntry<BLOG::WARN>("JoyPad cannot write to 0x{:04X}", addr);
 			return;
 		} else [[likely]] {
 			mInputControl = value & 0x30;
@@ -170,7 +170,7 @@ private:
 
 	u32 getJOYP(u32 addr) const noexcept {
 		if (addr != 0xFF00) {
-			blog.newEntry(BLOG::WARN, "JoyPad cannot read from 0x{:04X}", addr);
+			blog.newEntry<BLOG::WARN>("JoyPad cannot read from 0x{:04X}", addr);
 			return 0;
 		} else [[likely]] {
 			switch (mInputControl) {

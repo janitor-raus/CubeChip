@@ -8,7 +8,6 @@
 #if defined(ENABLE_GAMEBOY_SYSTEM) && defined(ENABLE_GAMEBOY_CLASSIC)
 
 #include "BasicVideoSpec.hpp"
-#include "GlobalAudioBase.hpp"
 #include "CoreRegistry.hpp"
 
 REGISTER_CORE(GAMEBOY_CLASSIC, ".gb")
@@ -28,16 +27,16 @@ void GAMEBOY_CLASSIC::instructionLoop() noexcept {
 
 	auto curCycles{ 0 };
 	while (curCycles < maxCycles) {
-		
+
 	}
 }
 
 void GAMEBOY_CLASSIC::renderAudioData() {
-	
+
 }
 
 void GAMEBOY_CLASSIC::renderVideoData() {
-	
+
 }
 
 #endif
