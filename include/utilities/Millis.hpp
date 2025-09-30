@@ -24,8 +24,11 @@ namespace Millis {
 	long long since(long long past_millis) noexcept;
 
 	/**
-	 * @brief Sleeps/spins the current thread for X milliseconds.
+	 * @brief Naively sleeps the current thread for X milliseconds.
 	 */
 	void sleep_for(unsigned long long millis) noexcept;
+	/**
+	 * @brief Sleeps/spins the current thread for X milliseconds.
+	 */
 	void sleeplock_for(double millis) noexcept;
 };

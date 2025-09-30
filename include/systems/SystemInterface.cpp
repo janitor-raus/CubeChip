@@ -17,6 +17,7 @@ void SystemInterface::startWorker() noexcept {
 	if (!mSystemThread.joinable()) {
 		mSystemThread = Thread([this](StopToken token) { systemThreadEntry(token); });
 	}
+	Millis::sleep_for(1);
 	if (!mTimingThread.joinable()) {
 		mTimingThread = Thread([this](StopToken token) { timingThreadEntry(token); });
 	}
