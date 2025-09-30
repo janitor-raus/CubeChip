@@ -706,7 +706,7 @@ void MEGACHIP::scrollBuffersRT() {
 	#pragma region A instruction branch
 
 	void MEGACHIP::instruction_ANNN(s32 NNN) noexcept {
-		setIndexRegister(NNN);
+		setIndexRegister(NNN & 0xFFF);
 	}
 
 	#pragma endregion
