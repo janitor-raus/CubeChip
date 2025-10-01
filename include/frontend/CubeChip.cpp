@@ -120,10 +120,4 @@ SDL_AppResult SDL_AppEvent(void *pHost, SDL_Event *event) {
 
 /*==================================================================*/
 
-void SDL_AppQuit(void *pHost, SDL_AppResult) {
-	if (pHost) {
-		auto* Host{ static_cast<FrontendHost*>(pHost) };
-		Host->quitApplication();
-	}
-	blog.flushToDisk();
-}
+void SDL_AppQuit(void*, SDL_AppResult) {}

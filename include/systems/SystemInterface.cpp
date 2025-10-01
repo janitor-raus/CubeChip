@@ -15,9 +15,9 @@
 
 void SystemInterface::startWorker() noexcept {
 	if (!mSystemThread.joinable()) {
+		initializeSystem();
 		mSystemThread = Thread([this](StopToken token) { systemThreadEntry(token); });
 	}
-	Millis::sleep_for(1);
 	if (!mTimingThread.joinable()) {
 		mTimingThread = Thread([this](StopToken token) { timingThreadEntry(token); });
 	}
@@ -37,7 +37,6 @@ void SystemInterface::stopWorker() noexcept {
 void SystemInterface::systemThreadEntry(StopToken token) {
 	SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 	thread_affinity::set_affinity(~0b11ull);
-	initializeSystem();
 
 	while (!token.stop_requested()) [[likely]] {
 		if (mNextFrame.exchange(false, mo::acq_rel)) [[likely]] {

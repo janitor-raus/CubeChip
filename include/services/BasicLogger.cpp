@@ -62,7 +62,7 @@ bool BasicLogger::initLogFile(const std::string& filename, const std::string& di
 	}
 
 	sLogPath.assign(newPath);
-	newEntry<BLOG::ERROR>("Logging started on {:%Y-%m-%d %H:%M:%S}",
+	newEntry<BLOG::INFO>("Logging started on {:%Y-%m-%d %H:%M:%S}",
 		std::chrono::system_clock::now());
 	return true;
 }

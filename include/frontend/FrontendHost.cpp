@@ -49,7 +49,7 @@ void FrontendHost::StopSystemThread::operator()(SystemInterface* ptr) noexcept {
 
 void FrontendHost::discardCore() {
 	mSystemCore.reset();
-	
+
 	BVS->setMainWindowTitle(AppName, "Waiting for file...");
 	BVS->resetMainWindow();
 
@@ -109,6 +109,9 @@ void FrontendHost::quitApplication() noexcept {
 		GAB->exportSettings().map(),
 		BVS->exportSettings().map()
 	);
+
+	// XXX -- Immediately throws unknown exception on Release builds??????
+	//blog.flushToDisk();
 }
 
 bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forcePortable) noexcept {
@@ -142,6 +145,7 @@ s32  FrontendHost::processEvents(void* event) noexcept {
 		switch (sdl_event->type) {
 			case SDL_EVENT_QUIT:
 			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+				quitApplication();
 				return SDL_APP_SUCCESS;
 
 			case SDL_EVENT_DROP_FILE:
@@ -157,6 +161,7 @@ s32  FrontendHost::processEvents(void* event) noexcept {
 				break;
 
 			case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
+				//auto a = sdl_event->display.displayID;
 			case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
 				FrontendInterface::UpdateFontScale(AppFontData_Roboto_Mono,
 					SDL_GetWindowDisplayScale(BVS->getMainWindow()));
