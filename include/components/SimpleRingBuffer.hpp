@@ -6,7 +6,8 @@
 
 #pragma once
 
-#include <array>
+#include <vector>
+#include <algorithm>
 #include <utility>
 #include <mutex>
 #include <shared_mutex>
@@ -63,7 +64,7 @@ public:
 private:
 	enum class SnapshotOrder { DESCENDING, ASCENDING };
 
-	void push_(std::size_t index, std::shared_ptr<T>&& ptr) noexcept {
+	void push_(std::size_t index, SharedPtr<T>&& ptr) noexcept {
 		std::shared_lock lock{ mGuard };
 		mBuffer[index & (N - 1)].store(std::move(ptr), mo::release);
 
@@ -77,21 +78,22 @@ private:
 	}
 
 	template <SnapshotOrder Order>
-	auto snapshot_() const noexcept {
-		std::array<T, N> output;
+	auto snapshot_(std::size_t count) const noexcept {
 		const auto pos{ head() };
+		const auto max{ std::min(pos + 1, N) };
+		std::vector<T> output(count ? std::min(count, max) : max);
 
 		if constexpr (Order == SnapshotOrder::ASCENDING) {
-			std::for_each(EXEC_POLICY(unseq)
-				output.begin(), output.end(),
+			std::for_each_n(EXEC_POLICY(unseq)
+				output.begin(), output.size(),
 				[&](auto& entry) noexcept {
-					entry = std::move(at_(N - 1 - (&entry - output.data()), pos)); }
+					entry = at_(max - 1 - (&entry - output.data()), pos); }
 			);
 		} else {
-			std::for_each(EXEC_POLICY(unseq)
-				output.begin(), output.end(),
+			std::for_each_n(EXEC_POLICY(unseq)
+				output.begin(), output.size(),
 				[&](auto& entry) noexcept {
-					entry = std::move(at_(&entry - output.data(), pos)); }
+					entry = at_(&entry - output.data(), pos); }
 			);
 		}
 
@@ -145,11 +147,11 @@ public:
 	 * @returns A vector of T representing the buffer contents; missing values are default-constructed.
 	 * @note This method is thread-safe, but may return stale data due to its non-blocking nature.
 	 */
-	std::array<T, N> fast_snapshot_asc() const noexcept {
-		return snapshot_<SnapshotOrder::ASCENDING>();
+	std::vector<T> fast_snapshot_asc(std::size_t count = 0) const noexcept {
+		return snapshot_<SnapshotOrder::ASCENDING>(count);
 	}
-	std::array<T, N> fast_snapshot_desc() const noexcept {
-		return snapshot_<SnapshotOrder::DESCENDING>();
+	std::vector<T> fast_snapshot_desc(std::size_t count = 0) const noexcept {
+		return snapshot_<SnapshotOrder::DESCENDING>(count);
 	}
 
 	/**
@@ -158,13 +160,13 @@ public:
 	 * @returns A vector of T representing the buffer contents; missing values are default-constructed.
 	 * @note This method is thread-safe, but cannot run concurrently with push() or clear() calls.
 	 */
-	std::array<T, N> safe_snapshot_asc() const noexcept {
+	std::vector<T> safe_snapshot_asc(std::size_t count = 0) const noexcept {
 		std::unique_lock lock{ mGuard };
-		return snapshot_<SnapshotOrder::ASCENDING>();
+		return snapshot_<SnapshotOrder::ASCENDING>(count);
 	}
-	std::array<T, N> safe_snapshot_desc() const noexcept {
+	std::vector<T> safe_snapshot_desc(std::size_t count = 0) const noexcept {
 		std::unique_lock lock{ mGuard };
-		return snapshot_<SnapshotOrder::DESCENDING>();
+		return snapshot_<SnapshotOrder::DESCENDING>(count);
 	}
 };
 

@@ -68,15 +68,12 @@ bool BasicLogger::initLogFile(const std::string& filename, const std::string& di
 }
 
 void BasicLogger::flushToDisk(std::size_t count) noexcept {
-	if (!sLogPath.empty()) {
-		if (count == 0) { count = sLogBuffer.size(); }
-		count = std::min(count, sLogBuffer.size());
-		std::ofstream logFile(sLogPath, std::ios::app);
+	if (sLogPath.empty()) { return; }
+	std::ofstream logFile(sLogPath, std::ios::app);
 
-		if (logFile) {
-			for (const auto& entry : sLogBuffer.safe_snapshot_asc(/*count*/))
-				{ logFile << entry << '\n'; }
-		}
+	if (logFile) {
+		for (const auto& entry : sLogBuffer.safe_snapshot_asc(count))
+			{ logFile << entry << '\n'; }
 	}
 }
 
