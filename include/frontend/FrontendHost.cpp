@@ -110,8 +110,7 @@ void FrontendHost::quitApplication() noexcept {
 		BVS->exportSettings().map()
 	);
 
-	// XXX -- Immediately throws unknown exception on Release builds??????
-	//blog.flushToDisk();
+	blog.flushToDisk();
 }
 
 bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forcePortable) noexcept {

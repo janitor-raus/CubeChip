@@ -17,9 +17,12 @@ using mo = std::memory_order;
 template <typename T>
 using Atom = std::atomic<T>;
 
+template <typename T>
+using SharedPtr = std::shared_ptr<T>;
+
 #if defined(__cpp_lib_atomic_shared_ptr) && __cpp_lib_atomic_shared_ptr >= 201711L
 	template <typename T>
-	using AtomSharedPtr = Atom<std::shared_ptr<T>>;
+	using AtomSharedPtr = Atom<SharedPtr<T>>;
 #else
 	#include <mutex>
 	#include <shared_mutex>
@@ -30,30 +33,28 @@ using Atom = std::atomic<T>;
 	*/
 	template <typename T>
 	class AtomSharedPtr {
-		using shared_ptr = std::shared_ptr<T>;
-
 		mutable std::shared_mutex mLock;
-		shared_ptr mSharedPtr;
+		SharedPtr mSharedPtr;
 
 	public:
 		AtomSharedPtr()
 			: mSharedPtr{ nullptr }
 		{}
 
-		explicit AtomSharedPtr(const shared_ptr& new_ptr)
+		explicit AtomSharedPtr(const SharedPtr& new_ptr)
 			: mSharedPtr{ new_ptr }
 		{}
 
-		explicit AtomSharedPtr(shared_ptr&& new_ptr)
+		explicit AtomSharedPtr(SharedPtr&& new_ptr)
 			: mSharedPtr{ std::move(new_ptr) }
 		{}
 
-		inline void store(const shared_ptr& new_ptr, std::memory_order = std::memory_order_seq_cst) {
+		inline void store(const SharedPtr& new_ptr, std::memory_order = std::memory_order_seq_cst) {
 			std::unique_lock lock(mLock);
 			mSharedPtr = new_ptr;
 		}
 
-		inline void store(shared_ptr&& new_ptr, std::memory_order = std::memory_order_seq_cst) {
+		inline void store(SharedPtr&& new_ptr, std::memory_order = std::memory_order_seq_cst) {
 			std::unique_lock lock(mLock);
 			mSharedPtr = std::move(new_ptr);
 		}
@@ -63,14 +64,14 @@ using Atom = std::atomic<T>;
 			return mSharedPtr;
 		}
 
-		auto exchange(const shared_ptr& new_ptr, std::memory_order = std::memory_order_seq_cst) {
+		auto exchange(const SharedPtr& new_ptr, std::memory_order = std::memory_order_seq_cst) {
 			std::unique_lock lock(mLock);
 			auto old{ mSharedPtr };
 			mSharedPtr = new_ptr;
 			return old;
 		}
 
-		auto exchange(shared_ptr&& new_ptr, std::memory_order = std::memory_order_seq_cst) {
+		auto exchange(SharedPtr&& new_ptr, std::memory_order = std::memory_order_seq_cst) {
 			std::unique_lock lock(mLock);
 			auto old{ std::move(mSharedPtr) };
 			mSharedPtr = std::move(new_ptr);

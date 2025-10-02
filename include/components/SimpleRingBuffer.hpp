@@ -48,10 +48,8 @@ class SimpleRingBuffer {
 	alignas(HDIS) Atom<std::size_t> mReadHead{ 0 };
 	alignas(HDIS) mutable std::shared_mutex mGuard;
 
-	static inline auto sDefaultT{ std::make_shared<T>(T{}) };
-
 public:
-	SimpleRingBuffer() noexcept { clear(); }
+	SimpleRingBuffer() noexcept { clear_buffer(); }
 
 	SimpleRingBuffer(self&&) = delete;
 	SimpleRingBuffer(const self&) = delete;
@@ -105,12 +103,14 @@ public:
 	 * @brief Empty the internal buffer by default-initializing its contents.
 	 * @note This method is thread-safe, but cannot run concurrently with push() or safe_snapshot_*() calls.
 	 */
-	void clear() noexcept {
+	void clear_buffer() noexcept {
 		std::unique_lock lock{ mGuard };
+		const static auto sDefaultT
+			{ std::make_shared<T>(T{}) };
 
 		std::for_each_n(EXEC_POLICY(unseq)
-			mBuffer, N, [](auto& entry) noexcept {
-				entry.store(sDefaultT, mo::relaxed); }
+			mBuffer, N, [](auto& entry) noexcept
+				{ entry.store(sDefaultT, mo::relaxed); }
 		);
 	}
 
