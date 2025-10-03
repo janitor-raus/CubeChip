@@ -59,16 +59,20 @@ public:
 	static void probableFileCallback(void*, const char* const* filelist, int) noexcept
 		{ if (filelist && filelist[0]) { setProbableFile(filelist[0]); } }
 
-private:
-	inline static GameValidator sCheckGame{};
-	inline static toml::table   sMainAppConfig{};
+	static auto getHomeDirectoryURL() noexcept
+		{ return "file:///" + sHomePath; }
 
 private:
-	Str  sHomePath{};
-	Str  sConfPath{};
+	static inline GameValidator sCheckGame{};
+	static inline toml::table   sMainAppConfig{};
+
+private:
+	static inline Str sHomePath{};
+	static inline Str sConfPath{};
 
 	static void triggerFatalError(const char* error) noexcept;
 	static bool isLocationWritable(const char* path) noexcept;
+
 	bool setHomePath(StrV override, bool portable, StrV org, StrV app) noexcept;
 
 public:

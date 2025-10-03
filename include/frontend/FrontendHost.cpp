@@ -7,6 +7,7 @@
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_dialog.h>
+#include <SDL3/SDL_misc.h>
 
 #include "HomeDirManager.hpp"
 #include "BasicLogger.hpp"
@@ -30,8 +31,11 @@ FrontendHost::FrontendHost(const Path& gamePath) noexcept {
 	HDM->setValidator(CoreRegistry::validateProgram);
 	CoreRegistry::loadProgramDB();
 
-	FrontendInterface::FnHook_OpenFile
-		.store(openFileDialog, mo::relaxed);
+	FrontendInterface::FnHook_OpenFile.store \
+		(openFileDialog, mo::relaxed);
+
+	FrontendInterface::FnHook_OpenDataDir.store \
+		(openHomeDirectory, mo::relaxed);
 
 	if (!gamePath.empty()) { loadGameFile(gamePath); }
 	if (!mSystemCore) { BVS->setMainWindowTitle(AppName, "Waiting for file..."); }
@@ -190,6 +194,11 @@ void FrontendHost::processFrame() {
 void FrontendHost::openFileDialog() noexcept {
 	SDL_ShowOpenFileDialog(HomeDirManager::probableFileCallback,
 		nullptr, BVS->getMainWindow(), nullptr, 0, nullptr, false);
+}
+
+void FrontendHost::openHomeDirectory() noexcept {
+	if (!SDL_OpenURL(HomeDirManager::getHomeDirectoryURL().c_str()))
+		{ blog.newEntry<BLOG::ERROR>("Failed to open Data folder! [{}]", SDL_GetError()); }
 }
 
 void FrontendHost::checkForHotkeys() {

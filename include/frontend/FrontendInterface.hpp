@@ -20,6 +20,9 @@ public:
 	static inline Atom<void(*)()>
 		FnHook_OpenFile{};
 
+	static inline Atom<void(*)()>
+		FnHook_OpenDataDir{};
+
 public:
 	static void Initialize(SDL_Window*, SDL_Renderer*);
 	static void Shutdown();

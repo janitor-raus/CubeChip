@@ -63,6 +63,8 @@ class FrontendHost final {
 
 	static void openFileDialog() noexcept;
 
+	static void openHomeDirectory() noexcept;
+
 public:
 	static inline HomeDirManager*  HDM{};
 	static inline GlobalAudioBase* GAB{};
