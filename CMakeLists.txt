@@ -120,14 +120,14 @@ if(MSVC)
 
 	target_compile_options(
 		"${PROJECT_NAME}" PRIVATE
-		$<$<CONFIG:Release>: /W4 /MP /utf-8 /O2 /Ob2 /Oi /Ot /GT /GL>
+		$<$<CONFIG:Release>: /W4 /MP /utf-8 /O2 /Ob2 /Oi /Ot /Zi /GT /GL>
 		$<$<CONFIG:Debug>: /W4 /MP /utf-8 /Od /Zi /RTC1>
 	)
 
 	target_link_options(
 		"${PROJECT_NAME}" PRIVATE
-		$<$<CONFIG:Release>: /LTCG /SUBSYSTEM:WINDOWS /INCREMENTAL:NO /OPT:ICF>
-		$<$<CONFIG:Debug>: /SUBSYSTEM:CONSOLE /INCREMENTAL>
+		$<$<CONFIG:Release>: /LTCG /SUBSYSTEM:WINDOWS /INCREMENTAL:NO /OPT:ICF /DEBUG>
+		$<$<CONFIG:Debug>: /SUBSYSTEM:CONSOLE /INCREMENTAL /DEBUG>
 	)
 
 else()
