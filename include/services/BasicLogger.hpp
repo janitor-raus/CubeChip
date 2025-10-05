@@ -38,15 +38,15 @@ public:
 
 private:
 	template <BLOG LOG_SEVERITY>
-	void writeEntry(const std::string& message);
+	void newEntry_(const std::string& message);
 
 public:
 	template <BLOG LOG_SEVERITY, typename... Args>
 	void newEntry(const std::string& message, Args&&... args) {
 		if constexpr (sizeof...(Args) == 0) {
-			writeEntry<LOG_SEVERITY>(message);
+			newEntry_<LOG_SEVERITY>(message);
 		} else {
-			writeEntry<LOG_SEVERITY>(fmt::vformat(message, fmt::make_format_args(args...)));
+			newEntry_<LOG_SEVERITY>(fmt::vformat(message, fmt::make_format_args(args...)));
 		}
 	}
 

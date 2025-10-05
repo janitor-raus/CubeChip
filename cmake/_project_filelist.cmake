@@ -31,7 +31,7 @@ set(COMPONENTS_HEADERS
 	"${PROJECT_INCLUDE_DIR}/components/FrameLimiter.hpp"
 	"${PROJECT_INCLUDE_DIR}/components/Map2D.hpp"
 	"${PROJECT_INCLUDE_DIR}/components/RangeIterator.hpp"
-	"${PROJECT_INCLUDE_DIR}/components/SimpleRingBuffer.hpp"
+	"${PROJECT_INCLUDE_DIR}/components/SlidingRingBuffer.hpp"
 	"${PROJECT_INCLUDE_DIR}/components/SimpleTimer.hpp"
 	"${PROJECT_INCLUDE_DIR}/components/TripleBuffer.hpp"
 	"${PROJECT_INCLUDE_DIR}/components/Voice.hpp"

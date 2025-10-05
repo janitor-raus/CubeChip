@@ -12,14 +12,20 @@
 #include "Millis.hpp"
 #include "BasicLogger.hpp"
 #include "SimpleFileIO.hpp"
-#include "SimpleRingBuffer.hpp"
+#include "SlidingRingBuffer.hpp"
 
 /*==================================================================*/
 
-std::filesystem::path sLogPath{};
-
-static SimpleRingBuffer
+static SlidingRingBuffer
 	<std::string, 512> sLogBuffer;
+
+alignas(HDIS)
+static fs::Path sLogPath{};
+static std::size_t sLineFlushCount{};
+
+static constexpr auto cLinesPerFlush{ 32ull };
+
+/*==================================================================*/
 
 static constexpr std::string_view
 getSeverityString(BLOG type) noexcept {
@@ -42,8 +48,8 @@ bool BasicLogger::initLogFile(const std::string& filename, const std::string& di
 		return false;
 	}
 
-	const auto newPath{ std::filesystem::path(directory) / filename };
-	const auto tmpPath{ std::filesystem::path(directory) / (filename + ".tmp") };
+	const auto newPath{ fs::Path(directory) / filename };
+	const auto tmpPath{ fs::Path(directory) / (filename + ".tmp") };
 
 	if (std::ofstream logFile{ tmpPath })
 		{ logFile.close(); }
@@ -72,27 +78,31 @@ void BasicLogger::flushToDisk(std::size_t count) noexcept {
 	std::ofstream logFile(sLogPath, std::ios::app);
 
 	if (logFile) {
-		for (const auto& entry : sLogBuffer.safe_snapshot_asc(count))
+		for (const auto& entry : sLogBuffer.snapshot(count, sLineFlushCount).safe())
 			{ logFile << entry << '\n'; }
+		logFile.flush();
 	}
 }
 
 /*==================================================================*/
 
 template <BLOG LOG_SEVERITY>
-void BasicLogger::writeEntry(const std::string& message) {
+void BasicLogger::newEntry_(const std::string& message) {
 	using namespace std::chrono;
 
 	sLogBuffer.push(fmt::format("{:%H:%M:%S} {:>5} > {}",
 		duration_cast<milliseconds>(nanoseconds(Millis::raw())),
 		getSeverityString(LOG_SEVERITY), message));
+
+	//if ((++sLineFlushCount % cLinesPerFlush) == 0)
+	//	[[unlikely]] { flushToDisk(cLinesPerFlush); }
 }
 
-template void BasicLogger::writeEntry<BLOG::INFO>(const std::string&);
-template void BasicLogger::writeEntry<BLOG::WARN>(const std::string&);
-template void BasicLogger::writeEntry<BLOG::ERROR>(const std::string&);
-template void BasicLogger::writeEntry<BLOG::FATAL>(const std::string&);
-template void BasicLogger::writeEntry<BLOG::DEBUG>(const std::string&);
+template void BasicLogger::newEntry_<BLOG::INFO>(const std::string&);
+template void BasicLogger::newEntry_<BLOG::WARN>(const std::string&);
+template void BasicLogger::newEntry_<BLOG::ERROR>(const std::string&);
+template void BasicLogger::newEntry_<BLOG::FATAL>(const std::string&);
+template void BasicLogger::newEntry_<BLOG::DEBUG>(const std::string&);
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
