@@ -329,7 +329,7 @@ void XOCHIP::makePatternWave(f32* data, u32 size, Voice* voice, Stream*) noexcep
 /*==================================================================*/
 
 void XOCHIP::skipInstruction() noexcept {
-	mCurrentPC += NNNN() == 0xF000 ? 4 : 2;
+	::assign_cast_add(mCurrentPC, NNNN() == 0xF000 ? 4 : 2);
 }
 
 void XOCHIP::scrollDisplayUP(s32 N) {
@@ -551,7 +551,7 @@ void XOCHIP::scrollDisplayRT() {
 	#pragma region A instruction branch
 
 	void XOCHIP::instruction_ANNN(s32 NNN) noexcept {
-		setIndexRegister(NNN);
+		setIndexRegister(NNN & 0xFFF);
 	}
 
 	#pragma endregion

@@ -53,6 +53,7 @@ void FrontendHost::StopSystemThread::operator()(SystemInterface* ptr) noexcept {
 
 void FrontendHost::discardCore() {
 	mSystemCore.reset();
+	blog.newEntry<BLOG::INFO>("Emulator core exited successfully.");
 
 	BVS->setMainWindowTitle(AppName, "Waiting for file...");
 	BVS->resetMainWindow();

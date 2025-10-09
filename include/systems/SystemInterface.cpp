@@ -49,7 +49,6 @@ void SystemInterface::systemThreadEntry(StopToken token) {
 
 			mTimer.start();
 			mainSystemLoop();
-			blog.newEntry<BLOG::INFO>("Frame Time: {:.3f} ms", mTimer.get_elapsed_millis());
 		} else {
 			Millis::sleep_for(1);
 		}
