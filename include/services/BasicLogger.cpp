@@ -9,21 +9,98 @@
 #include <string_view>
 #include <filesystem>
 
-#include "Millis.hpp"
 #include "BasicLogger.hpp"
 #include "SimpleFileIO.hpp"
 #include "SlidingRingBuffer.hpp"
+#include "ThreadAffinity.hpp"
+#include "Thread.hpp"
+#include "Millis.hpp"
 
 /*==================================================================*/
 
-static SlidingRingBuffer
-	<std::string, 512> sLogBuffer;
+class LoggerInstance {
+	SlidingRingBuffer
+		<std::string, 512> mLogBuffer;
 
-alignas(HDIS)
-static fs::Path sLogPath{};
-static std::size_t sLineFlushCount{};
+	alignas(HDIS)
+	std::ofstream mLogFile;
 
-static constexpr auto cLinesPerFlush{ 32ull };
+	std::size_t mLastFlushPos{};
+	std::size_t mLastFlushTime{};
+	Thread mLogFlusherThread;
+
+	friend class BasicLogger;
+	LoggerInstance() noexcept {
+		mLogFlusherThread = Thread([this](StopToken token)
+			noexcept { LogFlusherThreadEntry(token); });
+	}
+
+	bool testFlushSize() const noexcept {
+		const auto head{ mLogBuffer.head() };
+		return head >= mLastFlushPos && \
+			head - mLastFlushPos >= (mLogBuffer.size() / 2);
+	}
+
+	bool testFlushTime() const noexcept {
+		return Millis::now() - mLastFlushTime >= 10000;
+	}
+
+	void LogFlusherThreadEntry(StopToken token) noexcept {
+		thread_affinity::set_affinity(0b11ull);
+		while (!token.stop_requested()) [[likely]] {
+			if (testFlushSize() || testFlushTime())
+				[[unlikely]] { flushLogBuffer(); }
+			Millis::sleep_for(1);
+		}
+	}
+
+	void flushLogBuffer() noexcept {
+		if (!mLogFile) { return; }
+
+		const auto snapshot{ mLogBuffer.snapshot(0, mLastFlushPos).fast() };
+		if (snapshot.size() == 0) { mLastFlushTime = Millis::now(); return; }
+		for (const auto& entry : snapshot) { mLogFile << entry << '\n'; }
+
+		mLogFile.flush();
+		mLastFlushPos += snapshot.size();
+		mLastFlushTime = Millis::now();
+	}
+
+	void initLogFile(const std::string& filename, const std::string& directory) noexcept {
+		if (filename.empty() || directory.empty()) {
+			blog.newEntry<BLOG::ERROR>(
+				"Log file name/path cannot be blank!");
+			return;
+		}
+
+		const auto newPath{ fs::Path(directory) / filename };
+
+		mLogFile.open(newPath, std::ios::trunc);
+		if (mLogFile) {
+			blog.newEntry<BLOG::INFO>(
+				"Logging started on {:%Y-%m-%d %H:%M:%S}",
+				std::chrono::system_clock::now());
+		} else {
+			blog.newEntry<BLOG::ERROR>(
+				"Unable to create new Log file: \"{}\"",
+				newPath.string());
+		}
+	}
+
+
+public:
+	~LoggerInstance() noexcept {
+		if (mLogFlusherThread.joinable()) {
+			mLogFlusherThread.request_stop();
+			mLogFlusherThread.join();
+		}
+		flushLogBuffer();
+	}
+
+	auto& buffer() noexcept { return mLogBuffer; }
+} ;
+
+
 
 /*==================================================================*/
 
@@ -42,60 +119,21 @@ getSeverityString(BLOG type) noexcept {
 /*==================================================================*/
 	#pragma region BasicLogger Singleton Class
 
-bool BasicLogger::initLogFile(const std::string& filename, const std::string& directory) noexcept {
-	if (filename.empty() || directory.empty()) {
-		newEntry<BLOG::ERROR>("Log file name/path cannot be blank!");
-		return false;
-	}
-
-	const auto newPath{ fs::Path(directory) / filename };
-	const auto tmpPath{ fs::Path(directory) / (filename + ".tmp") };
-
-	if (std::ofstream logFile{ tmpPath })
-		{ logFile.close(); }
-	else {
-		newEntry<BLOG::ERROR>("Unable to create new Log file: \"{}\"",
-			tmpPath.string());
-		return false;
-	}
-
-	const auto fileRename{ fs::rename(tmpPath, newPath) };
-	if (!fileRename) {
-		newEntry<BLOG::ERROR>(
-			"Unable to replace old Log file: \"{}\" [{}]",
-			newPath.string(), fileRename.error().message());
-		return false;
-	}
-
-	sLogPath.assign(newPath);
-	newEntry<BLOG::INFO>("Logging started on {:%Y-%m-%d %H:%M:%S}",
-		std::chrono::system_clock::now());
-	return true;
+BasicLogger::BasicLogger() noexcept {
+	static LoggerInstance logger;
+	sMainLog = &logger;
 }
 
-void BasicLogger::flushToDisk(std::size_t count) noexcept {
-	if (sLogPath.empty()) { return; }
-	std::ofstream logFile(sLogPath, std::ios::app);
-
-	if (logFile) {
-		for (const auto& entry : sLogBuffer.snapshot(count, sLineFlushCount).safe())
-			{ logFile << entry << '\n'; }
-		logFile.flush();
-	}
+void BasicLogger::initLogFile(const std::string& filename, const std::string& directory) noexcept {
+	sMainLog->initLogFile(filename, directory);
 }
-
-/*==================================================================*/
 
 template <BLOG LOG_SEVERITY>
 void BasicLogger::newEntry_(const std::string& message) {
 	using namespace std::chrono;
 
-	sLogBuffer.push(fmt::format("{:%H:%M:%S} {:>5} > {}",
-		duration_cast<milliseconds>(nanoseconds(Millis::raw())),
-		getSeverityString(LOG_SEVERITY), message));
-
-	//if ((++sLineFlushCount % cLinesPerFlush) == 0)
-	//	[[unlikely]] { flushToDisk(cLinesPerFlush); }
+	sMainLog->buffer().push(fmt::format("{:%H:%M:%S} {:>5} > {}",
+		milliseconds(Millis::now()), getSeverityString(LOG_SEVERITY), message));
 }
 
 template void BasicLogger::newEntry_<BLOG::INFO>(const std::string&);

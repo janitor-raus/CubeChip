@@ -23,10 +23,15 @@ enum class BLOG {
 /*==================================================================*/
 	#pragma region BasicLogger Singleton Class
 
+class LoggerInstance;
+
 class BasicLogger final {
-	BasicLogger() noexcept = default;
+	BasicLogger() noexcept;
+
 	BasicLogger(const BasicLogger&) = delete;
 	BasicLogger& operator=(const BasicLogger&) = delete;
+
+	static inline LoggerInstance* sMainLog{};
 
 public:
 	static auto* initialize() noexcept {
@@ -34,7 +39,7 @@ public:
 		return &self;
 	}
 
-	bool initLogFile(const std::string& filename, const std::string& directory) noexcept;
+	void initLogFile(const std::string& filename, const std::string& directory) noexcept;
 
 private:
 	template <BLOG LOG_SEVERITY>
@@ -49,9 +54,6 @@ public:
 			newEntry_<LOG_SEVERITY>(fmt::vformat(message, fmt::make_format_args(args...)));
 		}
 	}
-
-	// here we have a method whose job will be in the cpp to flush N messages from the static TU ringbuffer to the log file.
-	void flushToDisk(std::size_t count = 0) noexcept;
 };
 
 	#pragma endregion

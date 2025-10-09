@@ -113,8 +113,6 @@ void FrontendHost::quitApplication() noexcept {
 		GAB->exportSettings().map(),
 		BVS->exportSettings().map()
 	);
-
-	blog.flushToDisk();
 }
 
 bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forcePortable) noexcept {

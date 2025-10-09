@@ -125,23 +125,20 @@ private:
 
 		friend class SlidingRingBuffer;
 		ProxySnap_Range(const self& buf, std::size_t count, std::size_t begin) noexcept
-			: buf{ buf }, count{ count }, begin{ begin & (N - 1) } {}
+			: buf{ buf }, count{ count }, begin{ begin } {}
 
 		auto snapshot() const noexcept {
 			const auto head{ buf.head() };
-			if (head == 0) { return std::vector<T>{}; }
+			if (head == 0 || begin > head) { return std::vector<T>{}; }
 
-			const auto relative{ head & (N - 1) };
-			const auto offset{ std::min(begin, relative) };
-
-			const auto dist{ (relative - offset) + 1 };
+			const auto dist{ std::min((head - begin) + 1, N) };
 			const auto size{ count ? std::min(count, dist) : dist };
 
 			std::vector<T> output;
 			output.reserve(size);
 
 			for (std::size_t i{}; i < size; ++i)
-				{ output.push_back(buf.at_(offset + i)); }
+				{ output.push_back(buf.at_(begin + i)); }
 
 			return output;
 		}
