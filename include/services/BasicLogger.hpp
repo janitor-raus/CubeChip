@@ -6,9 +6,10 @@
 
 #pragma once
 
-#include <fmt/format.h>
 #include <string>
-#include <cstddef>
+#include <utility>
+
+#include <fmt/format.h>
 
 /*==================================================================*/
 
@@ -42,17 +43,22 @@ public:
 	void initLogFile(const std::string& filename, const std::string& directory) noexcept;
 
 private:
-	template <BLOG LOG_SEVERITY>
-	void newEntry_(const std::string& message);
+	template <BLOG LOG_LEVEL>
+	void newEntry_(std::string&& message);
 
 public:
-	template <BLOG LOG_SEVERITY, typename... Args>
-	void newEntry(const std::string& message, Args&&... args) {
-		if constexpr (sizeof...(Args) == 0) {
-			newEntry_<LOG_SEVERITY>(message);
+	template <BLOG LOG_LEVEL, typename... Args>
+	void newEntry(std::string&& message, Args&&... args) {
+		if constexpr (sizeof...(Args) != 0) {
+			newEntry_<LOG_LEVEL>(fmt::vformat(message, fmt::make_format_args(args...)));
 		} else {
-			newEntry_<LOG_SEVERITY>(fmt::vformat(message, fmt::make_format_args(args...)));
+			newEntry_<LOG_LEVEL>(std::move(message));
 		}
+	}
+
+	template <BLOG LOG_LEVEL, typename... Args>
+	void newEntry(const std::string& message, Args&&... args) {
+		newEntry<LOG_LEVEL>(std::string(message), std::forward<Args>(args)...);
 	}
 };
 

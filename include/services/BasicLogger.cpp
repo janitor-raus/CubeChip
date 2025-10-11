@@ -5,9 +5,8 @@
 */
 
 #include <fmt/chrono.h>
-#include <utility>
+#include <cstdint>
 #include <string_view>
-#include <filesystem>
 
 #include "BasicLogger.hpp"
 #include "SimpleFileIO.hpp"
@@ -18,9 +17,51 @@
 
 /*==================================================================*/
 
+static constexpr std::string_view
+getSeverityString(BLOG type) noexcept {
+	switch (type) {
+		case BLOG::INFO:  return "INFO";
+		case BLOG::WARN:  return "WARN";
+		case BLOG::ERROR: return "ERROR";
+		case BLOG::FATAL: return "FATAL";
+		case BLOG::DEBUG: return "DEBUG";
+		default: return "UNKN";
+	}
+}
+
+static auto monotonicCount() noexcept {
+	static Atom<std::uint32_t> counter{};
+	return counter.fetch_add(1, mo::relaxed);
+}
+
+/*==================================================================*/
+
+template <typename LogLevelT>
+	requires (sizeof(LogLevelT) <= sizeof(int))
+struct alignas(HDIS) LogEntry {
+	std::uint64_t hash{};  // thread hash, to be filled in automatically
+	std::uint64_t time{};  // timestamp, expected to be ns
+	std::uint32_t index{}; // entry index, expected to be monotonic
+	LogLevelT     level{}; // log level, usually tied to an enum
+	const void* userdata{}; // pointer to additional data, if any
+	std::string message{};  // self-explanatory
+
+	constexpr LogEntry() noexcept = default;
+	LogEntry(std::uint32_t index, LogLevelT level, const void* userdata, std::string message) noexcept
+		: hash { std::hash<std::thread::id>{}(std::this_thread::get_id()) }
+		, time { static_cast<std::uint64_t>(Millis::raw()) }
+		, index{ index }
+		, level{ level }
+		, userdata{ userdata }
+		, message { std::move(message) }
+	{}
+};
+
 class LoggerInstance {
+	friend class BasicLogger;
+
 	SlidingRingBuffer
-		<std::string, 512> mLogBuffer;
+		<LogEntry<BLOG>, 512> mLogBuffer;
 
 	alignas(HDIS)
 	std::ofstream mLogFile;
@@ -29,7 +70,6 @@ class LoggerInstance {
 	std::size_t mLastFlushTime{};
 	Thread mLogFlusherThread;
 
-	friend class BasicLogger;
 	LoggerInstance() noexcept {
 		mLogFlusherThread = Thread([this](StopToken token)
 			noexcept { LogFlusherThreadEntry(token); });
@@ -55,11 +95,16 @@ class LoggerInstance {
 	}
 
 	void flushLogBuffer() noexcept {
+		using namespace std::chrono;
 		if (!mLogFile) { return; }
 
 		const auto snapshot{ mLogBuffer.snapshot(0, mLastFlushPos).fast() };
 		if (snapshot.size() == 0) { mLastFlushTime = Millis::now(); return; }
-		for (const auto& entry : snapshot) { mLogFile << entry << '\n'; }
+		for (const auto& entry : snapshot) {
+			mLogFile << fmt::format("{}) {:%H:%M:%S} {:>5} > {}", entry.index,
+				duration_cast<milliseconds>(nanoseconds(entry.time)),
+				getSeverityString(entry.level), entry.message) << '\n';
+		}
 
 		mLogFile.flush();
 		mLastFlushPos += snapshot.size();
@@ -100,22 +145,6 @@ public:
 	auto& buffer() noexcept { return mLogBuffer; }
 } ;
 
-
-
-/*==================================================================*/
-
-static constexpr std::string_view
-getSeverityString(BLOG type) noexcept {
-	switch (type) {
-		case BLOG::INFO:  return "INFO";
-		case BLOG::WARN:  return "WARN";
-		case BLOG::ERROR: return "ERROR";
-		case BLOG::FATAL: return "FATAL";
-		case BLOG::DEBUG: return "DEBUG";
-		default: return "UNKN";
-	}
-}
-
 /*==================================================================*/
 	#pragma region BasicLogger Singleton Class
 
@@ -128,19 +157,17 @@ void BasicLogger::initLogFile(const std::string& filename, const std::string& di
 	sMainLog->initLogFile(filename, directory);
 }
 
-template <BLOG LOG_SEVERITY>
-void BasicLogger::newEntry_(const std::string& message) {
-	using namespace std::chrono;
-
-	sMainLog->buffer().push(fmt::format("{:%H:%M:%S} {:>5} > {}",
-		milliseconds(Millis::now()), getSeverityString(LOG_SEVERITY), message));
+template <BLOG LOG_LEVEL>
+void BasicLogger::newEntry_(std::string&& message) {
+	sMainLog->buffer().push(LogEntry(monotonicCount(),
+		LOG_LEVEL, nullptr, std::move(message)));
 }
 
-template void BasicLogger::newEntry_<BLOG::INFO>(const std::string&);
-template void BasicLogger::newEntry_<BLOG::WARN>(const std::string&);
-template void BasicLogger::newEntry_<BLOG::ERROR>(const std::string&);
-template void BasicLogger::newEntry_<BLOG::FATAL>(const std::string&);
-template void BasicLogger::newEntry_<BLOG::DEBUG>(const std::string&);
+template void BasicLogger::newEntry_<BLOG::INFO> (std::string&& message);
+template void BasicLogger::newEntry_<BLOG::WARN> (std::string&& message);
+template void BasicLogger::newEntry_<BLOG::ERROR>(std::string&& message);
+template void BasicLogger::newEntry_<BLOG::FATAL>(std::string&& message);
+template void BasicLogger::newEntry_<BLOG::DEBUG>(std::string&& message);
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
