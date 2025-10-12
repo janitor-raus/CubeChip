@@ -17,7 +17,10 @@
 	#pragma warning(disable : 5039)
 		#include <mbctype.h>
 	#pragma warning(pop)
-	#define NOMINMAX
+
+	#ifndef NOMINMAX
+		#define NOMINMAX
+	#endif
 	#include <windows.h>
 #endif
 

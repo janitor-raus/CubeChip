@@ -90,23 +90,6 @@ target_link_libraries(
 
 # ==================================================================================== #
 
-if(WIN32)
-
-	if (CMAKE_SYSTEM_VERSION VERSION_LESS "10.0.22000.0")
-		message(WARNING "Windows SDK version is lower than 22000. Some features may be disabled.")
-		target_compile_definitions("${PROJECT_NAME}" PRIVATE OLD_WINDOWS_SDK)
-	endif()
-
-	target_link_libraries(
-		"${PROJECT_NAME}"
-		PRIVATE
-		"Dwmapi.lib"
-	)
-
-endif()
-
-# ==================================================================================== #
-
 if(MSVC)
 
 	set_property(

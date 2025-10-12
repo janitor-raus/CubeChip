@@ -5,16 +5,26 @@
 */
 
 #ifdef _WIN32
-	#define NOMINMAX
-	#pragma warning(push)
-	#pragma warning(disable : 5039)
-	#include <dwmapi.h>
-	#pragma comment(lib, "Dwmapi")
-	#pragma warning(pop)
+	#include <sdkddkver.h>
+
+	#if (NTDDI_VERSION < NTDDI_WIN10_CO)
+		#define OLD_WINDOWS_SDK
+	#else
+		#ifndef NOMINMAX
+			#define NOMINMAX
+		#endif
+
+		#pragma warning(push)
+		#pragma warning(disable : 5039)
+		#include <dwmapi.h>
+		#pragma comment(lib, "Dwmapi")
+		#pragma warning(pop)
+	#endif
 #endif
 
 #include "FrontendInterface.hpp"
 #include "BasicVideoSpec.hpp"
+#include "BasicLogger.hpp"
 #include "ColorOps.hpp"
 
 #include <vector>
@@ -57,23 +67,31 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings) noexcept {
 		showErrorBox("Failed to create main window!");
 		return;
 	}
-	#if defined(_WIN32) && !defined(OLD_WINDOWS_SDK)
-	else {
-		const auto windowHandle{ SDL_GetPointerProperty(
-			SDL_GetWindowProperties(mMainWindow),
-			SDL_PROP_WINDOW_WIN32_HWND_POINTER,
-			nullptr
-		) };
+	#ifdef _WIN32
+		#ifdef OLD_WINDOWS_SDK
+			static constexpr auto NTDDI_MAJOR{ ((NTDDI_VERSION >> 24) & 0x00FF) };
+			static constexpr auto NTDDI_MINOR{ ((NTDDI_VERSION >> 16) & 0x00FF) };
+			static constexpr auto NTDDI_BUILD{ ( NTDDI_VERSION        & 0xFFFF) };
+			blog.newEntry<BLOG::DEBUG>("Unable to adjust Main Window corner style, "
+				"Windows SDK is too old: {}.{}.{}", NTDDI_MAJOR, NTDDI_MINOR, NTDDI_BUILD);
+		#else
+			else {
+				const auto windowHandle{ SDL_GetPointerProperty(
+					SDL_GetWindowProperties(mMainWindow),
+					SDL_PROP_WINDOW_WIN32_HWND_POINTER,
+					nullptr
+				) };
 
-		if (windowHandle) {
-			const auto cornerMode{ DWMWCP_DONOTROUND };
-			DwmSetWindowAttribute(
-				static_cast<HWND>(windowHandle),
-				DWMWA_WINDOW_CORNER_PREFERENCE,
-				&cornerMode, sizeof(cornerMode)
-			);
-		}
-	}
+				if (windowHandle) {
+					static constexpr auto cornerMode{ DWMWCP_DONOTROUND };
+					DwmSetWindowAttribute(
+						static_cast<HWND>(windowHandle),
+						DWMWA_WINDOW_CORNER_PREFERENCE,
+						&cornerMode, sizeof(cornerMode)
+					);
+				}
+			}
+		#endif
 	#endif
 
 	ez::Rect deco{};
@@ -164,7 +182,7 @@ void BasicVideoSpec::normalizeRectToDisplay(ez::Rect& rect, ez::Rect& deco, bool
 	auto numDisplays{  0 }; // count of displays SDL found
 	auto bestDisplay{ -1 }; // index of display our window will use
 	bool rectIntersectsDisplay{};
-	
+
 	// 1: fetch all eligible display IDs
 	auto displays{ sdl::make_unique(SDL_GetDisplays(&numDisplays)) };
 	if (!displays || numDisplays <= 0) [[unlikely]]
@@ -196,7 +214,7 @@ void BasicVideoSpec::normalizeRectToDisplay(ez::Rect& rect, ez::Rect& deco, bool
 			const auto overlapArea{ ez::intersect(rect, displayBounds[i]).area() };
 			if (overlapArea > bestOverlap) { bestOverlap = overlapArea; bestDisplay = i; }
 		}
-	
+
 		// 5: fall back to searching for closest display
 		if ((rectIntersectsDisplay = !!bestOverlap) == false) {
 			auto bestDistance{ u64(-1) };
