@@ -12,6 +12,11 @@
 
 #include "FrontendHost.hpp"
 
+#define SDL_MAIN_USE_CALLBACKS
+#include <SDL3/SDL_main.h>
+#include <SDL3/SDL_hints.h>
+#include <SDL3/SDL_version.h>
+
 #ifdef _WIN32
 	#pragma warning(push)
 	#pragma warning(disable : 5039)
@@ -23,11 +28,6 @@
 	#endif
 	#include <windows.h>
 #endif
-
-#define SDL_MAIN_USE_CALLBACKS
-#include <SDL3/SDL_main.h>
-#include <SDL3/SDL_hints.h>
-#include <SDL3/SDL_version.h>
 
 /*==================================================================*/
 

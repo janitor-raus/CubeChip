@@ -4,15 +4,23 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
+#include "FrontendInterface.hpp"
+#include "BasicVideoSpec.hpp"
+#include "BasicLogger.hpp"
+#include "ColorOps.hpp"
+
+#include <vector>
+#include <SDL3/SDL.h>
+
 #ifdef _WIN32
 	#include <sdkddkver.h>
 
 	#if (NTDDI_VERSION < NTDDI_WIN10_CO)
 		#define OLD_WINDOWS_SDK
 	#else
-		#ifndef NOMINMAX
+		//#ifndef NOMINMAX
 			#define NOMINMAX
-		#endif
+		//#endif
 
 		#pragma warning(push)
 		#pragma warning(disable : 5039)
@@ -21,14 +29,6 @@
 		#pragma warning(pop)
 	#endif
 #endif
-
-#include "FrontendInterface.hpp"
-#include "BasicVideoSpec.hpp"
-#include "BasicLogger.hpp"
-#include "ColorOps.hpp"
-
-#include <vector>
-#include <SDL3/SDL.h>
 
 /*==================================================================*/
 
