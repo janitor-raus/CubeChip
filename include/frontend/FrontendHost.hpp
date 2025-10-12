@@ -12,6 +12,45 @@
 
 /*==================================================================*/
 
+#ifndef PROJECT_VERSION_MAJOR_I
+	#define PROJECT_VERSION_MAJOR_I 0
+#endif
+#ifndef PROJECT_VERSION_MINOR_I
+	#define PROJECT_VERSION_MINOR_I 0
+#endif
+#ifndef PROJECT_VERSION_PATCH_I
+	#define PROJECT_VERSION_PATCH_I 0
+#endif
+#ifndef PROJECT_VERSION_TWEAK_I
+	#define PROJECT_VERSION_TWEAK_I 0
+#endif
+#ifndef PROJECT_VERSION_MAJOR
+	#define PROJECT_VERSION_MAJOR "0"
+#endif
+#ifndef PROJECT_VERSION_MINOR
+	#define PROJECT_VERSION_MINOR "0"
+#endif
+#ifndef PROJECT_VERSION_PATCH
+	#define PROJECT_VERSION_PATCH "0"
+#endif
+#ifndef PROJECT_VERSION_TWEAK
+	#define PROJECT_VERSION_TWEAK "0"
+#endif
+#ifndef PROJECT_VERSION_GHASH
+	#define PROJECT_VERSION_GHASH "unknown"
+#endif
+#ifndef PROJECT_VERSION_WITH_DATE
+	#define PROJECT_VERSION_WITH_DATE "0.0.0.0"
+#endif
+#ifndef PROJECT_VERSION_WITH_HASH
+	#define PROJECT_VERSION_WITH_HASH "0.0.0.0.unknown"
+#endif
+#ifndef PROJECT_NAME
+	#define PROJECT_NAME "CubeChip?"
+#endif
+
+/*==================================================================*/
+
 struct ProjectVersion {
 	constexpr static inline auto major_i{ PROJECT_VERSION_MAJOR_I };
 	constexpr static inline auto minor_i{ PROJECT_VERSION_MINOR_I };
