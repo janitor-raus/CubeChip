@@ -308,12 +308,15 @@ void CHIP8_MODERN::renderVideoData() {
 	}
 	void CHIP8_MODERN::instruction_8xy1(s32 X, s32 Y) noexcept {
 		::assign_cast_or(mRegisterV[X], mRegisterV[Y]);
+		::assign_cast(mRegisterV[0xF], 0);
 	}
 	void CHIP8_MODERN::instruction_8xy2(s32 X, s32 Y) noexcept {
 		::assign_cast_and(mRegisterV[X], mRegisterV[Y]);
+		::assign_cast(mRegisterV[0xF], 0);
 	}
 	void CHIP8_MODERN::instruction_8xy3(s32 X, s32 Y) noexcept {
 		::assign_cast_xor(mRegisterV[X], mRegisterV[Y]);
+		::assign_cast(mRegisterV[0xF], 0);
 	}
 	void CHIP8_MODERN::instruction_8xy4(s32 X, s32 Y) noexcept {
 		const auto sum{ mRegisterV[X] + mRegisterV[Y] };
