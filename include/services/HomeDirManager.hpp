@@ -73,7 +73,10 @@ private:
 	static void triggerFatalError(const char* error) noexcept;
 	static bool isLocationWritable(const char* path) noexcept;
 
+private:
 	bool setHomePath(StrV override, bool portable, StrV org, StrV app) noexcept;
+public:
+	static auto* getHomePath() noexcept { return sHomePath.empty() ? nullptr : sHomePath.c_str(); }
 
 public:
 	void parseMainAppConfig() const noexcept;
