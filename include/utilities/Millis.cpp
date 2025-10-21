@@ -49,3 +49,15 @@ void Millis::sleeplock_for(double millis) noexcept {
 			{ std::this_thread::yield(); }
 	}
 }
+
+/*==================================================================*/
+
+#include <fmt/format.h>
+
+std::string NanoTime::format() const noexcept {
+	const auto total_secs{ nano / 1'000'000'000ll };
+
+	return fmt::format("{}:{:02}:{:02}.{:03}",
+		total_secs / 3600ll, (total_secs / 60ll) % 60ll,
+		total_secs % 60ll, (nano / 1000000ll) % 1000ll);
+}

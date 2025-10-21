@@ -32,3 +32,17 @@ namespace Millis {
 	 */
 	void sleeplock_for(double millis) noexcept;
 };
+
+/*==================================================================*/
+
+#include <string>
+
+struct NanoTime {
+	const long long nano{};
+
+	constexpr NanoTime(long long n) noexcept : nano{ n } {}
+
+	constexpr operator long long() const noexcept { return nano; }
+
+	std::string format() const noexcept;
+};
