@@ -6,8 +6,6 @@
 
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_events.h>
-#include <SDL3/SDL_dialog.h>
-#include <SDL3/SDL_misc.h>
 
 #include "HomeDirManager.hpp"
 #include "BasicLogger.hpp"
@@ -16,7 +14,6 @@
 #include "FrontendInterface.hpp"
 #include "BasicVideoSpec.hpp"
 #include "GlobalAudioBase.hpp"
-#include "DefaultConfig.hpp"
 #include "HDIS_HCIS.hpp"
 
 #include "FrontendHost.hpp"
@@ -31,11 +28,6 @@ FrontendHost::FrontendHost(const Path& gamePath) noexcept {
 	HDM->setValidator(CoreRegistry::validateProgram);
 	CoreRegistry::loadProgramDB();
 
-	FrontendInterface::FnHook_OpenFile.store \
-		(openFileDialog, mo::relaxed);
-
-	FrontendInterface::FnHook_OpenDataDir.store \
-		(openHomeDirectory, mo::relaxed);
 
 	if (!gamePath.empty()) { loadGameFile(gamePath); }
 	if (!mSystemCore) { BVS->setMainWindowTitle(AppName, "Waiting for file..."); }
@@ -53,7 +45,6 @@ void FrontendHost::StopSystemThread::operator()(SystemInterface* ptr) noexcept {
 
 void FrontendHost::discardCore() {
 	mSystemCore.reset();
-	blog.newEntry<BLOG::INFO>("Emulator core exited successfully.");
 
 	BVS->setMainWindowTitle(AppName, "Waiting for file...");
 	BVS->resetMainWindow();
@@ -64,7 +55,7 @@ void FrontendHost::discardCore() {
 }
 
 void FrontendHost::replaceCore() {
-	mSystemCore.reset();
+	mSystemCore.reset(); // ensures previous thread quits first!
 	mSystemCore.reset(CoreRegistry::constructCore());
 	if (mSystemCore) {
 		BVS->setMainWindowTitle(AppName, HDM->getFileStem());
@@ -116,10 +107,13 @@ void FrontendHost::quitApplication() noexcept {
 	);
 }
 
+
 bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forcePortable) noexcept {
 	HDM = HomeDirManager::initialize(
 		overrideHome, configName, forcePortable, OrgName, AppName);
 	if (!HDM) { return false; }
+
+	FrontendInterface::InitializeContext(HomeDirManager::getHomePath());
 
 	GlobalAudioBase::Settings GAB_settings;
 	BasicVideoSpec::Settings BVS_settings;
@@ -178,29 +172,19 @@ s32  FrontendHost::processEvents(void* event) noexcept {
 /*==================================================================*/
 
 void FrontendHost::processFrame() {
-	checkForHotkeys();
+	initializeInterface();
+	handleHotkeyActions();
 
 	const auto dialogResult{ HDM->getProbableFile() };
+
 	if (dialogResult) { loadGameFile(*dialogResult); }
+	if (!BVS->isSuccessful()) [[unlikely]] { return; }
 
-	if (!BVS->isSuccessful())
-		[[unlikely]] { return; }
-
-	BVS->renderPresent(!!mSystemCore, mSystemCore && mShowOverlay
+	BVS->renderPresent(!!mSystemCore, (mSystemCore && mToggleOSD)
 		? mSystemCore->copyOverlayData().c_str() : nullptr);
 }
 
-void FrontendHost::openFileDialog() noexcept {
-	SDL_ShowOpenFileDialog(HomeDirManager::probableFileCallback,
-		nullptr, BVS->getMainWindow(), nullptr, 0, nullptr, false);
-}
-
-void FrontendHost::openHomeDirectory() noexcept {
-	if (!SDL_OpenURL(HomeDirManager::getHomeDirectoryURL().c_str()))
-		{ blog.newEntry<BLOG::ERROR>("Failed to open Data folder! [{}]", SDL_GetError()); }
-}
-
-void FrontendHost::checkForHotkeys() {
+void FrontendHost::handleHotkeyActions() {
 	static BasicKeyboard Input;
 	Input.updateStates();
 
@@ -222,13 +206,21 @@ void FrontendHost::checkForHotkeys() {
 		{ BVS->cycleViewportScaleMode(); }
 
 	if (mSystemCore) {
-		if (Input.isPressed(KEY(ESCAPE)))
-			{ discardCore(); return; }
-		if (Input.isPressed(KEY(BACKSPACE)))
-			{ replaceCore(); return; }
+		if (Input.isPressed(KEY(ESCAPE))) {
+			discardCore();
+			blog.newEntry<BLOG::INFO>(
+				"Emulator core exited successfully.");
+			return;
+		}
+		if (Input.isPressed(KEY(BACKSPACE))) {
+			replaceCore();
+			blog.newEntry<BLOG::INFO>(
+				"Emulator core restarted successfully.");
+			return;
+		}
 
 		if (Input.isPressed(KEY(F11)))
-			{ mShowOverlay = !mShowOverlay; }
+			{ mToggleOSD = !mToggleOSD; }
 		if (Input.isPressed(KEY(F10)))
 			{ mUnlimited = !mUnlimited; toggleSystemLimiter(); }
 	}

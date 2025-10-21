@@ -27,6 +27,7 @@
 		#include <dwmapi.h>
 		#pragma comment(lib, "Dwmapi")
 		#pragma warning(pop)
+		#undef ERROR // bloody windows.h macro hell
 	#endif
 #endif
 
@@ -114,6 +115,7 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings) noexcept {
 
 	SDL_SetWindowPosition(mMainWindow, window.x, window.y);
 	SDL_SetWindowSize(mMainWindow, window.w, window.h);
+	SDL_SetWindowMinimumSize(mMainWindow, 800, 600);
 
 	mSuccessful = mMainRenderer = SDL_CreateRenderer(mMainWindow, nullptr);
 	if (!mSuccessful) {
@@ -121,7 +123,7 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings) noexcept {
 		return;
 	}
 
-	FrontendInterface::Initialize(mMainWindow, mMainRenderer);
+	FrontendInterface::InitializeVideo(mMainWindow, mMainRenderer);
 
 	resetMainWindow();
 }
@@ -369,9 +371,14 @@ void BasicVideoSpec::renderViewport() {
 		{
 			void* pixels{}; s32 pitch;
 
-			SDL_LockTexture(mSystemTexture, nullptr, &pixels, &pitch);
-			displayBuffer.read(static_cast<u32*>(pixels), mCurViewport.frame.area());
-			SDL_UnlockTexture(mSystemTexture);
+			if (SDL_LockTexture(mSystemTexture, nullptr, &pixels, &pitch)) {
+				displayBuffer.read(static_cast<u32*>(pixels), mCurViewport.frame.area());
+				SDL_UnlockTexture(mSystemTexture);
+			} else {
+				showErrorBox("Failed to lock System texture!");
+				mSystemTexture.reset();
+				return;
+			}
 		}
 
 		SDL_RenderTexture(mMainRenderer, mSystemTexture, nullptr, &innerFRect);
@@ -381,11 +388,11 @@ void BasicVideoSpec::renderViewport() {
 			SDL_SetRenderDrawColor(mMainRenderer, 0, 0, 0, 0x20);
 
 			const auto outerFRect{ to_FRect(mCurViewport.padded()) };
-			const auto drawLimit{ static_cast<s32>(outerFRect.h) };
+			const auto drawLimit{ s32(outerFRect.h) };
 			for (auto y{ 0 }; y < drawLimit; y += mCurViewport.pxpad) {
 				SDL_RenderLine(mMainRenderer,
-					outerFRect.x, static_cast<f32>(y),
-					outerFRect.w, static_cast<f32>(y));
+					outerFRect.x, f32(y),
+					outerFRect.w, f32(y));
 			}
 		}
 	}
@@ -401,19 +408,14 @@ void BasicVideoSpec::renderPresent(bool core, const char* overlay_data) {
 
 	renderViewport();
 
-	FrontendInterface::NewFrame();
-
 	const auto outerRect{ mCurViewport.rotate_if(mViewportRotation & 1).padded() };
-	const auto frameHeight{ s32(FrontendInterface::GetFrameHeight()) };
 
-	SDL_SetWindowMinimumSize(mMainWindow, outerRect.w, outerRect.h + frameHeight);
-
+	FrontendInterface::NewFrame();
 	FrontendInterface::PrepareViewport(
 		mSuccessful && mWindowTexture, mIntegerScaling,
 		outerRect.w, outerRect.h, mViewportRotation,
 		overlay_data, mWindowTexture
 	);
-	FrontendInterface::PrepareGeneralUI();
 	FrontendInterface::RenderFrame(mMainRenderer);
 
 	SDL_RenderPresent(mMainRenderer);

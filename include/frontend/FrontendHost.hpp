@@ -100,21 +100,20 @@ class FrontendHost final {
 
 	SystemCore mSystemCore;
 
-	static void openFileDialog() noexcept;
-
-	static void openHomeDirectory() noexcept;
-
 public:
 	static inline HomeDirManager*  HDM{};
 	static inline GlobalAudioBase* GAB{};
 	static inline BasicVideoSpec*  BVS{};
 
 private:
-	bool mShowOverlay{};
-	bool mUnlimited{};
+	static inline bool mToggleOSD{};
+	static inline bool mUnlimited{};
 
-	void checkForHotkeys();
+	static void ShowLogWindow(bool* enabled) noexcept;
+
+	void handleHotkeyActions();
 	void toggleSystemLimiter() noexcept;
+	void initializeInterface() noexcept;
 
 	void discardCore();
 	void replaceCore();

@@ -18,20 +18,35 @@
 
 /*==================================================================*/
 
+static ImGuiID sMainDockID{};
+static ImGuiID sTaskbarDockID{};
+static float   sTaskbarSize{};
+
 namespace ImGui {
-	[[maybe_unused]]
-	inline auto clamp(const ImVec2& value, const ImVec2& min, const ImVec2& max) {
-		return ImVec2{
-			std::clamp(value.x, min.x, max.x),
-			std::clamp(value.y, min.y, max.y)
-		};
+	ImVec2 clamp(const ImVec2& value, const ImVec2& min, const ImVec2& max) noexcept {
+		return { std::clamp(value.x, min.x, max.x), std::clamp(value.y, min.y, max.y) };
 	}
 
-	[[maybe_unused]]
-	inline auto abs(const ImVec2& value) {
-		return ImVec2{ std::abs(value.x), std::abs(value.y) };
+	ImVec2 floor(const ImVec2& value) noexcept {
+		return { std::floor(value.x), std::floor(value.y) };
 	}
 
+	ImVec2 ceil(const ImVec2& value) noexcept {
+		return { std::ceil(value.x), std::ceil(value.y) };
+	}
+
+	ImVec2 abs(const ImVec2& value) noexcept {
+		return { std::abs(value.x), std::abs(value.y) };
+	}
+	ImVec2 min(const ImVec2& value, const ImVec2& min) noexcept {
+		return { std::min(value.x, min.x), std::min(value.y, min.y) };
+	}
+	ImVec2 max(const ImVec2& value, const ImVec2& max) noexcept {
+		return { std::max(value.x, max.x), std::max(value.y, max.y) };
+	}
+}
+
+namespace ImGui {
 	[[maybe_unused]]
 	static void writeText(
 		const std::string& textString,
@@ -113,14 +128,42 @@ namespace ImGui {
 	}
 }
 
-void FrontendInterface::Initialize(SDL_Window* window, SDL_Renderer* renderer) {
+/*==================================================================*/
+
+void FrontendInterface::invokeRegisteredFuncs(HookRegistry& registry) noexcept {
+	std::unique_lock lock{ sRegistryAccessMutex };
+	auto it{ registry.begin() };
+	while (it != registry.end()) {
+		if (auto shared_ptr{ it->lock() }) {
+			(*shared_ptr)(); ++it;
+		} else {
+			it = registry.erase(it);
+		}
+	}
+}
+
+void FrontendInterface::invokeRegisteredFuncs(HookRegistry& registry, const std::string& key) noexcept {
+	if (registry.empty()) { return; }
+	if (ImGui::BeginMenu(key.c_str())) {
+		invokeRegisteredFuncs(registry);
+		ImGui::EndMenu();
+	}
+}
+
+void FrontendInterface::InitializeContext(const char* home_dir) {
+	static Str ini_path{ home_dir ? Str(home_dir) + "imgui.ini" : Str() };
+	static Str log_path{ home_dir ? Str(home_dir) + "imgui.log" : Str() };
+
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
-	ImGui::GetIO().IniFilename = nullptr;
-	ImGui::GetIO().LogFilename = nullptr;
+	ImGui::GetIO().IniFilename = home_dir ? ini_path.c_str() : nullptr;
+	ImGui::GetIO().LogFilename = home_dir ? log_path.c_str() : nullptr;
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+}
 
+void FrontendInterface::InitializeVideo(SDL_Window* window, SDL_Renderer* renderer) {
 	//UpdateFontScale();
 
 	ImGui::StyleColorsDark();
@@ -143,16 +186,23 @@ void FrontendInterface::ProcessEvent(void* event) {
 void FrontendInterface::NewFrame() {
 	ImGui_ImplSDLRenderer3_NewFrame();
 	ImGui_ImplSDL3_NewFrame();
+
 	ImGui::NewFrame();
+
+	sTaskbarSize = ImGui::GetFrameHeight() * 2.0f;
+
+	initializeMainDockspace();
+	invokeRegisteredWindows();
+
+	static bool show_demo_window{ true };
+	if (show_demo_window) {
+		ImGui::ShowDemoWindow(&show_demo_window);
+	}
 }
 
 void FrontendInterface::RenderFrame(SDL_Renderer* renderer) {
 	ImGui::Render();
 	ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
-}
-
-float FrontendInterface::GetFrameHeight() {
-	return ImGui::GetFrameHeight();
 }
 
 void FrontendInterface::UpdateFontScale(const void* data, int size, float scale) {
@@ -181,72 +231,80 @@ void FrontendInterface::PrepareViewport(
 	int width, int height, int rotation,
 	const char* overlay_data, SDL_Texture* texture
 ) {
-	const auto viewportFrameDimensions{ ImVec2{
-		ImGui::GetIO().DisplaySize.x,
-		ImGui::GetIO().DisplaySize.y - ImGui::GetFrameHeight()
-	} };
+	ImGui::SetNextWindowDockID(sMainDockID, ImGuiCond_FirstUseEver);
 
-	ImGui::SetNextWindowSize(viewportFrameDimensions);
-	ImGui::SetNextWindowPos({ 0.0f, ImGui::GetFrameHeight() });
-
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0.0f, 0.0f });
 	ImGui::Begin("ViewportFrame", nullptr,
-		ImGuiWindowFlags_NoTitleBar |
-		ImGuiWindowFlags_NoResize |
-		ImGuiWindowFlags_NoMove |
-		ImGuiWindowFlags_NoScrollbar |
-		ImGuiWindowFlags_NoScrollWithMouse |
-		ImGuiWindowFlags_NoBringToFrontOnFocus
-	);
-	ImGui::PopStyleVar();
-
-	if (ImGui::BeginMainMenuBar()) {
-		if (ImGui::BeginMenu("File"))
-		{
-			if (auto OpenFile{ FnHook_OpenFile.load(mo::relaxed) })
-				{ if (ImGui::MenuItem("Open File...")) { OpenFile(); } }
-
-			if (auto OpenDataDir{ FnHook_OpenDataDir.load(mo::relaxed) })
-				{ if (ImGui::MenuItem("Open Data Folder...")) { OpenDataDir(); } }
-
-			ImGui::EndMenu();
-		}
-		ImGui::EndMainMenuBar();
-	}
+		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
 	if (enable) {
-		const auto aspectRatio{ integer_scaling
-			? std::floor(std::min(
-				viewportFrameDimensions.x / width,
-				viewportFrameDimensions.y / height
-			))
-			: std::min(
-				viewportFrameDimensions.x / width,
-				viewportFrameDimensions.y / height
-			)
-		};
+		using namespace ImGui;
+		const ImVec2 windowArea{ GetContentRegionAvail() };
 
-		const auto viewportDimensions{ ImVec2{
-			width  * std::max(aspectRatio, 1.0f),
-			height * std::max(aspectRatio, 1.0f)
-		} };
+		auto rawAspectRatio{ std::min(windowArea.x / width, windowArea.y / height) };
+		const auto normalizedRatio{ std::max((integer_scaling
+			? std::floor(rawAspectRatio)
+			: rawAspectRatio
+		), 1.0f) };
 
-		const auto viewportOffsets{ (viewportFrameDimensions - viewportDimensions) / 2.0f };
+		const ImVec2 textureArea{ width * normalizedRatio, height * normalizedRatio };
 
-		if (viewportOffsets.x > 0.0f) { ImGui::SetCursorPosX(std::floor(ImGui::GetCursorPosX() + viewportOffsets.x)); }
-		if (viewportOffsets.y > 0.0f) { ImGui::SetCursorPosY(std::floor(ImGui::GetCursorPosY() + viewportOffsets.y)); }
+		SetCursorPos(floor(GetCursorPos() + (windowArea - textureArea) / 2.0f));
+		DrawRotatedImage(texture, textureArea, rotation);
 
-		ImGui::DrawRotatedImage(texture, viewportDimensions, rotation);
-
-		if (overlay_data) { ImGui::writeShadowedText(overlay_data, { 0.0f, 1.0f }); }
+		if (overlay_data) { writeShadowedText(overlay_data, { 0.0f, 1.0f }); }
 	}
 
 	ImGui::End();
 }
 
-void FrontendInterface::PrepareGeneralUI() {
-	//static bool show_demo_window{ true };
-	//if (show_demo_window) {
-	//	ImGui::ShowDemoWindow(&show_demo_window);
-	//}
+void FrontendInterface::initializeMainDockspace() {
+	const auto& viewport{ *ImGui::GetMainViewport() };
+	ImGui::SetNextWindowPos(viewport.Pos);
+	ImGui::SetNextWindowSize({
+		viewport.Size.x,
+		viewport.Size.y - sTaskbarSize
+	});
+	ImGui::SetNextWindowViewport(viewport.ID);
+
+	ImGui::Begin("MainDockspace", nullptr,
+		ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking |
+		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+		ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
+		ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
+		ImGuiWindowFlags_NoSavedSettings);
+
+	if (ImGui::BeginMainMenuBar()) {
+		invokeRegisteredMenus();
+
+		ImGui::EndMainMenuBar();
+	}
+
+	sMainDockID = ImGui::GetID("MainDockspace");
+	ImGui::DockSpace(sMainDockID, { 0.0f, 0.0f });
+	ImGui::End();
+
+	/*==================================================================*/
+
+	ImGui::SetNextWindowPos({
+		viewport.Pos.x,
+		viewport.Pos.y + viewport.Size.y - ImGui::GetFrameHeight() * 2
+	});
+	ImGui::SetNextWindowSize({ viewport.Size.x, ImGui::GetFrameHeight() * 2 });
+	ImGui::SetNextWindowViewport(viewport.ID);
+
+	ImGui::Begin("TaskbarDockspace", nullptr,
+		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+		ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
+		ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings
+	);
+
+	sTaskbarDockID = ImGui::GetID("TaskbarDockspace");
+	ImGui::DockSpace(sTaskbarDockID, { 0.0f, 0.0f },
+		ImGuiDockNodeFlags_NoDockingInCentralNode | ImGuiDockNodeFlags_NoResize |
+		ImGuiDockNodeFlags_NoDockingSplit
+		//| ImGuiDockNodeFlags_NoUndocking
+	);
+	ImGui::End();
 }
