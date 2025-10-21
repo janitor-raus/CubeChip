@@ -6,119 +6,93 @@
 
 #include <fmt/chrono.h>
 #include <cstdint>
-#include <string_view>
+#include <filesystem>
+#include <atomic>
 
 #include "BasicLogger.hpp"
-#include "SimpleFileIO.hpp"
-#include "SlidingRingBuffer.hpp"
+#include <AtomSharedPtr.hpp>
 #include "ThreadAffinity.hpp"
-#include "Thread.hpp"
 #include "Millis.hpp"
 
 /*==================================================================*/
 
-static constexpr std::string_view
-getSeverityString(BLOG type) noexcept {
-	switch (type) {
-		case BLOG::INFO:  return "INFO";
-		case BLOG::WARN:  return "WARN";
-		case BLOG::ERROR: return "ERROR";
-		case BLOG::FATAL: return "FATAL";
-		case BLOG::DEBUG: return "DEBUG";
-		default: return "UNKN";
-	}
-}
-
 static auto monotonicCount() noexcept {
-	static Atom<std::uint32_t> counter{};
-	return counter.fetch_add(1, mo::relaxed);
+	static std::atomic<std::uint32_t> counter{};
+	return counter.fetch_add(1, std::memory_order::relaxed);
 }
 
 /*==================================================================*/
 
-template <typename LogLevelT>
-	requires (sizeof(LogLevelT) <= sizeof(int))
-struct alignas(HDIS) LogEntry {
-	std::uint64_t hash{};  // thread hash, to be filled in automatically
-	std::uint64_t time{};  // timestamp, expected to be ns
-	std::uint32_t index{}; // entry index, expected to be monotonic
-	LogLevelT     level{}; // log level, usually tied to an enum
-	const void* userdata{}; // pointer to additional data, if any
-	std::string message{};  // self-explanatory
+template <typename LogLevelType>
+	requires (sizeof(LogLevelType) <= sizeof(int))
+LogEntry<LogLevelType>::LogEntry(
+	std::uint32_t index,
+	LogLevelType  level,
+	const void* userdata,
+	std::string message
+) noexcept
+	: hash { std::hash<std::thread::id>{}(std::this_thread::get_id()) }
+	, time { Millis::raw() }
+	, index{ index }
+	, level{ level }
+	, userdata{ userdata }
+	, message { std::move(message) }
+{}
 
-	constexpr LogEntry() noexcept = default;
-	LogEntry(std::uint32_t index, LogLevelT level, const void* userdata, std::string message) noexcept
-		: hash { std::hash<std::thread::id>{}(std::this_thread::get_id()) }
-		, time { static_cast<std::uint64_t>(Millis::raw()) }
-		, index{ index }
-		, level{ level }
-		, userdata{ userdata }
-		, message { std::move(message) }
-	{}
-};
+/*==================================================================*/
 
-class LoggerInstance {
-	friend class BasicLogger;
+LoggerInstance::LoggerInstance() noexcept {
+	mLogFlusherThread = Thread([this](StopToken token)
+		noexcept { LogFlusherThreadEntry(token); });
+}
 
-	SlidingRingBuffer
-		<LogEntry<BLOG>, 512> mLogBuffer;
+bool LoggerInstance::testFlushSize() const noexcept {
+	const auto head{ mLogBuffer.head() };
+	return head >= mLastFlushPos && \
+		head - mLastFlushPos >= (mLogBuffer.size() / 2);
+}
 
-	alignas(HDIS)
-	std::ofstream mLogFile;
+bool LoggerInstance::testFlushTime() const noexcept {
+	return Millis::now() - mLastFlushTime >= 10000;
+}
 
-	std::size_t mLastFlushPos{};
-	std::size_t mLastFlushTime{};
-	Thread mLogFlusherThread;
+void LoggerInstance::LogFlusherThreadEntry(StopToken token) noexcept {
+	thread_affinity::set_affinity(0b11ull);
+	while (!token.stop_requested()) [[likely]] {
+		if (testFlushSize() || testFlushTime())
+			[[unlikely]] { flushLogBuffer(); }
+		Millis::sleep_for(1);
+	}
+}
 
-	LoggerInstance() noexcept {
-		mLogFlusherThread = Thread([this](StopToken token)
-			noexcept { LogFlusherThreadEntry(token); });
+void LoggerInstance::flushLogBuffer() noexcept {
+	using namespace std::chrono;
+	if (!mLogFile) { return; }
+
+	const auto snapshot{ mLogBuffer.snapshot(0, mLastFlushPos).fast() };
+	if (snapshot.size() == 0) { mLastFlushTime = Millis::now(); return; }
+	for (const auto& entry : snapshot) {
+		mLogFile << fmt::format("{}) {} {:>5} > {}",
+			entry.index, NanoTime(entry.time).format(),
+			entry.level.to_string(), entry.message) << '\n';
 	}
 
-	bool testFlushSize() const noexcept {
-		const auto head{ mLogBuffer.head() };
-		return head >= mLastFlushPos && \
-			head - mLastFlushPos >= (mLogBuffer.size() / 2);
-	}
+	mLogFile.flush();
+	mLastFlushPos += snapshot.size();
+	mLastFlushTime = Millis::now();
+}
 
-	bool testFlushTime() const noexcept {
-		return Millis::now() - mLastFlushTime >= 10000;
-	}
-
-	void LogFlusherThreadEntry(StopToken token) noexcept {
-		thread_affinity::set_affinity(0b11ull);
-		while (!token.stop_requested()) [[likely]] {
-			if (testFlushSize() || testFlushTime())
-				[[unlikely]] { flushLogBuffer(); }
-			Millis::sleep_for(1);
-		}
-	}
-
-	void flushLogBuffer() noexcept {
-		using namespace std::chrono;
-		if (!mLogFile) { return; }
-
-		const auto snapshot{ mLogBuffer.snapshot(0, mLastFlushPos).fast() };
-		if (snapshot.size() == 0) { mLastFlushTime = Millis::now(); return; }
-		for (const auto& entry : snapshot) {
-			mLogFile << fmt::format("{}) {:%H:%M:%S} {:>5} > {}", entry.index,
-				duration_cast<milliseconds>(nanoseconds(entry.time)),
-				getSeverityString(entry.level), entry.message) << '\n';
-		}
-
-		mLogFile.flush();
-		mLastFlushPos += snapshot.size();
-		mLastFlushTime = Millis::now();
-	}
-
-	void initLogFile(const std::string& filename, const std::string& directory) noexcept {
+void LoggerInstance::createLog(
+	const std::string& filename,
+	const std::string& directory
+) noexcept {
 		if (filename.empty() || directory.empty()) {
 			blog.newEntry<BLOG::ERROR>(
 				"Log file name/path cannot be blank!");
 			return;
 		}
 
-		const auto newPath{ fs::Path(directory) / filename };
+		const auto newPath{ std::filesystem::path(directory) / filename };
 
 		mLogFile.open(newPath, std::ios::trunc);
 		if (mLogFile) {
@@ -132,18 +106,13 @@ class LoggerInstance {
 		}
 	}
 
-
-public:
-	~LoggerInstance() noexcept {
-		if (mLogFlusherThread.joinable()) {
-			mLogFlusherThread.request_stop();
-			mLogFlusherThread.join();
-		}
-		flushLogBuffer();
+LoggerInstance::~LoggerInstance() noexcept {
+	if (mLogFlusherThread.joinable()) {
+		mLogFlusherThread.request_stop();
+		mLogFlusherThread.join();
 	}
-
-	auto& buffer() noexcept { return mLogBuffer; }
-} ;
+	flushLogBuffer();
+}
 
 /*==================================================================*/
 	#pragma region BasicLogger Singleton Class
@@ -153,14 +122,14 @@ BasicLogger::BasicLogger() noexcept {
 	sMainLog = &logger;
 }
 
-void BasicLogger::initLogFile(const std::string& filename, const std::string& directory) noexcept {
-	sMainLog->initLogFile(filename, directory);
+void BasicLogger::createLog(const std::string& filename, const std::string& directory) noexcept {
+	sMainLog->createLog(filename, directory);
 }
 
-template <BLOG LOG_LEVEL>
+template <BLOG::LEVEL LOG_LEVEL>
 void BasicLogger::newEntry_(std::string&& message) {
 	sMainLog->buffer().push(LogEntry(monotonicCount(),
-		LOG_LEVEL, nullptr, std::move(message)));
+		BLOG(LOG_LEVEL), nullptr, std::move(message)));
 }
 
 template void BasicLogger::newEntry_<BLOG::INFO> (std::string&& message);

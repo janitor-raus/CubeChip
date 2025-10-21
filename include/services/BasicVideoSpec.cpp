@@ -18,9 +18,9 @@
 	#if (NTDDI_VERSION < NTDDI_WIN10_CO)
 		#define OLD_WINDOWS_SDK
 	#else
-		//#ifndef NOMINMAX
+		#ifndef NOMINMAX
 			#define NOMINMAX
-		//#endif
+		#endif
 
 		#pragma warning(push)
 		#pragma warning(disable : 5039)
@@ -159,6 +159,7 @@ bool BasicVideoSpec::isMainWindowID(u32 id) const noexcept {
 }
 
 void BasicVideoSpec::showErrorBox(const char* const title) noexcept {
+	blog.newEntry<BLOG::ERROR>("{}: {}", title, SDL_GetError());
 	SDL_ShowSimpleMessageBox(
 		SDL_MESSAGEBOX_ERROR, title,
 		SDL_GetError(), nullptr
