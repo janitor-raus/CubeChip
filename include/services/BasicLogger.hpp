@@ -7,7 +7,6 @@
 #pragma once
 
 #include <string>
-#include <string_view>
 #include <cstdint>
 #include <utility>
 #include <fstream>
@@ -41,15 +40,27 @@ public:
 	constexpr BLOG() noexcept = default;
 	constexpr BLOG(LEVEL level) noexcept : value{ level } {}
 
-	constexpr std::string_view
-	to_string() const noexcept {
+	// Severity string representations
+	constexpr const char* to_string() const noexcept {
 		switch (value) {
 			case INFO:  return "INFO";
 			case WARN:  return "WARN";
 			case ERROR: return "ERROR";
 			case FATAL: return "FATAL";
 			case DEBUG: return "DEBUG";
-			default: return "UNKN";
+			default:    return "UNKN";
+		}
+	}
+
+	// Severity color codes in RGBA format
+	constexpr std::uint32_t to_color() const noexcept {
+		switch (value) {
+			case INFO:  return 0x44BB00FF;
+			case WARN:  return 0xFFCC00FF;
+			case ERROR: return 0xEE9933FF;
+			case FATAL: return 0xCC3300FF;
+			case DEBUG: return 0x77DDDDFF;
+			default:    return 0xFFFFFFFF;
 		}
 	}
 };

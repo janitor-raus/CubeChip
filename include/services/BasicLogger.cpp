@@ -17,7 +17,7 @@
 /*==================================================================*/
 
 static auto monotonicCount() noexcept {
-	static std::atomic<std::uint32_t> counter{};
+	static std::atomic<std::uint32_t> counter{ 1 };
 	return counter.fetch_add(1, std::memory_order::relaxed);
 }
 

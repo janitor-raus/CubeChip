@@ -14,8 +14,16 @@
 #include "DefaultConfig.hpp"
 #include "BasicLogger.hpp"
 #include "Millis.hpp"
+#include "ColorOps.hpp"
 
 #include <imgui.h>
+#include <ranges>
+
+/*==================================================================*/
+
+static constexpr auto RGBA_to_ImVec4(RGBA color) noexcept {
+	return ImVec4{ color.R / 255.0f, color.G / 255.0f, color.B / 255.0f, 1.0f };
+}
 
 /*==================================================================*/
 
@@ -48,13 +56,12 @@ void FrontendHost::initializeInterface() noexcept {
 
 	static auto sWindow_Log = FrontendInterface::registerWindow(
 	[&]() noexcept {
-		static bool autoScroll = true;
-		static bool scrollToBottom = false;
-
 		if (!sShowLogWindow) { return; }
-		const auto snapshot{ blog->snapshot(0).fast() };
 
-		ImGui::Begin("AppLog##Logger", &sShowLogWindow, ImGuiWindowFlags_NoCollapse);
+		static bool autoScroll{ true };
+		static bool scrollToBottom{};
+
+		ImGui::Begin("Application Log##Logger", &sShowLogWindow, ImGuiWindowFlags_NoCollapse);
 		if (ImGui::Button("Scroll to Bottom")) { scrollToBottom = true; }
 
 		ImGui::SameLine();
@@ -74,16 +81,40 @@ void FrontendHost::initializeInterface() noexcept {
 			ImGui::TableSetupColumn("Message",  ImGuiTableColumnFlags_NoSort);
 			ImGui::TableHeadersRow();
 
-			for (const auto& entry : snapshot) {
+			const auto snapshot{ blog->snapshot(0).fast() };
+			static bool sortDescending{};
+
+			if (auto* sort{ ImGui::TableGetSortSpecs() }) {
+				if (sort->SpecsCount > 0 && sort->SpecsDirty) {
+					sortDescending = sort->Specs[0].SortDirection
+						== ImGuiSortDirection_Descending;
+				}
+			}
+
+			static auto renderTable{ [](auto& entry) {
 				ImGui::TableNextRow();
+
 				ImGui::TableSetColumnIndex(0);
 				ImGui::Text("%u", entry.index);
+
 				ImGui::TableSetColumnIndex(1);
-				ImGui::TextUnformatted(NanoTime(entry.time).format().c_str());
+				ImGui::TextUnformatted(
+					NanoTime(entry.time).format().c_str());
+
 				ImGui::TableSetColumnIndex(2);
-				ImGui::TextUnformatted(entry.level.to_string().data());
+				ImGui::TextColored(RGBA_to_ImVec4(
+					entry.level.to_color()), "%s",
+					entry.level.to_string());
+
 				ImGui::TableSetColumnIndex(3);
 				ImGui::TextUnformatted(entry.message.c_str());
+			} };
+
+			if (sortDescending) {
+				namespace rv = std::ranges::views;
+				for (auto& entry : rv::reverse(snapshot)) { renderTable(entry); }
+			} else {
+				for (auto& entry : snapshot) { renderTable(entry); }
 			}
 
 			if (scrollToBottom || (autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY())) {
