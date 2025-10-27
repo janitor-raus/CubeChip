@@ -20,22 +20,22 @@
 
 struct BLOG {
 	enum class LEVEL {
-		DEBUG, // Events meant for debugging purposes.
-		INFO,  // Events that are innocuous and informational.
-		WARN,  // Events that are unexpected and warrant attention.
-		ERROR, // Events that resulted in a predictable/recoverable error.
-		FATAL, // Events that resulted in unrecoverable failure.
+		DBG, // Events meant for debugging purposes.
+		INF,  // Events that are innocuous and informational.
+		WRN,  // Events that are unexpected and warrant attention.
+		ERR, // Events that resulted in a predictable/recoverable error.
+		FTL, // Events that resulted in unrecoverable failure.
 	};
 
 private:
 	LEVEL value{};
 
 public:
-	static constexpr LEVEL DEBUG = LEVEL::DEBUG;
-	static constexpr LEVEL INFO  = LEVEL::INFO;
-	static constexpr LEVEL WARN  = LEVEL::WARN;
-	static constexpr LEVEL ERROR = LEVEL::ERROR;
-	static constexpr LEVEL FATAL = LEVEL::FATAL;
+	static constexpr LEVEL DBG{ LEVEL::DBG };
+	static constexpr LEVEL INF{ LEVEL::INF };
+	static constexpr LEVEL WRN{ LEVEL::WRN };
+	static constexpr LEVEL ERR{ LEVEL::ERR };
+	static constexpr LEVEL FTL{ LEVEL::FTL };
 
 	constexpr BLOG() noexcept = default;
 	constexpr BLOG(LEVEL level) noexcept : value{ level } {}
@@ -43,24 +43,23 @@ public:
 	// Severity string representations
 	constexpr const char* to_string() const noexcept {
 		switch (value) {
-			case INFO:  return "INFO";
-			case WARN:  return "WARN";
-			case ERROR: return "ERROR";
-			case FATAL: return "FATAL";
-			case DEBUG: return "DEBUG";
-			default:    return "UNKN";
+			case DBG: return "DEBUG";
+			case INF: return "INFO";
+			case WRN: return "WARNING";
+			case ERR: return "ERROR";
+			case FTL: return "FATAL";
+			default:  return "UNKNOWN";
 		}
 	}
-
 	// Severity color codes in RGBA format
 	constexpr std::uint32_t to_color() const noexcept {
 		switch (value) {
-			case INFO:  return 0x44BB00FF;
-			case WARN:  return 0xFFCC00FF;
-			case ERROR: return 0xEE9933FF;
-			case FATAL: return 0xCC3300FF;
-			case DEBUG: return 0x77DDDDFF;
-			default:    return 0xFFFFFFFF;
+			case DBG: return 0x77DDDDFF;
+			case INF: return 0x44BB00FF;
+			case WRN: return 0xFFCC00FF;
+			case ERR: return 0xEE9933FF;
+			case FTL: return 0xCC3300FF;
+			default:  return 0xFFFFFFFF;
 		}
 	}
 };

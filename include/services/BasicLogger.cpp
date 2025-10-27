@@ -87,7 +87,7 @@ void LoggerInstance::createLog(
 	const std::string& directory
 ) noexcept {
 		if (filename.empty() || directory.empty()) {
-			blog.newEntry<BLOG::ERROR>(
+			blog.newEntry<BLOG::ERR>(
 				"Log file name/path cannot be blank!");
 			return;
 		}
@@ -96,11 +96,12 @@ void LoggerInstance::createLog(
 
 		mLogFile.open(newPath, std::ios::trunc);
 		if (mLogFile) {
-			blog.newEntry<BLOG::INFO>(
+			using namespace std::chrono;
+			blog.newEntry<BLOG::INF>(
 				"Logging started on {:%Y-%m-%d %H:%M:%S}",
-				std::chrono::system_clock::now());
+				current_zone()->to_local(system_clock::now()));
 		} else {
-			blog.newEntry<BLOG::ERROR>(
+			blog.newEntry<BLOG::ERR>(
 				"Unable to create new Log file: \"{}\"",
 				newPath.string());
 		}
@@ -132,11 +133,11 @@ void BasicLogger::newEntry_(std::string&& message) {
 		BLOG(LOG_LEVEL), nullptr, std::move(message)));
 }
 
-template void BasicLogger::newEntry_<BLOG::INFO> (std::string&& message);
-template void BasicLogger::newEntry_<BLOG::WARN> (std::string&& message);
-template void BasicLogger::newEntry_<BLOG::ERROR>(std::string&& message);
-template void BasicLogger::newEntry_<BLOG::FATAL>(std::string&& message);
-template void BasicLogger::newEntry_<BLOG::DEBUG>(std::string&& message);
+template void BasicLogger::newEntry_<BLOG::DBG>(std::string&& message);
+template void BasicLogger::newEntry_<BLOG::INF>(std::string&& message);
+template void BasicLogger::newEntry_<BLOG::WRN>(std::string&& message);
+template void BasicLogger::newEntry_<BLOG::ERR>(std::string&& message);
+template void BasicLogger::newEntry_<BLOG::FTL>(std::string&& message);
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/

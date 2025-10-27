@@ -161,7 +161,7 @@ bool BasicVideoSpec::isMainWindowID(u32 id) const noexcept {
 }
 
 void BasicVideoSpec::showErrorBox(const char* const title) noexcept {
-	blog.newEntry<BLOG::ERROR>("{}: {}", title, SDL_GetError());
+	blog.newEntry<BLOG::ERR>("{}: {}", title, SDL_GetError());
 	SDL_ShowSimpleMessageBox(
 		SDL_MESSAGEBOX_ERROR, title,
 		SDL_GetError(), nullptr

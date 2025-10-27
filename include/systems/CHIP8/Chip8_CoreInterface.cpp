@@ -244,7 +244,7 @@ void Chip8_CoreInterface::makePulseWave(f32* data, u32 size, Voice* voice, Strea
 }
 
 void Chip8_CoreInterface::instructionError(u32 HI, u32 LO) {
-	blog.newEntry<BLOG::INFO>("Unknown instruction: 0x{:02X}{:02X}", HI, LO);
+	blog.newEntry<BLOG::INF>("Unknown instruction: 0x{:02X}{:02X}", HI, LO);
 	triggerInterrupt(Interrupt::ERROR);
 }
 
@@ -258,7 +258,7 @@ void Chip8_CoreInterface::triggerInterrupt(Interrupt type) noexcept {
 bool Chip8_CoreInterface::checkRegularFile(const Path& filePath) const noexcept {
 	const auto fileRegular{ fs::is_regular_file(filePath) };
 	if (!fileRegular) {
-		blog.newEntry<BLOG::ERROR>("\"{}\" [{}]",
+		blog.newEntry<BLOG::DBG>("\"{}\" [{}]",
 			filePath.string(), fileRegular.error().message());
 		return false;
 	}
@@ -269,7 +269,7 @@ bool Chip8_CoreInterface::newPermaRegsFile(const Path& filePath) const noexcept 
 	static constexpr char dataPadding[std::size(sPermRegsV)]{};
 	const auto fileCreated{ ::writeFileData(filePath, dataPadding) };
 	if (!fileCreated) {
-		blog.newEntry<BLOG::ERROR>("\"{}\" [{}]",
+		blog.newEntry<BLOG::ERR>("\"{}\" [{}]",
 			filePath.string(), fileCreated.error().message());
 	}
 	return fileCreated.value();
@@ -278,7 +278,7 @@ bool Chip8_CoreInterface::newPermaRegsFile(const Path& filePath) const noexcept 
 void Chip8_CoreInterface::setFilePermaRegs(u32 X) noexcept {
 	auto fileData{ ::writeFileData(sPermaRegsPath, mRegisterV, X) };
 	if (!fileData) {
-		blog.newEntry<BLOG::ERROR>("File IO error: \"{}\" [{}]",
+		blog.newEntry<BLOG::ERR>("File IO error: \"{}\" [{}]",
 			sPermaRegsPath.string(), fileData.error().message());
 	}
 }
@@ -287,7 +287,7 @@ void Chip8_CoreInterface::getFilePermaRegs(u32 X) noexcept {
 	::assign_cast(X, std::min(X, u32(sPermRegsV.size())));
 	auto fileData{ ::readFileData(sPermaRegsPath, X) };
 	if (!fileData) {
-		blog.newEntry<BLOG::ERROR>("File IO error: \"{}\" [{}]",
+		blog.newEntry<BLOG::ERR>("File IO error: \"{}\" [{}]",
 			sPermaRegsPath.string(), fileData.error().message());
 	} else {
 		std::copy_n(fileData.value().begin(), X, sPermRegsV.begin());

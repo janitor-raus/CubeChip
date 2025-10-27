@@ -42,7 +42,7 @@ void FrontendHost::initializeInterface() noexcept {
 	[&]() noexcept {
 		if (ImGui::MenuItem("Open Data Folder...")) {
 			if (!SDL_OpenURL(HomeDirManager::getHomeDirectoryURL().c_str())) {
-				blog.newEntry<BLOG::ERROR>("Failed to open Data folder! [{}]", SDL_GetError());
+				blog.newEntry<BLOG::ERR>("Failed to open Data folder! [{}]", SDL_GetError());
 			}
 		}
 	});
