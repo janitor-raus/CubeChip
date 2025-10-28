@@ -20,6 +20,12 @@
 
 /*==================================================================*/
 
+#if defined(__cpp_constexpr) && (__cpp_constexpr >= 202211L)
+	#define CONSTEXPR_MATH constexpr
+#else
+	#define CONSTEXPR_MATH
+#endif
+
 #if defined(_MSC_VER)
 
 	#define PRECISE_FP_BEGIN \
