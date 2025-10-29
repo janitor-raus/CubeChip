@@ -79,22 +79,10 @@ void FrontendHost::loadGameFile(const Path& gameFile) {
 }
 
 void FrontendHost::hideMainWindow(bool state) noexcept {
-	if (!mSystemCore) { return; }
-
 	if (state) {
-		mSystemCore->addSystemState(EmuState::HIDDEN);
+		if (mSystemCore) { mSystemCore->addSystemState(EmuState::HIDDEN); }
 	} else {
-		mSystemCore->subSystemState(EmuState::HIDDEN);
-	}
-}
-
-void FrontendHost::pauseSystem(bool state) noexcept {
-	if (!mSystemCore) { return; }
-
-	if (state) {
-		mSystemCore->addSystemState(EmuState::PAUSED);
-	} else {
-		mSystemCore->subSystemState(EmuState::PAUSED);
+		if (mSystemCore) { mSystemCore->subSystemState(EmuState::HIDDEN); }
 	}
 }
 
@@ -106,7 +94,6 @@ void FrontendHost::quitApplication() noexcept {
 		BVS->exportSettings().map()
 	);
 }
-
 
 bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forcePortable) noexcept {
 	HDM = HomeDirManager::initialize(
@@ -133,6 +120,8 @@ bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forc
 	return true;
 }
 
+/*==================================================================*/
+
 s32  FrontendHost::processEvents(void* event) noexcept {
 	FrontendInterface::ProcessEvent(event);
 
@@ -157,11 +146,9 @@ s32  FrontendHost::processEvents(void* event) noexcept {
 				break;
 
 			case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
-				//auto a = sdl_event->display.displayID;
 			case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
 				FrontendInterface::UpdateFontScale(AppFontData_Roboto_Mono,
 					SDL_GetWindowDisplayScale(BVS->getMainWindow()));
-
 				break;
 		}
 	}
@@ -171,17 +158,16 @@ s32  FrontendHost::processEvents(void* event) noexcept {
 
 /*==================================================================*/
 
-void FrontendHost::processFrame() {
+s32  FrontendHost::processFrame() {
 	initializeInterface();
 	handleHotkeyActions();
 
 	const auto dialogResult{ HDM->getProbableFile() };
-
 	if (dialogResult) { loadGameFile(*dialogResult); }
-	if (!BVS->isSuccessful()) [[unlikely]] { return; }
 
-	BVS->renderPresent(!!mSystemCore, (mSystemCore && mToggleOSD)
-		? mSystemCore->copyOverlayData().c_str() : nullptr);
+	return BVS->renderPresent(!!mSystemCore, (mSystemCore && mToggleOSD)
+		? mSystemCore->copyOverlayData().c_str() : nullptr
+	) ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
 }
 
 void FrontendHost::handleHotkeyActions() {
@@ -218,7 +204,12 @@ void FrontendHost::handleHotkeyActions() {
 				"Emulator core restarted successfully.");
 			return;
 		}
-
+		if (Input.isPressed(KEY(F4))) {
+			if (auto paused{ mSystemCore->tryPauseSystem() }) {
+				blog.newEntry<BLOG::INF>("System has been {} by hotkey!",
+					*paused ? "paused" : "unpaused");
+			}
+		}
 		if (Input.isPressed(KEY(F11)))
 			{ mToggleOSD = !mToggleOSD; }
 		if (Input.isPressed(KEY(F10)))
@@ -227,12 +218,10 @@ void FrontendHost::handleHotkeyActions() {
 }
 
 void FrontendHost::toggleSystemLimiter() noexcept {
-	if (!mSystemCore) { return; }
-
 	if (mUnlimited) {
-		mSystemCore->addSystemState(EmuState::BENCH);
+		if (mSystemCore) { mSystemCore->addSystemState(EmuState::BENCH); }
 	} else {
-		mSystemCore->subSystemState(EmuState::BENCH);
+		if (mSystemCore) { mSystemCore->subSystemState(EmuState::BENCH); }
 	}
 }
 

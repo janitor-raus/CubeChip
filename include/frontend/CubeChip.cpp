@@ -108,9 +108,7 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 SDL_AppResult SDL_AppIterate(void *pHost) {
 	auto* Host{ static_cast<FrontendHost*>(pHost) };
 
-	Host->processFrame();
-
-	return SDL_APP_CONTINUE;
+	return SDL_AppResult(Host->processFrame());
 }
 
 /*==================================================================*/

@@ -23,9 +23,6 @@ BytePusher_CoreInterface::BytePusher_CoreInterface() noexcept {
 /*==================================================================*/
 
 void BytePusher_CoreInterface::mainSystemLoop() {
-	if (!isSystemRunning())
-		[[unlikely]] { return; }
-
 	instructionLoop();
 	renderAudioData();
 	renderVideoData();

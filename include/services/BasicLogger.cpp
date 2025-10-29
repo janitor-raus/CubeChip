@@ -72,8 +72,8 @@ void LoggerInstance::flushLogBuffer() noexcept {
 	const auto snapshot{ mLogBuffer.snapshot(0, mLastFlushPos).fast() };
 	if (snapshot.size() == 0) { mLastFlushTime = Millis::now(); return; }
 	for (const auto& entry : snapshot) {
-		mLogFile << fmt::format("{}) {} {:>5} > {}",
-			entry.index, NanoTime(entry.time).format(),
+		mLogFile << fmt::format("{0}) {1} {3:>{2}} > {4}",
+			entry.index, NanoTime(entry.time).format(), BLOG::LENGTH,
 			entry.level.to_string(), entry.message) << '\n';
 	}
 

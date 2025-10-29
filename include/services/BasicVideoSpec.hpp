@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include "Typedefs.hpp"
 #include "AtomSharedPtr.hpp"
 #include "TripleBuffer.hpp"
 #include "LifetimeWrapperSDL.hpp"
@@ -21,9 +20,9 @@ class BasicVideoSpec final {
 public:
 	struct Viewport {
 		ez::Frame frame{};
-		s32 multi{}, pxpad{};
+		int multi{}, pxpad{};
 
-		constexpr Viewport(s32 w = 0, s32 h = 0, s32 multi = 0, s32 pxpad = 0) noexcept
+		constexpr Viewport(int w = 0, int h = 0, int multi = 0, int pxpad = 0) noexcept
 			: frame{ std::clamp(w, 0x0, 0xFFF), std::clamp(h, 0x0, 0xFFF) }
 			, multi{ std::clamp(multi, 0x1, 0xF) }
 			, pxpad{ std::clamp(pxpad, 0x0, 0xF) }
@@ -42,19 +41,19 @@ public:
 			return ez::Frame{ frame.w * multi + pxpad * 2, frame.h * multi + pxpad * 2 };
 		}
 
-		static constexpr auto pack(s32 w, s32 h, s32 multi, s32 pxpad) noexcept {
-			return ((u32(w)     & 0xFFFu) <<  0) |
-				   ((u32(h)     & 0xFFFu) << 12) |
-				   ((u32(multi) & 0xFu)   << 24) |
-				   ((u32(pxpad) & 0xFu)   << 28);
+		static constexpr auto pack(int w, int h, int multi, int pxpad) noexcept {
+			return ((unsigned(w)     & 0xFFFu) <<  0) |
+				   ((unsigned(h)     & 0xFFFu) << 12) |
+				   ((unsigned(multi) & 0xFu)   << 24) |
+				   ((unsigned(pxpad) & 0xFu)   << 28);
 		}
 
-		static constexpr auto unpack(u32 packed) noexcept {
+		static constexpr auto unpack(unsigned packed) noexcept {
 			return Viewport{
-				s32((packed >>  0) & 0xFFFu),
-				s32((packed >> 12) & 0xFFFu),
-				s32((packed >> 24) & 0xFu),
-				s32((packed >> 28) & 0xFu)
+				int((packed >>  0) & 0xFFFu),
+				int((packed >> 12) & 0xFFFu),
+				int((packed >> 24) & 0xFu),
+				int((packed >> 28) & 0xFu)
 			};
 		}
 	};
@@ -67,20 +66,20 @@ private:
 
 /*==================================================================*/
 
-	Viewport  mCurViewport{};
-	Atom<u32> mNewViewport{};
+	Viewport       mCurViewport{};
+	Atom<unsigned> mNewViewport{};
 
-	Atom<u32> mOutlineColor{};
-	Atom<u8>  mTextureAlpha{ 0xFF };
+	Atom<unsigned> mOutlineColor{};
+	Atom<ez::u8>   mTextureAlpha{ 0xFF };
 
 	bool mUsingScanlines{};
 	bool mIntegerScaling{};
 
-	s32 mViewportRotation{};
-	s32 mViewportScaleMode{};
+	int mViewportRotation{};
+	int mViewportScaleMode{};
 
 public:
-	TripleBuffer<u32> displayBuffer;
+	TripleBuffer<unsigned> displayBuffer;
 
 	struct Settings {
 		static constexpr ez::Rect
@@ -88,53 +87,38 @@ public:
 
 		ez::Rect window{ defaults };
 		struct Viewport {
-			s32  filtering{ 0 };
+			int  filtering{ 0 };
 			bool int_scale{ true };
 			bool scanlines{ true };
 		} viewport;
 		bool first_run{ true };
 
-		auto map() noexcept {
-			return SettingsMap{
-				makeSetting("VIDEO.Window.X", &window.x),
-				makeSetting("VIDEO.Window.Y", &window.y),
-				makeSetting("VIDEO.Window.W", &window.w),
-				makeSetting("VIDEO.Window.H", &window.h),
-				makeSetting("VIDEO.Window.FirstRun", &first_run),
-				makeSetting("VIDEO.Viewport.Filtering", &viewport.filtering),
-				makeSetting("VIDEO.Viewport.Int_Scale", &viewport.int_scale),
-				makeSetting("VIDEO.Viewport.Scanlines", &viewport.scanlines),
-			};
-		}
+		SettingsMap map() noexcept;
 	};
 
 	[[nodiscard]]
 	auto exportSettings() const noexcept -> Settings;
 
 private:
-	BasicVideoSpec(const Settings& settings) noexcept;
+	BasicVideoSpec(const Settings& settings, bool& success) noexcept;
 	~BasicVideoSpec() noexcept;
 	BasicVideoSpec(const BasicVideoSpec&) = delete;
 	BasicVideoSpec& operator=(const BasicVideoSpec&) = delete;
 
 /*==================================================================*/
 
-	static inline bool mSuccessful{ true };
-
 public:
 	static auto* initialize(const Settings& settings) noexcept {
-		static BasicVideoSpec self(settings);
-		return mSuccessful ? &self : nullptr;
+		static bool sInitSuccess{ true };
+		static BasicVideoSpec self(settings, sInitSuccess);
+		return sInitSuccess ? &self : nullptr;
 	}
-
-	static bool isSuccessful() noexcept { return mSuccessful; }
-	static void showErrorBox(const char* const title) noexcept;
 
 /*==================================================================*/
 
 public:
-	f32  getDisplayRefreshRate(SDL_DisplayID display) noexcept;
-	void normalizeRectToDisplay(ez::Rect& rect, ez::Rect& deco, bool first_run) noexcept;
+	float getDisplayRefreshRate(SDL_DisplayID display) noexcept;
+	void  normalizeRectToDisplay(ez::Rect& rect, ez::Rect& deco, bool first_run) noexcept;
 
 /*==================================================================*/
 
@@ -152,28 +136,28 @@ public:
 	void isUsingScanlines(bool state) noexcept { mUsingScanlines = state; }
 	void toggleUsingScanlines()       noexcept { mUsingScanlines = !mUsingScanlines; }
 
-	void rotateViewport(s32 delta) noexcept {
+	void rotateViewport(int delta) noexcept {
 		mViewportRotation += delta;
 		mViewportRotation &= 3;
 	}
-	void setViewportRotation(s32 value) noexcept {
+	void setViewportRotation(int value) noexcept {
 		mViewportRotation = value & 3;
 	}
 
 	auto getViewportScaleMode() const noexcept { return mViewportScaleMode; }
-	void setViewportScaleMode(s32 mode) noexcept;
+	void setViewportScaleMode(int mode) noexcept;
 	void cycleViewportScaleMode() noexcept;
-	void setBorderColor(u32 color) noexcept;
+	void setBorderColor(unsigned color) noexcept;
 
 /*==================================================================*/
 
 private:
-	void prepareWindowTexture();
-	void prepareSystemTexture();
-	void renderViewport();
+	void prepareWindowTexture() noexcept(false);
+	void prepareSystemTexture() noexcept(false);
+	void renderViewport() noexcept(false);
 
 public:
-	void setViewportAlpha(u32 alpha) noexcept;
+	void setViewportAlpha(unsigned alpha) noexcept;
 
 	/**
 	 * @brief Sets various parameters to shape, scale, and pad the system's Viewport. Thread-safe.
@@ -185,16 +169,16 @@ public:
 	 * to draw scanlines over the Viewport. Capped at -16..16.
 	 * @return Boolean if successful.
 	 */
-	void setViewportSizes(s32 W, s32 H, s32 mult = 0, s32 ppad = 0) noexcept;
+	void setViewportSizes(int W, int H, int mult = 0, int ppad = 0) noexcept;
 	auto getViewportSizes() const noexcept -> Viewport;
 
 public:
-	void resetMainWindow();
-	void setMainWindowTitle(const Str& title, const Str& desc);
-	bool isMainWindowID(u32 id) const noexcept;
-	void raiseMainWindow();
+	void resetMainWindow() noexcept;
+	void setMainWindowTitle(const std::string& title, const std::string& desc);
+	bool isMainWindowID(unsigned id) const noexcept;
+	void raiseMainWindow() noexcept;
 
-	void renderPresent(bool core, const char* overlay_data);
+	bool renderPresent(bool core, const char* overlay_data) noexcept;
 };
 
 	#pragma endregion

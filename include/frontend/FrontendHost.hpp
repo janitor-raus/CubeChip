@@ -109,8 +109,6 @@ private:
 	static inline bool mToggleOSD{};
 	static inline bool mUnlimited{};
 
-	static void ShowLogWindow(bool* enabled) noexcept;
-
 	void handleHotkeyActions();
 	void toggleSystemLimiter() noexcept;
 	void initializeInterface() noexcept;
@@ -126,14 +124,12 @@ public:
 
 	static bool initApplication(StrV overrideHome, StrV configName, bool forcePortable) noexcept;
 
-	s32  processEvents(void* event) noexcept;
-
 	void hideMainWindow(bool state) noexcept;
-	void pauseSystem(bool state) noexcept;
 	void quitApplication() noexcept;
 	void loadGameFile(const Path&);
 
-	void processFrame();
+	s32  processEvents(void* event) noexcept;
+	s32  processFrame();
 };
 
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/

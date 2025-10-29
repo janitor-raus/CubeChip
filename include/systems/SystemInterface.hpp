@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <optional>
 #include <utility>
 #include <vector>
 #include <array>
@@ -42,7 +43,8 @@ enum EmuState : u8 {
 	FATAL  = 0x08, // fatal error path
 	BENCH  = 0x10, // benchmarking mode
 
-	NOT_RUNNING = HIDDEN | PAUSED | HALTED | FATAL // mask
+	NOT_RUNNING = HIDDEN | PAUSED | HALTED | FATAL, // when emulation must wait
+	CANNOT_PAUSE = HIDDEN | HALTED | FATAL, // when pausing is disallowed
 };
 
 struct SimpleKeyMapping {
@@ -115,15 +117,33 @@ public:
 		BVS = pBVS;
 	}
 
-	void addSystemState(EmuState state) noexcept { mGlobalState.fetch_or ( state, mo::acq_rel); }
-	void subSystemState(EmuState state) noexcept { mGlobalState.fetch_and(~state, mo::acq_rel); }
-	void xorSystemState(EmuState state) noexcept { mGlobalState.fetch_xor( state, mo::acq_rel); }
+	// Adds a State to the System, returns previous total state.
+	auto addSystemState(EmuState state) noexcept { return mGlobalState.fetch_or ( state, mo::acq_rel); }
+	// Removes a State from the System, returns previous total state.
+	auto subSystemState(EmuState state) noexcept { return mGlobalState.fetch_and(~state, mo::acq_rel); }
+	// Toggles a State in the System, returns previous total state.
+	auto xorSystemState(EmuState state) noexcept { return mGlobalState.fetch_xor( state, mo::acq_rel); }
 
+	// Sets the total System State to the given value.
 	void setSystemState(EmuState state) noexcept { mGlobalState.store(state, mo::release); }
+	// Fetches the current total System State.
 	auto getSystemState()         const noexcept { return mGlobalState.load(mo::acquire);  }
 
+	// Tests if the given State is present in the System.
 	bool hasSystemState(EmuState state) const noexcept { return !!(getSystemState() & state); }
-	bool isSystemRunning()              const noexcept { return !(getSystemState() & EmuState::NOT_RUNNING); }
+	// Tests if the System is allowed to run (temporarily or not).
+	bool canSystemWork()               const noexcept { return !(getSystemState() & EmuState::NOT_RUNNING); }
+	// Tests if the System is allowed to (un)pause on demand.
+	bool canSystemPause()              const noexcept { return !(getSystemState() & EmuState::CANNOT_PAUSE); }
+
+	// Attempts to (un)pause the System if possible, `reason` text optional.
+	std::optional<bool> tryPauseSystem() noexcept {
+		if (!canSystemPause()) { return std::nullopt; }
+		else {
+			xorSystemState(EmuState::PAUSED);
+			return !!(getSystemState() & EmuState::PAUSED);
+		}
+	}
 
 	virtual s32 getMaxDisplayW() const noexcept = 0;
 	virtual s32 getMaxDisplayH() const noexcept = 0;

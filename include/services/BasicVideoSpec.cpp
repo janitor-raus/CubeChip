@@ -10,6 +10,7 @@
 #include "ColorOps.hpp"
 
 #include <vector>
+#include <exception>
 #include <SDL3/SDL.h>
 
 #ifdef _WIN32
@@ -27,111 +28,141 @@
 		#include <dwmapi.h>
 		#pragma comment(lib, "Dwmapi")
 		#pragma warning(pop)
-		#undef ERROR // bloody windows.h macro hell
 	#endif
 #endif
 
 /*==================================================================*/
 
 static auto to_FRect(const ez::Frame& rect) noexcept {
-	return SDL_FRect{ 0.0f, 0.0f, f32(rect.w), f32(rect.h) };
+	return SDL_FRect{ 0.0f, 0.0f, float(rect.w), float(rect.h) };
 }
 
 static auto to_FRect(const BasicVideoSpec::Viewport& viewport) noexcept {
-	return SDL_FRect{ f32(viewport.pxpad), f32(viewport.pxpad),
-		f32(viewport.frame.w * viewport.multi), f32(viewport.frame.h * viewport.multi) };
+	return SDL_FRect{ float(viewport.pxpad), float(viewport.pxpad),
+		float(viewport.frame.w * viewport.multi), float(viewport.frame.h * viewport.multi) };
 }
 
 static auto to_Frame(SDL_Texture* texture) noexcept {
-	f32 w, h;
+	float w, h;
 	SDL_GetTextureSize(texture, &w, &h);
-	return ez::Frame(s32(w), s32(h));
+	return ez::Frame(int(w), int(h));
+}
+
+/*==================================================================*/
+
+struct FatalError : public std::runtime_error {
+	using std::runtime_error::runtime_error;
+};
+
+[[noreturn]] static
+void throwFatalError(unsigned line, const char* function) noexcept(false) {
+	blog.newEntry<BLOG::FTL>("L{} : {}(): {}",
+		line, function, SDL_GetError());
+
+	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,
+		"Fatal SDL Error", SDL_GetError(), nullptr);
+
+	throw FatalError("Fatal SDL Error");
 }
 
 /*==================================================================*/
 	#pragma region BasicVideoSpec Singleton Class
 
-BasicVideoSpec::BasicVideoSpec(const Settings& settings) noexcept {
-	mSuccessful = SDL_InitSubSystem(SDL_INIT_VIDEO);
-	if (!mSuccessful) {
-		showErrorBox("Failed to init Video Subsystem!");
-		return;
-	}
+BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept {
+	try {
+		if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) \
+			{ throwFatalError(__LINE__, __func__); }
 
-	mViewportScaleMode = std::max(0, settings.viewport.filtering % 3);
+		mViewportScaleMode = std::max(0, settings.viewport.filtering % 3);
 
-	mIntegerScaling    = settings.viewport.int_scale;
-	mUsingScanlines    = settings.viewport.scanlines;
+		mIntegerScaling    = settings.viewport.int_scale;
+		mUsingScanlines    = settings.viewport.scanlines;
 
-	mSuccessful = mMainWindow = SDL_CreateWindow(nullptr, 0, 0, SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE);
-	if (!mSuccessful) {
-		showErrorBox("Failed to create main window!");
-		return;
-	}
-	#ifdef _WIN32
-		#ifdef OLD_WINDOWS_SDK
-			static constexpr auto NTDDI_MAJOR{ ((NTDDI_VERSION >> 24) & 0x00FF) };
-			static constexpr auto NTDDI_MINOR{ ((NTDDI_VERSION >> 16) & 0x00FF) };
-			static constexpr auto NTDDI_BUILD{ ( NTDDI_VERSION        & 0xFFFF) };
-			blog.newEntry<BLOG::DEBUG>("Unable to adjust Main Window corner style, "
-				"Windows SDK is too old: {}.{}.{}", NTDDI_MAJOR, NTDDI_MINOR, NTDDI_BUILD);
-		#else
-			else {
-				const auto windowHandle{ SDL_GetPointerProperty(
-					SDL_GetWindowProperties(mMainWindow),
-					SDL_PROP_WINDOW_WIN32_HWND_POINTER,
-					nullptr
-				) };
+		mMainWindow = SDL_CreateWindow(nullptr, 0, 0, SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE); \
+		if (!mMainWindow) { throwFatalError(__LINE__, __func__); }
+		#ifdef _WIN32
+			#ifdef OLD_WINDOWS_SDK
+				static constexpr auto NTDDI_MAJOR{ ((NTDDI_VERSION >> 24) & 0x00FF) };
+				static constexpr auto NTDDI_MINOR{ ((NTDDI_VERSION >> 16) & 0x00FF) };
+				static constexpr auto NTDDI_BUILD{ ( NTDDI_VERSION        & 0xFFFF) };
+				blog.newEntry<BLOG::DEBUG>("Unable to adjust Main Window corner style, "
+					"Windows SDK is too old: {}.{}.{}", NTDDI_MAJOR, NTDDI_MINOR, NTDDI_BUILD);
+			#else
+				else {
+					const auto windowHandle{ SDL_GetPointerProperty(
+						SDL_GetWindowProperties(mMainWindow),
+						SDL_PROP_WINDOW_WIN32_HWND_POINTER,
+						nullptr
+					) };
 
-				if (windowHandle) {
-					static constexpr auto cornerMode{ DWMWCP_DONOTROUND };
-					DwmSetWindowAttribute(
-						static_cast<HWND>(windowHandle),
-						DWMWA_WINDOW_CORNER_PREFERENCE,
-						&cornerMode, sizeof(cornerMode)
-					);
+					if (windowHandle) {
+						static constexpr auto cornerMode{ DWMWCP_DONOTROUND };
+						DwmSetWindowAttribute(
+							static_cast<HWND>(windowHandle),
+							DWMWA_WINDOW_CORNER_PREFERENCE,
+							&cornerMode, sizeof(cornerMode)
+						);
+					}
 				}
-			}
+			#endif
 		#endif
-	#endif
 
-	ez::Rect deco{};
+		ez::Rect deco{};
 
-	if (auto dummy{ sdl::make_unique(SDL_CreateWindow(
-		nullptr, 64, 64, SDL_WINDOW_UTILITY | SDL_WINDOW_HIDDEN
-	)) }) {
-		#ifndef __APPLE__
-		constexpr auto away{ -(1 << 15) };
-		SDL_SetWindowPosition(dummy, away, away);
-		#endif
-		SDL_ShowWindow(dummy);
-		SDL_SyncWindow(dummy);
-		SDL_RenderPresent(mMainRenderer);
-		SDL_GetWindowBordersSize(dummy, &deco.x, &deco.y, &deco.w, &deco.h);
+		if (auto dummy{ sdl::make_unique(SDL_CreateWindow(
+			nullptr, 64, 64, SDL_WINDOW_UTILITY | SDL_WINDOW_HIDDEN
+		)) }) {
+			#ifndef __APPLE__
+			constexpr auto away{ -(1 << 15) };
+			SDL_SetWindowPosition(dummy, away, away);
+			#endif
+			SDL_ShowWindow(dummy);
+			SDL_SyncWindow(dummy);
+			SDL_RenderPresent(mMainRenderer);
+			SDL_GetWindowBordersSize(dummy, &deco.x, &deco.y, &deco.w, &deco.h);
+		}
+
+		auto window{ settings.window };
+		normalizeRectToDisplay(window, deco, settings.first_run);
+
+		SDL_SetWindowPosition(mMainWindow, window.x, window.y);
+		SDL_SetWindowSize(mMainWindow, window.w, window.h);
+		SDL_SetWindowMinimumSize(mMainWindow, 800, 600);
+
+		mMainRenderer = SDL_CreateRenderer(mMainWindow, nullptr); \
+		if (!mMainRenderer) { throwFatalError(__LINE__, __func__); }
+
+		FrontendInterface::InitializeVideo(mMainWindow, mMainRenderer);
+
+		resetMainWindow();
 	}
-
-	auto window{ settings.window };
-	normalizeRectToDisplay(window, deco, settings.first_run);
-
-	SDL_SetWindowPosition(mMainWindow, window.x, window.y);
-	SDL_SetWindowSize(mMainWindow, window.w, window.h);
-	SDL_SetWindowMinimumSize(mMainWindow, 800, 600);
-
-	mSuccessful = mMainRenderer = SDL_CreateRenderer(mMainWindow, nullptr);
-	if (!mSuccessful) {
-		showErrorBox("Failed to create Main renderer!");
-		return;
+	catch (const FatalError&) {
+		success = false; return;
 	}
-
-	FrontendInterface::InitializeVideo(mMainWindow, mMainRenderer);
-
-	resetMainWindow();
+	catch (const std::exception& e) {
+		blog.newEntry<BLOG::FTL>("{}(): Unknown exception caught: {}",
+			__func__, e.what());
+		success = false; return;
+	}
 }
 
 BasicVideoSpec::~BasicVideoSpec() noexcept {
 	FrontendInterface::Shutdown();
 
 	SDL_QuitSubSystem(SDL_INIT_VIDEO);
+}
+
+SettingsMap BasicVideoSpec::Settings::map() noexcept {
+	return {
+		makeSetting("VIDEO.Window.X", &window.x),
+		makeSetting("VIDEO.Window.Y", &window.y),
+		makeSetting("VIDEO.Window.W", &window.w),
+		makeSetting("VIDEO.Window.H", &window.h),
+		makeSetting("VIDEO.Window.FirstRun", &first_run),
+		makeSetting("VIDEO.Viewport.Filtering", &viewport.filtering),
+		makeSetting("VIDEO.Viewport.Int_Scale", &viewport.int_scale),
+		makeSetting("VIDEO.Viewport.Scanlines", &viewport.scanlines),
+	};
 }
 
 auto BasicVideoSpec::exportSettings() const noexcept -> Settings {
@@ -152,27 +183,19 @@ auto BasicVideoSpec::exportSettings() const noexcept -> Settings {
 	return out;
 }
 
-void BasicVideoSpec::setMainWindowTitle(const Str& title, const Str& desc) {
+void BasicVideoSpec::setMainWindowTitle(const std::string& title, const std::string& desc) {
 	SDL_SetWindowTitle(mMainWindow, (desc.empty() ? title : title + " :: " + desc).c_str());
 }
 
-bool BasicVideoSpec::isMainWindowID(u32 id) const noexcept {
-	return id == SDL_GetWindowID(mMainWindow);
+bool BasicVideoSpec::isMainWindowID(unsigned id) const noexcept {
+	return id > 0u && id == SDL_GetWindowID(mMainWindow);
 }
 
-void BasicVideoSpec::showErrorBox(const char* const title) noexcept {
-	blog.newEntry<BLOG::ERR>("{}: {}", title, SDL_GetError());
-	SDL_ShowSimpleMessageBox(
-		SDL_MESSAGEBOX_ERROR, title,
-		SDL_GetError(), nullptr
-	);
-}
-
-f32 BasicVideoSpec::getDisplayRefreshRate(SDL_DisplayID display) noexcept {
+float BasicVideoSpec::getDisplayRefreshRate(SDL_DisplayID display) noexcept {
 	if (const auto* mode{ SDL_GetCurrentDisplayMode(display) }) {
 		if (mode->refresh_rate_denominator > 0) {
-			return f32(mode->refresh_rate_numerator) /
-				f32(mode->refresh_rate_denominator);
+			return float(mode->refresh_rate_numerator) /
+				float(mode->refresh_rate_denominator);
 		} else {
 			return (mode->refresh_rate > 0.0f)
 				? mode->refresh_rate : 60.0f;
@@ -212,7 +235,7 @@ void BasicVideoSpec::normalizeRectToDisplay(ez::Rect& rect, ez::Rect& deco, bool
 
 	if (!first_run) {
 		// 4: find largest window/display overlap, if any
-		auto bestOverlap{ u64(0) };
+		unsigned long long bestOverlap{ 0 };
 		for (auto i{ 0u }; i < displayBounds.size(); ++i) {
 			const auto overlapArea{ ez::intersect(rect, displayBounds[i]).area() };
 			if (overlapArea > bestOverlap) { bestOverlap = overlapArea; bestDisplay = i; }
@@ -220,7 +243,7 @@ void BasicVideoSpec::normalizeRectToDisplay(ez::Rect& rect, ez::Rect& deco, bool
 
 		// 5: fall back to searching for closest display
 		if ((rectIntersectsDisplay = !!bestOverlap) == false) {
-			auto bestDistance{ u64(-1) };
+			unsigned long long bestDistance{ ~0ull };
 			const auto currentCenter{ rect.center() };
 
 			for (auto i{ 0u }; i < displayBounds.size(); ++i) {
@@ -251,11 +274,11 @@ void BasicVideoSpec::normalizeRectToDisplay(ez::Rect& rect, ez::Rect& deco, bool
 	}
 }
 
-void BasicVideoSpec::raiseMainWindow() {
+void BasicVideoSpec::raiseMainWindow() noexcept {
 	SDL_RaiseWindow(mMainWindow);
 }
 
-void BasicVideoSpec::resetMainWindow() {
+void BasicVideoSpec::resetMainWindow() noexcept {
 	SDL_ShowWindow(mMainWindow);
 	//SDL_SyncWindow(mMainWindow);
 
@@ -266,11 +289,11 @@ void BasicVideoSpec::resetMainWindow() {
 	mWindowTexture.reset();
 }
 
-void BasicVideoSpec::setViewportAlpha(u32 alpha) noexcept {
-	mTextureAlpha.store(u8(alpha), mo::release);
+void BasicVideoSpec::setViewportAlpha(unsigned alpha) noexcept {
+	mTextureAlpha.store(ez::u8(alpha), mo::release);
 }
 
-void BasicVideoSpec::setViewportSizes(s32 W, s32 H, s32 mult, s32 ppad) noexcept {
+void BasicVideoSpec::setViewportSizes(int W, int H, int mult, int ppad) noexcept {
 	mNewViewport.store(Viewport::pack(W, H, mult, ppad), mo::release);
 }
 
@@ -278,7 +301,7 @@ auto BasicVideoSpec::getViewportSizes() const noexcept -> BasicVideoSpec::Viewpo
 	return Viewport::unpack(mNewViewport.load(mo::acquire));
 }
 
-void BasicVideoSpec::setViewportScaleMode(s32 mode) noexcept {
+void BasicVideoSpec::setViewportScaleMode(int mode) noexcept {
 	switch (mode) {
 		case SDL_SCALEMODE_NEAREST:
 		case SDL_SCALEMODE_LINEAR:
@@ -301,26 +324,23 @@ void BasicVideoSpec::cycleViewportScaleMode() noexcept {
 	}
 }
 
-void BasicVideoSpec::setBorderColor(u32 color) noexcept {
+void BasicVideoSpec::setBorderColor(unsigned color) noexcept {
 	mOutlineColor.store(color, mo::release);
 }
 
 /*==================================================================*/
 
-void BasicVideoSpec::prepareWindowTexture() {
-	const auto outerRect{ mCurViewport.padded() };
+void BasicVideoSpec::prepareWindowTexture() noexcept(false) {
+	const auto fullViewportFrame{ mCurViewport.padded() };
 
-	if (to_Frame(mWindowTexture) != outerRect) {
-		mSuccessful = mWindowTexture = SDL_CreateTexture(
-			mMainRenderer,
-			SDL_PIXELFORMAT_RGBX8888,
-			SDL_TEXTUREACCESS_TARGET,
-			outerRect.w, outerRect.h
-		);
+	if (to_Frame(mWindowTexture) != fullViewportFrame)
+	{
+		mWindowTexture = SDL_CreateTexture(mMainRenderer, \
+			SDL_PIXELFORMAT_RGBX8888, SDL_TEXTUREACCESS_TARGET, \
+			fullViewportFrame.w, fullViewportFrame.h); \
+		if (!mWindowTexture) { throwFatalError(__LINE__, __func__); }
 
-		if (!mSuccessful) {
-			showErrorBox("Failed to create Window texture!");
-		} else {
+		else {
 			SDL_SetTextureScaleMode(mWindowTexture, SDL_SCALEMODE_NEAREST);
 			SDL_SetRenderTarget(mMainRenderer, mWindowTexture);
 			SDL_SetRenderDrawColor(mMainRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
@@ -329,31 +349,24 @@ void BasicVideoSpec::prepareWindowTexture() {
 	}
 }
 
-void BasicVideoSpec::prepareSystemTexture() {
+void BasicVideoSpec::prepareSystemTexture() noexcept(false) {
 	if (!mWindowTexture) { return; }
 
-	if (to_Frame(mSystemTexture) != mCurViewport.frame) {
+	if (to_Frame(mSystemTexture) != mCurViewport.frame)
+	{
+		mSystemTexture = SDL_CreateTexture(mMainRenderer, \
+			SDL_PIXELFORMAT_RGBX8888, SDL_TEXTUREACCESS_STREAMING, \
+			mCurViewport.frame.w, mCurViewport.frame.h); \
+		if (!mSystemTexture) { throwFatalError(__LINE__, __func__); }
 
-		mSuccessful = mSystemTexture = SDL_CreateTexture(
-			mMainRenderer,
-			SDL_PIXELFORMAT_RGBX8888,
-			SDL_TEXTUREACCESS_STREAMING,
-			mCurViewport.frame.w, mCurViewport.frame.h
-		);
-
-		if (!mSuccessful) {
-			showErrorBox("Failed to create System texture!");
-		} else {
+		else {
 			SDL_SetTextureScaleMode(mSystemTexture, static_cast<SDL_ScaleMode>(mViewportScaleMode));
 			SDL_SetTextureAlphaMod(mSystemTexture, mTextureAlpha.load(mo::acquire));
 		}
 	}
 }
 
-void BasicVideoSpec::renderViewport() {
-	if (!mWindowTexture && !mSystemTexture)
-		[[unlikely]] { return; }
-
+void BasicVideoSpec::renderViewport() noexcept(false) {
 	if (mWindowTexture) {
 		SDL_SetRenderTarget(mMainRenderer, mWindowTexture);
 
@@ -369,15 +382,13 @@ void BasicVideoSpec::renderViewport() {
 		SDL_RenderFillRect(mMainRenderer, &innerFRect);
 
 		{
-			void* pixels{}; s32 pitch;
+			void* pixels{}; int pitch;
 
-			if (SDL_LockTexture(mSystemTexture, nullptr, &pixels, &pitch)) {
-				displayBuffer.read(static_cast<u32*>(pixels), mCurViewport.frame.area());
+			if (!SDL_LockTexture(mSystemTexture, nullptr, &pixels, &pitch)) \
+				{ throwFatalError(__LINE__, __func__); }
+			else {
+				displayBuffer.read(static_cast<unsigned*>(pixels), mCurViewport.frame.area());
 				SDL_UnlockTexture(mSystemTexture);
-			} else {
-				showErrorBox("Failed to lock System texture!");
-				mSystemTexture.reset();
-				return;
 			}
 		}
 
@@ -388,37 +399,49 @@ void BasicVideoSpec::renderViewport() {
 			SDL_SetRenderDrawColor(mMainRenderer, 0, 0, 0, 0x20);
 
 			const auto outerFRect{ to_FRect(mCurViewport.padded()) };
-			const auto drawLimit{ s32(outerFRect.h) };
+			const auto drawLimit{ int(outerFRect.h) };
 			for (auto y{ 0 }; y < drawLimit; y += mCurViewport.pxpad) {
 				SDL_RenderLine(mMainRenderer,
-					outerFRect.x, f32(y),
-					outerFRect.w, f32(y));
+					outerFRect.x, float(y),
+					outerFRect.w, float(y));
 			}
 		}
 	}
-
-	SDL_SetRenderTarget(mMainRenderer, nullptr);
 }
 
-void BasicVideoSpec::renderPresent(bool core, const char* overlay_data) {
-	mCurViewport = getViewportSizes();
+bool BasicVideoSpec::renderPresent(bool core, const char* overlay_data) noexcept {
+	try {
+		mCurViewport = getViewportSizes();
 
-	if (core) { prepareWindowTexture(); }
-	if (core) { prepareSystemTexture(); }
+		if (core) { prepareWindowTexture(); }
+		if (core) { prepareSystemTexture(); }
 
-	renderViewport();
+		renderViewport();
+		SDL_SetRenderTarget(mMainRenderer, nullptr);
 
-	const auto outerRect{ mCurViewport.rotate_if(mViewportRotation & 1).padded() };
+		const auto outerRect{ mCurViewport.rotate_if(mViewportRotation & 1).padded() };
 
-	FrontendInterface::NewFrame();
-	FrontendInterface::PrepareViewport(
-		mSuccessful && mWindowTexture, mIntegerScaling,
-		outerRect.w, outerRect.h, mViewportRotation,
-		overlay_data, mWindowTexture
-	);
-	FrontendInterface::RenderFrame(mMainRenderer);
+		FrontendInterface::NewFrame();
+		FrontendInterface::PrepareViewport(
+			mWindowTexture, mIntegerScaling,
+			outerRect.w, outerRect.h, mViewportRotation,
+			overlay_data, mWindowTexture
+		);
+		FrontendInterface::RenderFrame(mMainRenderer);
 
-	SDL_RenderPresent(mMainRenderer);
+		if (!SDL_RenderPresent(mMainRenderer))
+			{ throwFatalError(__LINE__, __func__); }
+
+		return true;
+	}
+	catch (const FatalError&) {
+		return false;
+	}
+	catch (const std::exception& e) {
+		blog.newEntry<BLOG::FTL>("{}(): Unknown exception caught: {}",
+			__func__, e.what());
+		return false;
+	}
 }
 
 	#pragma endregion

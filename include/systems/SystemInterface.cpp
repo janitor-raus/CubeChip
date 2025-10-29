@@ -4,10 +4,11 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
+#include <fmt/format.h>
+
 #include "ThreadAffinity.hpp"
 #include "BasicVideoSpec.hpp"
 #include "FrameLimiter.hpp"
-#include "BasicLogger.hpp"
 
 #include "SystemInterface.hpp"
 
@@ -63,7 +64,7 @@ void SystemInterface::timingThreadEntry(StopToken token) {
 
 	while (!token.stop_requested()) [[likely]] {
 		if (Pacer.checkTime()) {
-			if (!isSystemRunning()) { continue; }
+			if (!canSystemWork()) { continue; }
 			Pacer.setLimiter(getRealSystemFramerate());
 			mStopFrame.store(true, mo::release);
 			mNextFrame.store(true, mo::release);
