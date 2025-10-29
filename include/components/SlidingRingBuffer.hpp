@@ -96,7 +96,7 @@ private:
 			output.reserve(size);
 
 			for (std::size_t i{}; i < size; ++i)
-				{ output.push_back(buf.at_(dist - size + i)); }
+				{ output.push_back(buf.at_(size - 1 - i, head)); }
 
 			return output;
 		}
