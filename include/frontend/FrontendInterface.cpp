@@ -130,24 +130,121 @@ namespace ImGui {
 
 /*==================================================================*/
 
-void FrontendInterface::invokeRegisteredFuncs(HookRegistry& registry) noexcept {
-	std::unique_lock lock{ sRegistryAccessMutex };
-	auto it{ registry.begin() };
-	while (it != registry.end()) {
-		if (auto shared_ptr{ it->lock() }) {
-			(*shared_ptr)(); ++it;
-		} else {
-			it = registry.erase(it);
-		}
-	}
+//void FrontendInterface::invokeRegisteredFuncs(HookRegistry& registry) noexcept {
+	//std::vector<Hook> active;
+	//active.reserve(registry.size());
+	//
+	//{
+	//	std::unique_lock lock{ sRegistryAccessMutex };
+	//
+	//	auto it{ registry.begin() };
+	//	while (it != registry.end()) {
+	//		if (auto shared_ptr{ it->lock() }) {
+	//			active.push_back(shared_ptr); ++it;
+	//		} else {
+	//			it = registry.erase(it);
+	//		}
+	//	}
+	//}
+	//
+	//for (auto& hook : active) { (*hook)(); }
+//}
+
+//void FrontendInterface::invokeRegisteredFuncs(HookRegistry& registry, const std::string& key) noexcept {
+//	if (registry.empty()) { return; }
+//	if (ImGui::BeginMenu(key.c_str())) {
+//		invokeRegisteredMenus(registry);
+//		ImGui::EndMenu();
+//	}
+//}
+
+bool FrontendInterface::mergeOverflowingWindows() noexcept {
+	std::unique_lock lock{ sHooks_Windows.overflow_lock };
+
+	auto& src_windows{ sHooks_Windows.overflow.buffer };
+	if (src_windows.empty()) { return false; }
+
+	auto& dst_windows{ sHooks_Windows.registry.buffer };
+
+	dst_windows.insert(dst_windows.end(),
+		std::make_move_iterator(src_windows.begin()),
+		std::make_move_iterator(src_windows.end())
+	);
+	src_windows.clear();
+
+	return true;
 }
 
-void FrontendInterface::invokeRegisteredFuncs(HookRegistry& registry, const std::string& key) noexcept {
-	if (registry.empty()) { return; }
-	if (ImGui::BeginMenu(key.c_str())) {
-		invokeRegisteredFuncs(registry);
-		ImGui::EndMenu();
+void FrontendInterface::invokeRegisteredWindows() noexcept {
+	std::unique_lock lock{ sHooks_Windows.registry_lock };
+
+	auto& windows{ sHooks_Windows.registry };
+
+	do {
+		while (windows.offset < windows.buffer.size()) {
+			auto& entry{ windows.buffer[windows.offset] };
+			if (auto shared_ptr{ entry.lock() }) {
+				(*shared_ptr)(); ++windows.offset;
+			} else {
+				windows.buffer.erase(windows.buffer.begin() + windows.offset);
+			}
+		}
+	} while (mergeOverflowingWindows());
+
+	windows.offset = 0;
+}
+
+
+
+bool FrontendInterface::mergeOverflowingMenus(const Key& tag) noexcept {
+	std::unique_lock lock{ sHooks_Menus.overflow_lock };
+
+	auto& src_window{ sHooks_Menus.overflow[tag] };
+	if (src_window.empty()) {
+		 return false; }
+
+	unsigned migration_count{};
+	for (auto& [menu_title, src_hooks] : src_window) {
+		if (src_hooks.buffer.empty()) { continue; }
+		auto& dst_hooks{ sHooks_Menus.registry[tag][menu_title] };
+
+		dst_hooks.buffer.insert(dst_hooks.buffer.end(),
+			std::make_move_iterator(src_hooks.buffer.begin()),
+			std::make_move_iterator(src_hooks.buffer.end())
+		);
+		src_hooks.buffer.clear();
+		++migration_count;
 	}
+
+	return !!migration_count;
+}
+
+void FrontendInterface::invokeRegisteredMenus(const Key& tag) noexcept {
+	std::unique_lock lock{ sHooks_Menus.registry_lock };
+
+	auto window{ sHooks_Menus.registry.find(tag) };
+	if (window == sHooks_Menus.registry.end()) { return; }
+
+	do {
+		for (auto& [menu_title, hooks] : window->second) {
+			if (hooks.buffer.empty()) { continue; }
+			if (!ImGui::BeginMenu(menu_title.c_str())) { continue; }
+
+			while (hooks.offset < hooks.buffer.size()) {
+				auto& entry{ hooks.buffer[hooks.offset] };
+				if (auto shared_ptr{ entry.lock() }) {
+					(*shared_ptr)(); ++hooks.offset;
+				} else {
+					hooks.buffer.erase(hooks.buffer.begin() + hooks.offset);
+				}
+			}
+
+			ImGui::EndMenu();
+		}
+	} while (mergeOverflowingMenus(tag));
+
+	for (auto& [_, hooks] : window->second)
+		{ hooks.offset = 0; } // reset for next frame
 }
 
 void FrontendInterface::InitializeContext(const char* home_dir) {
@@ -275,7 +372,7 @@ void FrontendInterface::initializeMainDockspace() {
 		ImGuiWindowFlags_NoSavedSettings);
 
 	if (ImGui::BeginMainMenuBar()) {
-		invokeRegisteredMenus();
+		invokeRegisteredMenus("");
 
 		ImGui::EndMainMenuBar();
 	}

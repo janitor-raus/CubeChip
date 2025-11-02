@@ -30,7 +30,7 @@ static constexpr auto RGBA_to_ImVec4(RGBA color) noexcept {
 void FrontendHost::initializeInterface() noexcept {
 	static bool sShowLogWindow{};
 
-	static auto sMenu_File_Open = FrontendInterface::registerMenu("File",
+	static auto sMenu_File_Open = FrontendInterface::registerMenu("", "File",
 	[&]() noexcept {
 		if (ImGui::MenuItem("Open File...")) {
 			SDL_ShowOpenFileDialog(HomeDirManager::probableFileCallback,
@@ -38,7 +38,7 @@ void FrontendHost::initializeInterface() noexcept {
 		}
 	});
 
-	static auto sMenu_File_Data = FrontendInterface::registerMenu("File",
+	static auto sMenu_File_Data = FrontendInterface::registerMenu("", "File",
 	[&]() noexcept {
 		if (ImGui::MenuItem("Open Data Folder...")) {
 			if (!SDL_OpenURL(HomeDirManager::getHomeDirectoryURL().c_str())) {
@@ -47,7 +47,7 @@ void FrontendHost::initializeInterface() noexcept {
 		}
 	});
 
-	static auto sMenu_Debug_Log = FrontendInterface::registerMenu("Debug",
+	static auto sMenu_Debug_Log = FrontendInterface::registerMenu("", "Debug",
 	[&]() noexcept {
 		if (ImGui::MenuItem("Show Logs...", nullptr, sShowLogWindow)) {
 			sShowLogWindow = !sShowLogWindow;
