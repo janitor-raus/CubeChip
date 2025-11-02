@@ -10,6 +10,7 @@
 
 #include "FrontendInterface.hpp"
 #include "HomeDirManager.hpp"
+#include "BasicLogger.hpp"
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
@@ -130,34 +131,6 @@ namespace ImGui {
 
 /*==================================================================*/
 
-//void FrontendInterface::invokeRegisteredFuncs(HookRegistry& registry) noexcept {
-	//std::vector<Hook> active;
-	//active.reserve(registry.size());
-	//
-	//{
-	//	std::unique_lock lock{ sRegistryAccessMutex };
-	//
-	//	auto it{ registry.begin() };
-	//	while (it != registry.end()) {
-	//		if (auto shared_ptr{ it->lock() }) {
-	//			active.push_back(shared_ptr); ++it;
-	//		} else {
-	//			it = registry.erase(it);
-	//		}
-	//	}
-	//}
-	//
-	//for (auto& hook : active) { (*hook)(); }
-//}
-
-//void FrontendInterface::invokeRegisteredFuncs(HookRegistry& registry, const std::string& key) noexcept {
-//	if (registry.empty()) { return; }
-//	if (ImGui::BeginMenu(key.c_str())) {
-//		invokeRegisteredMenus(registry);
-//		ImGui::EndMenu();
-//	}
-//}
-
 bool FrontendInterface::mergeOverflowingWindows() noexcept {
 	std::unique_lock lock{ sHooks_Windows.overflow_lock };
 
@@ -165,6 +138,8 @@ bool FrontendInterface::mergeOverflowingWindows() noexcept {
 	if (src_windows.empty()) { return false; }
 
 	auto& dst_windows{ sHooks_Windows.registry.buffer };
+
+	blog.newEntry<BLOG::DBG>("{} overflow windows found.", src_windows.size());
 
 	dst_windows.insert(dst_windows.end(),
 		std::make_move_iterator(src_windows.begin()),
@@ -207,6 +182,9 @@ bool FrontendInterface::mergeOverflowingMenus(const Key& tag) noexcept {
 	for (auto& [menu_title, src_hooks] : src_window) {
 		if (src_hooks.buffer.empty()) { continue; }
 		auto& dst_hooks{ sHooks_Menus.registry[tag][menu_title] };
+
+		blog.newEntry<BLOG::DBG>("{} overflow hooks for menu \"{}\" found.",
+			src_hooks.buffer.size(), menu_title);
 
 		dst_hooks.buffer.insert(dst_hooks.buffer.end(),
 			std::make_move_iterator(src_hooks.buffer.begin()),

@@ -60,8 +60,8 @@ class FrontendInterface {
 	struct RegistryBox {
 		T registry, overflow;
 
-		alignas(HDIS) std::shared_mutex
-			registry_lock, overflow_lock;
+		std::shared_mutex registry_lock;
+		std::shared_mutex overflow_lock;
 	};
 
 	static inline RegistryBox<HookRegistry>
