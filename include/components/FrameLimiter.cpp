@@ -14,6 +14,9 @@
 
 static constexpr auto millis = std::chrono::milliseconds(1);
 
+// 99.5% of 1ms sleeps measure below this value
+static constexpr auto spin_threshold{ 2.3f };
+
 static auto current_time() noexcept { return std::chrono::steady_clock::now(); }
 
 /*==================================================================*/
@@ -33,12 +36,15 @@ void FrameLimiter::setLimiterProperties(float framerate, bool force_initial_fram
 bool FrameLimiter::isFrameReady(bool lazy) noexcept {
 	if (hasTargetPeriodElapsed()) { return true; }
 
-	if (lazy || getRemainderToTarget() >= 2.3f) {
+	if ((lazy && targetFramePeriod >= spin_threshold) \
+		|| (getRemainderToTarget() >= spin_threshold))
+	{
 		std::this_thread::sleep_for(millis);
+		return false;
 	} else {
 		std::this_thread::yield();
+		return false;
 	}
-	return false;
 }
 
 bool FrameLimiter::isFrameReadyNoBlock() noexcept {
