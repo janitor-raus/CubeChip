@@ -25,14 +25,15 @@ void FrameLimiter::setLimiterProperties(float framerate, bool force_initial_fram
 	setLimiterProperties(framerate);
 	forceInitialFrame = force_initial_frame;
 	allowMissedFrames = allow_missed_frames;
+	previousFrameSkip = false;
 }
 
 /*==================================================================*/
 
-bool FrameLimiter::checkTime() noexcept {
-	if (hasPeriodElapsed()) { return true; }
+bool FrameLimiter::isFrameReady(bool lazy) noexcept {
+	if (hasTargetPeriodElapsed()) { return true; }
 
-	if (getRemainder() >= 2.3f) {
+	if (lazy || getRemainderToTarget() >= 2.3f) {
 		std::this_thread::sleep_for(millis);
 	} else {
 		std::this_thread::yield();
@@ -40,8 +41,8 @@ bool FrameLimiter::checkTime() noexcept {
 	return false;
 }
 
-bool FrameLimiter::checkTimeNoBlock() noexcept {
-	return hasPeriodElapsed();
+bool FrameLimiter::isFrameReadyNoBlock() noexcept {
+	return hasTargetPeriodElapsed();
 }
 
 auto FrameLimiter::getElapsedMillisSince() const noexcept {
@@ -56,7 +57,7 @@ auto FrameLimiter::getElapsedMicrosSince() const noexcept {
 
 /*==================================================================*/
 
-bool FrameLimiter::hasPeriodElapsed() noexcept {
+bool FrameLimiter::hasTargetPeriodElapsed() noexcept {
 	const auto currentTimePoint{ current_time() };
 
 	if (!doneFirstRunSetup) [[unlikely]] {
@@ -70,17 +71,18 @@ bool FrameLimiter::hasPeriodElapsed() noexcept {
 		return true;
 	}
 
-	previousTimeDelta = elapsedOverTarget + std::chrono::duration
+	elapsedTimePeriod = elapsedOverTarget + std::chrono::duration
 		<float, std::milli>(currentTimePoint - previousFrameTime).count();
 
-	if (previousTimeDelta < targetFramePeriod)
+	if (elapsedTimePeriod < targetFramePeriod)
 		[[likely]] { return false; }
 
 	if (allowMissedFrames) {
-		previousFrameSkip = previousTimeDelta >= targetFramePeriod + 0.050f;
-		elapsedOverTarget = std::fmod(previousTimeDelta, targetFramePeriod);
+		previousFrameSkip = elapsedTimePeriod >= targetFramePeriod + 0.050f;
+		elapsedOverTarget = std::fmod(elapsedTimePeriod, targetFramePeriod);
 	} else {
-		elapsedOverTarget = previousTimeDelta - targetFramePeriod;
+		// without frameskip, we carry over frame debt until caught up
+		elapsedOverTarget = elapsedTimePeriod - targetFramePeriod;
 	}
 
 	previousFrameTime = currentTimePoint;

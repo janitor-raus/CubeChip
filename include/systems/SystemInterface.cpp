@@ -63,7 +63,7 @@ void SystemInterface::timingThreadEntry(StopToken token) {
 	FrameLimiter Pacer(getRealSystemFramerate());
 
 	while (!token.stop_requested()) [[likely]] {
-		if (Pacer.checkTime()) {
+		if (Pacer.isFrameReady(!hasSystemState(EmuState::BENCH))) {
 			if (!canSystemWork()) { continue; }
 			Pacer.setLimiterProperties(getRealSystemFramerate());
 			mStopFrame.store(true, mo::release);

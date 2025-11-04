@@ -19,15 +19,15 @@ class FrameLimiter final {
 	bool allowMissedFrames{}; // allows missed frames when elapsedOverTarget > targetFramePeriod
 	bool previousFrameSkip{}; // indicates if frameskip occurred on last check (not how many)
 
-	float targetFramePeriod{}; // stores the desired frame period
-	float elapsedOverTarget{}; // stores time exceeded over target frame period
-	float previousTimeDelta{}; // stores delta between last two frame checks
+	float targetFramePeriod{}; // stores the target frame period (1s / framerate) in millis
+	float elapsedOverTarget{}; // stores time exceeded over last target frame period
+	float elapsedTimePeriod{}; // stores time elapsed since last valid frame check
 
 	chrono previousFrameTime{}; // stores timestamp of last valid frame check
 	sint64 validFrameCounter{}; // counts total amount of valid frame checks
 
 private:
-	bool hasPeriodElapsed() noexcept;
+	bool hasTargetPeriodElapsed() noexcept;
 
 /*==================================================================*/
 
@@ -50,8 +50,11 @@ public:
 /*==================================================================*/
 
 public:
-	bool checkTime() noexcept;
-	bool checkTimeNoBlock() noexcept;
+	// Check if a new frame is ready, yield/sleep as needed otherwise.
+	// If 'lazy' is true, does not yield at all, only sleeps.
+	bool isFrameReady(bool lazy = false) noexcept;
+	// Check if a new frame is ready, without blocking the thread.
+	bool isFrameReadyNoBlock() noexcept;
 
 	auto getElapsedMillisSince() const noexcept;
 	auto getElapsedMicrosSince() const noexcept;
@@ -60,10 +63,11 @@ public:
 
 public:
 	auto getValidFrameCounter() const noexcept { return validFrameCounter; }
-	auto getElapsedMillisLast() const noexcept { return previousTimeDelta; }
-	auto getFramespan()         const noexcept { return targetFramePeriod; }
-	auto getOvershoot()         const noexcept { return elapsedOverTarget; }
-	auto getRemainder()         const noexcept { return targetFramePeriod - previousTimeDelta; }
-	auto getPercentage()        const noexcept { return previousTimeDelta / targetFramePeriod; }
-	bool isKeepingPace()        const noexcept { return elapsedOverTarget < targetFramePeriod && !previousFrameSkip; }
+	auto getElapsedMillisLast() const noexcept { return elapsedTimePeriod; }
+	auto getTargetFramePeriod() const noexcept { return targetFramePeriod; }
+	auto getElapsedOverTarget() const noexcept { return elapsedOverTarget; }
+	auto getRemainderToTarget() const noexcept { return targetFramePeriod - elapsedTimePeriod; }
+	auto getFractionForTarget() const noexcept { return elapsedTimePeriod / targetFramePeriod; }
+
+	bool isKeepingPace() const noexcept { return !previousFrameSkip; }
 };
