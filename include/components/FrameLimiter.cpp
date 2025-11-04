@@ -5,7 +5,6 @@
 */
 
 #include <cmath>
-#include <chrono>
 #include <thread>
 #include <algorithm>
 
@@ -13,62 +12,78 @@
 
 /*==================================================================*/
 
-void FrameLimiter::setLimiter(float framerate) noexcept
-	{ timeFrequency = 1000.0f / std::clamp(framerate, 0.5f, 1000.0f); }
+static constexpr auto millis = std::chrono::milliseconds(1);
 
-void FrameLimiter::setLimiter(float framerate, bool firstpass, bool lostframe) noexcept {
-	setLimiter(framerate);
-	skipFirstPass = firstpass;
-	skipLostFrame = lostframe;
+static auto current_time() noexcept { return std::chrono::steady_clock::now(); }
+
+/*==================================================================*/
+
+void FrameLimiter::setLimiterProperties(float framerate) noexcept
+	{ targetFramePeriod = 1000.0f / std::clamp(framerate, 0.5f, 10000.0f); }
+
+void FrameLimiter::setLimiterProperties(float framerate, bool force_initial_frame, bool allow_missed_frames) noexcept {
+	setLimiterProperties(framerate);
+	forceInitialFrame = force_initial_frame;
+	allowMissedFrames = allow_missed_frames;
 }
 
 /*==================================================================*/
 
 bool FrameLimiter::checkTime() noexcept {
-	using millis = std::chrono::milliseconds;
-	if (isValidFrame()) { return true; }
+	if (hasPeriodElapsed()) { return true; }
 
-	if (getRemainder() >= 2.3f)
-		{ std::this_thread::sleep_for(millis(1)); }
-	else
-		{ std::this_thread::yield(); }
-
+	if (getRemainder() >= 2.3f) {
+		std::this_thread::sleep_for(millis);
+	} else {
+		std::this_thread::yield();
+	}
 	return false;
+}
+
+bool FrameLimiter::checkTimeNoBlock() noexcept {
+	return hasPeriodElapsed();
+}
+
+auto FrameLimiter::getElapsedMillisSince() const noexcept {
+	return std::chrono::duration_cast<std::chrono::microseconds>
+		(current_time() - previousFrameTime).count() / 1e3f;
+}
+
+auto FrameLimiter::getElapsedMicrosSince() const noexcept {
+	return std::chrono::duration_cast<std::chrono::nanoseconds>
+		(current_time() - previousFrameTime).count() / 1e3f;
 }
 
 /*==================================================================*/
 
-inline bool FrameLimiter::isValidFrame() noexcept {
-	using namespace std::chrono;
-	const auto timeAtCurrent{ steady_clock::now() };
+bool FrameLimiter::hasPeriodElapsed() noexcept {
+	const auto currentTimePoint{ current_time() };
 
-	if (!initTimeCheck) [[unlikely]] {
-		timePastFrame = timeAtCurrent;
-		initTimeCheck = true;
+	if (!doneFirstRunSetup) [[unlikely]] {
+		previousFrameTime = currentTimePoint;
+		doneFirstRunSetup = true;
 	}
 
-	if (skipFirstPass) [[unlikely]] {
-		skipFirstPass = false;
-		++validFrameCnt;
+	if (forceInitialFrame) [[unlikely]] {
+		forceInitialFrame = false;
+		++validFrameCounter;
 		return true;
 	}
 
-	timeVariation = {
-		timeOvershoot + duration<float, std::milli>
-		(timeAtCurrent - timePastFrame).count()
-	};
+	previousTimeDelta = elapsedOverTarget + std::chrono::duration
+		<float, std::milli>(currentTimePoint - previousFrameTime).count();
 
-	if (timeVariation < timeFrequency)
+	if (previousTimeDelta < targetFramePeriod)
 		[[likely]] { return false; }
 
-	if (skipLostFrame) {
-		lastFrameLost = timeVariation >= timeFrequency + 0.050f;
-		timeOvershoot = std::fmod(timeVariation, timeFrequency);
+	if (allowMissedFrames) {
+		previousFrameSkip = previousTimeDelta >= targetFramePeriod + 0.050f;
+		elapsedOverTarget = std::fmod(previousTimeDelta, targetFramePeriod);
 	} else {
-		timeOvershoot = timeVariation - timeFrequency;
+		elapsedOverTarget = previousTimeDelta - targetFramePeriod;
 	}
 
-	timePastFrame = timeAtCurrent;
-	++validFrameCnt;
+	previousFrameTime = currentTimePoint;
+	++validFrameCounter;
 	return true;
 }

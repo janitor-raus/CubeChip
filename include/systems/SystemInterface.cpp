@@ -60,12 +60,12 @@ void SystemInterface::timingThreadEntry(StopToken token) {
 	SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 	thread_affinity::set_affinity(0b11ull);
 
-	FrameLimiter Pacer;
+	FrameLimiter Pacer(getRealSystemFramerate());
 
 	while (!token.stop_requested()) [[likely]] {
 		if (Pacer.checkTime()) {
 			if (!canSystemWork()) { continue; }
-			Pacer.setLimiter(getRealSystemFramerate());
+			Pacer.setLimiterProperties(getRealSystemFramerate());
 			mStopFrame.store(true, mo::release);
 			mNextFrame.store(true, mo::release);
 		}

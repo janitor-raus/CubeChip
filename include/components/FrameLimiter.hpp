@@ -12,64 +12,58 @@
 
 class FrameLimiter final {
 	using chrono = std::chrono::steady_clock::time_point;
-	using uint64 = unsigned long long;
+	using sint64 = long long;
 
-	bool   initTimeCheck{}; // forces timestamp update on first check only
-	bool   skipFirstPass{}; // forces valid frame return on first check only
-	bool   skipLostFrame{}; // forces frameskip if timeOvershoot > timeFrequency
-	bool   lastFrameLost{}; // missed frame indicator when frameskip is enabled
+	bool doneFirstRunSetup{}; // forces initial setup of previousFrameTime
+	bool forceInitialFrame{}; // forces initial frame to pass unconditionally
+	bool allowMissedFrames{}; // allows missed frames when elapsedOverTarget > targetFramePeriod
+	bool previousFrameSkip{}; // indicates if frameskip occurred on last check (not how many)
 
-	float  timeFrequency{}; // holds time (ms) per unit Hertz
-	float  timeOvershoot{}; // holds time remainder (ms) from last successful check
-	float  timeVariation{}; // holds time difference between last check and now
-	chrono timePastFrame{}; // holds timestamp of the last frame's check
-	uint64 validFrameCnt{}; // counter of successful frame checks performed
+	float targetFramePeriod{}; // stores the desired frame period
+	float elapsedOverTarget{}; // stores time exceeded over target frame period
+	float previousTimeDelta{}; // stores delta between last two frame checks
 
-	inline bool isValidFrame() noexcept;
-	inline auto getElapsedTime() const noexcept
-		{ return std::chrono::steady_clock::now() - timePastFrame; }
+	chrono previousFrameTime{}; // stores timestamp of last valid frame check
+	sint64 validFrameCounter{}; // counts total amount of valid frame checks
+
+private:
+	bool hasPeriodElapsed() noexcept;
 
 /*==================================================================*/
 
 public:
 	FrameLimiter(
-		float framerate = 60.0f, // 0.5 ... 1000 range
-		bool  firstpass = true,  // skipFirstPass flag
-		bool  lostframe = true   // skipLostFrame flag
+		float framerate = 60.0f,
+		bool  force_initial_frame = true,
+		bool  allow_missed_frames = true
 	) noexcept {
-		setLimiter(framerate, firstpass, lostframe);
+		setLimiterProperties(framerate, force_initial_frame, allow_missed_frames);
 	}
 
-	FrameLimiter(const FrameLimiter& other) noexcept
-		: skipFirstPass{ other.skipFirstPass }
-		, skipLostFrame{ other.skipLostFrame }
-		, timeFrequency{ other.timeFrequency }
-	{}
+	FrameLimiter(const FrameLimiter&)            = delete;
+	FrameLimiter& operator=(const FrameLimiter&) = delete;
+	FrameLimiter& operator=(FrameLimiter&&)      = delete;
 
-	void setLimiter(float framerate) noexcept;
-	void setLimiter(float framerate, bool firstpass, bool lostframe) noexcept;
+	void setLimiterProperties(float framerate) noexcept;
+	void setLimiterProperties(float framerate, bool force_initial_frame, bool allow_missed_frames) noexcept;
 
 /*==================================================================*/
 
+public:
 	bool checkTime() noexcept;
+	bool checkTimeNoBlock() noexcept;
 
-	auto getElapsedMillisSince() const noexcept {
-		using namespace std::chrono;
-		return duration_cast<milliseconds>(getElapsedTime()).count();
-	}
-
-	auto getElapsedMicrosSince() const noexcept {
-		using namespace std::chrono;
-		return duration_cast<microseconds>(getElapsedTime()).count();
-	}
+	auto getElapsedMillisSince() const noexcept;
+	auto getElapsedMicrosSince() const noexcept;
 
 /*==================================================================*/
 
-	auto getValidFrameCounter() const noexcept { return validFrameCnt; }
-	auto getElapsedMillisLast() const noexcept { return timeVariation; }
-	auto getFramespan()         const noexcept { return timeFrequency; }
-	auto getOvershoot()         const noexcept { return timeOvershoot; }
-	auto getRemainder()         const noexcept { return timeFrequency - timeVariation; }
-	auto getPercentage()        const noexcept { return timeVariation / timeFrequency; }
-	bool isKeepingPace()        const noexcept { return timeOvershoot < timeFrequency && !lastFrameLost; }
+public:
+	auto getValidFrameCounter() const noexcept { return validFrameCounter; }
+	auto getElapsedMillisLast() const noexcept { return previousTimeDelta; }
+	auto getFramespan()         const noexcept { return targetFramePeriod; }
+	auto getOvershoot()         const noexcept { return elapsedOverTarget; }
+	auto getRemainder()         const noexcept { return targetFramePeriod - previousTimeDelta; }
+	auto getPercentage()        const noexcept { return previousTimeDelta / targetFramePeriod; }
+	bool isKeepingPace()        const noexcept { return elapsedOverTarget < targetFramePeriod && !previousFrameSkip; }
 };
