@@ -27,6 +27,7 @@ void SystemInterface::startWorker() noexcept {
 void SystemInterface::stopWorker() noexcept {
 	if (mSystemThread.joinable()) {
 		mSystemThread.request_stop();
+		declareNextFrame(true);
 		mSystemThread.join();
 	}
 	if (mTimingThread.joinable()) {
@@ -39,21 +40,17 @@ void SystemInterface::systemThreadEntry(StopToken token) {
 	SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 	thread_affinity::set_affinity(~0b11ull);
 
-	while (!token.stop_requested()) [[likely]] {
-		if (mNextFrame.exchange(false, mo::acq_rel)) [[likely]] {
+	do {
+		standbyNextFrame(false);
 
-			mElapsedFrames += 1;
-			if (hasSystemState(EmuState::BENCH)) [[likely]]
-				{ mBenchedFrames += 1; }
-			else
-				{ mBenchedFrames = 0; }
+		mElapsedFrames += 1;
+		mBenchedFrames = hasSystemState(EmuState::BENCH)
+			? mBenchedFrames + 1 : 0;
 
-			mTimer.start();
-			mainSystemLoop();
-		} else {
-			Millis::sleep_for(1);
-		}
-	}
+		mTimer.start();
+		mainSystemLoop();
+		mFrameBusyTime.store(mTimer.get_elapsed_millis(), mo::release);
+	} while (!token.stop_requested());
 }
 
 void SystemInterface::timingThreadEntry(StopToken token) {
@@ -62,14 +59,16 @@ void SystemInterface::timingThreadEntry(StopToken token) {
 
 	FrameLimiter Pacer(getRealSystemFramerate());
 
-	while (!token.stop_requested()) [[likely]] {
+	do {
 		if (Pacer.isFrameReady(!hasSystemState(EmuState::BENCH))) {
-			if (!canSystemWork()) { continue; }
 			Pacer.setLimiterProperties(getRealSystemFramerate());
-			mStopFrame.store(true, mo::release);
-			mNextFrame.store(true, mo::release);
+
+			if (!canSystemWork()) [[unlikely]] { continue; }
+
+			setStopFrame(true);
+			declareNextFrame(true);
 		}
-	}
+	} while (!token.stop_requested());
 }
 
 SystemInterface::SystemInterface() noexcept

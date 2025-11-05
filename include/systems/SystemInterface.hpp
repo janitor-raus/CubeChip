@@ -64,12 +64,14 @@ class alignas(HDIS) SystemInterface {
 	Thread mSystemThread;
 	Thread mTimingThread;
 
-	Atom<u32> mGlobalState{ EmuState::NORMAL };
+	Atom<f32> mFrameBusyTime{ 0.0f };
+	Atom<u8> mGlobalState{ EmuState::NORMAL };
 
-protected:
+private:
 	Atom<bool> mNextFrame{};
 	Atom<bool> mStopFrame{};
 
+protected:
 	SimpleTimer mTimer{};
 
 private:
@@ -159,9 +161,20 @@ public:    f32  getRealSystemFramerate() const noexcept;
 
 
 protected:
-	void setStopFrame(bool state) noexcept { mStopFrame.store(state, mo::relaxed); }
-	auto getStopFrame()     const noexcept { return mStopFrame.load(mo::relaxed);  }
+	void setStopFrame(bool state) noexcept { mStopFrame.store(state, mo::release); }
+	auto getStopFrame()     const noexcept { return mStopFrame.load(mo::acquire);  }
 
+private:
+	void declareNextFrame(bool state) noexcept {
+		mNextFrame.store(state, mo::release);
+		mNextFrame.notify_one();
+	}
+	void standbyNextFrame(bool state) noexcept {
+		mNextFrame.wait(state, mo::acquire);
+		mNextFrame.store(state, mo::release);
+	}
+
+protected:
 	void setViewportSizes(bool cond, u32 W, u32 H, u32 mult, u32 ppad) noexcept;
 
 	void setDisplayBorderColor(u32 color) noexcept;

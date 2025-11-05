@@ -219,7 +219,7 @@ protected:
 	if (hasSystemState(EmuState::BENCH)) [[likely]] {	\
 		setStopFrame(hasInterrupt());					\
 		LOOP_FUNCTION([this]() noexcept					\
-			{ return !mStopFrame.load(mo::acquire); });	\
+			{ return !getStopFrame(); });				\
 	} else {											\
 		LOOP_FUNCTION([this]() noexcept					\
 			{ return !hasInterrupt() && mCycleCount < mTargetCPF; }); \

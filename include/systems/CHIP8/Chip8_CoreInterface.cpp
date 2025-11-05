@@ -249,7 +249,7 @@ void Chip8_CoreInterface::instructionError(u32 HI, u32 LO) {
 }
 
 void Chip8_CoreInterface::triggerInterrupt(Interrupt type) noexcept {
-	mStopFrame.store(true, mo::relaxed);
+	setStopFrame(true);
 	mInterrupt = type;
 }
 
