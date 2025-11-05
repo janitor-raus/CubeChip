@@ -51,6 +51,9 @@ class FrontendInterface {
 
 		HookBuffer  buffer{};
 		std::size_t offset{};
+
+		// make Clang happy I guess.
+		HookRegistry() noexcept : buffer{}, offset{} {}
 	};
 
 	using HookRegistryMenuMap = std::unordered_map
