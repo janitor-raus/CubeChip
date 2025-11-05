@@ -43,13 +43,13 @@ void SystemInterface::systemThreadEntry(StopToken token) {
 	do {
 		standbyNextFrame(false);
 
-		mElapsedFrames += 1;
-		mBenchedFrames = hasSystemState(EmuState::BENCH)
-			? mBenchedFrames + 1 : 0;
-
 		mTimer.start();
 		mainSystemLoop();
 		mFrameBusyTime.store(mTimer.get_elapsed_millis(), mo::release);
+
+		mElapsedFrames += 1;
+		mBenchedFrames = hasSystemState(EmuState::BENCH)
+			? mBenchedFrames + 1 : 0;
 	} while (!token.stop_requested());
 }
 
