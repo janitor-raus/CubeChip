@@ -22,19 +22,23 @@ constexpr inline float transientFall(unsigned iter, float step = 0.01f) noexcept
 
 /*==================================================================*/
 
+/**
+* @brief The TransienceGain struct is used to calculate and return gain for a fade-in/out period.
+* Usually constructed from an AudioTimer instance, but can be operated independently too.
+*/
 struct TransienceGain {
-	bool intro : 1;
-	bool outro : 1;
-	bool fallback : 1;
+	bool intro    : 1 = false;
+	bool outro    : 1 = false;
+	bool fallback : 1 = true;
 
-	constexpr TransienceGain() noexcept : fallback{ true } {}
+	constexpr TransienceGain() noexcept = default;
 	constexpr TransienceGain(bool intro, bool outro, bool fallback) noexcept
 		: intro{ intro }, outro{ outro }, fallback{ fallback }
 	{}
 
-	constexpr auto calculate(unsigned sample_idx) const noexcept {
-		return  intro ? ::transientGain(sample_idx) :
-				outro ? ::transientFall(sample_idx) : fallback;
+	constexpr auto calculate(unsigned sample_idx, float step = 0.01f) const noexcept {
+		return  intro ? ::transientGain(sample_idx, step) :
+				outro ? ::transientFall(sample_idx, step) : fallback;
 	}
 };
 
@@ -42,8 +46,8 @@ struct TransienceGain {
 
 /**
 * @brief The AudioTimer represents how many frames a voice can be active.
-* Internally, the state change when the AudioTimer is updated allows for trancient
-* gain calculations, but they're not useful for data-driven voices.
+* The internal state change, when the AudioTimer is updated, allows for transient
+* gain calculations, though they're not useful for data-driven voices.
 */
 class AudioTimer {
 	unsigned timer_old{};
@@ -68,6 +72,11 @@ public:
 
 /*==================================================================*/
 
+/**
+ * @brief The Voice class represents a single audio voice with phase, step, and volume control.
+ * It provides methods to manage phase progression and volume levels, and is suitable for
+ * voice synthesis and audio processing.
+ */
 class Voice {
 	using self = Voice;
 
@@ -76,7 +85,7 @@ protected:
 	double mStep{};  // [0..1) range.
 	float  mVolumeGain{}; // System-facing volume control, to be controlled by a system.
 	float  mMasterGain{}; // Mastering volume control to manually balance against other voices.
-	
+
 public:
 	// Pass along additional data to a voice processor, if needed.
 	void* userdata{};
@@ -100,7 +109,7 @@ public:
 
 	constexpr Phase getPhase()      const noexcept { return mPhase; }
 	constexpr self& setPhase(Phase phase) noexcept { mPhase = phase; return *this; }
-	
+
 	// Peek the next raw phase without wrapping it, default is 1 step ahead.
 	constexpr double peekRawPhase(double steps = 1.0) const noexcept
 		{ return mPhase + mStep * steps; }

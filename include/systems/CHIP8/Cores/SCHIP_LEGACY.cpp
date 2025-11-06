@@ -392,22 +392,22 @@ void SCHIP_LEGACY::scrollDisplayRT() {
 	}
 	void SCHIP_LEGACY::instruction_8xy5(s32 X, s32 Y) noexcept {
 		const bool nborrow{ mRegisterV[X] >= mRegisterV[Y] };
-		::assign_cast(mRegisterV[X], mRegisterV[X] - mRegisterV[Y]);
+		::assign_cast_sub(mRegisterV[X], mRegisterV[Y]);
 		::assign_cast(mRegisterV[0xF], nborrow);
 	}
 	void SCHIP_LEGACY::instruction_8xy7(s32 X, s32 Y) noexcept {
 		const bool nborrow{ mRegisterV[Y] >= mRegisterV[X] };
-		::assign_cast(mRegisterV[X], mRegisterV[Y] - mRegisterV[X]);
+		::assign_cast_rsub(mRegisterV[X], mRegisterV[Y]);
 		::assign_cast(mRegisterV[0xF], nborrow);
 	}
 	void SCHIP_LEGACY::instruction_8xy6(s32 X, s32  ) noexcept {
 		const bool lsb{ (mRegisterV[X] & 1) == 1 };
-		::assign_cast(mRegisterV[X], mRegisterV[X] >> 1);
+		::assign_cast_shr(mRegisterV[X], 1);
 		::assign_cast(mRegisterV[0xF], lsb);
 	}
 	void SCHIP_LEGACY::instruction_8xyE(s32 X, s32  ) noexcept {
 		const bool msb{ (mRegisterV[X] >> 7) == 1 };
-		::assign_cast(mRegisterV[X], mRegisterV[X] << 1);
+		::assign_cast_shl(mRegisterV[X], 1);
 		::assign_cast(mRegisterV[0xF], msb);
 	}
 

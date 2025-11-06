@@ -642,7 +642,7 @@ void MEGACHIP::scrollBuffersRT() {
 	#pragma region 7 instruction branch
 
 	void MEGACHIP::instruction_7xNN(s32 X, s32 NN) noexcept {
-		::assign_cast(mRegisterV[X], mRegisterV[X] + NN);
+		::assign_cast_add(mRegisterV[X], NN);
 	}
 
 	#pragma endregion
@@ -920,7 +920,7 @@ void MEGACHIP::scrollBuffersRT() {
 			{ BVS->displayBuffer.write(mBackgroundBuffer); }
 	}
 	void MEGACHIP::instruction_Fx15(s32 X) noexcept {
-		mDelayTimer = mRegisterV[X];
+		::assign_cast(mDelayTimer, mRegisterV[X]);
 	}
 	void MEGACHIP::instruction_Fx18(s32 X) noexcept {
 		startVoiceAt(VOICE::BUZZER, mRegisterV[X] + (mRegisterV[X] == 1));

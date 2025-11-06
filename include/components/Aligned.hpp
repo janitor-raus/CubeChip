@@ -230,21 +230,21 @@ public:
 	constexpr bool is_constructed() const noexcept { return construct_count() >= element_count(); }
 	constexpr bool has_valid_ptr()  const noexcept { return mAllocated.get() != nullptr; }
 
-	[[nodiscard]] 
+	[[nodiscard]]
 	memory_type release() noexcept
 		{ return has_valid_ptr() ? std::move(mAllocated) : memory_type{}; }
 
-	[[nodiscard]] 
+	[[nodiscard]]
 	memory_type release_if_constructed() noexcept
 		{ return is_constructed() ? std::move(mAllocated) : memory_type{}; }
-	
-	[[nodiscard]] 
+
+	[[nodiscard]]
 	AlignedContainer<T, A> release_as_container() noexcept {
 		return AlignedContainer<T, A>(has_valid_ptr() \
 			? std::move(mAllocated) : memory_type{}, element_count());
 	}
 
-	[[nodiscard]] 
+	[[nodiscard]]
 	AlignedContainer<T, A> release_as_container_if_constructed() noexcept {
 		return AlignedContainer<T, A>(is_constructed() \
 			? std::move(mAllocated) : memory_type{}, element_count());

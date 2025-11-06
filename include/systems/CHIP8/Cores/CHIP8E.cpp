@@ -398,24 +398,24 @@ void CHIP8E::renderVideoData() {
 	}
 	void CHIP8E::instruction_8xy5(s32 X, s32 Y) noexcept {
 		const bool nborrow{ mRegisterV[X] >= mRegisterV[Y] };
-		::assign_cast(mRegisterV[X], mRegisterV[X] - mRegisterV[Y]);
+		::assign_cast_sub(mRegisterV[X], mRegisterV[Y]);
 		::assign_cast(mRegisterV[0xF], nborrow);
 	}
 	void CHIP8E::instruction_8xy7(s32 X, s32 Y) noexcept {
 		const bool nborrow{ mRegisterV[Y] >= mRegisterV[X] };
-		::assign_cast(mRegisterV[X], mRegisterV[Y] - mRegisterV[X]);
+		::assign_cast_rsub(mRegisterV[X], mRegisterV[Y]);
 		::assign_cast(mRegisterV[0xF], nborrow);
 	}
 	void CHIP8E::instruction_8xy6(s32 X, s32 Y) noexcept {
 		if (!Quirk.shiftVX) { mRegisterV[X] = mRegisterV[Y]; }
 		const bool lsb{ (mRegisterV[X] & 1) == 1 };
-		::assign_cast(mRegisterV[X], mRegisterV[X] >> 1);
+		::assign_cast_shr(mRegisterV[X], 1);
 		::assign_cast(mRegisterV[0xF], lsb);
 	}
 	void CHIP8E::instruction_8xyE(s32 X, s32 Y) noexcept {
 		if (!Quirk.shiftVX) { mRegisterV[X] = mRegisterV[Y]; }
 		const bool msb{ (mRegisterV[X] >> 7) == 1 };
-		::assign_cast(mRegisterV[X], mRegisterV[X] << 1);
+		::assign_cast_shl(mRegisterV[X], 1);
 		::assign_cast(mRegisterV[0xF], msb);
 	}
 
@@ -565,7 +565,7 @@ void CHIP8E::renderVideoData() {
 		mInputReg = &mRegisterV[X];
 	}
 	void CHIP8E::instruction_Fx15(s32 X) noexcept {
-		mDelayTimer = mRegisterV[X];
+		::assign_cast(mDelayTimer, mRegisterV[X]);
 	}
 	void CHIP8E::instruction_Fx18(s32 X) noexcept {
 		startVoice(mRegisterV[X] + (mRegisterV[X] == 1));

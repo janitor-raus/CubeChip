@@ -378,7 +378,7 @@ void SCHIP_MODERN::scrollDisplayRT() {
 	#pragma region 7 instruction branch
 
 	void SCHIP_MODERN::instruction_7xNN(s32 X, s32 NN) noexcept {
-		::assign_cast(mRegisterV[X], mRegisterV[X] + NN);
+		::assign_cast_add(mRegisterV[X], NN);
 	}
 
 	#pragma endregion
@@ -406,24 +406,24 @@ void SCHIP_MODERN::scrollDisplayRT() {
 	}
 	void SCHIP_MODERN::instruction_8xy5(s32 X, s32 Y) noexcept {
 		const bool nborrow{ mRegisterV[X] >= mRegisterV[Y] };
-		::assign_cast(mRegisterV[X], mRegisterV[X] - mRegisterV[Y]);
+		::assign_cast_sub(mRegisterV[X], mRegisterV[Y]);
 		::assign_cast(mRegisterV[0xF], nborrow);
 	}
 	void SCHIP_MODERN::instruction_8xy7(s32 X, s32 Y) noexcept {
 		const bool nborrow{ mRegisterV[Y] >= mRegisterV[X] };
-		::assign_cast(mRegisterV[X], mRegisterV[Y] - mRegisterV[X]);
+		::assign_cast_rsub(mRegisterV[X], mRegisterV[X]);
 		::assign_cast(mRegisterV[0xF], nborrow);
 	}
 	void SCHIP_MODERN::instruction_8xy6(s32 X, s32 Y) noexcept {
 		if (!Quirk.shiftVX) { mRegisterV[X] = mRegisterV[Y]; }
 		const bool lsb{ (mRegisterV[X] & 1) == 1 };
-		::assign_cast(mRegisterV[X], mRegisterV[X] >> 1);
+		::assign_cast_shr(mRegisterV[X], 1);
 		::assign_cast(mRegisterV[0xF], lsb);
 	}
 	void SCHIP_MODERN::instruction_8xyE(s32 X, s32 Y) noexcept {
 		if (!Quirk.shiftVX) { mRegisterV[X] = mRegisterV[Y]; }
 		const bool msb{ (mRegisterV[X] >> 7) == 1 };
-		::assign_cast(mRegisterV[X], mRegisterV[X] << 1);
+		::assign_cast_shl(mRegisterV[X], 1);
 		::assign_cast(mRegisterV[0xF], msb);
 	}
 
@@ -569,7 +569,7 @@ void SCHIP_MODERN::scrollDisplayRT() {
 		mInputReg = &mRegisterV[X];
 	}
 	void SCHIP_MODERN::instruction_Fx15(s32 X) noexcept {
-		mDelayTimer = mRegisterV[X];
+		::assign_cast(mDelayTimer, mRegisterV[X]);
 	}
 	void SCHIP_MODERN::instruction_Fx18(s32 X) noexcept {
 		startVoice(mRegisterV[X] + (mRegisterV[X] == 1));
