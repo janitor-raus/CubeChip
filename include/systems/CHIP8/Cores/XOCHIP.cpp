@@ -518,7 +518,7 @@ void XOCHIP::scrollDisplayRT() {
 	}
 	void XOCHIP::instruction_8xy7(s32 X, s32 Y) noexcept {
 		const bool nborrow{ mRegisterV[Y] >= mRegisterV[X] };
-		::assign_cast_rsub(mRegisterV[X], mRegisterV[X]);
+		::assign_cast_rsub(mRegisterV[X], mRegisterV[Y]);
 		::assign_cast(mRegisterV[0xF], nborrow);
 	}
 	void XOCHIP::instruction_8xy6(s32 X, s32 Y) noexcept {
