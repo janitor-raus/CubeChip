@@ -8,21 +8,20 @@
 
 #include <string>
 #include <cstdint>
-#include <utility>
-#include <fstream>
+#include <memory>
 
 #include <fmt/format.h>
 
 #include "SlidingRingBuffer.hpp"
-#include "Thread.hpp"
+#include "HDIS_HCIS.hpp"
 
 /*==================================================================*/
 
 struct BLOG {
 	enum class LEVEL {
 		DBG, // Events meant for debugging purposes.
-		INF,  // Events that are innocuous and informational.
-		WRN,  // Events that are unexpected and warrant attention.
+		INF, // Events that are innocuous and informational.
+		WRN, // Events that are unexpected and warrant attention.
 		ERR, // Events that resulted in a predictable/recoverable error.
 		FTL, // Events that resulted in unrecoverable failure.
 	};
@@ -88,51 +87,22 @@ struct alignas(HDIS) LogEntry {
 };
 
 /*==================================================================*/
-
-class BasicLogger;
-
-class LoggerInstance {
-	friend class BasicLogger;
-
-	using LogBufferT = SlidingRingBuffer
-		<LogEntry<BLOG>, 512>;
-
-	LogBufferT mLogBuffer;
-
-	alignas(HDIS)
-		std::ofstream mLogFile;
-
-	std::size_t mLastFlushPos{};
-	std::size_t mLastFlushTime{};
-	Thread mLogFlusherThread;
-
-	LoggerInstance() noexcept;
-
-	bool testFlushSize() const noexcept;
-	bool testFlushTime() const noexcept;
-
-	void LogFlusherThreadEntry(StopToken token) noexcept;
-
-	void flushLogBuffer() noexcept;
-
-	void createLog(const std::string& filename, const std::string& directory) noexcept;
-
-public:
-	~LoggerInstance() noexcept;
-
-	auto& buffer() noexcept { return mLogBuffer; }
-};
-
-/*==================================================================*/
 	#pragma region BasicLogger Singleton Class
+
+using LogBufferT = SlidingRingBuffer
+	<LogEntry<BLOG>, 512>;
+
+class LoggerInstance;
 
 class BasicLogger final {
 	BasicLogger() noexcept;
+	~BasicLogger() noexcept;
 
 	BasicLogger(const BasicLogger&) = delete;
 	BasicLogger& operator=(const BasicLogger&) = delete;
 
-	static inline LoggerInstance* sMainLog{};
+	const std::unique_ptr
+		<LoggerInstance> mMainLog{};
 
 public:
 	static auto* initialize() noexcept {
@@ -140,28 +110,24 @@ public:
 		return &self;
 	}
 
-	const auto& buffer() const noexcept { return sMainLog->buffer(); }
-	const auto* operator->() const noexcept { return &buffer(); }
+	const LogBufferT& buffer() const noexcept;
+	const LogBufferT* operator->() const noexcept { return &buffer(); }
 
 	void createLog(const std::string& filename, const std::string& directory) noexcept;
 
 private:
 	template <BLOG::LEVEL LOG_LEVEL>
-	void newEntry_(std::string&& message);
+	void newEntry_(std::string&& message) noexcept;
 
 public:
 	template <BLOG::LEVEL LOG_LEVEL, typename... Args>
-	void newEntry(std::string&& message, Args&&... args) {
-		if constexpr (sizeof...(Args) != 0) {
-			newEntry_<LOG_LEVEL>(fmt::vformat(message, fmt::make_format_args(args...)));
-		} else {
-			newEntry_<LOG_LEVEL>(std::move(message));
-		}
+	void newEntry(std::string&& message, Args&&... args) noexcept {
+		newEntry_<LOG_LEVEL>(fmt::vformat(message, fmt::make_format_args(args...)));
 	}
 
 	template <BLOG::LEVEL LOG_LEVEL, typename... Args>
-	void newEntry(const std::string& message, Args&&... args) {
-		newEntry<LOG_LEVEL>(std::string(message), std::forward<Args>(args)...);
+	void newEntry(const std::string& message, Args&&... args) noexcept {
+		newEntry_<LOG_LEVEL>(fmt::vformat(message, fmt::make_format_args(args...)));
 	}
 };
 
