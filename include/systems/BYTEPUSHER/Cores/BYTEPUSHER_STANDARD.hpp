@@ -14,7 +14,7 @@
 /*==================================================================*/
 
 class BYTEPUSHER_STANDARD final : public BytePusher_CoreInterface {
-	static constexpr u64 cTotalMemory{ MiB(16) };
+	static constexpr u64 cTotalMemory{ 16_MiB };
 	static constexpr u32 cSafezoneOOB{     8 };
 	static constexpr f32 cRefreshRate{ 60.0f };
 

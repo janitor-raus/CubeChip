@@ -17,7 +17,7 @@
 /*==================================================================*/
 
 class GAMEBOY_CLASSIC final : public GameBoy_CoreInterface {
-	static constexpr u64 cTotalMemory{ KiB(64) };
+	static constexpr u64 cTotalMemory{   64_KiB };
 	static constexpr u32 cSafezoneOOB{        8 };
 	static constexpr f32 cRefreshRate{ 59.7275f };
 	static constexpr s32 cResSizeMult{        2 };

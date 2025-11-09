@@ -14,7 +14,7 @@
 /*==================================================================*/
 
 class MEGACHIP final : public Chip8_CoreInterface {
-	static constexpr u64 cTotalMemory{ MiB(16) };
+	static constexpr u64 cTotalMemory{ 16_MiB };
 	static constexpr u32 cSafezoneOOB{    32 };
 	static constexpr u32 cGameLoadPos{   512 };
 	static constexpr u32 cStartOffset{   512 };

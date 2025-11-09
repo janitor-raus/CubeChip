@@ -14,7 +14,7 @@
 /*==================================================================*/
 
 class XOCHIP final : public Chip8_CoreInterface {
-	static constexpr u64 cTotalMemory{ KiB(64) };
+	static constexpr u64 cTotalMemory{ 64_KiB };
 	static constexpr u32 cSafezoneOOB{   128 };
 	static constexpr u32 cGameLoadPos{   512 };
 	static constexpr u32 cStartOffset{   512 };
