@@ -29,8 +29,8 @@ Chip8_CoreInterface::Chip8_CoreInterface() noexcept {
 
 /*==================================================================*/
 
-void Chip8_CoreInterface::updateKeyStates() {
-	if (!std::size(mCustomBinds)) { return; }
+void Chip8_CoreInterface::updateKeyStates() noexcept {
+	if (!mCustomBinds.size()) { return; }
 
 	Input->updateStates();
 
@@ -45,7 +45,7 @@ void Chip8_CoreInterface::updateKeyStates() {
 	mKeysLoop &= mKeysLock &= ~(mKeysPrev ^ mKeysCurr);
 }
 
-void Chip8_CoreInterface::loadPresetBinds() {
+void Chip8_CoreInterface::loadPresetBinds() noexcept {
 	static constexpr auto _{ SDL_SCANCODE_UNKNOWN };
 	static constexpr SimpleKeyMapping defaultKeyMappings[]{
 		{0x1, KEY(1), _}, {0x2, KEY(2), _}, {0x3, KEY(3), _}, {0xC, KEY(4), _},
@@ -174,27 +174,21 @@ void Chip8_CoreInterface::mainSystemLoop() {
 
 	renderAudioData();
 	renderVideoData();
-	pushOverlayData();
+	makeOverlayData();
 }
 
-Str* Chip8_CoreInterface::makeOverlayData() {
-	static thread_local ez::EMA suavemente{};
+void Chip8_CoreInterface::appendOverlayData() noexcept {
+	if (hasSystemState(EmuState::BENCH)) {
+		static thread_local ez::EMA suavemente{};
 
-	suavemente.set_alpha(getRealSystemFramerate());
-	suavemente.add(mCycleCount * getRealSystemFramerate() / 1e6f);
+		suavemente.set_alpha(getRealSystemFramerate());
+		suavemente.add(mCycleCount * getRealSystemFramerate() / 1e6f);
 
-	*getOverlayDataBuffer() = fmt::format(
-		" ::  MIPS:{:8.2f} (frame: {})\n{}",
-		suavemente.avg(), mBenchedFrames,
-		*SystemInterface::makeOverlayData()
-	);
-	return getOverlayDataBuffer();
-}
+		formatOverlayData(" ::  MIPS:{:8.2f} (frame: {})\n",
+			suavemente.avg(), mBenchedFrames);
+	}
 
-void Chip8_CoreInterface::pushOverlayData() {
-	if (hasSystemState(EmuState::BENCH)) [[likely]]
-		{ saveOverlayData(makeOverlayData()); }
-	else { SystemInterface::pushOverlayData(); }
+	SystemInterface::appendOverlayData();
 }
 
 /*==================================================================*/

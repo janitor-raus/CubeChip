@@ -4,11 +4,10 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include <fmt/format.h>
-
 #include "ThreadAffinity.hpp"
 #include "BasicVideoSpec.hpp"
 #include "FrameLimiter.hpp"
+#include "BasicLogger.hpp"
 
 #include "SystemInterface.hpp"
 
@@ -17,10 +16,40 @@
 void SystemInterface::startWorker() noexcept {
 	if (!mSystemThread.joinable()) {
 		initializeSystem();
-		mSystemThread = Thread([this](StopToken token) { systemThreadEntry(token); });
+		mSystemThread = Thread([this](StopToken token) noexcept {
+			SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
+			thread_affinity::set_affinity(~0b11ull);
+
+			do {
+				standbyNextFrame(false);
+
+				mTimer.start();
+				mainSystemLoop();
+
+				mElapsedFrames += 1;
+				mBenchedFrames = hasSystemState(EmuState::BENCH)
+					? mBenchedFrames + 1 : 0;
+			} while (!token.stop_requested());
+		});
 	}
 	if (!mTimingThread.joinable()) {
-		mTimingThread = Thread([this](StopToken token) { timingThreadEntry(token); });
+		mTimingThread = Thread([this](StopToken token) noexcept {
+			SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
+			thread_affinity::set_affinity(0b11ull);
+
+			FrameLimiter Pacer(getRealSystemFramerate());
+
+			do {
+				if (Pacer.isFrameReady(!hasSystemState(EmuState::BENCH))) {
+					Pacer.setLimiterProperties(getRealSystemFramerate());
+
+					if (!canSystemWork()) [[unlikely]] { return; }
+
+					setStopFrame(true);
+					declareNextFrame(true);
+				}
+			} while (!token.stop_requested());
+		});
 	}
 }
 
@@ -36,48 +65,13 @@ void SystemInterface::stopWorker() noexcept {
 	}
 }
 
-void SystemInterface::systemThreadEntry(StopToken token) {
-	SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
-	thread_affinity::set_affinity(~0b11ull);
-
-	do {
-		standbyNextFrame(false);
-
-		mTimer.start();
-		mainSystemLoop();
-		mFrameBusyTime.store(mTimer.get_elapsed_millis(), mo::release);
-
-		mElapsedFrames += 1;
-		mBenchedFrames = hasSystemState(EmuState::BENCH)
-			? mBenchedFrames + 1 : 0;
-	} while (!token.stop_requested());
-}
-
-void SystemInterface::timingThreadEntry(StopToken token) {
-	SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
-	thread_affinity::set_affinity(0b11ull);
-
-	FrameLimiter Pacer(getRealSystemFramerate());
-
-	do {
-		if (Pacer.isFrameReady(!hasSystemState(EmuState::BENCH))) {
-			Pacer.setLimiterProperties(getRealSystemFramerate());
-
-			if (!canSystemWork()) [[unlikely]] { continue; }
-
-			setStopFrame(true);
-			declareNextFrame(true);
-		}
-	} while (!token.stop_requested());
-}
-
 SystemInterface::SystemInterface() noexcept
 	: mOverlayData{ std::make_shared<Str>() }
 {
-	static thread_local auto pRNG  { std::make_unique<Well512>()       };
-	static thread_local auto pInput{ std::make_unique<BasicKeyboard>() };
-	RNG   = pRNG.get();
-	Input = pInput.get();
+	static thread_local auto sRNG   = std::make_unique<Well512>();
+	static thread_local auto sInput = std::make_unique<BasicKeyboard>();
+	RNG   = sRNG.get();
+	Input = sInput.get();
 }
 
 /*==================================================================*/
@@ -107,27 +101,26 @@ void SystemInterface::setBaseSystemFramerate(f32 value) noexcept
 void SystemInterface::setFramerateMultiplier(f32 value) noexcept
 	{ mFramerateMultiplier.store(std::clamp(value, 0.10f, 10.00f), mo::relaxed); }
 
-void SystemInterface::saveOverlayData(const Str* data) {
-	mOverlayData.store(std::make_shared<Str>(*data), mo::release);
-}
-
-Str* SystemInterface::makeOverlayData() {
+void SystemInterface::appendOverlayData() noexcept {
 	const auto framerate{ getRealSystemFramerate() };
 	const auto frametime{ mTimer.get_elapsed_millis() };
 	const auto framespan{ 1000.0f / framerate };
 
-	*getOverlayDataBuffer() = fmt::format(
+	formatOverlayData(
 		"Framerate:{:9.3f} fps |{:9.3f}ms\n"
 		"Frametime:{:9.3f} ms ({:>6.2f}%)\n",
 		framerate, framespan, frametime,
-		frametime / framespan * 100
-	);
-
-	return getOverlayDataBuffer();
+		frametime / framespan * 100.0f);
 }
 
-void SystemInterface::pushOverlayData() {
-	saveOverlayData(SystemInterface::makeOverlayData());
+void SystemInterface::makeOverlayData() noexcept {
+	if (!hasSystemState(EmuState::STATS)) { return; }
+	appendOverlayData();
+
+	mOverlayData.store(std::make_shared<Str> \
+		(std::move(mOverlayDataBuffer)), mo::release);
+	mOverlayDataBuffer.clear();
+	mOverlayDataBuffer.reserve(1_KiB);
 }
 
 Str SystemInterface::copyOverlayData() const noexcept {

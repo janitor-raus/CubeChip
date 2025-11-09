@@ -211,7 +211,7 @@ void FrontendHost::handleHotkeyActions() {
 			}
 		}
 		if (Input.isPressed(KEY(F11)))
-			{ mToggleOSD = !mToggleOSD; }
+			{ mToggleOSD = !mToggleOSD; toggleSystemOSD(); }
 		if (Input.isPressed(KEY(F10)))
 			{ mUnlimited = !mUnlimited; toggleSystemLimiter(); }
 	}
@@ -222,6 +222,14 @@ void FrontendHost::toggleSystemLimiter() noexcept {
 		if (mSystemCore) { mSystemCore->addSystemState(EmuState::BENCH); }
 	} else {
 		if (mSystemCore) { mSystemCore->subSystemState(EmuState::BENCH); }
+	}
+}
+
+void FrontendHost::toggleSystemOSD() noexcept {
+	if (mToggleOSD) {
+		if (mSystemCore) { mSystemCore->addSystemState(EmuState::STATS); }
+	} else {
+		if (mSystemCore) { mSystemCore->subSystemState(EmuState::STATS); }
 	}
 }
 

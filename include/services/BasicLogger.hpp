@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <memory>
 
-#include <fmt/format.h>
+#include <fmt/base.h>
 
 #include "SlidingRingBuffer.hpp"
 #include "HDIS_HCIS.hpp"

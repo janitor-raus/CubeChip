@@ -110,8 +110,10 @@ private:
 	static inline bool mUnlimited{};
 
 	void handleHotkeyActions();
-	void toggleSystemLimiter() noexcept;
 	void initializeInterface() noexcept;
+
+	void toggleSystemLimiter() noexcept;
+	void toggleSystemOSD()     noexcept;
 
 	void discardCore();
 	void replaceCore();

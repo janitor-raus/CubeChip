@@ -53,12 +53,12 @@ private:
 	u32  mKeysLoop{}; // bitfield of keys repeating input on Fx0A
 
 protected:
-	void updateKeyStates();
-	void loadPresetBinds();
+	void updateKeyStates() noexcept;
+	void loadPresetBinds() noexcept;
 
 	template <IsContiguousContainer T>
 		requires (SameValueTypes<T, decltype(mCustomBinds)>)
-	void loadCustomBinds(const T& binds) {
+	void loadCustomBinds(const T& binds) noexcept {
 		mCustomBinds.assign(std::begin(binds), std::end(binds));
 		mKeysPrev = mKeysCurr = mKeysLock = 0;
 	}
@@ -231,8 +231,7 @@ protected:
 public:
 	void mainSystemLoop() override final;
 
-	Str* makeOverlayData() override final;
-	void pushOverlayData() override final;
+	void appendOverlayData() noexcept override final;
 
 protected:
 	static constexpr auto cSmallFontOffset{ 0x00 };

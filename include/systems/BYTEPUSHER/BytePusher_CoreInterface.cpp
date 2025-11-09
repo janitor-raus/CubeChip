@@ -26,7 +26,7 @@ void BytePusher_CoreInterface::mainSystemLoop() {
 	instructionLoop();
 	renderAudioData();
 	renderVideoData();
-	pushOverlayData();
+	makeOverlayData();
 }
 
 void BytePusher_CoreInterface::loadPresetBinds() {

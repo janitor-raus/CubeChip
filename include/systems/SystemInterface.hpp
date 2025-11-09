@@ -19,6 +19,7 @@
 #include "ExecPolicy.hpp"
 #include "Thread.hpp"
 #include "Millis.hpp"
+#include "BasicLogger.hpp"
 
 #include "AssignCast.hpp"
 #include "ArrayOps.hpp"
@@ -42,6 +43,9 @@ enum EmuState : u8 {
 	HALTED = 0x04, // normal end path
 	FATAL  = 0x08, // fatal error path
 	BENCH  = 0x10, // benchmarking mode
+	STATS  = 0x20, // produce OSD stats
+	DUMMY  = 0x40, // dummy mode (no audio/video)
+	DEBUG  = 0x80, // debugger enabled
 
 	NOT_RUNNING = HIDDEN | PAUSED | HALTED | FATAL, // when emulation must wait
 	CANNOT_PAUSE = HIDDEN | HALTED | FATAL, // when pausing is disallowed
@@ -64,10 +68,9 @@ class alignas(HDIS) SystemInterface {
 	Thread mSystemThread;
 	Thread mTimingThread;
 
-	Atom<f32> mFrameBusyTime{ 0.0f };
+	Atom<f32> mFrameBusyTime{ 0.0f }; // wtf was this even for???
 	Atom<u8> mGlobalState{ EmuState::NORMAL };
 
-private:
 	Atom<bool> mNextFrame{};
 	Atom<bool> mStopFrame{};
 
@@ -95,9 +98,6 @@ public:
 	void stopWorker() noexcept;
 
 protected:
-	void systemThreadEntry(StopToken token);
-	void timingThreadEntry(StopToken token);
-
 	Atom<f32> mBaseSystemFramerate{};
 	Atom<f32> mFramerateMultiplier{ 1.0f };
 
@@ -119,15 +119,14 @@ public:
 		BVS = pBVS;
 	}
 
-	// Adds a State to the System, returns previous total state.
-	auto addSystemState(EmuState state) noexcept { return mGlobalState.fetch_or ( state, mo::acq_rel); }
-	// Removes a State from the System, returns previous total state.
-	auto subSystemState(EmuState state) noexcept { return mGlobalState.fetch_and(~state, mo::acq_rel); }
-	// Toggles a State in the System, returns previous total state.
-	auto xorSystemState(EmuState state) noexcept { return mGlobalState.fetch_xor( state, mo::acq_rel); }
-
-	// Sets the total System State to the given value.
-	void setSystemState(EmuState state) noexcept { mGlobalState.store(state, mo::release); }
+	// Adds a State to the System, returns previous value of State.
+	auto addSystemState(EmuState state) noexcept { return mGlobalState.fetch_or ( state, mo::acq_rel) & state; }
+	// Removes a State from the System, returns previous value of State.
+	auto subSystemState(EmuState state) noexcept { return mGlobalState.fetch_and(~state, mo::acq_rel) & state; }
+	// Toggles a State in the System, returns previous value of State.
+	auto xorSystemState(EmuState state) noexcept { return mGlobalState.fetch_xor( state, mo::acq_rel) & state; }
+	// Sets the total System State, return previous value of State.
+	auto setSystemState(EmuState state) noexcept { return mGlobalState.exchange(state, mo::acq_rel) & state; }
 	// Fetches the current total System State.
 	auto getSystemState()         const noexcept { return mGlobalState.load(mo::acquire);  }
 
@@ -138,13 +137,10 @@ public:
 	// Tests if the System is allowed to (un)pause on demand.
 	bool canSystemPause()              const noexcept { return !(getSystemState() & EmuState::CANNOT_PAUSE); }
 
-	// Attempts to (un)pause the System if possible, `reason` text optional.
+	// Attempts to (un)pause the System if possible, returns paused State value.
 	std::optional<bool> tryPauseSystem() noexcept {
 		if (!canSystemPause()) { return std::nullopt; }
-		else {
-			xorSystemState(EmuState::PAUSED);
-			return !!(getSystemState() & EmuState::PAUSED);
-		}
+		return !xorSystemState(EmuState::PAUSED);
 	}
 
 	virtual s32 getMaxDisplayW() const noexcept = 0;
@@ -182,26 +178,27 @@ protected:
 	virtual void mainSystemLoop() = 0;
 	virtual void initializeSystem() noexcept = 0;
 
-	/**
-	 * @brief Save the Overlay data buffer contents to the public-facing buffer as a final step.
-	 * @param[in] data :: A pointer to a string object, typically the return of getOverlayDataBuffer().
-	 */
-	/*___*/ void saveOverlayData(const Str* data);
-	/**
-	 * @brief Overridable method dedicated to assembling the string of Overlay data.
-	 */
-	virtual Str* makeOverlayData();
-	/**
-	 * @brief Overridable method dedicated to controlling when/how the Overlay data is pushed to
-	 *        the public-facing buffer, typically used along with saveOverlayData().
-	 */
-	virtual void pushOverlayData();
+protected:
+	template <typename... Args>
+	void formatOverlayData(std::string&& message, Args&&... args) noexcept {
+		try {
+			fmt::vformat_to(std::back_inserter(*getOverlayDataBuffer()),
+				message, fmt::make_format_args(args...));
+		} catch (...) { /* ignore */ }
+	}
+
+	template <typename... Args>
+	void formatOverlayData(const std::string& message, Args&&... args) noexcept {
+		try {
+			fmt::vformat_to(std::back_inserter(*getOverlayDataBuffer()),
+				message, fmt::make_format_args(args...));
+		} catch (...) { /* ignore */ }
+	}
+
+protected:
+	virtual void appendOverlayData() noexcept;
+	/*****/ void makeOverlayData() noexcept;
 
 public:
-	/**
-	 * @brief Public-facing method dedicated to fetching a copy of the Overlay data string from
-	 *        the public-facing buffer, thread-safe.
-	 * @note This method should not be used across a DLL boundary, as it is not ABI-safe.
-	 */
 	Str copyOverlayData() const noexcept;
 };
