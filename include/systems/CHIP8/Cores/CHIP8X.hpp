@@ -14,27 +14,27 @@
 /*==================================================================*/
 
 class CHIP8X final : public Chip8_CoreInterface {
-	static constexpr u64 cTotalMemory{ 4_KiB };
-	static constexpr u32 cSafezoneOOB{    32 };
-	static constexpr u32 cGameLoadPos{   768 };
-	static constexpr u32 cStartOffset{   768 };
-	static constexpr f32 cRefreshRate{ 61.0f };
+	static constexpr u64 cTotalMemory = 4_KiB;
+	static constexpr u32 cSafezoneOOB =    32;
+	static constexpr u32 cGameLoadPos =   768;
+	static constexpr u32 cStartOffset =   768;
+	static constexpr f32 cRefreshRate = 61.0f;
 
-	static constexpr s32 cResSizeMult{  8 };
-	static constexpr s32 cScreenSizeX{ 64 };
-	static constexpr s32 cScreenSizeY{ 32 };
-	static constexpr s32 cInstSpeedHi{ 30 };
-	static constexpr s32 cInstSpeedLo{ 15 };
+	static constexpr s32 cResSizeMult =  8;
+	static constexpr s32 cScreenSizeX = 64;
+	static constexpr s32 cScreenSizeY = 32;
+	static constexpr s32 cInstSpeedHi = 30;
+	static constexpr s32 cInstSpeedLo = 15;
 
-	static constexpr u32 cMaxDisplayW{ 64 };
-	static constexpr u32 cMaxDisplayH{ 32 };
+	static constexpr u32 cMaxDisplayW = 64;
+	static constexpr u32 cMaxDisplayH = 32;
 
 private:
-	FixedMap2D<u32, (cScreenSizeX >> 3), cScreenSizeY>
+	FixedMap2D<RGBA, (cScreenSizeX >> 3), cScreenSizeY>
 		mColoredBuffer{};
 
-	u32 mBackgroundColor{ 0x00 };
-	u32 mColorResolution{ 0xFC };
+	u32 mBackgroundColor = 0x00;
+	u32 mColorResolution = 0xFC;
 
 	std::array<u8, cScreenSizeX * cScreenSizeY>
 		mDisplayBuffer{};
@@ -44,8 +44,8 @@ private:
 
 	template <std::integral T>
 	void writeMemoryI(T value, u32 pos) noexcept {
-		const auto index{ mRegisterI + pos };
-		const auto valid{ index < cTotalMemory ? index : cTotalMemory + cSafezoneOOB - 1 };
+		const auto index = mRegisterI + pos;
+		const auto valid = index < cTotalMemory ? index : cTotalMemory + cSafezoneOOB - 1;
 		::assign_cast(mMemoryBank[valid], value);
 	}
 

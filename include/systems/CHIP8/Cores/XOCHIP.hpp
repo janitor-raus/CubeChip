@@ -14,20 +14,20 @@
 /*==================================================================*/
 
 class XOCHIP final : public Chip8_CoreInterface {
-	static constexpr u64 cTotalMemory{ 64_KiB };
-	static constexpr u32 cSafezoneOOB{   128 };
-	static constexpr u32 cGameLoadPos{   512 };
-	static constexpr u32 cStartOffset{   512 };
-	static constexpr f32 cRefreshRate{ 60.0f };
+	static constexpr u64 cTotalMemory = 64_KiB;
+	static constexpr u32 cSafezoneOOB =   128;
+	static constexpr u32 cGameLoadPos =   512;
+	static constexpr u32 cStartOffset =   512;
+	static constexpr f32 cRefreshRate = 60.0f;
 
-	static constexpr s32 cResSizeMult{     8 };
-	static constexpr s32 cScreenSizeX{    64 };
-	static constexpr s32 cScreenSizeY{    32 };
-	static constexpr s32 cInstSpeedHi{ 50000 };
-	static constexpr s32 cInstSpeedLo{  1000 };
+	static constexpr s32 cResSizeMult =     8;
+	static constexpr s32 cScreenSizeX =    64;
+	static constexpr s32 cScreenSizeY =    32;
+	static constexpr s32 cInstSpeedHi = 50000;
+	static constexpr s32 cInstSpeedLo =  1000;
 
-	static constexpr u32 cMaxDisplayW{ 128 };
-	static constexpr u32 cMaxDisplayH{  64 };
+	static constexpr u32 cMaxDisplayW = 128;
+	static constexpr u32 cMaxDisplayH =  64;
 
 private:
 	std::array<RGBA, 16> mBitColors{};
@@ -192,7 +192,7 @@ private:
 
 /*==================================================================*/
 
-	static inline thread_local u32 mPlanarMask{ 0x1 };
+	static inline thread_local u32 mPlanarMask = 0x1;
 
 	Map2D<u8> mDisplayBuffer[4];
 
@@ -201,8 +201,8 @@ private:
 
 	template <std::integral T>
 	void writeMemoryI(T value, u32 pos) noexcept {
-		const auto index{ mRegisterI + pos };
-		const auto valid{ index < cTotalMemory ? index : cTotalMemory + cSafezoneOOB - 1 };
+		const auto index = mRegisterI + pos;
+		const auto valid = index < cTotalMemory ? index : cTotalMemory + cSafezoneOOB - 1;
 		::assign_cast(mMemoryBank[valid], value);
 	}
 

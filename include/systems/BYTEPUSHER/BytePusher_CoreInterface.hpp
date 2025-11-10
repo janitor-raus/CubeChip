@@ -25,8 +25,8 @@ protected:
 	enum STREAM { MAIN };
 	enum VOICE { ID_0, COUNT };
 
-	u32  getKeyStates();
-	void loadPresetBinds();
+	u32  getKeyStates() noexcept;
+	void loadPresetBinds() noexcept;
 
 	template <IsContiguousContainer T>
 		requires (SameValueTypes<T, decltype(mCustomBinds)>)

@@ -39,8 +39,8 @@ void CHIP8_MODERN::handleCycleLoop() noexcept
 template <typename Lambda>
 void CHIP8_MODERN::instructionLoop(Lambda&& condition) noexcept {
 	for (mCycleCount = 0; condition(); ++mCycleCount) {
-		const auto HI{ mMemoryBank[mCurrentPC++] };
-		const auto LO{ mMemoryBank[mCurrentPC++] };
+		const auto HI = mMemoryBank[mCurrentPC++];
+		const auto LO = mMemoryBank[mCurrentPC++];
 
 		#define _NNN (HI << 8 | LO)
 		#define _X (HI & 0xF)
@@ -134,7 +134,6 @@ void CHIP8_MODERN::instructionLoop(Lambda&& condition) noexcept {
 			CASE_xNF(0xC0):
 				instruction_CxNN(_X, LO);
 				break;
-			[[likely]]
 			CASE_xNF(0xD0):
 				instruction_DxyN(_X, Y_, _N);
 				break;
@@ -201,9 +200,9 @@ void CHIP8_MODERN::renderAudioData() {
 void CHIP8_MODERN::renderVideoData() {
 	BVS->displayBuffer.write(mDisplayBuffer, isUsingPixelTrails()
 		? [](u32 pixel) noexcept
-			{ return sBitColors[pixel != 0] | cPixelOpacity[pixel]; }
+			{ return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
 		: [](u32 pixel) noexcept
-			{ return sBitColors[pixel >> 3] | 0xFFu; }
+			{ return sBitColors[pixel >> 3]; }
 	);
 
 	std::for_each(EXEC_POLICY(unseq)
@@ -319,29 +318,29 @@ void CHIP8_MODERN::renderVideoData() {
 		::assign_cast(mRegisterV[0xF], 0);
 	}
 	void CHIP8_MODERN::instruction_8xy4(s32 X, s32 Y) noexcept {
-		const auto sum{ mRegisterV[X] + mRegisterV[Y] };
+		const auto sum = mRegisterV[X] + mRegisterV[Y];
 		::assign_cast(mRegisterV[X], sum);
 		::assign_cast(mRegisterV[0xF], sum >> 8);
 	}
 	void CHIP8_MODERN::instruction_8xy5(s32 X, s32 Y) noexcept {
-		const bool nborrow{ mRegisterV[X] >= mRegisterV[Y] };
+		const bool nborrow = mRegisterV[X] >= mRegisterV[Y];
 		::assign_cast_sub(mRegisterV[X], mRegisterV[Y]);
 		::assign_cast(mRegisterV[0xF], nborrow);
 	}
 	void CHIP8_MODERN::instruction_8xy7(s32 X, s32 Y) noexcept {
-		const bool nborrow{ mRegisterV[Y] >= mRegisterV[X] };
+		const bool nborrow = mRegisterV[Y] >= mRegisterV[X];
 		::assign_cast_rsub(mRegisterV[X], mRegisterV[Y]);
 		::assign_cast(mRegisterV[0xF], nborrow);
 	}
 	void CHIP8_MODERN::instruction_8xy6(s32 X, s32 Y) noexcept {
 		if (!Quirk.shiftVX) { ::assign_cast(mRegisterV[X], mRegisterV[Y]); }
-		const bool lsb{ (mRegisterV[X] & 0x01) != 0 };
+		const bool lsb = (mRegisterV[X] & 0x01) != 0;
 		::assign_cast_shr(mRegisterV[X], 1);
 		::assign_cast(mRegisterV[0xF], lsb);
 	}
 	void CHIP8_MODERN::instruction_8xyE(s32 X, s32 Y) noexcept {
 		if (!Quirk.shiftVX) { ::assign_cast(mRegisterV[X], mRegisterV[Y]); }
-		const bool msb{ (mRegisterV[X] & 0x80) != 0 };
+		const bool msb = (mRegisterV[X] & 0x80) != 0;
 		::assign_cast_shl(mRegisterV[X], 1);
 		::assign_cast(mRegisterV[0xF], msb);
 	}
@@ -412,7 +411,7 @@ void CHIP8_MODERN::renderVideoData() {
 				if (Quirk.wrapSprite) { X %= cScreenSizeX; }
 				else if (X >= cScreenSizeX) { return; }
 
-				for (auto B{ 0 }; B < 8; ++B, ++X %= cScreenSizeX) {
+				for (auto B = 0; B < 8; ++B, ++X %= cScreenSizeX) {
 					if (DATA & 0x80 >> B) {
 						if (!((mDisplayBuffer(X, Y) ^= 0x8) & 0x8))
 							[[unlikely]] { mRegisterV[0xF] = 1; }
@@ -427,8 +426,8 @@ void CHIP8_MODERN::renderVideoData() {
 		if (Quirk.waitVblank) [[unlikely]]
 			{ triggerInterrupt(Interrupt::FRAME); }
 
-		auto pX{ mRegisterV[X] % cScreenSizeX };
-		auto pY{ mRegisterV[Y] % cScreenSizeY };
+		auto pX = mRegisterV[X] % cScreenSizeX;
+		auto pY = mRegisterV[Y] % cScreenSizeY;
 
 		mRegisterV[0xF] = 0;
 
@@ -440,7 +439,7 @@ void CHIP8_MODERN::renderVideoData() {
 
 			[[unlikely]]
 			case 0:
-				for (auto H{ 0 }, I{ 0 }; H < 16; ++H, I += 2, ++pY %= cScreenSizeY)
+				for (auto H = 0, I = 0; H < 16; ++H, I += 2, ++pY %= cScreenSizeY)
 				{
 					drawByte(pX + 0, pY, readMemoryI(I + 0));
 					drawByte(pX + 8, pY, readMemoryI(I + 1));
@@ -451,7 +450,7 @@ void CHIP8_MODERN::renderVideoData() {
 
 			[[unlikely]]
 			default:
-				for (auto H{ 0 }; H < N; ++H, ++pY %= cScreenSizeY)
+				for (auto H = 0; H < N; ++H, ++pY %= cScreenSizeY)
 				{
 					drawByte(pX, pY, readMemoryI(H));
 					if (!Quirk.wrapSprite && pY == cScreenSizeY - 1) { break; }
@@ -506,11 +505,11 @@ void CHIP8_MODERN::renderVideoData() {
 		writeMemoryI(bcd.digit[0], 2);
 	}
 	void CHIP8_MODERN::instruction_FN55(s32 N) noexcept {
-		for (auto idx{ 0 }; idx <= N; ++idx) { writeMemoryI(mRegisterV[idx], idx); }
+		for (auto idx = 0; idx <= N; ++idx) { writeMemoryI(mRegisterV[idx], idx); }
 		if (!Quirk.idxRegNoInc) [[likely]] { incIndexRegister(N + 1); }
 	}
 	void CHIP8_MODERN::instruction_FN65(s32 N) noexcept {
-		for (auto idx{ 0 }; idx <= N; ++idx) { mRegisterV[idx] = readMemoryI(idx); }
+		for (auto idx = 0; idx <= N; ++idx) { mRegisterV[idx] = readMemoryI(idx); }
 		if (!Quirk.idxRegNoInc) [[likely]] { incIndexRegister(N + 1); }
 	}
 

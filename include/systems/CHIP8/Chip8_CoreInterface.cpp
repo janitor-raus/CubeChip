@@ -15,10 +15,10 @@
 /*==================================================================*/
 
 Chip8_CoreInterface::Chip8_CoreInterface() noexcept {
-	if (const auto* path{ HDM->addSystemDir("savestate", "CHIP8") })
+	if (const auto* path = HDM->addSystemDir("savestate", "CHIP8"))
 		{ sSavestatePath = *path / HDM->getFileSHA1(); }
 
-	if (const auto* path{ HDM->addSystemDir("permaRegs", "CHIP8") })
+	if (const auto* path = HDM->addSystemDir("permaRegs", "CHIP8"))
 		{ sPermaRegsPath = *path / HDM->getFileSHA1(); }
 
 	mAudioDevice.addAudioStream(STREAM::MAIN, 48'000);
@@ -46,7 +46,7 @@ void Chip8_CoreInterface::updateKeyStates() noexcept {
 }
 
 void Chip8_CoreInterface::loadPresetBinds() noexcept {
-	static constexpr auto _{ SDL_SCANCODE_UNKNOWN };
+	static constexpr auto _ = SDL_SCANCODE_UNKNOWN;
 	static constexpr SimpleKeyMapping defaultKeyMappings[]{
 		{0x1, KEY(1), _}, {0x2, KEY(2), _}, {0x3, KEY(3), _}, {0xC, KEY(4), _},
 		{0x4, KEY(Q), _}, {0x5, KEY(W), _}, {0x6, KEY(E), _}, {0xD, KEY(R), _},
@@ -58,15 +58,15 @@ void Chip8_CoreInterface::loadPresetBinds() noexcept {
 }
 
 bool Chip8_CoreInterface::keyPressed(u8* keyReg) noexcept {
-	if (!std::size(mCustomBinds)) { return false; }
+	if (!mCustomBinds.size()) { return false; }
 
 	if (mElapsedFrames >= mTickLast + mTickSpan)
 		[[unlikely]] { mKeysPrev &= ~mKeysLoop; }
 
-	/**/const auto pressKeys{ mKeysCurr & ~mKeysPrev };
+	/**/const auto pressKeys = mKeysCurr & ~mKeysPrev;
 	if (pressKeys) {
-		const auto pressDiff{ pressKeys & ~mKeysLoop };
-		const auto validKeys{ pressDiff ? pressDiff : mKeysLoop };
+		const auto pressDiff = pressKeys & ~mKeysLoop;
+		const auto validKeys = pressDiff ? pressDiff : mKeysLoop;
 
 		mKeysLock |= validKeys;
 		mTickLast  = mElapsedFrames;
@@ -156,7 +156,7 @@ void Chip8_CoreInterface::skipInstruction() noexcept {
 }
 
 void Chip8_CoreInterface::performProgJump(u32 next) noexcept {
-	const auto oldPC{ mCurrentPC - 2u };
+	const auto oldPC = mCurrentPC - 2u;
 	::assign_cast(mCurrentPC, next & 0xFFFu);
 	if (mCurrentPC == oldPC) [[unlikely]]
 		{ triggerInterrupt(Interrupt::SOUND); }
@@ -194,14 +194,14 @@ void Chip8_CoreInterface::appendOverlayData() noexcept {
 /*==================================================================*/
 
 void Chip8_CoreInterface::startVoice(s32 duration, s32 tone) noexcept {
-	 auto voice_index{ 0 };
+	auto voice_index = 0;
 	startVoiceAt(voice_index, duration, tone);
 	if (duration) { ++voice_index %= VOICE::COUNT - 1; }
 }
 
 void Chip8_CoreInterface::startVoiceAt(u32 voice_index, u32 duration, u32 tone) noexcept {
 	mAudioTimers[voice_index].set(duration);
-	if (auto* stream{ mAudioDevice.at(STREAM::MAIN) }) {
+	if (auto* stream = mAudioDevice.at(STREAM::MAIN)) {
 		mVoices[voice_index].setStep((sTonalOffset + (tone ? tone : 8 \
 			* (((mCurrentPC >> 1) + mStackTop + 1) & 0x3E) \
 		)) / stream->getFreq() * getFramerateMultiplier());
@@ -209,10 +209,11 @@ void Chip8_CoreInterface::startVoiceAt(u32 voice_index, u32 duration, u32 tone) 
 }
 
 void Chip8_CoreInterface::mixAudioData(VoiceGenerators processors) noexcept {
-	if (auto* stream{ mAudioDevice.at(STREAM::MAIN) }) {
+	if (auto* stream = mAudioDevice.at(STREAM::MAIN)) {
 
-		auto buffer{ ::allocate_n<f32>(stream->getNextBufferSize(getRealSystemFramerate()))
-			.as_value().release_as_container() };
+		auto buffer = ::allocate_n<f32>
+			(stream->getNextBufferSize(getRealSystemFramerate()))
+			.as_value().release_as_container();
 
 		for (auto& bundle : processors)
 			{ bundle.run(buffer, stream); }
@@ -226,10 +227,10 @@ void Chip8_CoreInterface::mixAudioData(VoiceGenerators processors) noexcept {
 
 void Chip8_CoreInterface::makePulseWave(f32* data, u32 size, Voice* voice, Stream*) noexcept {
 	if (!voice || !voice->userdata) [[unlikely]] { return; }
-	auto* timer{ static_cast<AudioTimer*>(voice->userdata) };
+	auto* timer = static_cast<AudioTimer*>(voice->userdata);
 
 	for (auto i{ 0u }; i < size; ++i) {
-		if (const auto gain{ voice->getLevel(i, *timer) }) {
+		if (const auto gain = voice->getLevel(i, *timer)) {
 			::assign_cast_add(data[i], \
 				WaveForms::pulse(voice->peekPhase(i)) * gain);
 		} else break;
@@ -250,7 +251,7 @@ void Chip8_CoreInterface::triggerInterrupt(Interrupt type) noexcept {
 /*==================================================================*/
 
 bool Chip8_CoreInterface::checkRegularFile(const Path& filePath) const noexcept {
-	const auto fileRegular{ fs::is_regular_file(filePath) };
+	const auto fileRegular = fs::is_regular_file(filePath);
 	if (!fileRegular) {
 		blog.newEntry<BLOG::DBG>("\"{}\" [{}]",
 			filePath.string(), fileRegular.error().message());
@@ -261,7 +262,7 @@ bool Chip8_CoreInterface::checkRegularFile(const Path& filePath) const noexcept 
 
 bool Chip8_CoreInterface::newPermaRegsFile(const Path& filePath) const noexcept {
 	static constexpr char dataPadding[std::size(sPermRegsV)]{};
-	const auto fileCreated{ ::writeFileData(filePath, dataPadding) };
+	const auto fileCreated = ::writeFileData(filePath, dataPadding);
 	if (!fileCreated) {
 		blog.newEntry<BLOG::ERR>("\"{}\" [{}]",
 			filePath.string(), fileCreated.error().message());
@@ -270,7 +271,7 @@ bool Chip8_CoreInterface::newPermaRegsFile(const Path& filePath) const noexcept 
 }
 
 void Chip8_CoreInterface::setFilePermaRegs(u32 X) noexcept {
-	auto fileData{ ::writeFileData(sPermaRegsPath, mRegisterV, X) };
+	auto fileData = ::writeFileData(sPermaRegsPath, mRegisterV, X);
 	if (!fileData) {
 		blog.newEntry<BLOG::ERR>("File IO error: \"{}\" [{}]",
 			sPermaRegsPath.string(), fileData.error().message());
@@ -278,8 +279,8 @@ void Chip8_CoreInterface::setFilePermaRegs(u32 X) noexcept {
 }
 
 void Chip8_CoreInterface::getFilePermaRegs(u32 X) noexcept {
-	::assign_cast(X, std::min(X, u32(sPermRegsV.size())));
-	auto fileData{ ::readFileData(sPermaRegsPath, X) };
+	::assign_cast_min(X, sPermRegsV.size());
+	auto fileData = ::readFileData(sPermaRegsPath, X);
 	if (!fileData) {
 		blog.newEntry<BLOG::ERR>("File IO error: \"{}\" [{}]",
 			sPermaRegsPath.string(), fileData.error().message());

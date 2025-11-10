@@ -14,7 +14,7 @@
 /*==================================================================*/
 
 BytePusher_CoreInterface::BytePusher_CoreInterface() noexcept {
-	if (const auto* path{ HDM->addSystemDir("savestate", "BYTEPUSHER") })
+	if (const auto* path = HDM->addSystemDir("savestate", "BYTEPUSHER"))
 		{ sSavestatePath = *path / HDM->getFileSHA1(); }
 
 	loadPresetBinds();
@@ -29,8 +29,8 @@ void BytePusher_CoreInterface::mainSystemLoop() {
 	makeOverlayData();
 }
 
-void BytePusher_CoreInterface::loadPresetBinds() {
-	static constexpr auto _{ SDL_SCANCODE_UNKNOWN };
+void BytePusher_CoreInterface::loadPresetBinds() noexcept {
+	static constexpr auto _ = SDL_SCANCODE_UNKNOWN;
 	static constexpr SimpleKeyMapping defaultKeyMappings[]{
 		{0x1, KEY(1), _}, {0x2, KEY(2), _}, {0x3, KEY(3), _}, {0xC, KEY(4), _},
 		{0x4, KEY(Q), _}, {0x5, KEY(W), _}, {0x6, KEY(E), _}, {0xD, KEY(R), _},
@@ -41,8 +41,8 @@ void BytePusher_CoreInterface::loadPresetBinds() {
 	loadCustomBinds(std::span(defaultKeyMappings));
 }
 
-u32  BytePusher_CoreInterface::getKeyStates() {
-	auto keyStates{ 0u };
+u32  BytePusher_CoreInterface::getKeyStates() noexcept {
+	auto keyStates = 0u;
 
 	Input->updateStates();
 

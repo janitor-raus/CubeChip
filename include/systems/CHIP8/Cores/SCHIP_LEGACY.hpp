@@ -14,17 +14,17 @@
 /*==================================================================*/
 
 class SCHIP_LEGACY final : public Chip8_CoreInterface {
-	static constexpr u64 cTotalMemory{ 4_KiB };
-	static constexpr u32 cSafezoneOOB{    32 };
-	static constexpr u32 cGameLoadPos{   512 };
-	static constexpr u32 cStartOffset{   512 };
-	static constexpr f32 cRefreshRate{ 64.0f };
+	static constexpr u64 cTotalMemory = 4_KiB;
+	static constexpr u32 cSafezoneOOB =    32;
+	static constexpr u32 cGameLoadPos =   512;
+	static constexpr u32 cStartOffset =   512;
+	static constexpr f32 cRefreshRate = 64.0f;
 
-	static constexpr s32 cResSizeMult{   4 };
-	static constexpr s32 cScreenSizeX{ 128 };
-	static constexpr s32 cScreenSizeY{  64 };
-	static constexpr s32 cInstSpeedHi{  45 };
-	static constexpr s32 cInstSpeedLo{  32 };
+	static constexpr s32 cResSizeMult =   4;
+	static constexpr s32 cScreenSizeX = 128;
+	static constexpr s32 cScreenSizeY =  64;
+	static constexpr s32 cInstSpeedHi =  45;
+	static constexpr s32 cInstSpeedLo =  32;
 
 /*==================================================================*/
 
@@ -36,8 +36,8 @@ class SCHIP_LEGACY final : public Chip8_CoreInterface {
 
 	template <std::integral T>
 	void writeMemoryI(T value, u32 pos) noexcept {
-		const auto index{ mRegisterI + pos };
-		const auto valid{ index < cTotalMemory ? index : cTotalMemory + cSafezoneOOB - 1 };
+		const auto index = mRegisterI + pos;
+		const auto valid = index < cTotalMemory ? index : cTotalMemory + cSafezoneOOB - 1;
 		::assign_cast(mMemoryBank[valid], value);
 	}
 

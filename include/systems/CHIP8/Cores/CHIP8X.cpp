@@ -40,8 +40,8 @@ void CHIP8X::handleCycleLoop() noexcept
 template <typename Lambda>
 void CHIP8X::instructionLoop(Lambda&& condition) noexcept {
 	for (mCycleCount = 0; condition(); ++mCycleCount) {
-		const auto HI{ mMemoryBank[mCurrentPC++] };
-		const auto LO{ mMemoryBank[mCurrentPC++] };
+		const auto HI = mMemoryBank[mCurrentPC++];
+		const auto LO = mMemoryBank[mCurrentPC++];
 
 		#define _NNN (HI << 8 | LO)
 		#define _X (HI & 0xF)
@@ -151,7 +151,6 @@ void CHIP8X::instructionLoop(Lambda&& condition) noexcept {
 			CASE_xNF(0xC0):
 				instruction_CxNN(_X, LO);
 				break;
-			[[likely]]
 			CASE_xNF(0xD0):
 				instruction_DxyN(_X, Y_, _N);
 				break;
@@ -231,12 +230,12 @@ void CHIP8X::renderVideoData() {
 	if (isUsingPixelTrails()) {
 		BVS->displayBuffer.write(mDisplayBuffer, [this](auto& pixel) noexcept {
 			if (pixel == 0) {
-				return cBackColor[mBackgroundColor] | 0xFFu;
+				return cBackColor[mBackgroundColor];
 			} else {
-				const auto idx{ &pixel - mDisplayBuffer.data() };
-				const auto Y{ (idx / cScreenSizeX) & mColorResolution };
-				const auto X{ (idx % cScreenSizeX) >> 3 };
-				return mColoredBuffer(X, Y) | cPixelOpacity[pixel];
+				const auto idx = &pixel - mDisplayBuffer.data();
+				const auto Y = (idx / cScreenSizeX) & mColorResolution;
+				const auto X = (idx % cScreenSizeX) >> 3;
+				return RGBA::premul(mColoredBuffer(X, Y), cBitWeight[pixel]);
 			}
 		});
 
@@ -247,19 +246,19 @@ void CHIP8X::renderVideoData() {
 	} else {
 		BVS->displayBuffer.write(mDisplayBuffer, [this](auto& pixel) noexcept {
 			if (pixel == 0) {
-				return cBackColor[mBackgroundColor] | 0xFFu;
+				return cBackColor[mBackgroundColor];
 			} else {
-				const auto idx{ &pixel - mDisplayBuffer.data() };
-				const auto Y{ (idx / cScreenSizeX) & mColorResolution };
-				const auto X{ (idx % cScreenSizeX) >> 3 };
-				return mColoredBuffer(X, Y) | 0xFFu;
+				const auto idx = &pixel - mDisplayBuffer.data();
+				const auto Y = (idx / cScreenSizeX) & mColorResolution;
+				const auto X = (idx % cScreenSizeX) >> 3;
+				return mColoredBuffer(X, Y);
 			}
 		});
 	}
 }
 
 void CHIP8X::setBuzzerPitch(s32 pitch) noexcept {
-	if (auto* stream{ mAudioDevice.at(STREAM::MAIN) }) {
+	if (auto* stream = mAudioDevice.at(STREAM::MAIN)) {
 		mVoices[VOICE::UNIQUE].setStep((sTonalOffset + (
 			(0xFF - (pitch ? pitch : 0x80)) >> 3 << 4)
 		) / stream->getFreq() * getFramerateMultiplier());
@@ -267,8 +266,8 @@ void CHIP8X::setBuzzerPitch(s32 pitch) noexcept {
 }
 
 void CHIP8X::drawLoresColor(s32 X, s32 Y, s32 idx) noexcept {
-	for (auto pY{ 0 }, maxH{ Y >> 4 }; pY <= maxH; ++pY) {
-		for (auto pX{ 0 }, maxW{ X >> 4 }; pX <= maxW; ++pX) {
+	for (auto pY = 0, maxH = Y >> 4; pY <= maxH; ++pY) {
+		for (auto pX = 0, maxW = X >> 4; pX <= maxW; ++pX) {
 			mColoredBuffer((X + pX) & 0x7, ((Y + pY) << 2) & 0x1F) = cForeColor[idx & 0x7];
 		}
 	}
@@ -276,7 +275,7 @@ void CHIP8X::drawLoresColor(s32 X, s32 Y, s32 idx) noexcept {
 }
 
 void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
-	for (auto pY{ Y }, pX{ X >> 3 }; pY < Y + N; ++pY) {
+	for (auto pY = Y, pX = X >> 3; pY < Y + N; ++pY) {
 		mColoredBuffer(pX & 0x7, pY & 0x1F) = cForeColor[idx & 0x7];
 	}
 	mColorResolution = 0xFF;
@@ -347,8 +346,8 @@ void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 		if (mRegisterV[X] == mRegisterV[Y]) { skipInstruction(); }
 	}
 	void CHIP8X::instruction_5xy1(s32 X, s32 Y) noexcept {
-		const auto lenX{ (mRegisterV[X] & 0x70) + (mRegisterV[Y] & 0x70) };
-		const auto lenY{ (mRegisterV[X] + mRegisterV[Y]) & 0x7 };
+		const auto lenX = (mRegisterV[X] & 0x70) + (mRegisterV[Y] & 0x70);
+		const auto lenY = (mRegisterV[X] + mRegisterV[Y]) & 0x7;
 		::assign_cast(mRegisterV[X], lenX | lenY);
 	}
 
@@ -391,29 +390,29 @@ void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 		::assign_cast_xor(mRegisterV[X], mRegisterV[Y]);
 	}
 	void CHIP8X::instruction_8xy4(s32 X, s32 Y) noexcept {
-		const auto sum{ mRegisterV[X] + mRegisterV[Y] };
+		const auto sum = mRegisterV[X] + mRegisterV[Y];
 		::assign_cast(mRegisterV[X], sum);
 		::assign_cast(mRegisterV[0xF], sum >> 8);
 	}
 	void CHIP8X::instruction_8xy5(s32 X, s32 Y) noexcept {
-		const bool nborrow{ mRegisterV[X] >= mRegisterV[Y] };
+		const bool nborrow = mRegisterV[X] >= mRegisterV[Y];
 		::assign_cast_sub(mRegisterV[X], mRegisterV[Y]);
 		::assign_cast(mRegisterV[0xF], nborrow);
 	}
 	void CHIP8X::instruction_8xy7(s32 X, s32 Y) noexcept {
-		const bool nborrow{ mRegisterV[Y] >= mRegisterV[X] };
+		const bool nborrow = mRegisterV[Y] >= mRegisterV[X];
 		::assign_cast_rsub(mRegisterV[X], mRegisterV[Y]);
 		::assign_cast(mRegisterV[0xF], nborrow);
 	}
 	void CHIP8X::instruction_8xy6(s32 X, s32 Y) noexcept {
 		if (!Quirk.shiftVX) { mRegisterV[X] = mRegisterV[Y]; }
-		const bool lsb{ (mRegisterV[X] & 1) == 1 };
+		const bool lsb = (mRegisterV[X] & 1) == 1;
 		::assign_cast_shr(mRegisterV[X], 1);
 		::assign_cast(mRegisterV[0xF], lsb);
 	}
 	void CHIP8X::instruction_8xyE(s32 X, s32 Y) noexcept {
 		if (!Quirk.shiftVX) { mRegisterV[X] = mRegisterV[Y]; }
-		const bool msb{ (mRegisterV[X] >> 7) == 1 };
+		const bool msb = (mRegisterV[X] >> 7) == 1;
 		::assign_cast_shl(mRegisterV[X], 1);
 		::assign_cast(mRegisterV[0xF], msb);
 	}
@@ -488,7 +487,7 @@ void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 				if (Quirk.wrapSprite) { X &= (cScreenSizeX - 1); }
 				else if (X >= cScreenSizeX) { return; }
 
-				for (auto B{ 0 }; B < 8; ++B, ++X &= (cScreenSizeX - 1)) {
+				for (auto B = 0; B < 8; ++B, ++X &= (cScreenSizeX - 1)) {
 					if (DATA & 0x80 >> B) {
 						if (!((mDisplayBuffer[Y * cScreenSizeX + X] ^= 0x8) & 0x8))
 							{ mRegisterV[0xF] = 1; }
@@ -502,8 +501,8 @@ void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 	void CHIP8X::instruction_DxyN(s32 X, s32 Y, s32 N) noexcept {
 		triggerInterrupt(Interrupt::FRAME);
 
-		auto pX{ mRegisterV[X] & (cScreenSizeX - 1) };
-		auto pY{ mRegisterV[Y] & (cScreenSizeY - 1) };
+		auto pX = mRegisterV[X] & (cScreenSizeX - 1);
+		auto pY = mRegisterV[Y] & (cScreenSizeY - 1);
 
 		mRegisterV[0xF] = 0;
 
@@ -515,7 +514,7 @@ void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 
 			[[unlikely]]
 			case 0:
-				for (auto H{ 0 }, I{ 0 }; H < 16; ++H, I += 2, ++pY &= (cScreenSizeY - 1))
+				for (auto H = 0, I = 0; H < 16; ++H, I += 2, ++pY &= (cScreenSizeY - 1))
 				{
 					drawByte(pX + 0, pY, readMemoryI(I + 0));
 					drawByte(pX + 8, pY, readMemoryI(I + 1));
@@ -526,7 +525,7 @@ void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 
 			[[unlikely]]
 			default:
-				for (auto H{ 0 }; H < N; ++H, ++pY &= (cScreenSizeY - 1))
+				for (auto H = 0; H < N; ++H, ++pY &= (cScreenSizeY - 1))
 				{
 					drawByte(pX, pY, readMemoryI(H));
 					if (!Quirk.wrapSprite && pY == (cScreenSizeY - 1)) { break; }
@@ -587,11 +586,11 @@ void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 		writeMemoryI(bcd.digit[0], 2);
 	}
 	void CHIP8X::instruction_FN55(s32 N) noexcept {
-		for (auto idx{ 0 }; idx <= N; ++idx) { writeMemoryI(mRegisterV[idx], idx); }
+		for (auto idx = 0; idx <= N; ++idx) { writeMemoryI(mRegisterV[idx], idx); }
 		if (!Quirk.idxRegNoInc) [[likely]] { incIndexRegister(N + 1); }
 	}
 	void CHIP8X::instruction_FN65(s32 N) noexcept {
-		for (auto idx{ 0 }; idx <= N; ++idx) { mRegisterV[idx] = readMemoryI(idx); }
+		for (auto idx = 0; idx <= N; ++idx) { mRegisterV[idx] = readMemoryI(idx); }
 		if (!Quirk.idxRegNoInc) [[likely]] { incIndexRegister(N + 1); }
 	}
 	void CHIP8X::instruction_FxF8(s32 X) noexcept {

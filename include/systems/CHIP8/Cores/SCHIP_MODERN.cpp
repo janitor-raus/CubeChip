@@ -39,8 +39,8 @@ void SCHIP_MODERN::handleCycleLoop() noexcept
 template <typename Lambda>
 void SCHIP_MODERN::instructionLoop(Lambda&& condition) noexcept {
 	for (mCycleCount = 0; condition(); ++mCycleCount) {
-		const auto HI{ mMemoryBank[mCurrentPC++] };
-		const auto LO{ mMemoryBank[mCurrentPC++] };
+		const auto HI = mMemoryBank[mCurrentPC++];
+		const auto LO = mMemoryBank[mCurrentPC++];
 
 		#define _NNN (HI << 8 | LO)
 		#define _X (HI & 0xF)
@@ -152,7 +152,6 @@ void SCHIP_MODERN::instructionLoop(Lambda&& condition) noexcept {
 			CASE_xNF(0xC0):
 				instruction_CxNN(_X, LO);
 				break;
-			[[likely]]
 			CASE_xNF(0xD0):
 				instruction_DxyN(_X, Y_, _N);
 				break;
@@ -227,12 +226,10 @@ void SCHIP_MODERN::renderAudioData() {
 
 void SCHIP_MODERN::renderVideoData() {
 	BVS->displayBuffer.write(mDisplayBuffer[0], isUsingPixelTrails()
-		? [](u32 pixel) noexcept {
-			return cPixelOpacity[pixel] | sBitColors[pixel != 0];
-		}
-		: [](u32 pixel) noexcept {
-			return 0xFFu | sBitColors[pixel >> 3];
-		}
+		? [](u32 pixel) noexcept
+			{ return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
+		: [](u32 pixel) noexcept
+			{ return sBitColors[pixel >> 3]; }
 	);
 
 	setViewportSizes(isResolutionChanged(false), mDisplay.W, mDisplay.H,
@@ -247,11 +244,11 @@ void SCHIP_MODERN::renderVideoData() {
 }
 
 void SCHIP_MODERN::prepDisplayArea(const Resolution mode) {
-	const bool wasLargerDisplay{ isLargerDisplay(mode != Resolution::LO) };
+	const bool wasLargerDisplay = isLargerDisplay(mode != Resolution::LO);
 	isResolutionChanged(wasLargerDisplay != isLargerDisplay());
 
-	const auto W{ isLargerDisplay() ? cScreenSizeX * 2 : cScreenSizeX };
-	const auto H{ isLargerDisplay() ? cScreenSizeY * 2 : cScreenSizeY };
+	const auto W = isLargerDisplay() ? cScreenSizeX * 2 : cScreenSizeX;
+	const auto H = isLargerDisplay() ? cScreenSizeY * 2 : cScreenSizeY;
 
 	mDisplay.set(W, H);
 
@@ -400,29 +397,29 @@ void SCHIP_MODERN::scrollDisplayRT() {
 		::assign_cast_xor(mRegisterV[X], mRegisterV[Y]);
 	}
 	void SCHIP_MODERN::instruction_8xy4(s32 X, s32 Y) noexcept {
-		const auto sum{ mRegisterV[X] + mRegisterV[Y] };
+		const auto sum = mRegisterV[X] + mRegisterV[Y];
 		::assign_cast(mRegisterV[X], sum);
 		::assign_cast(mRegisterV[0xF], sum >> 8);
 	}
 	void SCHIP_MODERN::instruction_8xy5(s32 X, s32 Y) noexcept {
-		const bool nborrow{ mRegisterV[X] >= mRegisterV[Y] };
+		const bool nborrow = mRegisterV[X] >= mRegisterV[Y];
 		::assign_cast_sub(mRegisterV[X], mRegisterV[Y]);
 		::assign_cast(mRegisterV[0xF], nborrow);
 	}
 	void SCHIP_MODERN::instruction_8xy7(s32 X, s32 Y) noexcept {
-		const bool nborrow{ mRegisterV[Y] >= mRegisterV[X] };
-		::assign_cast_rsub(mRegisterV[X], mRegisterV[X]);
+		const bool nborrow = mRegisterV[Y] >= mRegisterV[X];
+		::assign_cast_rsub(mRegisterV[X], mRegisterV[Y]);
 		::assign_cast(mRegisterV[0xF], nborrow);
 	}
 	void SCHIP_MODERN::instruction_8xy6(s32 X, s32 Y) noexcept {
 		if (!Quirk.shiftVX) { mRegisterV[X] = mRegisterV[Y]; }
-		const bool lsb{ (mRegisterV[X] & 1) == 1 };
+		const bool lsb = (mRegisterV[X] & 1) == 1;
 		::assign_cast_shr(mRegisterV[X], 1);
 		::assign_cast(mRegisterV[0xF], lsb);
 	}
 	void SCHIP_MODERN::instruction_8xyE(s32 X, s32 Y) noexcept {
 		if (!Quirk.shiftVX) { mRegisterV[X] = mRegisterV[Y]; }
-		const bool msb{ (mRegisterV[X] >> 7) == 1 };
+		const bool msb = (mRegisterV[X] >> 7) == 1;
 		::assign_cast_shl(mRegisterV[X], 1);
 		::assign_cast(mRegisterV[0xF], msb);
 	}
@@ -493,7 +490,7 @@ void SCHIP_MODERN::scrollDisplayRT() {
 				if (Quirk.wrapSprite) { X &= (mDisplay.W - 1); }
 				else if (X >= mDisplay.W) { return; }
 
-				for (auto B{ 0 }; B < 8; ++B, ++X &= (mDisplay.W - 1)) {
+				for (auto B = 0; B < 8; ++B, ++X &= (mDisplay.W - 1)) {
 					if (DATA & 0x80 >> B) {
 						if (!((mDisplayBuffer[0](X, Y) ^= 0x8) & 0x8))
 							{ mRegisterV[0xF] = 1; }
@@ -508,8 +505,8 @@ void SCHIP_MODERN::scrollDisplayRT() {
 		if (Quirk.waitVblank) [[unlikely]]
 			{ triggerInterrupt(Interrupt::FRAME); }
 
-		const auto pX{ mRegisterV[X] & (mDisplay.W - 1) };
-		const auto pY{ mRegisterV[Y] & (mDisplay.H - 1) };
+		const auto pX = mRegisterV[X] & (mDisplay.W - 1);
+		const auto pY = mRegisterV[Y] & (mDisplay.H - 1);
 
 		mRegisterV[0xF] = 0;
 
@@ -521,7 +518,7 @@ void SCHIP_MODERN::scrollDisplayRT() {
 
 			[[unlikely]]
 			case 0:
-				for (auto tN{ 0 }, tY{ pY }; tN < 32;)
+				for (auto tN = 0, tY = pY; tN < 32;)
 				{
 					drawByte(pX + 0, tY, readMemoryI(tN + 0));
 					drawByte(pX + 8, tY, readMemoryI(tN + 1));
@@ -532,7 +529,7 @@ void SCHIP_MODERN::scrollDisplayRT() {
 
 			[[likely]]
 			default:
-				for (auto tN{ 0 }, tY{ pY }; tN < N;)
+				for (auto tN = 0, tY = pY; tN < N;)
 				{
 					drawByte(pX, tY, readMemoryI(tN));
 					if (!Quirk.wrapSprite && tY == (mDisplay.H - 1)) { break; }
@@ -591,11 +588,11 @@ void SCHIP_MODERN::scrollDisplayRT() {
 		writeMemoryI(bcd.digit[0], 2);
 	}
 	void SCHIP_MODERN::instruction_FN55(s32 N) noexcept {
-		for (auto idx{ 0 }; idx <= N; ++idx) { writeMemoryI(mRegisterV[idx], idx); }
+		for (auto idx = 0; idx <= N; ++idx) { writeMemoryI(mRegisterV[idx], idx); }
 		if (!Quirk.idxRegNoInc) [[likely]] { incIndexRegister(N + 1); }
 	}
 	void SCHIP_MODERN::instruction_FN65(s32 N) noexcept {
-		for (auto idx{ 0 }; idx <= N; ++idx) { mRegisterV[idx] = readMemoryI(idx); }
+		for (auto idx = 0; idx <= N; ++idx) { mRegisterV[idx] = readMemoryI(idx); }
 		if (!Quirk.idxRegNoInc) [[likely]] { incIndexRegister(N + 1); }
 	}
 	void SCHIP_MODERN::instruction_FN75(s32 N) noexcept {

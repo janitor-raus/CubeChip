@@ -296,8 +296,9 @@ protected:
 	#define PX_3 0xE7
 	#define PX_4 0xFF
 
-	static constexpr std::array<u32, 16> cPixelOpacity{ {
-		0x00, PX_1, PX_2, PX_2,
+	// Premul table for pixel trails
+	static constexpr std::array<u32, 16> cBitWeight{ {
+		PX_4, PX_1, PX_2, PX_2,
 		PX_3, PX_3, PX_3, PX_3,
 		PX_4, PX_4, PX_4, PX_4,
 		PX_4, PX_4, PX_4, PX_4,

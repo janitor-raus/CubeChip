@@ -14,24 +14,24 @@
 /*==================================================================*/
 
 class MEGACHIP final : public Chip8_CoreInterface {
-	static constexpr u64 cTotalMemory{ 16_MiB };
-	static constexpr u32 cSafezoneOOB{    32 };
-	static constexpr u32 cGameLoadPos{   512 };
-	static constexpr u32 cStartOffset{   512 };
-	static constexpr f32 cRefreshRate{ 60.0f };
+	static constexpr u64 cTotalMemory = 16_MiB;
+	static constexpr u32 cSafezoneOOB =    32;
+	static constexpr u32 cGameLoadPos =   512;
+	static constexpr u32 cStartOffset =   512;
+	static constexpr f32 cRefreshRate = 60.0f;
 
-	static constexpr s32 cResSizeMult{   2 };
-	static constexpr s32 cScreenSizeX{ 128 };
-	static constexpr s32 cScreenSizeY{  64 };
-	static constexpr s32 cInstSpeedHi{  45 };
-	static constexpr s32 cInstSpeedLo{  30 };
+	static constexpr s32 cResSizeMult =   2;
+	static constexpr s32 cScreenSizeX = 128;
+	static constexpr s32 cScreenSizeY =  64;
+	static constexpr s32 cInstSpeedHi =  45;
+	static constexpr s32 cInstSpeedLo =  30;
 
-	static constexpr s32 cScreenMegaX{  256 };
-	static constexpr s32 cScreenMegaY{  192 };
-	static constexpr s32 cInstSpeedMC{ 3000 };
+	static constexpr s32 cScreenMegaX =  256;
+	static constexpr s32 cScreenMegaY =  192;
+	static constexpr s32 cInstSpeedMC = 3000;
 
-	static constexpr u32 cMaxDisplayW{ 256 };
-	static constexpr u32 cMaxDisplayH{ 192 };
+	static constexpr u32 cMaxDisplayW = 256;
+	static constexpr u32 cMaxDisplayH = 192;
 
 /*==================================================================*/
 
@@ -39,8 +39,8 @@ class MEGACHIP final : public Chip8_CoreInterface {
 
 	struct Texture {
 		s32 W{}, H{};
-		s32 collide{ 0xFF };
-		s32 opacity{ 0xFF };
+		s32 collide = 0xFF;
+		s32 opacity = 0xFF;
 		u32 fontOffset{};
 
 		constexpr void reset() noexcept
@@ -99,8 +99,8 @@ class MEGACHIP final : public Chip8_CoreInterface {
 
 	template <std::integral T>
 	void writeMemoryI(T value, u32 pos) noexcept {
-		const auto index{ mRegisterI + pos };
-		const auto valid{ index < cTotalMemory ? index : cTotalMemory + cSafezoneOOB - 1 };
+		const auto index = mRegisterI + pos;
+		const auto valid = index < cTotalMemory ? index : cTotalMemory + cSafezoneOOB - 1;
 		::assign_cast(mMemoryBank[valid], value);
 	}
 

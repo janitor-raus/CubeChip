@@ -35,8 +35,8 @@ void MEGACHIP::handleCycleLoop() noexcept
 template <typename Lambda>
 void MEGACHIP::instructionLoop(Lambda&& condition) noexcept {
 	for (mCycleCount = 0; condition(); ++mCycleCount) {
-		const auto HI{ mMemoryBank[mCurrentPC++] };
-		const auto LO{ mMemoryBank[mCurrentPC++] };
+		const auto HI = mMemoryBank[mCurrentPC++];
+		const auto LO = mMemoryBank[mCurrentPC++];
 
 		#define _NNN (HI << 8 | LO)
 		#define _X (HI & 0xF)
@@ -220,7 +220,6 @@ void MEGACHIP::instructionLoop(Lambda&& condition) noexcept {
 			CASE_xNF(0xC0):
 				instruction_CxNN(_X, LO);
 				break;
-			[[likely]]
 			CASE_xNF(0xD0):
 				instruction_DxyN(_X, Y_, _N);
 				break;
@@ -305,19 +304,19 @@ void MEGACHIP::renderAudioData() {
 
 void MEGACHIP::renderVideoData() {
 	if (!isManualRefresh()) {
-		for (auto i{ 0u }; i < mDisplayBuffer.size(); ++i) {
-			auto pixel{ mDisplayBuffer[i] };
-			auto color{ isUsingPixelTrails()
-				? (sBitColors[pixel != 0] | cPixelOpacity[pixel])
-				: (sBitColors[pixel >> 3] | 0xFFu) };
+		for (auto i = 0u; i < mDisplayBuffer.size(); ++i) {
+			auto pixel = mDisplayBuffer[i];
+			auto color = isUsingPixelTrails()
+				? RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel])
+				: sBitColors[pixel >> 3];
 
-			auto x{ (i % cScreenSizeX) * 2 };
-			auto y{ (i / cScreenSizeX) * 2 + 32 };
+			auto x = (i % cScreenSizeX) * 2;
+			auto y = (i / cScreenSizeX) * 2;
 
-			mBackgroundBuffer(x + 0, y + 0) = color;
-			mBackgroundBuffer(x + 1, y + 0) = color;
-			mBackgroundBuffer(x + 0, y + 1) = color;
-			mBackgroundBuffer(x + 1, y + 1) = color;
+			mBackgroundBuffer(x + 0, y + 32) = color;
+			mBackgroundBuffer(x + 1, y + 32) = color;
+			mBackgroundBuffer(x + 0, y + 33) = color;
+			mBackgroundBuffer(x + 1, y + 33) = color;
 		}
 
 		BVS->displayBuffer.write(mBackgroundBuffer);
@@ -325,7 +324,7 @@ void MEGACHIP::renderVideoData() {
 }
 
 void MEGACHIP::prepDisplayArea(Resolution mode) {
-	const bool wasManualRefresh{ isManualRefresh(mode == Resolution::MC) };
+	const bool wasManualRefresh = isManualRefresh(mode == Resolution::MC);
 	isResolutionChanged(wasManualRefresh != isManualRefresh());
 
 	if (isManualRefresh()) {
@@ -362,8 +361,8 @@ void MEGACHIP::scrollDisplayRT() {
 /*==================================================================*/
 
 void MEGACHIP::initializeFontColors() noexcept {
-	for (auto i{ 0 }; i < 10; ++i) {
-		const auto mult{ u8(std::max(0, 255 - 11 * i)) };
+	for (auto i = 0; i < 10; ++i) {
+		const auto mult = u8(255 - 11 * i);
 
 		mFontColor[i] = RGBA{
 			ez::fixedScale8(mult, 264),
@@ -413,7 +412,7 @@ void MEGACHIP::blendAndFlushBuffers() const {
 }
 
 void MEGACHIP::startAudioTrack(bool repeat) noexcept {
-	if (auto* stream{ mAudioDevice.at(STREAM::MAIN) }) {
+	if (auto* stream = mAudioDevice.at(STREAM::MAIN)) {
 
 		mTrack.loop = repeat;
 		mTrack.data = &mMemoryBank[mRegisterI + 6];
@@ -421,7 +420,7 @@ void MEGACHIP::startAudioTrack(bool repeat) noexcept {
 					| readMemoryI(3) <<  8
 					| readMemoryI(4);
 
-		const bool oob{ mTrack.data + mTrack.size > &mMemoryBank.back() };
+		const bool oob = mTrack.data + mTrack.size > &mMemoryBank.back();
 		if (!mTrack.size || oob) { mTrack.reset(); }
 		else {
 			mVoices[VOICE::UNIQUE].setPhase(0.0).setStep(getFramerateMultiplier() * (
@@ -433,11 +432,11 @@ void MEGACHIP::startAudioTrack(bool repeat) noexcept {
 
 void MEGACHIP::makeByteWave(f32* data, u32 size, Voice* voice, Stream*) noexcept {
 	if (!voice || !voice->userdata) [[unlikely]] { return; }
-	if (auto* track{ static_cast<TrackData*>(voice->userdata) }) {
+	if (auto* track = static_cast<TrackData*>(voice->userdata)) {
 		if (!track->isOn()) { return; }
 
-		for (auto i{ 0u }; i < size; ++i) {
-			const auto head{ voice->peekRawPhase(i) };
+		for (auto i = 0u; i < size; ++i) {
+			const auto head = voice->peekRawPhase(i);
 			if (!track->loop && head >= 1.0) {
 				track->reset(); return;
 			} else {
@@ -541,7 +540,7 @@ void MEGACHIP::scrollBuffersRT() {
 		::assign_cast_add(mCurrentPC, 2);
 	}
 	void MEGACHIP::instruction_02NN(s32 NN) noexcept {
-		for (auto pos{ 0 }, byte{ 0 }; pos < NN; byte += 4) {
+		for (auto pos = 0, byte = 0; pos < NN; byte += 4) {
 			mColorPalette(++pos) = {
 				readMemoryI(byte + 1),
 				readMemoryI(byte + 2),
@@ -664,27 +663,27 @@ void MEGACHIP::scrollBuffersRT() {
 		::assign_cast_xor(mRegisterV[X], mRegisterV[Y]);
 	}
 	void MEGACHIP::instruction_8xy4(s32 X, s32 Y) noexcept {
-		const auto sum{ mRegisterV[X] + mRegisterV[Y] };
+		const auto sum = mRegisterV[X] + mRegisterV[Y];
 		::assign_cast(mRegisterV[X], sum);
 		::assign_cast(mRegisterV[0xF], sum >> 8);
 	}
 	void MEGACHIP::instruction_8xy5(s32 X, s32 Y) noexcept {
-		const bool nborrow{ mRegisterV[X] >= mRegisterV[Y] };
+		const bool nborrow = mRegisterV[X] >= mRegisterV[Y];
 		::assign_cast_sub(mRegisterV[X], mRegisterV[Y]);
 		::assign_cast(mRegisterV[0xF], nborrow);
 	}
 	void MEGACHIP::instruction_8xy7(s32 X, s32 Y) noexcept {
-		const bool nborrow{ mRegisterV[Y] >= mRegisterV[X] };
+		const bool nborrow = mRegisterV[Y] >= mRegisterV[X];
 		::assign_cast_rsub(mRegisterV[X], mRegisterV[Y]);
 		::assign_cast(mRegisterV[0xF], nborrow);
 	}
 	void MEGACHIP::instruction_8xy6(s32 X, s32  ) noexcept {
-		const bool lsb{ (mRegisterV[X] & 0x01) != 0 };
+		const bool lsb = (mRegisterV[X] & 0x01) != 0;
 		::assign_cast_shr(mRegisterV[X], 1);
 		::assign_cast(mRegisterV[0xF], lsb);
 	}
 	void MEGACHIP::instruction_8xyE(s32 X, s32  ) noexcept {
-		const bool msb{ (mRegisterV[X] & 0x80) != 0 };
+		const bool msb = (mRegisterV[X] & 0x80) != 0;
 		::assign_cast_shl(mRegisterV[X], 1);
 		::assign_cast(mRegisterV[0xF], msb);
 	}
@@ -740,13 +739,13 @@ void MEGACHIP::scrollBuffersRT() {
 		s32 WIDTH,   s32 DATA
 	) noexcept {
 		if (!DATA) { return false; }
-		bool collided{ false };
+		bool collided = false;
 
-		for (auto B{ 0 }; B < WIDTH; ++B) {
-			const auto offsetX{ originX + B };
+		for (auto B = 0; B < WIDTH; ++B) {
+			const auto offsetX = originX + B;
 
 			if (DATA >> (WIDTH - 1 - B) & 0x1) {
-				auto& pixel{ mDisplayBuffer(offsetX, originY) };
+				auto& pixel = mDisplayBuffer(offsetX, originY);
 				if (!((pixel ^= 0x8) & 0x8)) { collided = true; }
 			}
 			if (offsetX == cScreenSizeX - 1) { return collided; }
@@ -759,13 +758,13 @@ void MEGACHIP::scrollBuffersRT() {
 		s32 WIDTH,   s32 DATA
 	) noexcept {
 		if (!DATA) { return false; }
-		bool collided{ false };
+		bool collided = false;
 
-		for (auto B{ 0 }; B < WIDTH; ++B) {
-			const auto offsetX{ originX + B };
+		for (auto B = 0; B < WIDTH; ++B) {
+			const auto offsetX = originX + B;
 
-			auto& pixelHI{ mDisplayBuffer(offsetX, originY + 0) };
-			auto& pixelLO{ mDisplayBuffer(offsetX, originY + 1) };
+			auto& pixelHI = mDisplayBuffer(offsetX, originY + 0);
+			auto& pixelLO = mDisplayBuffer(offsetX, originY + 1);
 
 			if (DATA >> (WIDTH - 1 - B) & 0x1) {
 				collided |= !!(pixelHI & 0x8);
@@ -783,20 +782,20 @@ void MEGACHIP::scrollBuffersRT() {
 			{ triggerInterrupt(Interrupt::FRAME); }
 
 		if (isManualRefresh()) {
-			const auto originX{ mRegisterV[X] + 0 };
-			const auto originY{ mRegisterV[Y] + 0 };
+			const auto originX = mRegisterV[X] + 0;
+			const auto originY = mRegisterV[Y] + 0;
 
 			mRegisterV[0xF] = 0;
 
 			if (!Quirk.wrapSprite && originY >= cScreenMegaY) { return; }
 			if (mTexture.fontOffset != mRegisterI) [[likely]] { goto paintTexture; }
 
-			for (auto rowN{ 0 }, offsetY{ originY }; rowN < N; ++rowN)
+			for (auto rowN = 0, offsetY = originY; rowN < N; ++rowN)
 			{
 				if (Quirk.wrapSprite && offsetY >= cScreenMegaY) { continue; }
-				const auto octoPixelBatch{ readMemoryI(rowN) };
+				const auto octoPixelBatch = readMemoryI(rowN);
 
-				for (auto colN{ 7 }, offsetX{ originX }; colN >= 0; --colN)
+				for (auto colN = 7, offsetX = originX; colN >= 0; --colN)
 				{
 					if (octoPixelBatch >> colN & 0x1)
 						{ mBackgroundBuffer(offsetX, offsetY) = mFontColor[rowN]; }
@@ -813,17 +812,17 @@ void MEGACHIP::scrollBuffersRT() {
 			if (mRegisterI + mTexture.W * mTexture.H >= cTotalMemory)
 				[[unlikely]] { mTexture.reset(); return; }
 
-			for (auto rowN{ 0 }, offsetY{ originY }; rowN < mTexture.H; ++rowN)
+			for (auto rowN = 0, offsetY = originY; rowN < mTexture.H; ++rowN)
 			{
 				if (Quirk.wrapSprite && offsetY >= cScreenMegaY) { continue; }
 				const auto offsetI = rowN * mTexture.W;
 
-				for (auto colN{ 0 }, offsetX{ originX }; colN < mTexture.W; ++colN)
+				for (auto colN = 0, offsetX = originX; colN < mTexture.W; ++colN)
 				{
-					if (const auto sourceColorIdx{ readMemoryI(offsetI + colN) })
+					if (const auto sourceColorIdx = readMemoryI(offsetI + colN))
 					{
-						auto& collideCoord{ mCollisionMap(offsetX, offsetY) };
-						auto& backbufCoord{ mBackgroundBuffer(offsetX, offsetY) };
+						auto& collideCoord = mCollisionMap(offsetX, offsetY);
+						auto& backbufCoord = mBackgroundBuffer(offsetX, offsetY);
 
 						if (collideCoord == mTexture.collide)
 							[[unlikely]] { mRegisterV[0xF] = 1; }
@@ -840,15 +839,15 @@ void MEGACHIP::scrollBuffersRT() {
 			}
 		} else {
 			if (isLargerDisplay()) {
-				const auto offsetX{ 8 - (mRegisterV[X] & 7) };
-				const auto originX{ mRegisterV[X] & 0x78 };
-				const auto originY{ mRegisterV[Y] & 0x3F };
+				const auto offsetX = 8 - (mRegisterV[X] & 7);
+				const auto originX = mRegisterV[X] & 0x78;
+				const auto originY = mRegisterV[Y] & 0x3F;
 
-				auto collisions{ 0 };
+				auto collisions = 0;
 
 				if (N == 0) {
-					for (auto rowN{ 0 }; rowN < 16; ++rowN) {
-						const auto offsetY{ originY + rowN };
+					for (auto rowN = 0; rowN < 16; ++rowN) {
+						const auto offsetY = originY + rowN;
 
 						collisions += drawSingleBytes(
 							originX, offsetY, offsetX ? 24 : 16,
@@ -858,8 +857,8 @@ void MEGACHIP::scrollBuffersRT() {
 						if (offsetY == cScreenSizeY - 1) { break; }
 					}
 				} else {
-					for (auto rowN{ 0 }; rowN < N; ++rowN) {
-						const auto offsetY{ originY + rowN };
+					for (auto rowN = 0; rowN < N; ++rowN) {
+						const auto offsetY = originY + rowN;
 
 						collisions += drawSingleBytes(
 							originX, offsetY, offsetX ? 16 : 8,
@@ -871,15 +870,15 @@ void MEGACHIP::scrollBuffersRT() {
 				::assign_cast(mRegisterV[0xF], collisions);
 			}
 			else {
-				const auto offsetX{ 16 - 2 * (mRegisterV[X] & 0x07) };
-				const auto originX{ mRegisterV[X] * 2 & 0x70 };
-				const auto originY{ mRegisterV[Y] * 2 & 0x3F };
-				const auto lengthN{ N == 0 ? 16 : N };
+				const auto offsetX = 16 - 2 * (mRegisterV[X] & 0x07);
+				const auto originX = mRegisterV[X] * 2 & 0x70;
+				const auto originY = mRegisterV[Y] * 2 & 0x3F;
+				const auto lengthN = N == 0 ? 16 : N;
 
-				auto collisions{ 0 };
+				auto collisions = 0;
 
-				for (auto rowN{ 0 }; rowN < lengthN; ++rowN) {
-					const auto offsetY{ originY + rowN * 2 };
+				for (auto rowN = 0; rowN < lengthN; ++rowN) {
+					const auto offsetY = originY + rowN * 2;
 
 					collisions += drawDoubleBytes(originX, offsetY, 0x20,
 						ez::bitDup8(readMemoryI(rowN)) << offsetX);
@@ -930,11 +929,11 @@ void MEGACHIP::scrollBuffersRT() {
 	}
 	void MEGACHIP::instruction_Fx29(s32 X) noexcept {
 		setIndexRegister((mRegisterV[X] & 0xF) * 5 + cSmallFontOffset);
-		mTexture.fontOffset = mRegisterI;
+		::assign_cast(mTexture.fontOffset, mRegisterI);
 	}
 	void MEGACHIP::instruction_Fx30(s32 X) noexcept {
 		setIndexRegister((mRegisterV[X] & 0xF) * 10 + cLargeFontOffset);
-		mTexture.fontOffset = mRegisterI;
+		::assign_cast(mTexture.fontOffset, mRegisterI);
 	}
 	void MEGACHIP::instruction_Fx33(s32 X) noexcept {
 		const TriBCD bcd{ mRegisterV[X] };
@@ -944,11 +943,11 @@ void MEGACHIP::scrollBuffersRT() {
 		writeMemoryI(bcd.digit[0], 2);
 	}
 	void MEGACHIP::instruction_FN55(s32 N) noexcept {
-		for (auto idx{ 0 }; idx <= N; ++idx)
+		for (auto idx = 0; idx <= N; ++idx)
 			{ writeMemoryI(mRegisterV[idx], idx); }
 	}
 	void MEGACHIP::instruction_FN65(s32 N) noexcept {
-		for (auto idx{ 0 }; idx <= N; ++idx)
+		for (auto idx = 0; idx <= N; ++idx)
 			{ mRegisterV[idx] = readMemoryI(idx); }
 	}
 	void MEGACHIP::instruction_FN75(s32 N) noexcept {
