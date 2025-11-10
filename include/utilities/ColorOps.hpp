@@ -48,12 +48,12 @@ struct alignas(4) RGBA {
 		: R{ R }, G{ G }, B{ B }, A{ A }
 	{}
 
-	constexpr Packed RGB_()     const noexcept { return R << 24 | G << 16 | B << 8 | 0; }
-	constexpr Packed RBG_()     const noexcept { return R << 24 | B << 16 | G << 8 | 0; }
-	constexpr Packed GRB_()     const noexcept { return G << 24 | R << 16 | B << 8 | 0; }
-	constexpr Packed GBR_()     const noexcept { return G << 24 | B << 16 | R << 8 | 0; }
-	constexpr Packed BRG_()     const noexcept { return B << 24 | R << 16 | G << 8 | 0; }
-	constexpr Packed BGR_()     const noexcept { return B << 24 | G << 16 | R << 8 | 0; }
+	constexpr Packed RGB_()     const noexcept { return R << 24 | G << 16 | B << 8 | Opaque; }
+	constexpr Packed RBG_()     const noexcept { return R << 24 | B << 16 | G << 8 | Opaque; }
+	constexpr Packed GRB_()     const noexcept { return G << 24 | R << 16 | B << 8 | Opaque; }
+	constexpr Packed GBR_()     const noexcept { return G << 24 | B << 16 | R << 8 | Opaque; }
+	constexpr Packed BRG_()     const noexcept { return B << 24 | R << 16 | G << 8 | Opaque; }
+	constexpr Packed BGR_()     const noexcept { return B << 24 | G << 16 | R << 8 | Opaque; }
 
 	constexpr Packed RBGA()     const noexcept { return R << 24 | B << 16 | G << 8 | A; }
 	constexpr Packed GRBA()     const noexcept { return G << 24 | R << 16 | B << 8 | A; }
@@ -209,6 +209,35 @@ struct alignas(4) RGBA {
 		if (auto alpha{ ez::fixedMul8(src.A, weight) }) [[likely]]
 			{ return blendWeightedAlpha(channelBlend(src, dst, func), dst, alpha); }
 		return dst;
+	}
+
+	/**
+	 * @brief Pre-multiplies an RGBA color by a given weight.
+	 * @param[in] src :: Source color (alpha is ignored).
+	 * @param[in] weight :: Weight to pre-multiply by.
+	 */
+	[[nodiscard]] static constexpr
+	RGBA premul(RGBA src, Weight weight) noexcept {
+		return RGBA{
+			ez::fixedMul8(src.R, weight),
+			ez::fixedMul8(src.G, weight),
+			ez::fixedMul8(src.B, weight),
+			src.A
+		};
+	}
+
+	/**
+	 * @brief Pre-multiplies an RGBA color with its own alpha as weight.
+	 * @param[in] src :: Source color with alpha.
+	 */
+	[[nodiscard]] static constexpr
+	RGBA premul(RGBA src) noexcept {
+		return RGBA{
+			ez::fixedMul8(src.R, src.A),
+			ez::fixedMul8(src.G, src.A),
+			ez::fixedMul8(src.B, src.A),
+			src.A
+		};
 	}
 };
 
