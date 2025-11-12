@@ -18,8 +18,6 @@ REGISTER_CORE(XOCHIP, ".xo8")
 void XOCHIP::initializeSystem() noexcept {
 	Quirk.wrapSprite = true;
 
-	::fill_n(mMemoryBank, cTotalMemory, cSafezoneOOB, 0xFF);
-
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
 	copyFontToMemory(mMemoryBank.data(), 80);
 	copyColorsToCore(mBitColors.data());
@@ -46,7 +44,7 @@ void XOCHIP::instructionLoop(Lambda&& condition) noexcept {
 		const auto HI = mMemoryBank[mCurrentPC++];
 		const auto LO = mMemoryBank[mCurrentPC++];
 
-		#define _NNN (HI << 8 | LO)
+		#define _NNN ((HI << 8 | LO) & 0xFFF)
 		#define _X (HI & 0xF)
 		#define Y_ (LO >> 4)
 		#define _N (LO & 0xF)
@@ -54,10 +52,10 @@ void XOCHIP::instructionLoop(Lambda&& condition) noexcept {
 		switch (HI) {
 			case 0x00:
 				switch (LO) {
-					CASE_xNF0(0xC0):
+					CASE_xNF(0xC0):
 						instruction_00CN(_N);
 						break;
-					CASE_xNF0(0xD0):
+					CASE_xNF(0xD0):
 						instruction_00DN(_N);
 						break;
 					case 0xE0:
@@ -452,19 +450,19 @@ void XOCHIP::scrollDisplayRT() {
 		const auto dist = std::abs(X - Y) + 1;
 		const auto flip = X < Y ? 1 : -1;
 		for (auto Z = 0; Z < dist; ++Z)
-			{ writeMemoryI(mRegisterV[X + Z * flip], Z); }
+			{ mMemoryBank[mRegisterI + Z] = mRegisterV[X + Z * flip]; }
 	}
 	void XOCHIP::instruction_5xy3(s32 X, s32 Y) noexcept {
 		const auto dist = std::abs(X - Y) + 1;
 		const auto flip = X < Y ? 1 : -1;
 		for (auto Z = 0; Z < dist; ++Z)
-			{ mRegisterV[X + Z * flip] = readMemoryI(Z); }
+			{ mRegisterV[X + Z * flip] = mMemoryBank[mRegisterI + Z]; }
 	}
 	void XOCHIP::instruction_5xy4(s32 X, s32 Y) noexcept {
 		const auto dist = std::abs(X - Y) + 1;
 		const auto flip = X < Y ? 1 : -1;
 		for (auto Z = 0; Z < dist; ++Z)
-			{ setColorBit332(X + Z * flip, readMemoryI(Z)); }
+			{ setColorBit332(X + Z * flip, mMemoryBank[mRegisterI + Z]); }
 	}
 
 	#pragma endregion
@@ -550,7 +548,7 @@ void XOCHIP::scrollDisplayRT() {
 	#pragma region A instruction branch
 
 	void XOCHIP::instruction_ANNN(s32 NNN) noexcept {
-		setIndexRegister(NNN & 0xFFF);
+		::assign_cast(mRegisterI, NNN);
 	}
 
 	#pragma endregion
@@ -612,7 +610,7 @@ void XOCHIP::scrollDisplayRT() {
 
 	template <std::size_t P>
 	void XOCHIP::drawSingleRow(s32 X, s32 Y) noexcept {
-		drawByte(X, Y, P, readMemoryI(sPlaneMult[P][mPlanarMask]));
+		drawByte(X, Y, P, mMemoryBank[mRegisterI + sPlaneMult[P][mPlanarMask]]);
 	}
 
 	template <std::size_t P>
@@ -620,8 +618,8 @@ void XOCHIP::scrollDisplayRT() {
 		const auto I = sPlaneMult[P][mPlanarMask] * 32;
 
 		for (auto H = 0; H < 16; ++H) {
-			drawByte(X + 0, Y, P, readMemoryI(I + H * 2 + 0));
-			drawByte(X + 8, Y, P, readMemoryI(I + H * 2 + 1));
+			drawByte(X + 0, Y, P, mMemoryBank[mRegisterI + I + H * 2 + 0]);
+			drawByte(X + 8, Y, P, mMemoryBank[mRegisterI + I + H * 2 + 1]);
 
 			if (!Quirk.wrapSprite && Y == (mDisplay.H - 1)) { break; }
 			else { ++Y &= (mDisplay.H - 1); }
@@ -633,7 +631,7 @@ void XOCHIP::scrollDisplayRT() {
 		const auto I = sPlaneMult[P][mPlanarMask] * N;
 
 		for (auto H = 0; H < N; ++H) {
-			drawByte(X, Y, P, readMemoryI(I + H));
+			drawByte(X, Y, P, mMemoryBank[mRegisterI + I + H]);
 
 			if (!Quirk.wrapSprite && Y == (mDisplay.H - 1)) { break; }
 			else { ++Y &= (mDisplay.H - 1); }
@@ -690,13 +688,13 @@ void XOCHIP::scrollDisplayRT() {
 	#pragma region F instruction branch
 
 	void XOCHIP::instruction_F000() noexcept {
-		setIndexRegister(NNNN());
+		::assign_cast(mRegisterI, NNNN());
 		::assign_cast_add(mCurrentPC, 2);
 	}
 	void XOCHIP::instruction_F002() noexcept {
 		SUGGEST_VECTORIZABLE_LOOP
 		for (auto idx = 0; idx < 16; ++idx)
-			{ mPattern[idx] = readMemoryI(idx); }
+			{ mPattern[idx] = mMemoryBank[mRegisterI + idx]; }
 	}
 	void XOCHIP::instruction_FN01(s32 N) noexcept {
 		mPlanarMask = N;
@@ -715,31 +713,31 @@ void XOCHIP::scrollDisplayRT() {
 		mAudioTimers[VOICE::UNIQUE].set(mRegisterV[X] + (mRegisterV[X] == 1));
 	}
 	void XOCHIP::instruction_Fx1E(s32 X) noexcept {
-		incIndexRegister(mRegisterV[X]);
+		::assign_cast_add(mRegisterI, mRegisterV[X]);
 	}
 	void XOCHIP::instruction_Fx29(s32 X) noexcept {
-		setIndexRegister((mRegisterV[X] & 0xF) * 5 + cSmallFontOffset);
+		::assign_cast(mRegisterI, (mRegisterV[X] & 0xF) * 5 + cSmallFontOffset);
 	}
 	void XOCHIP::instruction_Fx30(s32 X) noexcept {
-		setIndexRegister((mRegisterV[X] & 0xF) * 10 + cLargeFontOffset);
+		::assign_cast(mRegisterI, (mRegisterV[X] & 0xF) * 10 + cLargeFontOffset);
 	}
 	void XOCHIP::instruction_Fx33(s32 X) noexcept {
 		const TriBCD bcd{ mRegisterV[X] };
 
-		writeMemoryI(bcd.digit[2], 0);
-		writeMemoryI(bcd.digit[1], 1);
-		writeMemoryI(bcd.digit[0], 2);
+		mMemoryBank[mRegisterI + 0] = bcd.digit[2];
+		mMemoryBank[mRegisterI + 1] = bcd.digit[1];
+		mMemoryBank[mRegisterI + 2] = bcd.digit[0];
 	}
 	void XOCHIP::instruction_Fx3A(s32 X) noexcept {
 		setPatternPitch(mRegisterV[X]);
 	}
 	void XOCHIP::instruction_FN55(s32 N) noexcept {
-		for (auto idx = 0; idx <= N; ++idx) { writeMemoryI(mRegisterV[idx], idx); }
-		if (!Quirk.idxRegNoInc) [[likely]] { incIndexRegister(N + 1); }
+		for (auto idx = 0; idx <= N; ++idx) { mMemoryBank[mRegisterI + idx] = mRegisterV[idx]; }
+		if (!Quirk.idxRegNoInc) [[likely]] { ::assign_cast_add(mRegisterI, N + 1); }
 	}
 	void XOCHIP::instruction_FN65(s32 N) noexcept {
-		for (auto idx = 0; idx <= N; ++idx) { mRegisterV[idx] = readMemoryI(idx); }
-		if (!Quirk.idxRegNoInc) [[likely]] { incIndexRegister(N + 1); }
+		for (auto idx = 0; idx <= N; ++idx) { mRegisterV[idx] = mMemoryBank[mRegisterI + idx]; }
+		if (!Quirk.idxRegNoInc) [[likely]] { ::assign_cast_add(mRegisterI, N + 1); }
 	}
 	void XOCHIP::instruction_FN75(s32 N) noexcept {
 		setPermaRegs(N + 1);

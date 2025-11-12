@@ -15,8 +15,6 @@ REGISTER_CORE(SCHIP_MODERN, ".sc8")
 /*==================================================================*/
 
 void SCHIP_MODERN::initializeSystem() noexcept {
-	::fill_n(mMemoryBank, cTotalMemory, cSafezoneOOB, 0xFF);
-
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
 	copyFontToMemory(mMemoryBank.data(), 240);
 
@@ -42,7 +40,7 @@ void SCHIP_MODERN::instructionLoop(Lambda&& condition) noexcept {
 		const auto HI = mMemoryBank[mCurrentPC++];
 		const auto LO = mMemoryBank[mCurrentPC++];
 
-		#define _NNN (HI << 8 | LO)
+		#define _NNN ((HI << 8 | LO) & 0xFFF)
 		#define _X (HI & 0xF)
 		#define Y_ (LO >> 4)
 		#define _N (LO & 0xF)
@@ -225,7 +223,7 @@ void SCHIP_MODERN::renderAudioData() {
 }
 
 void SCHIP_MODERN::renderVideoData() {
-	BVS->displayBuffer.write(mDisplayBuffer[0], isUsingPixelTrails()
+	BVS->displayBuffer.write(mDisplayBuffer, isUsingPixelTrails()
 		? [](u32 pixel) noexcept
 			{ return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
 		: [](u32 pixel) noexcept
@@ -236,8 +234,8 @@ void SCHIP_MODERN::renderVideoData() {
 		isLargerDisplay() ? cResSizeMult / 2 : cResSizeMult, 2);
 
 	std::for_each(EXEC_POLICY(unseq)
-		mDisplayBuffer[0].begin(),
-		mDisplayBuffer[0].end(),
+		mDisplayBuffer.begin(),
+		mDisplayBuffer.end(),
 		[](auto& pixel) noexcept
 			{ ::assign_cast(pixel, (pixel & 0x8) | (pixel >> 1)); }
 	);
@@ -252,19 +250,19 @@ void SCHIP_MODERN::prepDisplayArea(const Resolution mode) {
 
 	mDisplay.set(W, H);
 
-	mDisplayBuffer[0].resizeClean(W, H);
+	mDisplayBuffer.resizeClean(W, H);
 };
 
 /*==================================================================*/
 
 void SCHIP_MODERN::scrollDisplayDN(s32 N) {
-	mDisplayBuffer[0].shift(0, +N);
+	mDisplayBuffer.shift(0, +N);
 }
 void SCHIP_MODERN::scrollDisplayLT() {
-	mDisplayBuffer[0].shift(-4, 0);
+	mDisplayBuffer.shift(-4, 0);
 }
 void SCHIP_MODERN::scrollDisplayRT() {
-	mDisplayBuffer[0].shift(+4, 0);
+	mDisplayBuffer.shift(+4, 0);
 }
 
 /*==================================================================*/
@@ -278,7 +276,7 @@ void SCHIP_MODERN::scrollDisplayRT() {
 	void SCHIP_MODERN::instruction_00E0() noexcept {
 		if (Quirk.waitVblank) [[unlikely]]
 			{ triggerInterrupt(Interrupt::FRAME); }
-		mDisplayBuffer[0].initialize();
+		mDisplayBuffer.initialize();
 	}
 	void SCHIP_MODERN::instruction_00EE() noexcept {
 		mCurrentPC = mStackBank[--mStackTop & 0xF];
@@ -441,7 +439,7 @@ void SCHIP_MODERN::scrollDisplayRT() {
 	#pragma region A instruction branch
 
 	void SCHIP_MODERN::instruction_ANNN(s32 NNN) noexcept {
-		setIndexRegister(NNN);
+		::assign_cast(mRegisterI, NNN);
 	}
 
 	#pragma endregion
@@ -480,7 +478,7 @@ void SCHIP_MODERN::scrollDisplayRT() {
 			case 0b10000000:
 				if (Quirk.wrapSprite) { X &= (mDisplay.W - 1); }
 				if (X < mDisplay.W) {
-					if (!((mDisplayBuffer[0](X, Y) ^= 0x8) & 0x8))
+					if (!((mDisplayBuffer(X, Y) ^= 0x8) & 0x8))
 						{ mRegisterV[0xF] = 1; }
 				}
 				return;
@@ -492,7 +490,7 @@ void SCHIP_MODERN::scrollDisplayRT() {
 
 				for (auto B = 0; B < 8; ++B, ++X &= (mDisplay.W - 1)) {
 					if (DATA & 0x80 >> B) {
-						if (!((mDisplayBuffer[0](X, Y) ^= 0x8) & 0x8))
+						if (!((mDisplayBuffer(X, Y) ^= 0x8) & 0x8))
 							{ mRegisterV[0xF] = 1; }
 					}
 					if (!Quirk.wrapSprite && X == (mDisplay.W - 1)) { return; }
@@ -513,15 +511,15 @@ void SCHIP_MODERN::scrollDisplayRT() {
 		switch (N) {
 			[[unlikely]]
 			case 1:
-				drawByte(pX, pY, readMemoryI(0));
+				drawByte(pX, pY, mMemoryBank[mRegisterI]);
 				break;
 
 			[[unlikely]]
 			case 0:
 				for (auto tN = 0, tY = pY; tN < 32;)
 				{
-					drawByte(pX + 0, tY, readMemoryI(tN + 0));
-					drawByte(pX + 8, tY, readMemoryI(tN + 1));
+					drawByte(pX + 0, tY, mMemoryBank[mRegisterI + tN + 0]);
+					drawByte(pX + 8, tY, mMemoryBank[mRegisterI + tN + 1]);
 					if (!Quirk.wrapSprite && tY == (mDisplay.H - 1)) { break; }
 					else { tN += 2; ++tY &= (mDisplay.H - 1); }
 				}
@@ -531,7 +529,7 @@ void SCHIP_MODERN::scrollDisplayRT() {
 			default:
 				for (auto tN = 0, tY = pY; tN < N;)
 				{
-					drawByte(pX, tY, readMemoryI(tN));
+					drawByte(pX, tY, mMemoryBank[mRegisterI + tN]);
 					if (!Quirk.wrapSprite && tY == (mDisplay.H - 1)) { break; }
 					else { tN += 1; ++tY &= (mDisplay.H - 1); }
 				}
@@ -572,28 +570,28 @@ void SCHIP_MODERN::scrollDisplayRT() {
 		startVoice(mRegisterV[X] + (mRegisterV[X] == 1));
 	}
 	void SCHIP_MODERN::instruction_Fx1E(s32 X) noexcept {
-		incIndexRegister(mRegisterV[X]);
+		::assign_cast_add(mRegisterI, mRegisterV[X]);
 	}
 	void SCHIP_MODERN::instruction_Fx29(s32 X) noexcept {
-		setIndexRegister((mRegisterV[X] & 0xF) * 5 + cSmallFontOffset);
+		::assign_cast(mRegisterI, (mRegisterV[X] & 0xF) * 5 + cSmallFontOffset);
 	}
 	void SCHIP_MODERN::instruction_Fx30(s32 X) noexcept {
-		setIndexRegister((mRegisterV[X] & 0xF) * 10 + cLargeFontOffset);
+		::assign_cast(mRegisterI, (mRegisterV[X] & 0xF) * 10 + cLargeFontOffset);
 	}
 	void SCHIP_MODERN::instruction_Fx33(s32 X) noexcept {
 		const TriBCD bcd{ mRegisterV[X] };
 
-		writeMemoryI(bcd.digit[2], 0);
-		writeMemoryI(bcd.digit[1], 1);
-		writeMemoryI(bcd.digit[0], 2);
+		mMemoryBank[mRegisterI + 0] = bcd.digit[2];
+		mMemoryBank[mRegisterI + 1] = bcd.digit[1];
+		mMemoryBank[mRegisterI + 2] = bcd.digit[0];
 	}
 	void SCHIP_MODERN::instruction_FN55(s32 N) noexcept {
-		for (auto idx = 0; idx <= N; ++idx) { writeMemoryI(mRegisterV[idx], idx); }
-		if (!Quirk.idxRegNoInc) [[likely]] { incIndexRegister(N + 1); }
+		for (auto idx = 0; idx <= N; ++idx) { mMemoryBank[mRegisterI + idx] = mRegisterV[idx]; }
+		if (!Quirk.idxRegNoInc) [[likely]] { ::assign_cast_add(mRegisterI, N + 1); }
 	}
 	void SCHIP_MODERN::instruction_FN65(s32 N) noexcept {
-		for (auto idx = 0; idx <= N; ++idx) { mRegisterV[idx] = readMemoryI(idx); }
-		if (!Quirk.idxRegNoInc) [[likely]] { incIndexRegister(N + 1); }
+		for (auto idx = 0; idx <= N; ++idx) { mRegisterV[idx] = mMemoryBank[mRegisterI + idx]; }
+		if (!Quirk.idxRegNoInc) [[likely]] { ::assign_cast_add(mRegisterI, N + 1); }
 	}
 	void SCHIP_MODERN::instruction_FN75(s32 N) noexcept {
 		setPermaRegs(N + 1);

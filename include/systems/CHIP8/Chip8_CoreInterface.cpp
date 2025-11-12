@@ -156,8 +156,8 @@ void Chip8_CoreInterface::skipInstruction() noexcept {
 }
 
 void Chip8_CoreInterface::performProgJump(u32 next) noexcept {
-	const auto oldPC = mCurrentPC - 2u;
-	::assign_cast(mCurrentPC, next & 0xFFFu);
+	const auto oldPC = (mCurrentPC - 2);
+	::assign_cast(mCurrentPC, next);
 	if (mCurrentPC == oldPC) [[unlikely]]
 		{ triggerInterrupt(Interrupt::SOUND); }
 }

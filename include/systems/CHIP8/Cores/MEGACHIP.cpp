@@ -38,7 +38,7 @@ void MEGACHIP::instructionLoop(Lambda&& condition) noexcept {
 		const auto HI = mMemoryBank[mCurrentPC++];
 		const auto LO = mMemoryBank[mCurrentPC++];
 
-		#define _NNN (HI << 8 | LO)
+		#define _NNN ((HI << 8 | LO) & 0xFFF)
 		#define _X (HI & 0xF)
 		#define Y_ (LO >> 4)
 		#define _N (LO & 0xF)
@@ -342,7 +342,7 @@ void MEGACHIP::prepDisplayArea(Resolution mode) {
 /*==================================================================*/
 
 void MEGACHIP::skipInstruction() noexcept {
-	mCurrentPC += readMemory(mCurrentPC) == 0x01 ? 4 : 2;
+	mCurrentPC += mMemoryBank[mCurrentPC] == 0x01 ? 4 : 2;
 }
 
 void MEGACHIP::scrollDisplayUP(s32 N) {
@@ -416,16 +416,16 @@ void MEGACHIP::startAudioTrack(bool repeat) noexcept {
 
 		mTrack.loop = repeat;
 		mTrack.data = &mMemoryBank[mRegisterI + 6];
-		mTrack.size = readMemoryI(2) << 16
-					| readMemoryI(3) <<  8
-					| readMemoryI(4);
+		mTrack.size = mMemoryBank[mRegisterI + 2] << 16
+					| mMemoryBank[mRegisterI + 3] <<  8
+					| mMemoryBank[mRegisterI + 4];
 
 		const bool oob = mTrack.data + mTrack.size > &mMemoryBank.back();
 		if (!mTrack.size || oob) { mTrack.reset(); }
 		else {
 			mVoices[VOICE::UNIQUE].setPhase(0.0).setStep(getFramerateMultiplier() * (
-				(readMemoryI(0) << 8 | readMemoryI(1)) / f64(mTrack.size) / stream->getFreq()
-			)).userdata = &mTrack;
+				(mMemoryBank[mRegisterI + 0] << 8 | mMemoryBank[mRegisterI + 1]) \
+				/ f64(mTrack.size) / stream->getFreq())).userdata = &mTrack;
 		}
 	}
 }
@@ -536,16 +536,16 @@ void MEGACHIP::scrollBuffersRT() {
 		mTrack.reset();
 	}
 	void MEGACHIP::instruction_01NN(s32 NN) noexcept {
-		setIndexRegister((NN << 16) | NNNN());
+		::assign_cast(mRegisterI, (NN << 16) | NNNN());
 		::assign_cast_add(mCurrentPC, 2);
 	}
 	void MEGACHIP::instruction_02NN(s32 NN) noexcept {
 		for (auto pos = 0, byte = 0; pos < NN; byte += 4) {
 			mColorPalette(++pos) = {
-				readMemoryI(byte + 1),
-				readMemoryI(byte + 2),
-				readMemoryI(byte + 3),
-				readMemoryI(byte + 0),
+				mMemoryBank[mRegisterI + byte + 1],
+				mMemoryBank[mRegisterI + byte + 2],
+				mMemoryBank[mRegisterI + byte + 3],
+				mMemoryBank[mRegisterI + byte + 0],
 			};
 		}
 	}
@@ -705,7 +705,7 @@ void MEGACHIP::scrollBuffersRT() {
 	#pragma region A instruction branch
 
 	void MEGACHIP::instruction_ANNN(s32 NNN) noexcept {
-		setIndexRegister(NNN & 0xFFF);
+		::assign_cast(mRegisterI, NNN);
 	}
 
 	#pragma endregion
@@ -793,7 +793,7 @@ void MEGACHIP::scrollBuffersRT() {
 			for (auto rowN = 0, offsetY = originY; rowN < N; ++rowN)
 			{
 				if (Quirk.wrapSprite && offsetY >= cScreenMegaY) { continue; }
-				const auto octoPixelBatch = readMemoryI(rowN);
+				const auto octoPixelBatch = mMemoryBank[mRegisterI + rowN];
 
 				for (auto colN = 7, offsetX = originX; colN >= 0; --colN)
 				{
@@ -819,7 +819,7 @@ void MEGACHIP::scrollBuffersRT() {
 
 				for (auto colN = 0, offsetX = originX; colN < mTexture.W; ++colN)
 				{
-					if (const auto sourceColorIdx = readMemoryI(offsetI + colN))
+					if (const auto sourceColorIdx = mMemoryBank[mRegisterI + offsetI + colN])
 					{
 						auto& collideCoord = mCollisionMap(offsetX, offsetY);
 						auto& backbufCoord = mBackgroundBuffer(offsetX, offsetY);
@@ -849,22 +849,21 @@ void MEGACHIP::scrollBuffersRT() {
 					for (auto rowN = 0; rowN < 16; ++rowN) {
 						const auto offsetY = originY + rowN;
 
-						collisions += drawSingleBytes(
-							originX, offsetY, offsetX ? 24 : 16,
-							(readMemoryI(2 * rowN + 0)  << 8 | \
-							 readMemoryI(2 * rowN + 1)) << offsetX
-						);
-						if (offsetY == cScreenSizeY - 1) { break; }
+						collisions += drawSingleBytes(originX, offsetY, offsetX ? 24 : 16, (
+							mMemoryBank[mRegisterI + 2 * rowN + 0] << 8 |
+							mMemoryBank[mRegisterI + 2 * rowN + 1] << 0
+						) << offsetX);
+
+						if (offsetY == (cScreenSizeY - 1)) { break; }
 					}
 				} else {
 					for (auto rowN = 0; rowN < N; ++rowN) {
 						const auto offsetY = originY + rowN;
 
-						collisions += drawSingleBytes(
-							originX, offsetY, offsetX ? 16 : 8,
-							readMemoryI(rowN) << offsetX
-						);
-						if (offsetY == cScreenSizeY - 1) { break; }
+						collisions += drawSingleBytes(originX, offsetY, offsetX ? 16 : 8,
+							mMemoryBank[mRegisterI + rowN] << offsetX);
+
+						if (offsetY == (cScreenSizeY - 1)) { break; }
 					}
 				}
 				::assign_cast(mRegisterV[0xF], collisions);
@@ -881,9 +880,9 @@ void MEGACHIP::scrollBuffersRT() {
 					const auto offsetY = originY + rowN * 2;
 
 					collisions += drawDoubleBytes(originX, offsetY, 0x20,
-						ez::bitDup8(readMemoryI(rowN)) << offsetX);
+						ez::bitDup8(mMemoryBank[mRegisterI + rowN]) << offsetX);
 
-					if (offsetY == cScreenSizeY - 2) { break; }
+					if (offsetY == (cScreenSizeY - 2)) { break; }
 				}
 				::assign_cast(mRegisterV[0xF], collisions != 0);
 			}
@@ -925,30 +924,32 @@ void MEGACHIP::scrollBuffersRT() {
 		startVoiceAt(VOICE::BUZZER, mRegisterV[X] + (mRegisterV[X] == 1));
 	}
 	void MEGACHIP::instruction_Fx1E(s32 X) noexcept {
-		incIndexRegister(mRegisterV[X]);
+		::assign_cast_add(mRegisterI, mRegisterV[X]);
 	}
 	void MEGACHIP::instruction_Fx29(s32 X) noexcept {
-		setIndexRegister((mRegisterV[X] & 0xF) * 5 + cSmallFontOffset);
+		::assign_cast(mRegisterI, (mRegisterV[X] & 0xF) * 5 + cSmallFontOffset);
 		::assign_cast(mTexture.fontOffset, mRegisterI);
 	}
 	void MEGACHIP::instruction_Fx30(s32 X) noexcept {
-		setIndexRegister((mRegisterV[X] & 0xF) * 10 + cLargeFontOffset);
+		::assign_cast(mRegisterI, (mRegisterV[X] & 0xF) * 10 + cLargeFontOffset);
 		::assign_cast(mTexture.fontOffset, mRegisterI);
 	}
 	void MEGACHIP::instruction_Fx33(s32 X) noexcept {
 		const TriBCD bcd{ mRegisterV[X] };
 
-		writeMemoryI(bcd.digit[2], 0);
-		writeMemoryI(bcd.digit[1], 1);
-		writeMemoryI(bcd.digit[0], 2);
+		mMemoryBank[mRegisterI + 0] = bcd.digit[2];
+		mMemoryBank[mRegisterI + 1] = bcd.digit[1];
+		mMemoryBank[mRegisterI + 2] = bcd.digit[0];
 	}
 	void MEGACHIP::instruction_FN55(s32 N) noexcept {
-		for (auto idx = 0; idx <= N; ++idx)
-			{ writeMemoryI(mRegisterV[idx], idx); }
+		for (auto idx = 0; idx <= N; ++idx) {
+			mMemoryBank[mRegisterI + idx] = mRegisterV[idx];
+		}
 	}
 	void MEGACHIP::instruction_FN65(s32 N) noexcept {
-		for (auto idx = 0; idx <= N; ++idx)
-			{ mRegisterV[idx] = readMemoryI(idx); }
+		for (auto idx = 0; idx <= N; ++idx) {
+			mRegisterV[idx] = mMemoryBank[mRegisterI + idx];
+		}
 	}
 	void MEGACHIP::instruction_FN75(s32 N) noexcept {
 		setPermaRegs(std::min(N, 7) + 1);

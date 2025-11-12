@@ -17,7 +17,6 @@ REGISTER_CORE(SCHIP_LEGACY, ".sc8")
 void SCHIP_LEGACY::initializeSystem() noexcept {
 	::generate_n(mMemoryBank, 0, cTotalMemory,
 		[&]() noexcept { return RNG->next<u8>(); });
-	::fill_n(mMemoryBank, cTotalMemory, cSafezoneOOB, 0xFF);
 
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
 	copyFontToMemory(mMemoryBank.data(), 180);
@@ -45,7 +44,7 @@ void SCHIP_LEGACY::instructionLoop(Lambda&& condition) noexcept {
 		const auto HI = mMemoryBank[mCurrentPC++];
 		const auto LO = mMemoryBank[mCurrentPC++];
 
-		#define _NNN (HI << 8 | LO)
+		#define _NNN ((HI << 8 | LO) & 0xFFF)
 		#define _X (HI & 0xF)
 		#define Y_ (LO >> 4)
 		#define _N (LO & 0xF)
@@ -425,7 +424,7 @@ void SCHIP_LEGACY::scrollDisplayRT() {
 	#pragma region A instruction branch
 
 	void SCHIP_LEGACY::instruction_ANNN(s32 NNN) noexcept {
-		setIndexRegister(NNN);
+		::assign_cast(mRegisterI, NNN);
 	}
 
 	#pragma endregion
@@ -468,7 +467,7 @@ void SCHIP_LEGACY::scrollDisplayRT() {
 				auto& pixel = mDisplayBuffer(offsetX, originY);
 				if (!((pixel ^= 0x8) & 0x8)) { collided = true; }
 			}
-			if (offsetX == cScreenSizeX - 1) { return collided; }
+			if (offsetX == (cScreenSizeX - 1)) { return collided; }
 		}
 		return collided;
 	}
@@ -492,7 +491,7 @@ void SCHIP_LEGACY::scrollDisplayRT() {
 			} else {
 				pixelLO = pixelHI;
 			}
-			if (offsetX == cScreenSizeX - 1) { return collided; }
+			if (offsetX == (cScreenSizeX - 1)) { return collided; }
 		}
 		return collided;
 	}
@@ -512,22 +511,21 @@ void SCHIP_LEGACY::scrollDisplayRT() {
 				for (auto rowN = 0; rowN < 16; ++rowN) {
 					const auto offsetY = originY + rowN;
 
-					collisions += drawSingleBytes(
-						originX, offsetY, offsetX ? 24 : 16,
-						(readMemoryI(2 * rowN + 0)  << 8 | \
-						 readMemoryI(2 * rowN + 1)) << offsetX
-					);
-					if (offsetY == cScreenSizeY - 1) { break; }
+					collisions += drawSingleBytes(originX, offsetY, offsetX ? 24 : 16, (
+						mMemoryBank[mRegisterI + 2 * rowN + 0] << 8 |
+						mMemoryBank[mRegisterI + 2 * rowN + 1] << 0
+					) << offsetX);
+
+					if (offsetY == (cScreenSizeY - 1)) { break; }
 				}
 			} else {
 				for (auto rowN = 0; rowN < N; ++rowN) {
 					const auto offsetY = originY + rowN;
 
-					collisions += drawSingleBytes(
-						originX, offsetY, offsetX ? 16 : 8,
-						readMemoryI(rowN) << offsetX
-					);
-					if (offsetY == cScreenSizeY - 1) { break; }
+					collisions += drawSingleBytes(originX, offsetY, offsetX ? 16 : 8,
+						mMemoryBank[mRegisterI + rowN] << offsetX);
+
+					if (offsetY == (cScreenSizeY - 1)) { break; }
 				}
 			}
 			::assign_cast(mRegisterV[0xF], collisions);
@@ -544,9 +542,9 @@ void SCHIP_LEGACY::scrollDisplayRT() {
 				const auto offsetY = originY + rowN * 2;
 
 				collisions += drawDoubleBytes(originX, offsetY, 0x20,
-					ez::bitDup8(readMemoryI(rowN)) << offsetX);
+					ez::bitDup8(mMemoryBank[mRegisterI + rowN]) << offsetX);
 
-				if (offsetY == cScreenSizeY - 2) { break; }
+				if (offsetY == (cScreenSizeY - 2)) { break; }
 			}
 			::assign_cast(mRegisterV[0xF], collisions != 0);
 		}
@@ -585,28 +583,28 @@ void SCHIP_LEGACY::scrollDisplayRT() {
 		startVoice(mRegisterV[X] + (mRegisterV[X] == 1));
 	}
 	void SCHIP_LEGACY::instruction_Fx1E(s32 X) noexcept {
-		incIndexRegister(mRegisterV[X]);
+		::assign_cast_add(mRegisterI, mRegisterV[X]);
 	}
 	void SCHIP_LEGACY::instruction_Fx29(s32 X) noexcept {
-		setIndexRegister((mRegisterV[X] & 0xF) * 5 + cSmallFontOffset);
+		::assign_cast(mRegisterI, (mRegisterV[X] & 0xF) * 5 + cSmallFontOffset);
 	}
 	void SCHIP_LEGACY::instruction_Fx30(s32 X) noexcept {
-		setIndexRegister((mRegisterV[X] & 0xF) * 10 + cLargeFontOffset);
+		::assign_cast(mRegisterI, (mRegisterV[X] & 0xF) * 10 + cLargeFontOffset);
 	}
 	void SCHIP_LEGACY::instruction_Fx33(s32 X) noexcept {
 		const TriBCD bcd{ mRegisterV[X] };
 
-		writeMemoryI(bcd.digit[2], 0);
-		writeMemoryI(bcd.digit[1], 1);
-		writeMemoryI(bcd.digit[0], 2);
+		mMemoryBank[mRegisterI + 0] = bcd.digit[2];
+		mMemoryBank[mRegisterI + 1] = bcd.digit[1];
+		mMemoryBank[mRegisterI + 2] = bcd.digit[0];
 	}
 	void SCHIP_LEGACY::instruction_FN55(s32 N) noexcept {
-		for (auto idx = 0; idx <= N; ++idx) { writeMemoryI(mRegisterV[idx], idx); }
-		if (Quirk.idxRegMinus) [[likely]] { incIndexRegister(N); }
+		for (auto idx = 0; idx <= N; ++idx) { mMemoryBank[mRegisterI + idx] = mRegisterV[idx]; }
+		if (Quirk.idxRegMinus) [[likely]] { ::assign_cast_add(mRegisterI, N); }
 	}
 	void SCHIP_LEGACY::instruction_FN65(s32 N) noexcept {
-		for (auto idx = 0; idx <= N; ++idx) { mRegisterV[idx] = readMemoryI(idx); }
-		if (Quirk.idxRegMinus) [[likely]] { incIndexRegister(N); }
+		for (auto idx = 0; idx <= N; ++idx) { mRegisterV[idx] = mMemoryBank[mRegisterI + idx]; }
+		if (Quirk.idxRegMinus) [[likely]] { ::assign_cast_add(mRegisterI, N); }
 	}
 	void SCHIP_LEGACY::instruction_FN75(s32 N) noexcept {
 		setPermaRegs(std::min(N, 7) + 1);

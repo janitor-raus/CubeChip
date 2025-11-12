@@ -17,7 +17,6 @@ REGISTER_CORE(CHIP8E, ".c8e")
 void CHIP8E::initializeSystem() noexcept {
 	::generate_n(mMemoryBank, 0, cTotalMemory,
 		[&]() noexcept { return RNG->next<u8>(); });
-	::fill_n(mMemoryBank, cTotalMemory, cSafezoneOOB, 0xFF);
 
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
 	copyFontToMemory(mMemoryBank.data(), 80);
@@ -45,7 +44,7 @@ void CHIP8E::instructionLoop(Lambda&& condition) noexcept {
 		const auto HI = mMemoryBank[mCurrentPC++];
 		const auto LO = mMemoryBank[mCurrentPC++];
 
-		#define _NNN (HI << 8 | LO)
+		#define _NNN ((HI << 8 | LO) & 0xFFF)
 		#define _X (HI & 0xF)
 		#define Y_ (LO >> 4)
 		#define _N (LO & 0xF)
@@ -338,14 +337,12 @@ void CHIP8E::renderVideoData() {
 	}
 	void CHIP8E::instruction_5xy2(s32 X, s32 Y) noexcept {
 		for (auto Z = 0; Z + X <= Y; ++Z) {
-			writeMemoryI(mRegisterV[Z + X], 0);
-			::assign_cast(mRegisterI, mRegisterI + 1 & 0xFFF);
+			mMemoryBank[mRegisterI++] = mRegisterV[Z + X];
 		}
 	}
 	void CHIP8E::instruction_5xy3(s32 X, s32 Y) noexcept {
 		for (auto Z = 0; Z + X <= Y; ++Z) {
-			::assign_cast(mRegisterV[Z + X], readMemoryI(0));
-			::assign_cast(mRegisterI, mRegisterI + 1 & 0xFFF);
+			mRegisterV[Z + X] = mMemoryBank[mRegisterI++];
 		}
 	}
 
@@ -406,15 +403,13 @@ void CHIP8E::renderVideoData() {
 		::assign_cast(mRegisterV[0xF], nborrow);
 	}
 	void CHIP8E::instruction_8xy6(s32 X, s32 Y) noexcept {
-		if (!Quirk.shiftVX) { mRegisterV[X] = mRegisterV[Y]; }
-		const bool lsb = (mRegisterV[X] & 1) == 1;
-		::assign_cast_shr(mRegisterV[X], 1);
+		const bool lsb = (mRegisterV[Y] & 1) == 1;
+		::assign_cast(mRegisterV[X], mRegisterV[Y] >> 1);
 		::assign_cast(mRegisterV[0xF], lsb);
 	}
 	void CHIP8E::instruction_8xyE(s32 X, s32 Y) noexcept {
-		if (!Quirk.shiftVX) { mRegisterV[X] = mRegisterV[Y]; }
-		const bool msb = (mRegisterV[X] >> 7) == 1;
-		::assign_cast_shl(mRegisterV[X], 1);
+		const bool msb = (mRegisterV[Y] >> 7) == 1;
+		::assign_cast(mRegisterV[X], mRegisterV[Y] << 1);
 		::assign_cast(mRegisterV[0xF], msb);
 	}
 
@@ -435,7 +430,7 @@ void CHIP8E::renderVideoData() {
 	#pragma region A instruction branch
 
 	void CHIP8E::instruction_ANNN(s32 NNN) noexcept {
-		::assign_cast(mRegisterI, NNN & 0xFFF);
+		::assign_cast(mRegisterI, NNN);
 	}
 
 	#pragma endregion
@@ -475,24 +470,18 @@ void CHIP8E::renderVideoData() {
 
 			[[likely]]
 			case 0b10000000:
-				if (Quirk.wrapSprite) { X &= (mDisplay.W - 1); }
-				if (X < mDisplay.W) {
-					if (!((mDisplayBuffer[Y * mDisplay.W + X] ^= 0x8) & 0x8))
-						{ mRegisterV[0xF] = 1; }
-				}
+				if (!((mDisplayBuffer(X, Y) ^= 0x8) & 0x8))
+					{ mRegisterV[0xF] = 1; }
 				return;
 
 			[[unlikely]]
 			default:
-				if (Quirk.wrapSprite) { X &= (mDisplay.W - 1); }
-				else if (X >= mDisplay.W) { return; }
-
-				for (auto B = 0; B < 8; ++B, ++X &= (mDisplay.W - 1)) {
+				for (auto B = 0; B < 8; ++B) {
 					if (DATA & 0x80 >> B) {
-						if (!((mDisplayBuffer[Y * mDisplay.W + X] ^= 0x8) & 0x8))
+						if (!((mDisplayBuffer(X, Y) ^= 0x8) & 0x8))
 							{ mRegisterV[0xF] = 1; }
 					}
-					if (!Quirk.wrapSprite && X == (mDisplay.W - 1)) { return; }
+					if (++X == cScreenSizeX) { return; }
 				}
 				return;
 		}
@@ -501,36 +490,28 @@ void CHIP8E::renderVideoData() {
 	void CHIP8E::instruction_DxyN(s32 X, s32 Y, s32 N) noexcept {
 		triggerInterrupt(Interrupt::FRAME);
 
-		auto pX = mRegisterV[X] & (mDisplay.W - 1);
-		auto pY = mRegisterV[Y] & (mDisplay.H - 1);
+		auto pX = mRegisterV[X] & (cScreenSizeX - 1);
+		auto pY = mRegisterV[Y] & (cScreenSizeY - 1);
 
 		mRegisterV[0xF] = 0;
 
 		switch (N) {
+			[[unlikely]]
+			case 0: return;
+
 			[[likely]]
 			case 1:
-				drawByte(pX, pY, readMemoryI(0));
-				break;
-
-			[[unlikely]]
-			case 0:
-				for (auto H = 0, I = 0; H < 16; ++H, I += 2, ++pY &= (mDisplay.H - 1))
-				{
-					drawByte(pX + 0, pY, readMemoryI(I + 0));
-					drawByte(pX + 8, pY, readMemoryI(I + 1));
-
-					if (!Quirk.wrapSprite && pY == (mDisplay.H - 1)) { break; }
-				}
-				break;
+				drawByte(pX, pY, mMemoryBank[mRegisterI]);
+				return;
 
 			[[unlikely]]
 			default:
-				for (auto H = 0; H < N; ++H, ++pY &= (mDisplay.H - 1))
+				for (auto H = 0; H < N; ++H)
 				{
-					drawByte(pX, pY, readMemoryI(H));
-					if (!Quirk.wrapSprite && pY == (mDisplay.H - 1)) { break; }
+					drawByte(pX, pY, mMemoryBank[mRegisterI + H]);
+					if (++pY == cScreenSizeY) { return; }
 				}
-				break;
+				return;
 		}
 	}
 
@@ -582,21 +563,21 @@ void CHIP8E::renderVideoData() {
 	void CHIP8E::instruction_Fx33(s32 X) noexcept {
 		const TriBCD bcd{ mRegisterV[X] };
 
-		writeMemoryI(bcd.digit[2], 0);
-		writeMemoryI(bcd.digit[1], 1);
-		writeMemoryI(bcd.digit[0], 2);
+		mMemoryBank[mRegisterI + 0] = bcd.digit[2];
+		mMemoryBank[mRegisterI + 1] = bcd.digit[1];
+		mMemoryBank[mRegisterI + 2] = bcd.digit[0];
 	}
 	void CHIP8E::instruction_Fx4F(s32 X) noexcept {
 		triggerInterrupt(Interrupt::DELAY);
 		::assign_cast(mDelayTimer, mRegisterV[X]);
 	}
 	void CHIP8E::instruction_FN55(s32 N) noexcept {
-		for (auto idx = 0; idx <= N; ++idx) { writeMemoryI(mRegisterV[idx], idx); }
-		if (!Quirk.idxRegNoInc) [[likely]] { mRegisterI = (mRegisterI + N + 1) & 0xFFF; }
+		for (auto idx = 0; idx <= N; ++idx) { mMemoryBank[mRegisterI + idx] = mRegisterV[idx]; }
+		::assign_cast_add(mRegisterI, N + 1);
 	}
 	void CHIP8E::instruction_FN65(s32 N) noexcept {
-		for (auto idx = 0; idx <= N; ++idx) { mRegisterV[idx] = readMemoryI(idx); }
-		if (!Quirk.idxRegNoInc) [[likely]] { mRegisterI = (mRegisterI + N + 1) & 0xFFF; }
+		for (auto idx = 0; idx <= N; ++idx) { mRegisterV[idx] = mMemoryBank[mRegisterI + idx]; }
+		::assign_cast_add(mRegisterI, N + 1);
 	}
 	void CHIP8E::instruction_FxE3(s32  ) noexcept {
 		triggerInterrupt(Interrupt::FRAME);

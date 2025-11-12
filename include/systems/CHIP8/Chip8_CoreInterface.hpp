@@ -136,15 +136,6 @@ protected:
 	u32 mCurrentPC{};
 	u32 mRegisterI{};
 
-	virtual u32 incIndexRegister(u32 value) noexcept
-		{ return mRegisterI = (mRegisterI + value) & 0xFFF; }
-
-	virtual u32 decIndexRegister(u32 value) noexcept
-		{ return mRegisterI = (mRegisterI - value) & 0xFFF; }
-
-	virtual u32 setIndexRegister(u32 value) noexcept
-		{ return mRegisterI = value & 0xFFF; }
-
 	u8* mInputReg{};
 
 	u32 mDelayTimer{};

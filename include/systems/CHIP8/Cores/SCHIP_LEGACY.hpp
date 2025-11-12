@@ -15,7 +15,6 @@
 
 class SCHIP_LEGACY final : public Chip8_CoreInterface {
 	static constexpr u64 cTotalMemory = 4_KiB;
-	static constexpr u32 cSafezoneOOB =    32;
 	static constexpr u32 cGameLoadPos =   512;
 	static constexpr u32 cStartOffset =   512;
 	static constexpr f32 cRefreshRate = 64.0f;
@@ -31,19 +30,8 @@ class SCHIP_LEGACY final : public Chip8_CoreInterface {
 	FixedMap2D<u8, cScreenSizeX, cScreenSizeY>
 		mDisplayBuffer;
 
-	std::array<u8, cTotalMemory + cSafezoneOOB>
+	MemoryBank<cTotalMemory>
 		mMemoryBank{};
-
-	template <std::integral T>
-	void writeMemoryI(T value, u32 pos) noexcept {
-		const auto index = mRegisterI + pos;
-		const auto valid = index < cTotalMemory ? index : cTotalMemory + cSafezoneOOB - 1;
-		::assign_cast(mMemoryBank[valid], value);
-	}
-
-	auto readMemoryI(u32 pos) const noexcept {
-		return mMemoryBank[mRegisterI + pos];
-	}
 
 /*==================================================================*/
 

@@ -15,7 +15,6 @@
 
 class CHIP8X final : public Chip8_CoreInterface {
 	static constexpr u64 cTotalMemory = 4_KiB;
-	static constexpr u32 cSafezoneOOB =    32;
 	static constexpr u32 cGameLoadPos =   768;
 	static constexpr u32 cStartOffset =   768;
 	static constexpr f32 cRefreshRate = 61.0f;
@@ -36,22 +35,11 @@ private:
 	u32 mBackgroundColor = 0x00;
 	u32 mColorResolution = 0xFC;
 
-	std::array<u8, cScreenSizeX * cScreenSizeY>
+	FixedMap2D<u8, cScreenSizeX, cScreenSizeY>
 		mDisplayBuffer{};
 
-	std::array<u8, cTotalMemory + cSafezoneOOB>
+	MemoryBank<cTotalMemory>
 		mMemoryBank{};
-
-	template <std::integral T>
-	void writeMemoryI(T value, u32 pos) noexcept {
-		const auto index = mRegisterI + pos;
-		const auto valid = index < cTotalMemory ? index : cTotalMemory + cSafezoneOOB - 1;
-		::assign_cast(mMemoryBank[valid], value);
-	}
-
-	auto readMemoryI(u32 pos) const noexcept {
-		return mMemoryBank[mRegisterI + pos];
-	}
 
 	void setBuzzerPitch(s32 pitch) noexcept;
 

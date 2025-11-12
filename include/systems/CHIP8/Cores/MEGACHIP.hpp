@@ -15,7 +15,6 @@
 
 class MEGACHIP final : public Chip8_CoreInterface {
 	static constexpr u64 cTotalMemory = 16_MiB;
-	static constexpr u32 cSafezoneOOB =    32;
 	static constexpr u32 cGameLoadPos =   512;
 	static constexpr u32 cStartOffset =   512;
 	static constexpr f32 cRefreshRate = 60.0f;
@@ -94,32 +93,8 @@ class MEGACHIP final : public Chip8_CoreInterface {
 
 	std::array<RGBA, 10> mFontColor{};
 
-	std::array<u8, cTotalMemory + cSafezoneOOB>
+	MemoryBank<cTotalMemory>
 		mMemoryBank{};
-
-	template <std::integral T>
-	void writeMemoryI(T value, u32 pos) noexcept {
-		const auto index = mRegisterI + pos;
-		const auto valid = index < cTotalMemory ? index : cTotalMemory + cSafezoneOOB - 1;
-		::assign_cast(mMemoryBank[valid], value);
-	}
-
-	auto readMemory(u32 pos) const noexcept {
-		return mMemoryBank[pos];
-	}
-
-	auto readMemoryI(u32 pos) const noexcept {
-		return mMemoryBank[mRegisterI + pos];
-	}
-
-	u32 incIndexRegister(u32 value) noexcept override final
-		{ return mRegisterI = (mRegisterI + value) & 0xFFFFFF; }
-
-	u32 decIndexRegister(u32 value) noexcept override final
-		{ return mRegisterI = (mRegisterI - value) & 0xFFFFFF; }
-
-	u32 setIndexRegister(u32 value) noexcept override final
-		{ return mRegisterI = value & 0xFFFFFF; }
 
 /*==================================================================*/
 

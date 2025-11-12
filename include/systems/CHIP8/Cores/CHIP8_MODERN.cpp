@@ -15,8 +15,6 @@ REGISTER_CORE(CHIP8_MODERN, ".ch8")
 /*==================================================================*/
 
 void CHIP8_MODERN::initializeSystem() noexcept {
-	::fill_n(mMemoryBank, cTotalMemory, cSafezoneOOB, 0xFF);
-
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
 	copyFontToMemory(mMemoryBank.data(), 80);
 
@@ -42,7 +40,7 @@ void CHIP8_MODERN::instructionLoop(Lambda&& condition) noexcept {
 		const auto HI = mMemoryBank[mCurrentPC++];
 		const auto LO = mMemoryBank[mCurrentPC++];
 
-		#define _NNN (HI << 8 | LO)
+		#define _NNN ((HI << 8 | LO) & 0xFFF)
 		#define _X (HI & 0xF)
 		#define Y_ (LO >> 4)
 		#define _N (LO & 0xF)
@@ -362,7 +360,7 @@ void CHIP8_MODERN::renderVideoData() {
 	#pragma region A instruction branch
 
 	void CHIP8_MODERN::instruction_ANNN(s32 NNN) noexcept {
-		setIndexRegister(NNN);
+		::assign_cast(mRegisterI, NNN);
 	}
 
 	#pragma endregion
@@ -399,7 +397,7 @@ void CHIP8_MODERN::renderVideoData() {
 
 			[[likely]]
 			case 0b10000000:
-				if (Quirk.wrapSprite) { X %= cScreenSizeX; }
+				if (Quirk.wrapSprite) { X &= (cScreenSizeX - 1); }
 				if (X < cScreenSizeX) {
 					if (!((mDisplayBuffer(X, Y) ^= 0x8) & 0x8))
 						[[unlikely]] { mRegisterV[0xF] = 1; }
@@ -408,15 +406,15 @@ void CHIP8_MODERN::renderVideoData() {
 
 			[[unlikely]]
 			default:
-				if (Quirk.wrapSprite) { X %= cScreenSizeX; }
+				if (Quirk.wrapSprite) { X &= (cScreenSizeX - 1); }
 				else if (X >= cScreenSizeX) { return; }
 
-				for (auto B = 0; B < 8; ++B, ++X %= cScreenSizeX) {
+				for (auto B = 0; B < 8; ++B, ++X &= (cScreenSizeX - 1)) {
 					if (DATA & 0x80 >> B) {
 						if (!((mDisplayBuffer(X, Y) ^= 0x8) & 0x8))
 							[[unlikely]] { mRegisterV[0xF] = 1; }
 					}
-					if (!Quirk.wrapSprite && X == cScreenSizeX - 1) { return; }
+					if (!Quirk.wrapSprite && X == (cScreenSizeX - 1)) { return; }
 				}
 				return;
 		}
@@ -426,34 +424,34 @@ void CHIP8_MODERN::renderVideoData() {
 		if (Quirk.waitVblank) [[unlikely]]
 			{ triggerInterrupt(Interrupt::FRAME); }
 
-		auto pX = mRegisterV[X] % cScreenSizeX;
-		auto pY = mRegisterV[Y] % cScreenSizeY;
+		auto pX = mRegisterV[X] & (cScreenSizeX - 1);
+		auto pY = mRegisterV[Y] & (cScreenSizeY - 1);
 
 		mRegisterV[0xF] = 0;
 
 		switch (N) {
 			[[likely]]
 			case 1:
-				drawByte(pX, pY, readMemoryI(0));
+				drawByte(pX, pY, mMemoryBank[mRegisterI]);
 				break;
 
 			[[unlikely]]
 			case 0:
-				for (auto H = 0, I = 0; H < 16; ++H, I += 2, ++pY %= cScreenSizeY)
+				for (auto H = 0, I = 0; H < 16; ++H, ++pY &= (cScreenSizeY - 1))
 				{
-					drawByte(pX + 0, pY, readMemoryI(I + 0));
-					drawByte(pX + 8, pY, readMemoryI(I + 1));
+					drawByte(pX + 0, pY, mMemoryBank[mRegisterI + I++]);
+					drawByte(pX + 8, pY, mMemoryBank[mRegisterI + I++]);
 
-					if (!Quirk.wrapSprite && pY == cScreenSizeY - 1) { break; }
+					if (!Quirk.wrapSprite && pY == (cScreenSizeY - 1)) { break; }
 				}
 				break;
 
 			[[unlikely]]
 			default:
-				for (auto H = 0; H < N; ++H, ++pY %= cScreenSizeY)
+				for (auto H = 0; H < N; ++H, ++pY &= (cScreenSizeY - 1))
 				{
-					drawByte(pX, pY, readMemoryI(H));
-					if (!Quirk.wrapSprite && pY == cScreenSizeY - 1) { break; }
+					drawByte(pX, pY, mMemoryBank[mRegisterI + H]);
+					if (!Quirk.wrapSprite && pY == (cScreenSizeY - 1)) { break; }
 				}
 				break;
 		}
@@ -492,25 +490,25 @@ void CHIP8_MODERN::renderVideoData() {
 		startVoice(mRegisterV[X] + (mRegisterV[X] == 1));
 	}
 	void CHIP8_MODERN::instruction_Fx1E(s32 X) noexcept {
-		incIndexRegister(mRegisterV[X]);
+		::assign_cast_add(mRegisterI, mRegisterV[X]);
 	}
 	void CHIP8_MODERN::instruction_Fx29(s32 X) noexcept {
-		setIndexRegister((mRegisterV[X] & 0xF) * 5 + cSmallFontOffset);
+		::assign_cast(mRegisterI, (mRegisterV[X] & 0xF) * 5 + cSmallFontOffset);
 	}
 	void CHIP8_MODERN::instruction_Fx33(s32 X) noexcept {
 		const TriBCD bcd{ mRegisterV[X] };
 
-		writeMemoryI(bcd.digit[2], 0);
-		writeMemoryI(bcd.digit[1], 1);
-		writeMemoryI(bcd.digit[0], 2);
+		mMemoryBank[mRegisterI + 0] = bcd.digit[2];
+		mMemoryBank[mRegisterI + 1] = bcd.digit[1];
+		mMemoryBank[mRegisterI + 2] = bcd.digit[0];
 	}
 	void CHIP8_MODERN::instruction_FN55(s32 N) noexcept {
-		for (auto idx = 0; idx <= N; ++idx) { writeMemoryI(mRegisterV[idx], idx); }
-		if (!Quirk.idxRegNoInc) [[likely]] { incIndexRegister(N + 1); }
+		for (auto idx = 0; idx <= N; ++idx) { mMemoryBank[mRegisterI + idx] = mRegisterV[idx]; }
+		if (!Quirk.idxRegNoInc) [[likely]] { ::assign_cast_add(mRegisterI, N + 1); }
 	}
 	void CHIP8_MODERN::instruction_FN65(s32 N) noexcept {
-		for (auto idx = 0; idx <= N; ++idx) { mRegisterV[idx] = readMemoryI(idx); }
-		if (!Quirk.idxRegNoInc) [[likely]] { incIndexRegister(N + 1); }
+		for (auto idx = 0; idx <= N; ++idx) { mRegisterV[idx] = mMemoryBank[mRegisterI + idx]; }
+		if (!Quirk.idxRegNoInc) [[likely]] { ::assign_cast_add(mRegisterI, N + 1); }
 	}
 
 	#pragma endregion
