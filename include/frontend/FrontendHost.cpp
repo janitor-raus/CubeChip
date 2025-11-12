@@ -60,7 +60,7 @@ void FrontendHost::replaceCore() {
 	if (mSystemCore) {
 		BVS->setMainWindowTitle(AppName, HDM->getFileStem());
 		BVS->displayBuffer.resize(mSystemCore->getDisplaySize());
-		toggleSystemLimiter();
+		toggleSystemLimiter(); toggleSystemOSD();
 		mSystemCore->startWorker();
 	}
 }
