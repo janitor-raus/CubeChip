@@ -202,3 +202,24 @@ protected:
 public:
 	Str copyOverlayData() const noexcept;
 };
+
+
+
+template <std::size_t N>
+class MemoryBank : public SimpleContainerFacade<MemoryBank<N>, std::uint8_t> {
+	static_assert(std::has_single_bit(N),
+		"MemoryBank size must be a power of two!");
+
+	std::array<std::uint8_t, N> mem{};
+
+public:
+	constexpr       auto& operator[](std::size_t index)       noexcept
+		{ return mem[index & (N - 1)]; }
+	constexpr const auto& operator[](std::size_t index) const noexcept
+		{ return mem[index & (N - 1)]; }
+
+	constexpr auto size() const noexcept { return N; }
+
+	constexpr       auto* data()       noexcept { return mem.data(); }
+	constexpr const auto* data() const noexcept { return mem.data(); }
+};
