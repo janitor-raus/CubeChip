@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <bit>
 #include <span>
 #include <cassert>
 #include <cstring>
@@ -34,8 +35,8 @@ concept Allocatable = std::is_object_v<T> && !std::is_abstract_v<T>;
  */
 template <Allocatable T, std::size_t A>
 class AlignedTypeArrayDeleter {
-	static_assert((A & (A - 1)) == 0,
-		"N must be a power of two.");
+	static_assert(std::has_single_bit(A),
+		"A must be a power of two.");
 	static_assert(A <= MAX_ALIGN,
 		"Exceeded maximum allowed alignment.");
 	static_assert(!std::is_trivially_destructible_v<T>,
@@ -65,8 +66,8 @@ public:
  */
 template <Allocatable T, std::size_t A>
 class AlignedLiteArrayDeleter {
-	static_assert((A & (A - 1)) == 0,
-		"N must be a power of two.");
+	static_assert(std::has_single_bit(A),
+		"A must be a power of two.");
 	static_assert(A <= MAX_ALIGN,
 		"Exceeded maximum allowed alignment.");
 	static_assert(std::is_trivially_destructible_v<T>,
@@ -374,8 +375,8 @@ public:
 
 template<Allocatable T, std::size_t A = HDIS>
 inline AlignedMemoryBlock<T, A> allocate_n(std::size_t size) noexcept {
-	static_assert((A & (A - 1)) == 0u,
-		"N must be a power of two.");
+	static_assert(std::has_single_bit(A),
+		"A must be a power of two.");
 	static_assert(A <= MAX_ALIGN,
 		"Exceeded maximum allowed alignment.");
 
@@ -387,8 +388,8 @@ inline AlignedMemoryBlock<T, A> allocate_n(std::size_t size) noexcept {
 
 template <Allocatable T, std::size_t A>
 struct AlignedDeleter {
-	static_assert((A & (A - 1)) == 0,
-		"N must be power of two.");
+	static_assert(std::has_single_bit(A),
+		"A must be power of two.");
 	static_assert(A <= MAX_ALIGN,
 		"Exceeded maximum alignment.");
 

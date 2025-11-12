@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <bit>
 #include <span>
 #include <array>
 #include <cmath>
@@ -474,18 +475,18 @@ public:
 
 /*==================================================================*/
 
-template <typename T, std::size_t X, std::size_t Y, std::size_t N = sizeof(T)>
+template <typename T, std::size_t X, std::size_t Y, std::size_t A = alignof(T)>
 	requires (std::is_default_constructible_v<T>)
-class alignas(N) FixedMap2D final {
+class alignas(A) FixedMap2D final {
 	static_assert(X * Y >= 1,
 		"FixedMap2D must have X and Y of at least 1.");
-	static_assert((N & (N - 1)) == 0u,
-		"N must be a power of two.");
-	static_assert(N <= MAX_ALIGN,
+	static_assert(std::has_single_bit(A),
+		"A must be a power of two.");
+	static_assert(A <= MAX_ALIGN,
 		"Exceeded maximum allowed alignment.");
 
 	using self = FixedMap2D;
-	using self_flip = FixedMap2D<T, Y, X, N>;
+	using self_flip = FixedMap2D<T, Y, X, A>;
 
 public:
 	using element_type = T;
