@@ -58,3 +58,56 @@ inline void generate_n(Object& array, std::size_t offset, std::size_t count, Gen
 			std::forward<Generator>(lambda));
 	}
 }
+
+/*==================================================================*/
+
+/**
+ * @brief CRTP facade for simple container-like classes. Offers basic
+ * iterator support and common container methods. Requires the Derived
+ * to implement `data()` and `size()` methods. Does not offer direct
+ * element access methods.
+ * @tparam Derived The derived class inheriting the facade.
+ * @tparam T The type of elements stored in the container.
+ */
+template <typename Derived, typename T>
+	requires (std::is_class_v<Derived> && std::is_object_v<T>)
+struct SimpleContainerFacade {
+	using value_type      = T;
+	using size_type       = std::size_t;
+	using difference_type = std::ptrdiff_t;
+	using pointer         = value_type*;
+	using const_pointer   = const value_type*;
+	using reference       = value_type&;
+	using const_reference = const value_type&;
+
+	using iterator       = pointer;
+	using const_iterator = const_pointer;
+
+	using reverse_iterator       = std::reverse_iterator<iterator>;
+	using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+
+	constexpr iterator begin() noexcept { return self().data(); }
+	constexpr iterator end()   noexcept { return self().data() + self().size(); }
+	constexpr const_iterator begin() const noexcept { return self().data(); }
+	constexpr const_iterator end()   const noexcept { return self().data() + self().size(); }
+	constexpr const_iterator cbegin() const noexcept { return begin(); }
+	constexpr const_iterator cend()   const noexcept { return end(); }
+
+	constexpr reverse_iterator rbegin() noexcept { return std::reverse_iterator(end()); }
+	constexpr reverse_iterator rend()   noexcept { return std::reverse_iterator(begin()); }
+	constexpr const_reverse_iterator rbegin() const noexcept { return std::reverse_iterator(end()); }
+	constexpr const_reverse_iterator rend()   const noexcept { return std::reverse_iterator(begin()); }
+	constexpr const_reverse_iterator crbegin() const noexcept { return rbegin(); }
+	constexpr const_reverse_iterator crend()   const noexcept { return rend(); }
+
+	constexpr auto empty() const noexcept { return self().size() == 0; }
+
+	constexpr reference front() noexcept { return *begin(); }
+	constexpr reference back()  noexcept { return *rbegin(); }
+	constexpr const_reference front() const noexcept { return *cbegin(); }
+	constexpr const_reference back()  const noexcept { return *crbegin(); }
+
+private:
+	constexpr       Derived& self()       noexcept { return *static_cast<      Derived*>(this); }
+	constexpr const Derived& self() const noexcept { return *static_cast<const Derived*>(this); }
+};
