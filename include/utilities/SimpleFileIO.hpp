@@ -126,7 +126,7 @@ inline auto readFileData(
 
 		inFile.seekg(static_cast<std::streampos>(dataReadOffset));
 		if (!inFile) { return ::make_unexpected(std::make_error_code(std::errc::invalid_argument)); }
-		
+
 		std::vector<char> fileData{};
 
 		if (dataReadSize) {

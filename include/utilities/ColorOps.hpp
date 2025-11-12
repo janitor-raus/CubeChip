@@ -222,7 +222,7 @@ struct alignas(4) RGBA {
 			ez::fixedMul8(src.R, weight),
 			ez::fixedMul8(src.G, weight),
 			ez::fixedMul8(src.B, weight),
-			src.A
+			weight
 		};
 	}
 
