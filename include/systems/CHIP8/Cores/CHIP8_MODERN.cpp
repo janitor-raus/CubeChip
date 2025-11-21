@@ -18,7 +18,6 @@ void CHIP8_MODERN::initializeSystem() noexcept {
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
 	copyFontToMemory(mMemoryBank.data(), 80);
 
-	mDisplay.set(cScreenSizeX, cScreenSizeY);
 	setViewportSizes(true, cScreenSizeX, cScreenSizeY, cResSizeMult, 2);
 	setBaseSystemFramerate(cRefreshRate);
 
@@ -397,18 +396,12 @@ void CHIP8_MODERN::renderVideoData() {
 
 			[[likely]]
 			case 0b10000000:
-				if (Quirk.wrapSprite) { X &= (cScreenSizeX - 1); }
-				if (X < cScreenSizeX) {
-					if (!((mDisplayBuffer(X, Y) ^= 0x8) & 0x8))
-						[[unlikely]] { mRegisterV[0xF] = 1; }
-				}
+				if (!((mDisplayBuffer(X, Y) ^= 0x8) & 0x8))
+					[[unlikely]] { mRegisterV[0xF] = 1; }
 				return;
 
 			[[unlikely]]
 			default:
-				if (Quirk.wrapSprite) { X &= (cScreenSizeX - 1); }
-				else if (X >= cScreenSizeX) { return; }
-
 				for (auto B = 0; B < 8; ++B, ++X &= (cScreenSizeX - 1)) {
 					if (DATA & 0x80 >> B) {
 						if (!((mDisplayBuffer(X, Y) ^= 0x8) & 0x8))
@@ -433,7 +426,7 @@ void CHIP8_MODERN::renderVideoData() {
 			[[likely]]
 			case 1:
 				drawByte(pX, pY, mMemoryBank[mRegisterI]);
-				break;
+				return;
 
 			[[unlikely]]
 			case 0:
@@ -442,18 +435,18 @@ void CHIP8_MODERN::renderVideoData() {
 					drawByte(pX + 0, pY, mMemoryBank[mRegisterI + I++]);
 					drawByte(pX + 8, pY, mMemoryBank[mRegisterI + I++]);
 
-					if (!Quirk.wrapSprite && pY == (cScreenSizeY - 1)) { break; }
+					if (!Quirk.wrapSprite && pY == (cScreenSizeY - 1)) { return; }
 				}
-				break;
+				return;
 
 			[[unlikely]]
 			default:
 				for (auto H = 0; H < N; ++H, ++pY &= (cScreenSizeY - 1))
 				{
 					drawByte(pX, pY, mMemoryBank[mRegisterI + H]);
-					if (!Quirk.wrapSprite && pY == (cScreenSizeY - 1)) { break; }
+					if (!Quirk.wrapSprite && pY == (cScreenSizeY - 1)) { return; }
 				}
-				break;
+				return;
 		}
 	}
 

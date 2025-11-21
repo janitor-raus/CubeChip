@@ -12,6 +12,8 @@
 #include "HomeDirManager.hpp"
 #include "BasicLogger.hpp"
 
+#include "fonts/RobotoMono.hpp"
+
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
@@ -97,7 +99,7 @@ namespace ImGui {
 		static constexpr ImVec2 BL{ 0, 1 };
 		static constexpr ImVec2 BR{ 1, 1 };
 
-		const auto pos{ ImGui::GetCursorScreenPos() };
+		const auto pos = ImGui::GetCursorScreenPos();
 
 		const ImVec2 A{ pos.x,                pos.y };
 		const ImVec2 B{ pos.x + dimensions.x, pos.y };
@@ -132,12 +134,12 @@ namespace ImGui {
 /*==================================================================*/
 
 bool FrontendInterface::mergeOverflowingWindows() noexcept {
-	std::unique_lock lock{ sHooks_Windows.overflow_lock };
+	std::unique_lock lock{ sHooks->windows.overflow_lock };
 
-	auto& src_windows{ sHooks_Windows.overflow.buffer };
+	auto& src_windows = sHooks->windows.overflow.buffer;
 	if (src_windows.empty()) { return false; }
 
-	auto& dst_windows{ sHooks_Windows.registry.buffer };
+	auto& dst_windows = sHooks->windows.registry.buffer;
 
 	blog.newEntry<BLOG::DBG>("{} overflow windows found.", src_windows.size());
 
@@ -151,14 +153,14 @@ bool FrontendInterface::mergeOverflowingWindows() noexcept {
 }
 
 void FrontendInterface::invokeRegisteredWindows() noexcept {
-	std::unique_lock lock{ sHooks_Windows.registry_lock };
+	std::unique_lock lock{ sHooks->windows.registry_lock };
 
-	auto& windows{ sHooks_Windows.registry };
+	auto& windows = sHooks->windows.registry;
 
 	do {
 		while (windows.offset < windows.buffer.size()) {
-			auto& entry{ windows.buffer[windows.offset] };
-			if (auto shared_ptr{ entry.lock() }) {
+			auto& entry = windows.buffer[windows.offset];
+			if (auto shared_ptr = entry.lock()) {
 				(*shared_ptr)(); ++windows.offset;
 			} else {
 				windows.buffer.erase(windows.buffer.begin() + windows.offset);
@@ -169,19 +171,17 @@ void FrontendInterface::invokeRegisteredWindows() noexcept {
 	windows.offset = 0;
 }
 
-
-
 bool FrontendInterface::mergeOverflowingMenus(const Key& tag) noexcept {
-	std::unique_lock lock{ sHooks_Menus.overflow_lock };
+	std::unique_lock lock{ sHooks->menus.overflow_lock };
 
-	auto& src_window{ sHooks_Menus.overflow[tag] };
+	auto& src_window = sHooks->menus.overflow[tag];
 	if (src_window.empty()) {
 		 return false; }
 
-	unsigned migration_count{};
+	unsigned migration_count = 0;
 	for (auto& [menu_title, src_hooks] : src_window) {
 		if (src_hooks.buffer.empty()) { continue; }
-		auto& dst_hooks{ sHooks_Menus.registry[tag][menu_title] };
+		auto& dst_hooks = sHooks->menus.registry[tag][menu_title];
 
 		blog.newEntry<BLOG::DBG>("{} overflow hooks for menu \"{}\" found.",
 			src_hooks.buffer.size(), menu_title);
@@ -198,10 +198,10 @@ bool FrontendInterface::mergeOverflowingMenus(const Key& tag) noexcept {
 }
 
 void FrontendInterface::invokeRegisteredMenus(const Key& tag) noexcept {
-	std::unique_lock lock{ sHooks_Menus.registry_lock };
+	std::unique_lock lock{ sHooks->menus.registry_lock };
 
-	auto window{ sHooks_Menus.registry.find(tag) };
-	if (window == sHooks_Menus.registry.end()) { return; }
+	auto window = sHooks->menus.registry.find(tag);
+	if (window == sHooks->menus.registry.end()) { return; }
 
 	do {
 		for (auto& [menu_title, hooks] : window->second) {
@@ -209,8 +209,8 @@ void FrontendInterface::invokeRegisteredMenus(const Key& tag) noexcept {
 			if (!ImGui::BeginMenu(menu_title.c_str())) { continue; }
 
 			while (hooks.offset < hooks.buffer.size()) {
-				auto& entry{ hooks.buffer[hooks.offset] };
-				if (auto shared_ptr{ entry.lock() }) {
+				auto& entry = hooks.buffer[hooks.offset];
+				if (auto shared_ptr = entry.lock()) {
 					(*shared_ptr)(); ++hooks.offset;
 				} else {
 					hooks.buffer.erase(hooks.buffer.begin() + hooks.offset);
@@ -225,20 +225,47 @@ void FrontendInterface::invokeRegisteredMenus(const Key& tag) noexcept {
 		{ hooks.offset = 0; } // reset for next frame
 }
 
-void FrontendInterface::InitializeContext(const char* home_dir) {
-	static Str ini_path{ home_dir ? Str(home_dir) + "imgui.ini" : Str() };
-	static Str log_path{ home_dir ? Str(home_dir) + "imgui.log" : Str() };
+/*==================================================================*/
+
+void FrontendInterface::SetScaleFactor(float scale) noexcept {
+	ImGui::GetStyle().FontScaleMain = scale;
+}
+float& FrontendInterface::GetScaleFactor() noexcept {
+	return ImGui::GetStyle().FontScaleMain;
+}
+
+/*==================================================================*/
+
+static ImFont* sMainFont{};
+
+void FrontendInterface::InitContext(const char* home_dir) {
+	static Str ini_path = home_dir ? Str(home_dir) + "imgui.ini" : Str();
+	static Str log_path = home_dir ? Str(home_dir) + "imgui.log" : Str();
 
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
-	ImGui::GetIO().IniFilename = home_dir ? ini_path.c_str() : nullptr;
-	ImGui::GetIO().LogFilename = home_dir ? log_path.c_str() : nullptr;
-	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+	auto& io = ImGui::GetIO();
+
+	io.IniFilename = home_dir ? ini_path.c_str() : nullptr;
+	io.LogFilename = home_dir ? log_path.c_str() : nullptr;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+	sHooks = std::make_unique<RegistryAggregate>();
+
+	sMainFont = io.Fonts->AddFontFromMemoryCompressedTTF
+		(FontData::Roboto_Mono, std::size(FontData::Roboto_Mono), 16.0f);
+
+	io.Fonts->Build();
+	io.FontDefault = sMainFont;
 }
 
-void FrontendInterface::InitializeVideo(SDL_Window* window, SDL_Renderer* renderer) {
+void FrontendInterface::QuitContext() {
+	ImGui::DestroyContext();
+}
+
+void FrontendInterface::InitVideo(SDL_Window* window, SDL_Renderer* renderer) {
 	//UpdateFontScale();
 
 	ImGui::StyleColorsDark();
@@ -248,11 +275,12 @@ void FrontendInterface::InitializeVideo(SDL_Window* window, SDL_Renderer* render
 	ImGui_ImplSDLRenderer3_Init(renderer);
 }
 
-void FrontendInterface::Shutdown() {
+void FrontendInterface::QuitVideo() {
 	ImGui_ImplSDLRenderer3_Shutdown();
 	ImGui_ImplSDL3_Shutdown();
-	ImGui::DestroyContext();
 }
+
+/*==================================================================*/
 
 void FrontendInterface::ProcessEvent(void* event) {
 	ImGui_ImplSDL3_ProcessEvent(reinterpret_cast<SDL_Event*>(event));
@@ -264,15 +292,10 @@ void FrontendInterface::NewFrame() {
 
 	ImGui::NewFrame();
 
-	sTaskbarSize = ImGui::GetFrameHeight() * 2.0f;
+	sTaskbarSize = ImGui::GetFrameHeight();
 
 	initializeMainDockspace();
 	invokeRegisteredWindows();
-
-	static bool show_demo_window{ true };
-	if (show_demo_window) {
-		ImGui::ShowDemoWindow(&show_demo_window);
-	}
 }
 
 void FrontendInterface::RenderFrame(SDL_Renderer* renderer) {
@@ -280,26 +303,7 @@ void FrontendInterface::RenderFrame(SDL_Renderer* renderer) {
 	ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
 }
 
-void FrontendInterface::UpdateFontScale(const void* data, int size, float scale) {
-	static auto currentScale{ 0.0f };
-
-	if (scale < 1.0f) { return; }
-	if (std::fabs(currentScale - scale) > 0.0f) {
-		currentScale = scale;
-		auto& io{ ImGui::GetIO() };
-
-		if (data && size) {
-			io.Fonts->AddFontFromMemoryCompressedTTF(data, size, scale * 17.0f);
-		} else {
-			ImFontConfig fontConfig;
-			fontConfig.SizePixels = 16.0f * scale;
-
-			io.Fonts->Clear();
-			io.Fonts->AddFontDefault(&fontConfig);
-		}
-		ImGui::GetStyle().ScaleAllSizes(scale);
-	}
-}
+/*==================================================================*/
 
 void FrontendInterface::PrepareViewport(
 	bool enable, bool integer_scaling,
@@ -333,7 +337,7 @@ void FrontendInterface::PrepareViewport(
 }
 
 void FrontendInterface::initializeMainDockspace() {
-	const auto& viewport{ *ImGui::GetMainViewport() };
+	const auto& viewport = *ImGui::GetMainViewport();
 	ImGui::SetNextWindowPos(viewport.Pos);
 	ImGui::SetNextWindowSize({
 		viewport.Size.x,
@@ -368,12 +372,14 @@ void FrontendInterface::initializeMainDockspace() {
 	ImGui::SetNextWindowSize({ viewport.Size.x, ImGui::GetFrameHeight() * 2 });
 	ImGui::SetNextWindowViewport(viewport.ID);
 
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{});
 	ImGui::Begin("TaskbarDockspace", nullptr,
 		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
 		ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
 		ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
 		ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings
 	);
+	ImGui::PopStyleVar();
 
 	sTaskbarDockID = ImGui::GetID("TaskbarDockspace");
 	ImGui::DockSpace(sTaskbarDockID, { 0.0f, 0.0f },

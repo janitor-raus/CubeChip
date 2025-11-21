@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "Typedefs.hpp"
+#include "SettingWrapper.hpp"
 
 /*==================================================================*/
 
@@ -105,6 +106,15 @@ public:
 	static inline GlobalAudioBase* GAB{};
 	static inline BasicVideoSpec*  BVS{};
 
+	struct Settings {
+		float ui_scale = 1.5f;
+
+		SettingsMap map() noexcept;
+	};
+
+private:
+	auto exportSettings() const noexcept -> Settings;
+
 private:
 	static inline bool mToggleOSD{};
 	static inline bool mUnlimited{};
@@ -114,6 +124,7 @@ private:
 
 	void toggleSystemLimiter() noexcept;
 	void toggleSystemOSD()     noexcept;
+	void toggleSystemHidden(bool state) noexcept;
 
 	void discardCore();
 	void replaceCore();
@@ -126,7 +137,6 @@ public:
 
 	static bool initApplication(StrV overrideHome, StrV configName, bool forcePortable) noexcept;
 
-	void hideMainWindow(bool state) noexcept;
 	void quitApplication() noexcept;
 	void loadGameFile(const Path&);
 

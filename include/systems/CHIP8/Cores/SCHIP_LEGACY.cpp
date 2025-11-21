@@ -21,7 +21,6 @@ void SCHIP_LEGACY::initializeSystem() noexcept {
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
 	copyFontToMemory(mMemoryBank.data(), 180);
 
-	mDisplay.set(cScreenSizeX, cScreenSizeY);
 	setViewportSizes(true, cScreenSizeX, cScreenSizeY, cResSizeMult, 2);
 	setBaseSystemFramerate(cRefreshRate);
 

@@ -14,7 +14,7 @@
 /*==================================================================*/
 
 BytePusher_CoreInterface::BytePusher_CoreInterface() noexcept {
-	if (const auto* path = HDM->addSystemDir("savestate", "BYTEPUSHER"))
+	if (auto* path = HDM->addSystemDir("savestate", "BYTEPUSHER"))
 		{ sSavestatePath = *path / HDM->getFileSHA1(); }
 
 	loadPresetBinds();

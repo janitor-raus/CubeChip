@@ -56,7 +56,7 @@ class FrontendInterface {
 		HookRegistry() noexcept : buffer{}, offset{} {}
 	};
 
-	using HookRegistryMenuMap = std::unordered_map
+	using HookRegistryMapped = std::unordered_map
 		<Key, std::unordered_map<Key, HookRegistry>>;
 
 	template <typename T>
@@ -67,11 +67,13 @@ class FrontendInterface {
 		std::shared_mutex overflow_lock;
 	};
 
-	static inline RegistryBox<HookRegistry>
-		sHooks_Windows;
+	struct RegistryAggregate {
+		RegistryBox<HookRegistry>     windows{};
+		RegistryBox<HookRegistryMapped> menus{};
+	};
 
-	static inline RegistryBox<HookRegistryMenuMap>
-		sHooks_Menus;
+	static inline std::unique_ptr
+		<RegistryAggregate> sHooks = nullptr;
 
 public:
 	/**
@@ -83,14 +85,14 @@ public:
 	 */
 	template <VoidInvocable Fn> [[nodiscard]]
 	static Hook registerWindow(Fn&& fn) noexcept {
-		auto shared_ptr{ std::make_shared<Func>(std::forward<Fn>(fn)) };
+		auto shared_ptr = std::make_shared<Func>(std::forward<Fn>(fn));
 
-		if (sHooks_Windows.registry_lock.try_lock()) { // may fail spuriously (fine)
-			sHooks_Windows.registry.buffer.push_back(shared_ptr);
-			sHooks_Windows.registry_lock.unlock();
+		if (sHooks->windows.registry_lock.try_lock()) { // may fail spuriously (fine)
+			sHooks->windows.registry.buffer.push_back(shared_ptr);
+			sHooks->windows.registry_lock.unlock();
 		} else {
-			std::unique_lock lock{ sHooks_Windows.overflow_lock }; // must wait to acquire
-			sHooks_Windows.overflow.buffer.push_back(shared_ptr);
+			std::unique_lock lock{ sHooks->windows.overflow_lock }; // must wait to acquire
+			sHooks->windows.overflow.buffer.push_back(shared_ptr);
 		}
 
 		return shared_ptr;
@@ -103,14 +105,14 @@ public:
 	 */
 	template <VoidInvocable Fn> [[nodiscard]]
 	static Hook registerMenu(const Key& window_tag, const Key& menu_title, Fn&& fn) noexcept {
-		auto shared_ptr{ std::make_shared<Func>(std::forward<Fn>(fn)) };
+		auto shared_ptr = std::make_shared<Func>(std::forward<Fn>(fn));
 
-		if (sHooks_Menus.registry_lock.try_lock()) { // may fail spuriously (fine)
-			sHooks_Menus.registry[window_tag][menu_title].buffer.push_back(shared_ptr);
-			sHooks_Menus.registry_lock.unlock();
+		if (sHooks->menus.registry_lock.try_lock()) { // may fail spuriously (fine)
+			sHooks->menus.registry[window_tag][menu_title].buffer.push_back(shared_ptr);
+			sHooks->menus.registry_lock.unlock();
 		} else {
-			std::unique_lock lock{ sHooks_Menus.overflow_lock }; // must wait to acquire
-			sHooks_Menus.overflow[window_tag][menu_title].buffer.push_back(shared_ptr);
+			std::unique_lock lock{ sHooks->menus.overflow_lock }; // must wait to acquire
+			sHooks->menus.overflow[window_tag][menu_title].buffer.push_back(shared_ptr);
 		}
 
 		return shared_ptr;
@@ -124,10 +126,17 @@ private:
 	static void invokeRegisteredMenus(const Key& tag) noexcept;
 
 public:
-	static void InitializeContext(const char*);
-	static void InitializeVideo(SDL_Window*, SDL_Renderer*);
-	static void Shutdown();
+	static void InitContext(const char*);
+	static void QuitContext();
 
+	static void InitVideo(SDL_Window*, SDL_Renderer*);
+	static void QuitVideo();
+
+public:
+	static void   SetScaleFactor(float scale) noexcept;
+	static float& GetScaleFactor() noexcept;
+
+public:
 	static void ProcessEvent(void* event);
 	static void NewFrame();
 	static void RenderFrame(SDL_Renderer*);

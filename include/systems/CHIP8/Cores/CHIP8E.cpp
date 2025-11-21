@@ -21,7 +21,6 @@ void CHIP8E::initializeSystem() noexcept {
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
 	copyFontToMemory(mMemoryBank.data(), 80);
 
-	mDisplay.set(cScreenSizeX, cScreenSizeY);
 	setViewportSizes(true, cScreenSizeX, cScreenSizeY, cResSizeMult, 2);
 	setBaseSystemFramerate(cRefreshRate);
 
@@ -30,9 +29,8 @@ void CHIP8E::initializeSystem() noexcept {
 	mVoices[VOICE::ID_2].userdata = &mAudioTimers[VOICE::ID_2];
 	mVoices[VOICE::ID_3].userdata = &mAudioTimers[VOICE::ID_3];
 
-	Quirk.waitVblank = true;
 	mCurrentPC = cStartOffset;
-	mTargetCPF = Quirk.waitVblank ? cInstSpeedHi : cInstSpeedLo;
+	mTargetCPF = cInstSpeedHi;
 }
 
 void CHIP8E::handleCycleLoop() noexcept

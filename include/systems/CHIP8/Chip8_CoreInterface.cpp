@@ -15,10 +15,10 @@
 /*==================================================================*/
 
 Chip8_CoreInterface::Chip8_CoreInterface() noexcept {
-	if (const auto* path = HDM->addSystemDir("savestate", "CHIP8"))
+	if (auto* path = HDM->addSystemDir("savestate", "CHIP8"))
 		{ sSavestatePath = *path / HDM->getFileSHA1(); }
 
-	if (const auto* path = HDM->addSystemDir("permaRegs", "CHIP8"))
+	if (auto* path = HDM->addSystemDir("permaRegs", "CHIP8"))
 		{ sPermaRegsPath = *path / HDM->getFileSHA1(); }
 
 	mAudioDevice.addAudioStream(STREAM::MAIN, 48'000);

@@ -11,6 +11,7 @@
 #include "FrontendInterface.hpp"
 #include "HomeDirManager.hpp"
 #include "BasicVideoSpec.hpp"
+#include "GlobalAudioBase.hpp"
 #include "DefaultConfig.hpp"
 #include "BasicLogger.hpp"
 #include "Millis.hpp"
@@ -28,8 +29,6 @@ static constexpr auto RGBA_to_ImVec4(RGBA color) noexcept {
 /*==================================================================*/
 
 void FrontendHost::initializeInterface() noexcept {
-	static bool sShowLogWindow{};
-
 	static auto sMenu_File_Open = FrontendInterface::registerMenu("", "File",
 	[&]() noexcept {
 		if (ImGui::MenuItem("Open File...")) {
@@ -47,6 +46,21 @@ void FrontendHost::initializeInterface() noexcept {
 		}
 	});
 
+	static bool sShowDemoWindow{};
+	static auto sMenu_Debug_Demo = FrontendInterface::registerMenu("", "Debug",
+	[&]() noexcept {
+		if (ImGui::MenuItem("ImGUI Demo...", nullptr, sShowDemoWindow)) {
+			sShowDemoWindow = !sShowDemoWindow;
+		}
+	});
+
+	static auto sWindow_Demo = FrontendInterface::registerWindow(
+	[&]() noexcept {
+		if (!sShowDemoWindow) { return; }
+		ImGui::ShowDemoWindow(&sShowDemoWindow);
+	});
+
+	static bool sShowLogWindow{};
 	static auto sMenu_Debug_Log = FrontendInterface::registerMenu("", "Debug",
 	[&]() noexcept {
 		if (ImGui::MenuItem("Show Logs...", nullptr, sShowLogWindow)) {
@@ -54,11 +68,28 @@ void FrontendHost::initializeInterface() noexcept {
 		}
 	});
 
+	static auto sMenu_Settings_ScaleUI = FrontendInterface::registerMenu("", "Settings",
+	[&]() noexcept {
+		static auto sScaleFactor = int(FrontendInterface::GetScaleFactor() * 100);
+		ImGui::SliderInt(" UI Scale", &sScaleFactor, 100, 300, "%d%%");
+
+		if (ImGui::IsItemDeactivatedAfterEdit()) {
+			FrontendInterface::SetScaleFactor(sScaleFactor * 0.01f);
+		}
+	});
+
+	static auto sMenu_Settings_MasterVol = FrontendInterface::registerMenu("", "Settings",
+	[&]() noexcept {
+		static auto sGlobalGain = int(GAB->getGlobalGain() * 100);
+		if (ImGui::SliderInt(" Master Volume", &sGlobalGain, 0, 100, "%d%%"))
+			{ GAB->setGlobalGain(sGlobalGain * 0.01f); }
+	});
+
 	static auto sWindow_Log = FrontendInterface::registerWindow(
 	[&]() noexcept {
 		if (!sShowLogWindow) { return; }
 
-		static bool autoScroll{ true };
+		static bool autoScroll = true;
 		static bool scrollToBottom{};
 
 		ImGui::Begin("Application Log##Logger", &sShowLogWindow, ImGuiWindowFlags_NoCollapse);
@@ -81,10 +112,10 @@ void FrontendHost::initializeInterface() noexcept {
 			ImGui::TableSetupColumn("Message",  ImGuiTableColumnFlags_NoSort);
 			ImGui::TableHeadersRow();
 
-			const auto snapshot{ blog->snapshot(0).fast() };
+			const auto snapshot = blog->snapshot(0).fast();
 			static bool sortDescending{};
 
-			if (auto* sort{ ImGui::TableGetSortSpecs() }) {
+			if (auto* sort = ImGui::TableGetSortSpecs()) {
 				if (sort->SpecsCount > 0 && sort->SpecsDirty) {
 					sortDescending = sort->Specs[0].SortDirection
 						== ImGuiSortDirection_Descending;

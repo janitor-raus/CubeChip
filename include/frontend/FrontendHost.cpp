@@ -17,7 +17,6 @@
 #include "HDIS_HCIS.hpp"
 
 #include "FrontendHost.hpp"
-#include "fonts/RobotoMono.hpp"
 #include "SystemInterface.hpp"
 #include "CoreRegistry.hpp"
 
@@ -39,6 +38,20 @@ void FrontendHost::StopSystemThread::operator()(SystemInterface* ptr) noexcept {
 		ptr->~SystemInterface();
 		::operator delete(ptr, std::align_val_t(HDIS));
 	}
+}
+
+SettingsMap FrontendHost::Settings::map() noexcept {
+	return {
+		makeSetting("Frontend.Interface.Scale", &ui_scale),
+	};
+}
+
+auto FrontendHost::exportSettings() const noexcept -> Settings {
+	Settings out;
+
+	out.ui_scale = FrontendInterface::GetScaleFactor();
+
+	return out;
 }
 
 /*==================================================================*/
@@ -78,36 +91,21 @@ void FrontendHost::loadGameFile(const Path& gameFile) {
 	}
 }
 
-void FrontendHost::hideMainWindow(bool state) noexcept {
-	if (state) {
-		if (mSystemCore) { mSystemCore->addSystemState(EmuState::HIDDEN); }
-	} else {
-		if (mSystemCore) { mSystemCore->subSystemState(EmuState::HIDDEN); }
-	}
-}
-
-void FrontendHost::quitApplication() noexcept {
-	mSystemCore.reset();
-
-	HDM->writeMainAppConfig(
-		GAB->exportSettings().map(),
-		BVS->exportSettings().map()
-	);
-}
-
 bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forcePortable) noexcept {
 	HDM = HomeDirManager::initialize(
 		overrideHome, configName, forcePortable, OrgName, AppName);
 	if (!HDM) { return false; }
 
-	FrontendInterface::InitializeContext(HomeDirManager::getHomePath());
+	FrontendInterface::InitContext(HomeDirManager::getHomePath());
 
 	GlobalAudioBase::Settings GAB_settings;
-	BasicVideoSpec::Settings BVS_settings;
+	BasicVideoSpec ::Settings BVS_settings;
+	FrontendHost   ::Settings FE_settings;
 
 	HDM->parseMainAppConfig(
 		GAB_settings.map(),
-		BVS_settings.map()
+		BVS_settings.map(),
+		FE_settings.map()
 	);
 
 	GAB = GlobalAudioBase::initialize(GAB_settings);
@@ -117,7 +115,19 @@ bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forc
 	BVS = BasicVideoSpec::initialize(BVS_settings);
 	if (!BVS) { return false; }
 
+	FrontendInterface::SetScaleFactor(FE_settings.ui_scale);
+
 	return true;
+}
+
+void FrontendHost::quitApplication() noexcept {
+	mSystemCore.reset();
+
+	HDM->writeMainAppConfig(
+		GAB->exportSettings().map(),
+		BVS->exportSettings().map(),
+		this->exportSettings().map()
+	);
 }
 
 /*==================================================================*/
@@ -125,12 +135,11 @@ bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forc
 s32  FrontendHost::processEvents(void* event) noexcept {
 	FrontendInterface::ProcessEvent(event);
 
-	auto sdl_event{ reinterpret_cast<SDL_Event*>(event) };
+	auto sdl_event = reinterpret_cast<SDL_Event*>(event);
 	if (BVS->isMainWindowID(sdl_event->window.windowID)) {
 		switch (sdl_event->type) {
 			case SDL_EVENT_QUIT:
 			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-				quitApplication();
 				return SDL_APP_SUCCESS;
 
 			case SDL_EVENT_DROP_FILE:
@@ -138,17 +147,16 @@ s32  FrontendHost::processEvents(void* event) noexcept {
 				break;
 
 			case SDL_EVENT_WINDOW_MINIMIZED:
-				hideMainWindow(true);
+				toggleSystemHidden(true);
 				break;
 
 			case SDL_EVENT_WINDOW_RESTORED:
-				hideMainWindow(false);
+				toggleSystemHidden(false);
 				break;
 
 			case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
 			case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
-				FrontendInterface::UpdateFontScale(AppFontData_Roboto_Mono,
-					SDL_GetWindowDisplayScale(BVS->getMainWindow()));
+				// Check if ImGui updates DPI scaling automatically
 				break;
 		}
 	}
@@ -162,7 +170,7 @@ s32  FrontendHost::processFrame() {
 	initializeInterface();
 	handleHotkeyActions();
 
-	const auto dialogResult{ HDM->getProbableFile() };
+	const auto dialogResult = HDM->getProbableFile();
 	if (dialogResult) { loadGameFile(*dialogResult); }
 
 	return BVS->renderPresent(!!mSystemCore, (mSystemCore && mToggleOSD)
@@ -205,7 +213,7 @@ void FrontendHost::handleHotkeyActions() {
 			return;
 		}
 		if (Input.isPressed(KEY(F4))) {
-			if (auto paused{ mSystemCore->tryPauseSystem() }) {
+			if (auto paused = mSystemCore->tryPauseSystem()) {
 				blog.newEntry<BLOG::INF>("System has been {} by hotkey!",
 					*paused ? "paused" : "unpaused");
 			}
@@ -230,6 +238,14 @@ void FrontendHost::toggleSystemOSD() noexcept {
 		if (mSystemCore) { mSystemCore->addSystemState(EmuState::STATS); }
 	} else {
 		if (mSystemCore) { mSystemCore->subSystemState(EmuState::STATS); }
+	}
+}
+
+void FrontendHost::toggleSystemHidden(bool state) noexcept {
+	if (state) {
+		if (mSystemCore) { mSystemCore->addSystemState(EmuState::HIDDEN); }
+	} else {
+		if (mSystemCore) { mSystemCore->subSystemState(EmuState::HIDDEN); }
 	}
 }
 

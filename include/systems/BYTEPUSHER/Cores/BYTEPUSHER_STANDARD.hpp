@@ -14,17 +14,17 @@
 /*==================================================================*/
 
 class BYTEPUSHER_STANDARD final : public BytePusher_CoreInterface {
-	static constexpr u64 cTotalMemory{ 16_MiB };
-	static constexpr u32 cSafezoneOOB{     8 };
-	static constexpr f32 cRefreshRate{ 60.0f };
+	static constexpr u64 cTotalMemory = 16_MiB;
+	static constexpr u32 cSafezoneOOB =     8;
+	static constexpr f32 cRefreshRate = 60.0f;
 
-	static constexpr s32 cAudioLength{ 256 };
-	static constexpr s32 cResSizeMult{   2 };
-	static constexpr s32 cScreenSizeX{ 256 };
-	static constexpr s32 cScreenSizeY{ 256 };
+	static constexpr s32 cAudioLength = 256;
+	static constexpr s32 cResSizeMult =   2;
+	static constexpr s32 cScreenSizeX = 256;
+	static constexpr s32 cScreenSizeY = 256;
 
-	static constexpr u32 cMaxDisplayW{ 256 };
-	static constexpr u32 cMaxDisplayH{ 256 };
+	static constexpr u32 cMaxDisplayW = 256;
+	static constexpr u32 cMaxDisplayH = 256;
 
 private:
 	std::array<u8, cTotalMemory + cSafezoneOOB>

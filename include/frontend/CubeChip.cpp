@@ -31,7 +31,7 @@
 
 /*==================================================================*/
 
-BasicLogger& blog{ *BasicLogger::initialize() };
+BasicLogger& blog = *BasicLogger::initialize();
 
 /*==================================================================*/
 
@@ -52,28 +52,30 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 
 	cxxopts::Options options(AppName, "Cross-platform multi-system emulator");
 
-	options.add_options("Runtime")
-		("program",  "Forces the application to load a program on startup.",
-			cxxopts::value<Str>())
-		("headless", "Forces the application to run without a graphical user interface.",
-			cxxopts::value<bool>()->default_value("false"));
+	{
+		options.add_options("Runtime")
+			("program",  "Forces the application to load a program on startup.",
+				cxxopts::value<Str>())
+			("headless", "Forces the application to run without a graphical user interface.",
+				cxxopts::value<bool>()->default_value("false"));
 
-	options.add_options("Configuration")
-		("homedir",  "Forces application to use a different home directory to read/write files.",
-			cxxopts::value<Str>())
-		("config",   "Forces application to use a different config file to load/save settings, relative to the home directory.",
-			cxxopts::value<Str>())
-		("portable", "Force application to operate in portable mode, setting the home directory to the executable's location. Overriden by --home.",
-			cxxopts::value<bool>()->default_value("false"));
+		options.add_options("Configuration")
+			("homedir",  "Forces application to use a different home directory to read/write files.",
+				cxxopts::value<Str>())
+			("config",   "Forces application to use a different config file to load/save settings, relative to the home directory.",
+				cxxopts::value<Str>())
+			("portable", "Force application to operate in portable mode, setting the home directory to the executable's location. Overriden by --home.",
+				cxxopts::value<bool>()->default_value("false"));
 
-	options.add_options("General")
-		("version", "Print application version info.")
-		("help",    "List application options.");
+		options.add_options("General")
+			("version", "Print application version info.")
+			("help",    "List application options.");
 
-	options.parse_positional({ "program" });
-	options.positional_help("program_file");
+		options.parse_positional({ "program" });
+		options.positional_help("program_file");
+	}
 
-	auto result{ options.parse(argc, argv) };
+	auto result = options.parse(argc, argv);
 
 	if (result.count("version")) {
 		Console::Attach();
@@ -96,7 +98,8 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 		result.count("portable") ? true : false
 	)) { return SDL_APP_FAILURE; }
 
-	*Host = FrontendHost::initialize(result.count("program") ? result["program"].as<Str>() : ""s);
+	*Host = FrontendHost::initialize(
+		result.count("program") ? result["program"].as<Str>() : ""s);
 
 	thread_affinity::set_affinity(0b11ull);
 
@@ -106,7 +109,7 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 /*==================================================================*/
 
 SDL_AppResult SDL_AppIterate(void *pHost) {
-	auto* Host{ static_cast<FrontendHost*>(pHost) };
+	auto* Host = static_cast<FrontendHost*>(pHost);
 
 	return SDL_AppResult(Host->processFrame());
 }
@@ -114,11 +117,15 @@ SDL_AppResult SDL_AppIterate(void *pHost) {
 /*==================================================================*/
 
 SDL_AppResult SDL_AppEvent(void *pHost, SDL_Event *event) {
-	auto* Host{ static_cast<FrontendHost*>(pHost) };
+	auto* Host = static_cast<FrontendHost*>(pHost);
 
 	return SDL_AppResult(Host->processEvents(event));
 }
 
 /*==================================================================*/
 
-void SDL_AppQuit(void*, SDL_AppResult) {}
+void SDL_AppQuit(void* pHost, SDL_AppResult) {
+	auto* Host = static_cast<FrontendHost*>(pHost);
+
+	Host->quitApplication();
+}

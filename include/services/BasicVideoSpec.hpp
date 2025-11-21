@@ -70,7 +70,7 @@ private:
 	Atom<unsigned> mNewViewport{};
 
 	Atom<unsigned> mOutlineColor{};
-	Atom<ez::u8>   mTextureAlpha{ 0xFF };
+	Atom<ez::u8>   mTextureAlpha = 0xFF;
 
 	bool mUsingScanlines{};
 	bool mIntegerScaling{};
@@ -85,13 +85,13 @@ public:
 		static constexpr ez::Rect
 			defaults{ 0, 0, 640, 480 };
 
-		ez::Rect window{ defaults };
+		ez::Rect window = defaults;
 		struct Viewport {
-			int  filtering{ 0 };
-			bool int_scale{ true };
-			bool scanlines{ true };
+			int  filtering = 0;
+			bool int_scale = true;
+			bool scanlines = true;
 		} viewport;
-		bool first_run{ true };
+		bool first_run = true;
 
 		SettingsMap map() noexcept;
 	};
@@ -109,7 +109,7 @@ private:
 
 public:
 	static auto* initialize(const Settings& settings) noexcept {
-		static bool sInitSuccess{ true };
+		static bool sInitSuccess = true;
 		static BasicVideoSpec self(settings, sInitSuccess);
 		return sInitSuccess ? &self : nullptr;
 	}

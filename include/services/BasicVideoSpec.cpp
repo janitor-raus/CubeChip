@@ -89,14 +89,14 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 					"Windows SDK is too old: {}.{}.{}", NTDDI_MAJOR, NTDDI_MINOR, NTDDI_BUILD);
 			#else
 				else {
-					const auto windowHandle{ SDL_GetPointerProperty(
+					const auto windowHandle = SDL_GetPointerProperty(
 						SDL_GetWindowProperties(mMainWindow),
 						SDL_PROP_WINDOW_WIN32_HWND_POINTER,
 						nullptr
-					) };
+					);
 
 					if (windowHandle) {
-						static constexpr auto cornerMode{ DWMWCP_DONOTROUND };
+						static constexpr auto cornerMode = DWMWCP_DONOTROUND;
 						DwmSetWindowAttribute(
 							static_cast<HWND>(windowHandle),
 							DWMWA_WINDOW_CORNER_PREFERENCE,
@@ -109,11 +109,11 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 
 		ez::Rect deco{};
 
-		if (auto dummy{ sdl::make_unique(SDL_CreateWindow(
+		if (auto dummy = sdl::make_unique(SDL_CreateWindow(
 			nullptr, 64, 64, SDL_WINDOW_UTILITY | SDL_WINDOW_HIDDEN
-		)) }) {
+		))) {
 			#ifndef __APPLE__
-			constexpr auto away{ -(1 << 15) };
+			constexpr auto away = -(1 << 15);
 			SDL_SetWindowPosition(dummy, away, away);
 			#endif
 			SDL_ShowWindow(dummy);
@@ -122,7 +122,7 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 			SDL_GetWindowBordersSize(dummy, &deco.x, &deco.y, &deco.w, &deco.h);
 		}
 
-		auto window{ settings.window };
+		auto window = settings.window;
 		normalizeRectToDisplay(window, deco, settings.first_run);
 
 		SDL_SetWindowPosition(mMainWindow, window.x, window.y);
@@ -132,7 +132,7 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 		mMainRenderer = SDL_CreateRenderer(mMainWindow, nullptr); \
 		if (!mMainRenderer) { throwFatalError(__LINE__, __func__); }
 
-		FrontendInterface::InitializeVideo(mMainWindow, mMainRenderer);
+		FrontendInterface::InitVideo(mMainWindow, mMainRenderer);
 
 		resetMainWindow();
 	}
@@ -147,21 +147,22 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 }
 
 BasicVideoSpec::~BasicVideoSpec() noexcept {
-	FrontendInterface::Shutdown();
+	FrontendInterface::QuitVideo();
+	FrontendInterface::QuitContext();
 
 	SDL_QuitSubSystem(SDL_INIT_VIDEO);
 }
 
 SettingsMap BasicVideoSpec::Settings::map() noexcept {
 	return {
-		makeSetting("VIDEO.Window.X", &window.x),
-		makeSetting("VIDEO.Window.Y", &window.y),
-		makeSetting("VIDEO.Window.W", &window.w),
-		makeSetting("VIDEO.Window.H", &window.h),
-		makeSetting("VIDEO.Window.FirstRun", &first_run),
-		makeSetting("VIDEO.Viewport.Filtering", &viewport.filtering),
-		makeSetting("VIDEO.Viewport.Int_Scale", &viewport.int_scale),
-		makeSetting("VIDEO.Viewport.Scanlines", &viewport.scanlines),
+		makeSetting("Window.X", &window.x),
+		makeSetting("Window.Y", &window.y),
+		makeSetting("Window.W", &window.w),
+		makeSetting("Window.H", &window.h),
+		makeSetting("Window.FirstRun", &first_run),
+		makeSetting("Viewport.Filtering", &viewport.filtering),
+		makeSetting("Viewport.Int_Scale", &viewport.int_scale),
+		makeSetting("Viewport.Scanlines", &viewport.scanlines),
 	};
 }
 
@@ -192,7 +193,7 @@ bool BasicVideoSpec::isMainWindowID(unsigned id) const noexcept {
 }
 
 float BasicVideoSpec::getDisplayRefreshRate(SDL_DisplayID display) noexcept {
-	if (const auto* mode{ SDL_GetCurrentDisplayMode(display) }) {
+	if (const auto* mode = SDL_GetCurrentDisplayMode(display)) {
 		if (mode->refresh_rate_denominator > 0) {
 			return float(mode->refresh_rate_numerator) /
 				float(mode->refresh_rate_denominator);
@@ -205,12 +206,12 @@ float BasicVideoSpec::getDisplayRefreshRate(SDL_DisplayID display) noexcept {
 }
 
 void BasicVideoSpec::normalizeRectToDisplay(ez::Rect& rect, ez::Rect& deco, bool first_run) noexcept {
-	auto numDisplays{  0 }; // count of displays SDL found
-	auto bestDisplay{ -1 }; // index of display our window will use
+	auto numDisplays =  0; // count of displays SDL found
+	auto bestDisplay = -1; // index of display our window will use
 	bool rectIntersectsDisplay{};
 
 	// 1: fetch all eligible display IDs
-	auto displays{ sdl::make_unique(SDL_GetDisplays(&numDisplays)) };
+	auto displays = sdl::make_unique(SDL_GetDisplays(&numDisplays));
 	if (!displays || numDisplays <= 0) [[unlikely]]
 		{ rect = Settings::defaults; return; }
 
@@ -218,7 +219,7 @@ void BasicVideoSpec::normalizeRectToDisplay(ez::Rect& rect, ez::Rect& deco, bool
 	std::vector<ez::Rect> displayBounds;
 	displayBounds.reserve(numDisplays);
 
-	for (auto i{ 0 }; i < numDisplays; ++i) {
+	for (auto i = 0; i < numDisplays; ++i) {
 		if (displays[i] == SDL_GetPrimaryDisplay()) { bestDisplay = i; }
 		SDL_Rect display;
 		if (SDL_GetDisplayUsableBounds(displays[i], &display)) {
@@ -235,18 +236,18 @@ void BasicVideoSpec::normalizeRectToDisplay(ez::Rect& rect, ez::Rect& deco, bool
 
 	if (!first_run) {
 		// 4: find largest window/display overlap, if any
-		unsigned long long bestOverlap{ 0 };
-		for (auto i{ 0u }; i < displayBounds.size(); ++i) {
+		auto bestOverlap = 0ull;
+		for (auto i = 0u; i < displayBounds.size(); ++i) {
 			const auto overlapArea{ ez::intersect(rect, displayBounds[i]).area() };
 			if (overlapArea > bestOverlap) { bestOverlap = overlapArea; bestDisplay = i; }
 		}
 
 		// 5: fall back to searching for closest display
 		if ((rectIntersectsDisplay = !!bestOverlap) == false) {
-			unsigned long long bestDistance{ ~0ull };
+			auto bestDistance = ~0ull;
 			const auto currentCenter{ rect.center() };
 
-			for (auto i{ 0u }; i < displayBounds.size(); ++i) {
+			for (auto i = 0u; i < displayBounds.size(); ++i) {
 				const auto displayCenter{ displayBounds[i].center() };
 				const auto distance{ ez::distance(currentCenter, displayCenter) };
 				if (distance < bestDistance) { bestDistance = distance; bestDisplay = i; }
@@ -255,10 +256,10 @@ void BasicVideoSpec::normalizeRectToDisplay(ez::Rect& rect, ez::Rect& deco, bool
 	}
 
 	// 6: shrink window to best fit chosen display
-	const auto& target{ displayBounds[bestDisplay] };
+	const auto& target = displayBounds[bestDisplay];
 
-	const auto up{ deco.x }, lt{ deco.y };
-	const auto dn{ deco.w }, rt{ deco.h };
+	const auto up = deco.x, lt = deco.y;
+	const auto dn = deco.w, rt = deco.h;
 
 	rect.w = std::min(rect.w, target.w - lt - rt);
 	rect.h = std::min(rect.h, target.h - up - dn);
@@ -331,7 +332,7 @@ void BasicVideoSpec::setBorderColor(unsigned color) noexcept {
 /*==================================================================*/
 
 void BasicVideoSpec::prepareWindowTexture() noexcept(false) {
-	const auto fullViewportFrame{ mCurViewport.padded() };
+	const auto fullViewportFrame = mCurViewport.padded();
 
 	if (to_Frame(mWindowTexture) != fullViewportFrame)
 	{
@@ -370,15 +371,15 @@ void BasicVideoSpec::renderViewport() noexcept(false) {
 	if (mWindowTexture) {
 		SDL_SetRenderTarget(mMainRenderer, mWindowTexture);
 
-		const RGBA Color{ mOutlineColor.load(mo::acquire) };
+		const RGBA Color = mOutlineColor.load(mo::acquire);
 		SDL_SetRenderDrawColor(mMainRenderer, Color.R, Color.G, Color.B, SDL_ALPHA_OPAQUE);
-		const auto outerFRect{ to_FRect(mCurViewport.padded()) };
+		const auto outerFRect = to_FRect(mCurViewport.padded());
 		SDL_RenderFillRect(mMainRenderer, &outerFRect);
 	}
 
 	if (mSystemTexture) {
 		SDL_SetRenderDrawColor(mMainRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-		const auto innerFRect{ to_FRect(mCurViewport) };
+		const auto innerFRect = to_FRect(mCurViewport);
 		SDL_RenderFillRect(mMainRenderer, &innerFRect);
 
 		{
@@ -398,9 +399,9 @@ void BasicVideoSpec::renderViewport() noexcept(false) {
 			SDL_SetRenderDrawBlendMode(mMainRenderer, SDL_BLENDMODE_BLEND);
 			SDL_SetRenderDrawColor(mMainRenderer, 0, 0, 0, 0x20);
 
-			const auto outerFRect{ to_FRect(mCurViewport.padded()) };
-			const auto drawLimit{ int(outerFRect.h) };
-			for (auto y{ 0 }; y < drawLimit; y += mCurViewport.pxpad) {
+			const auto outerFRect = to_FRect(mCurViewport.padded());
+			const auto drawLimit = int(outerFRect.h);
+			for (auto y = 0; y < drawLimit; y += mCurViewport.pxpad) {
 				SDL_RenderLine(mMainRenderer,
 					outerFRect.x, float(y),
 					outerFRect.w, float(y));
@@ -419,7 +420,7 @@ bool BasicVideoSpec::renderPresent(bool core, const char* overlay_data) noexcept
 		renderViewport();
 		SDL_SetRenderTarget(mMainRenderer, nullptr);
 
-		const auto outerRect{ mCurViewport.rotate_if(mViewportRotation & 1).padded() };
+		const auto outerRect = mCurViewport.rotate_if(mViewportRotation & 1).padded();
 
 		FrontendInterface::NewFrame();
 		FrontendInterface::PrepareViewport(

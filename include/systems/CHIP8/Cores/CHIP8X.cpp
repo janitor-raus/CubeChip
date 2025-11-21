@@ -21,7 +21,6 @@ void CHIP8X::initializeSystem() noexcept {
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
 	copyFontToMemory(mMemoryBank.data(), 80);
 
-	mDisplay.set(cScreenSizeX, cScreenSizeY);
 	setViewportSizes(true, cScreenSizeX, cScreenSizeY, cResSizeMult, 2);
 	setBaseSystemFramerate(cRefreshRate);
 
