@@ -5,6 +5,7 @@
 */
 
 #include <fmt/ostream.h>
+#include <fmt/chrono.h>
 
 #include <cstdint>
 #include <filesystem>
@@ -20,7 +21,7 @@
 /*==================================================================*/
 
 static auto monotonicCount() noexcept {
-	static std::atomic<std::uint32_t> counter{ 1 };
+	static std::atomic<std::uint32_t> counter = 1;
 	return counter.fetch_add(1, std::memory_order::relaxed);
 }
 
@@ -34,12 +35,12 @@ LogEntry<LogLevelType>::LogEntry(
 	const void* userdata,
 	std::string message
 ) noexcept
-	: hash { std::hash<std::thread::id>{}(std::this_thread::get_id()) }
-	, time { Millis::raw() }
-	, index{ index }
-	, level{ level }
-	, userdata{ userdata }
-	, message { std::move(message) }
+	: hash    (std::hash<std::thread::id>()(std::this_thread::get_id()))
+	, time    (Millis::raw())
+	, index   (index)
+	, level   (level)
+	, userdata(userdata)
+	, message (std::move(message))
 {}
 
 /*==================================================================*/
@@ -59,7 +60,7 @@ class LoggerInstance {
 	LogBufferT mLogBuffer;
 
 	bool testFlushSize() const noexcept {
-		const auto head{ mLogBuffer.head() };
+		const auto head = mLogBuffer.head();
 		return head >= mLastFlushPos && \
 			head - mLastFlushPos >= (mLogBuffer.size() / 2);
 	}
@@ -71,7 +72,7 @@ class LoggerInstance {
 	void flushLogBuffer() noexcept{
 		if (!mLogFile) { return; }
 
-		const auto snapshot{ mLogBuffer.snapshot(0, mLastFlushPos).fast() };
+		const auto snapshot = mLogBuffer.snapshot(0, mLastFlushPos).fast();
 		if (snapshot.size() == 0) { mLastFlushTime = Millis::now(); return; }
 		for (const auto& entry : snapshot) {
 			fmt::print(mLogFile, "{0}) {1} {3:>{2}} > {4}\n",
@@ -85,21 +86,28 @@ class LoggerInstance {
 	}
 
 	void createLog(const std::string& filename, const std::string& directory) noexcept {
+		#ifdef __APPLE__
+			blog.newEntry<BLOG::INF>(
+				"Logging started on {:%Y-%m-%d %H:%M:%S} ({})",
+				std::chrono::system_clock::now(),
+				"timezone not corrected on macOS");
+		#else
+			blog.newEntry<BLOG::INF>(
+				"Logging started on {:%Y-%m-%d %H:%M:%S}",
+				std::chrono::current_zone()->to_local(
+					std::chrono::system_clock::now()));
+		#endif
+
 		if (filename.empty() || directory.empty()) {
 			blog.newEntry<BLOG::ERR>(
 				"Log file name/path cannot be blank!");
 			return;
 		}
 
-		const auto newPath{ std::filesystem::path(directory) / filename };
+		const auto newPath = std::filesystem::path(directory) / filename;
 
 		mLogFile.open(newPath, std::ios::trunc);
-		if (mLogFile) {
-			using namespace std::chrono;
-			blog.newEntry<BLOG::INF>(
-				"Logging started on {:%Y-%m-%d %H:%M:%S}",
-				current_zone()->to_local(system_clock::now()));
-		} else {
+		if (!mLogFile) {
 			blog.newEntry<BLOG::ERR>(
 				"Unable to create new Log file: \"{}\"",
 				newPath.string());

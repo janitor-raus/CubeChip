@@ -30,16 +30,16 @@ private:
 	LEVEL value{};
 
 public:
-	static constexpr LEVEL DBG{ LEVEL::DBG };
-	static constexpr LEVEL INF{ LEVEL::INF };
-	static constexpr LEVEL WRN{ LEVEL::WRN };
-	static constexpr LEVEL ERR{ LEVEL::ERR };
-	static constexpr LEVEL FTL{ LEVEL::FTL };
+	static constexpr LEVEL DBG = LEVEL::DBG;
+	static constexpr LEVEL INF = LEVEL::INF;
+	static constexpr LEVEL WRN = LEVEL::WRN;
+	static constexpr LEVEL ERR = LEVEL::ERR;
+	static constexpr LEVEL FTL = LEVEL::FTL;
 
 	static constexpr auto LENGTH{ 7u }; // hardcoded for now
 
 	constexpr BLOG() noexcept = default;
-	constexpr BLOG(LEVEL level) noexcept : value{ level } {}
+	constexpr BLOG(LEVEL level) noexcept : value(level) {}
 
 	// Severity string representations
 	constexpr const char* to_string() const noexcept {
