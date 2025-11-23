@@ -35,27 +35,27 @@ using SharedPtr = std::shared_ptr<T>;
 	template <typename T>
 	class AtomSharedPtr {
 		mutable std::shared_mutex mLock;
-		SharedPtr mSharedPtr;
+		SharedPtr<T> mSharedPtr;
 
 	public:
 		AtomSharedPtr()
 			: mSharedPtr(nullptr)
 		{}
 
-		explicit AtomSharedPtr(const SharedPtr& new_ptr)
+		explicit AtomSharedPtr(const SharedPtr<T>& new_ptr)
 			: mSharedPtr(new_ptr)
 		{}
 
-		explicit AtomSharedPtr(SharedPtr&& new_ptr)
+		explicit AtomSharedPtr(SharedPtr<T>&& new_ptr)
 			: mSharedPtr(std::move(new_ptr))
 		{}
 
-		inline void store(const SharedPtr& new_ptr, std::memory_order = std::memory_order_seq_cst) {
+		inline void store(const SharedPtr<T>& new_ptr, std::memory_order = std::memory_order_seq_cst) {
 			std::unique_lock lock(mLock);
 			mSharedPtr = new_ptr;
 		}
 
-		inline void store(SharedPtr&& new_ptr, std::memory_order = std::memory_order_seq_cst) {
+		inline void store(SharedPtr<T>&& new_ptr, std::memory_order = std::memory_order_seq_cst) {
 			std::unique_lock lock(mLock);
 			mSharedPtr = std::move(new_ptr);
 		}
@@ -65,14 +65,14 @@ using SharedPtr = std::shared_ptr<T>;
 			return mSharedPtr;
 		}
 
-		auto exchange(const SharedPtr& new_ptr, std::memory_order = std::memory_order_seq_cst) {
+		auto exchange(const SharedPtr<T>& new_ptr, std::memory_order = std::memory_order_seq_cst) {
 			std::unique_lock lock(mLock);
 			auto old = mSharedPtr;
 			mSharedPtr = new_ptr;
 			return old;
 		}
 
-		auto exchange(SharedPtr&& new_ptr, std::memory_order = std::memory_order_seq_cst) {
+		auto exchange(SharedPtr<T>&& new_ptr, std::memory_order = std::memory_order_seq_cst) {
 			std::unique_lock lock(mLock);
 			auto old = std::move(mSharedPtr);
 			mSharedPtr = std::move(new_ptr);
