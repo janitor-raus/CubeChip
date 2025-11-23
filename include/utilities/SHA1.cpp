@@ -16,8 +16,8 @@
 
 /*==================================================================*/
 
-static constexpr std::size_t BLOCK_INTS  { 16 }; // number of 32-bit integers per SHA1 block
-static constexpr std::size_t BLOCK_BYTES { BLOCK_INTS * 4 };
+static constexpr std::size_t BLOCK_INTS  = 16; // number of 32-bit integers per SHA1 block
+static constexpr std::size_t BLOCK_BYTES = BLOCK_INTS * 4;
 
 inline static std::uint32_t blk(std::uint32_t* block, std::size_t i) {
 	return std::rotl(
@@ -86,11 +86,11 @@ inline static void R4(
 
 void SHA1::transform(std::uint32_t* block) {
 	// copy digest[] to working vars
-	auto a{ digest[0] };
-	auto b{ digest[1] };
-	auto c{ digest[2] };
-	auto d{ digest[3] };
-	auto e{ digest[4] };
+	auto a = digest[0];
+	auto b = digest[1];
+	auto c = digest[2];
+	auto d = digest[3];
+	auto e = digest[4];
 
 	// 4 rounds of 20 operations each, loop unrolled
 	R0(block, a, b, c, d, e,  0); R0(block, e, a, b, c, d,  1); R0(block, d, e, a, b, c,  2); R0(block, c, d, e, a, b,  3);
@@ -129,7 +129,7 @@ void SHA1::transform(std::uint32_t* block) {
 void SHA1::buffer_to_block(std::uint32_t* block) {
 
 	// convert the string (byte buffer) to a std::uint32_t array (MSB)
-	for (std::size_t i{ 0 }; i < BLOCK_INTS; ++i) {
+	for (std::size_t i = 0; i < BLOCK_INTS; ++i) {
 		block[i] = (buffer[4 * i + 3] & 0xFF)
 				 | (buffer[4 * i + 2] & 0xFF) <<  8
 				 | (buffer[4 * i + 1] & 0xFF) << 16
@@ -156,7 +156,7 @@ void SHA1::update(const std::string& s) {
 void SHA1::update(std::istream& is) {
 	while (true) {
 		char sbuf[BLOCK_BYTES]{};
-		const auto chunksize{ BLOCK_BYTES - buffer.size() };
+		const auto chunksize = BLOCK_BYTES - buffer.size();
 		is.read(sbuf, static_cast<std::streamsize>(chunksize));
 
 		buffer.append(sbuf, static_cast<std::size_t>(is.gcount()));
@@ -173,7 +173,7 @@ void SHA1::update(const char* data, std::size_t size) {
 	std::size_t offset{};
 
 	while (offset < size) {
-		const auto chunksize{ std::min(BLOCK_BYTES - buffer.size(), size - offset) };
+		const auto chunksize = std::min(BLOCK_BYTES - buffer.size(), size - offset);
 
 		buffer.append(data + offset, chunksize);
 		offset += chunksize;
@@ -189,11 +189,11 @@ void SHA1::update(const char* data, std::size_t size) {
 
 std::string SHA1::final() {
 	// total number of hashed bits
-	const auto total_bits{ (transforms * BLOCK_BYTES + buffer.size()) * 8 };
+	const auto total_bits = (transforms * BLOCK_BYTES + buffer.size()) * 8;
 
 	// add padding
 	buffer += static_cast<char>(0x80);
-	const std::size_t orig_size{ buffer.size() };
+	const std::size_t orig_size = buffer.size();
 	while (buffer.size() < BLOCK_BYTES)
 		{ buffer += static_cast<char>(0x00); }
 
@@ -202,7 +202,7 @@ std::string SHA1::final() {
 
 	if (orig_size > BLOCK_BYTES - 8) {
 		transform(block);
-		for (std::size_t i{ 0 }; i < BLOCK_INTS - 2; ++i)
+		for (std::size_t i = 0; i < BLOCK_INTS - 2; ++i)
 			{ block[i] = 0; }
 	}
 

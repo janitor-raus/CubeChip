@@ -48,8 +48,8 @@ class SlidingRingBuffer {
 	using self = SlidingRingBuffer;
 
 	alignas(HDIS) AtomSharedPtr<T>  mBuffer[N]{};
-	alignas(HDIS) Atom<std::size_t> mPushHead{ 0 };
-	alignas(HDIS) Atom<std::size_t> mReadHead{ 0 };
+	alignas(HDIS) Atom<std::size_t> mPushHead{};
+	alignas(HDIS) Atom<std::size_t> mReadHead{};
 	alignas(HDIS) mutable std::shared_mutex mGuard;
 
 public:

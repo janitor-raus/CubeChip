@@ -147,7 +147,7 @@ namespace EzMaths {
 	// Simple mirror folding function with repeating peaks
 	template<typename T>
 		requires (std::is_unsigned_v<T>)
-	inline constexpr T peak_mirror_fold(T value, std::size_t max) noexcept {
+	inline constexpr T peak_mirror_fold(T value, u64 max) noexcept {
 		auto wrapped = value % (max * 2);
 		return T(wrapped < max ? wrapped : (2 * max - 1) - wrapped);
 	}
