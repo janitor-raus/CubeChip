@@ -38,10 +38,10 @@ using Path = std::filesystem::path;
 using namespace std::string_literals;
 using namespace std::string_view_literals;
 
-inline constexpr auto KiB(size_type v) noexcept { return size_type(1024) * v; }
-inline constexpr auto MiB(size_type v) noexcept { return size_type(1024) * KiB(v); }
-inline constexpr auto GiB(size_type v) noexcept { return size_type(1024) * MiB(v); }
+inline constexpr auto KiB(unsigned long long v) noexcept { return 1024ull * v; }
+inline constexpr auto MiB(unsigned long long v) noexcept { return 1024ull * KiB(v); }
+inline constexpr auto GiB(unsigned long long v) noexcept { return 1024ull * MiB(v); }
 
-inline constexpr auto operator""_KiB(size_type v) noexcept { return KiB(v); }
-inline constexpr auto operator""_MiB(size_type v) noexcept { return MiB(v); }
-inline constexpr auto operator""_GiB(size_type v) noexcept { return GiB(v); }
+inline constexpr auto operator""_KiB(unsigned long long v) noexcept { return KiB(v); }
+inline constexpr auto operator""_MiB(unsigned long long v) noexcept { return MiB(v); }
+inline constexpr auto operator""_GiB(unsigned long long v) noexcept { return GiB(v); }
