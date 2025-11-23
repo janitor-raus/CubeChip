@@ -22,8 +22,8 @@ private:
 
 public:
 	template <std::integral Any_Int>
-	constexpr Phase(Any_Int value) noexcept : mPhase{ Byte_T(value) * (1.0 / 255.0) } {}
-	constexpr Phase(Float_T value) noexcept : mPhase{ value - int(value) } {}
+	constexpr Phase(Any_Int value) noexcept : mPhase(Byte_T(value) * (1.0 / 255.0)) {}
+	constexpr Phase(Float_T value) noexcept : mPhase(value - int(value)) {}
 	constexpr Phase() noexcept = default;
 
 	constexpr operator Float_T() const noexcept { return mPhase; }

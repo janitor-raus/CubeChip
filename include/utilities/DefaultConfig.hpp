@@ -34,12 +34,12 @@ namespace config {
 
 	template <typename T>
 	inline void set(toml::table& dst, std::string_view key, T src = T{}) {
-		auto* current{ &dst };
-		auto start{ key.begin() };
+		auto* current = &dst;
+		auto start = key.begin();
 
 		while (start != key.end()) {
-			auto end{ std::find(start, key.end(), '.') };
-			std::string_view subkey{ start, end };
+			auto end = std::find(start, key.end(), '.');
+			std::string_view subkey(start, end);
 
 			if (end == key.end()) {
 				current->insert_or_assign(subkey, src);

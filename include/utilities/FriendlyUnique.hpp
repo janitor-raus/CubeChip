@@ -21,7 +21,7 @@ public:
 	using element_type = UniqueType::element_type;
 	using deleter_type = UniqueType::deleter_type;
 
-	constexpr FriendlyUnique(T* ptr = nullptr) noexcept : mPtr{ ptr, D{} } {}
+	constexpr FriendlyUnique(T* ptr = nullptr) noexcept : mPtr(ptr, D()) {}
 	constexpr FriendlyUnique(FriendlyUnique&&) noexcept = default;
 	constexpr FriendlyUnique& operator=(FriendlyUnique&&) noexcept = default;
 	constexpr FriendlyUnique& operator=(T* ptr) noexcept { reset(ptr); return *this; }

@@ -12,7 +12,7 @@
 /*==================================================================*/
 
 static const auto sInitialApplicationTimestamp
-	{ std::chrono::steady_clock::now() };
+	= std::chrono::steady_clock::now();
 
 /*==================================================================*/
 
@@ -36,11 +36,11 @@ void Millis::sleep_for(unsigned long long millis) noexcept {
 void Millis::sleeplock_for(double millis) noexcept {
 	using namespace std::chrono;
 
-	const auto target{ steady_clock::now() + duration_cast
-		<nanoseconds>(duration<double, std::milli>(millis)) };
+	const auto target = steady_clock::now() + duration_cast
+		<nanoseconds>(duration<double, std::milli>(millis));
 
 	while (true) {
-		const auto cur_time{ steady_clock::now() };
+		const auto cur_time = steady_clock::now();
 		if (cur_time >= target) { return; }
 
 		if (target - cur_time >= microseconds(2300)) // avg sleep duration 99.5% < 2.3ms
@@ -55,7 +55,7 @@ void Millis::sleeplock_for(double millis) noexcept {
 #include <fmt/format.h>
 
 std::string NanoTime::format() const noexcept {
-	const auto total_secs{ nano / 1'000'000'000ll };
+	const auto total_secs = nano / 1'000'000'000ll;
 
 	return fmt::format("{}:{:02}:{:02}.{:03}",
 		total_secs / 3600ll, (total_secs / 60ll) % 60ll,

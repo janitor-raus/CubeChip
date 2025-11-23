@@ -43,9 +43,9 @@ auto SimpleTimer::reset() noexcept -> self& {
 /*==================================================================*/
 
 auto SimpleTimer::mark_lap() noexcept {
-	const auto current_time{ clock::now() };
+	const auto current_time = clock::now();
 
-	duration diff{ duration::zero() };
+	duration diff = duration::zero();
 	if (is_active()) {
 		if (is_paused()) {
 			diff = mTimerStop - mTimerStart - mPausedTime;

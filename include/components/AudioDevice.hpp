@@ -113,7 +113,7 @@ public:
 
 	[[nodiscard]]
 	Stream* at(signed key) noexcept {
-		auto it{ audioStreams.find(key) };
+		auto it = audioStreams.find(key);
 		return it != audioStreams.end() ? &it->second : nullptr;
 	}
 };

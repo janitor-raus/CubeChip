@@ -44,7 +44,7 @@ class SettingWrapper {
 public:
 	template <typename T>
 	SettingWrapper(T* ptr) noexcept
-		: mSettingPtr{ ptr }
+		: mSettingPtr(ptr)
 	{}
 
 	template <typename T>
@@ -85,4 +85,4 @@ concept VariantCompatible = requires
 template <typename T>
 	requires (VariantCompatible<T*, SettingVar>)
 inline auto makeSetting(const std::string& key, T* const ptr) noexcept
-	{ return std::pair{ key, SettingWrapper{ ptr } }; }
+	{ return std::pair(key, SettingWrapper(ptr)); }

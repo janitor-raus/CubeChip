@@ -30,7 +30,7 @@ enum BIC_Button : unsigned {
 	#pragma region BasicKeyboard Class
 
 class BasicKeyboard final {
-	static constexpr auto TOTALKEYS{ 0u + SDL_SCANCODE_COUNT };
+	static constexpr auto TOTALKEYS = 0u + SDL_SCANCODE_COUNT;
 
 	bool mOldState[TOTALKEYS]{};
 	bool mCurState[TOTALKEYS]{};

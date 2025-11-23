@@ -29,7 +29,7 @@ public:
 	template <typename T, std::size_t N>
 		requires (std::is_convertible_v<T, result_type> && N >= 16)
 	constexpr Well512(T(&seeds)[N]) noexcept {
-		for (auto i{ 0 }; i < 16; ++i) {
+		for (auto i = 0; i < 16; ++i) {
 			mState[i] = static_cast<result_type>(seeds[i]);
 		}
 	}

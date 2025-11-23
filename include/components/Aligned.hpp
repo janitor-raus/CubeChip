@@ -46,10 +46,9 @@ class AlignedTypeArrayDeleter {
 
 public:
 	constexpr AlignedTypeArrayDeleter() noexcept = default;
-	constexpr AlignedTypeArrayDeleter(std::size_t size) noexcept : mSize{ size } {}
+	constexpr AlignedTypeArrayDeleter(std::size_t size) noexcept : mSize(size) {}
 
-	void operator()(T* ptr) const
-		noexcept(std::is_nothrow_destructible_v<T>)
+	void operator()(T* ptr) const noexcept(std::is_nothrow_destructible_v<T>)
 	{
 		if (ptr) { std::destroy_n(EXEC_POLICY(unseq) ptr, mSize); }
 		::operator delete[](ptr, std::align_val_t(A));
@@ -147,7 +146,7 @@ public:
 	constexpr const_reference back()  const { return data()[size() - 1]; }
 
 	explicit AlignedContainer(memory_type&& memory_block, size_type size) noexcept
-		: pData{ std::move(memory_block) }, mSize{ size } {}
+		: pData(std::move(memory_block)), mSize(size) {}
 
 public:
 	constexpr reference at(size_type idx) {
@@ -210,7 +209,7 @@ private:
 	friend self allocate_n<T, A>(std::size_t) noexcept;
 
 	AlignedMemoryBlock(T* ptr, size_type size) noexcept
-		: mAllocated{ ptr, { size } }, mSize{ size }
+		: mAllocated(ptr, size), mSize(size)
 	{}
 
 	constexpr size_type clamp_element_construction_count(size_type count) const noexcept
@@ -259,7 +258,7 @@ public:
 		requires(std::is_default_constructible_v<T>)
 	{
 		if (has_valid_ptr() && !is_constructed()) {
-			const auto safe_count{ clamp_element_construction_count(count) };
+			const auto safe_count = clamp_element_construction_count(count);
 			std::uninitialized_value_construct_n(EXEC_POLICY(unseq)
 				mAllocated.get() + construct_count(), safe_count);
 			mOffset += safe_count;
@@ -279,7 +278,7 @@ public:
 		requires(std::is_default_constructible_v<T>)
 	{
 		if (has_valid_ptr() && !is_constructed()) {
-			const auto safe_count{ clamp_element_construction_count(count) };
+			const auto safe_count = clamp_element_construction_count(count);
 			std::uninitialized_default_construct_n(EXEC_POLICY(unseq)
 				mAllocated.get() + construct_count(), safe_count);
 			mOffset += safe_count;
@@ -300,7 +299,7 @@ public:
 		requires(std::is_copy_constructible_v<T> && std::is_convertible_v<V&&, T>)
 	{
 		if (has_valid_ptr() && !is_constructed()) {
-			const auto safe_count{ clamp_element_construction_count(count) };
+			const auto safe_count = clamp_element_construction_count(count);
 			std::uninitialized_fill_n(EXEC_POLICY(unseq)
 				mAllocated.get() + construct_count(), safe_count, std::forward<V>(value));
 			mOffset += safe_count;
@@ -323,7 +322,7 @@ public:
 		requires(std::is_copy_constructible_v<T> && std::is_convertible_v<V, T>)
 	{
 		if (has_valid_ptr() && !is_constructed()) {
-			const auto safe_count{ clamp_element_construction_count(count) };
+			const auto safe_count = clamp_element_construction_count(count);
 			if constexpr (std::is_same_v<T, V> && std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T>) {
 				std::memcpy(mAllocated.get() + construct_count(), from, safe_count * sizeof(T));
 			} else {
@@ -350,7 +349,7 @@ public:
 		requires(std::is_move_constructible_v<T> && std::is_convertible_v<V, T>)
 	{
 		if (has_valid_ptr() && !is_constructed()) {
-			const auto safe_count{ clamp_element_construction_count(count) };
+			const auto safe_count = clamp_element_construction_count(count);
 			if constexpr (std::is_same_v<T, V> && std::is_trivially_move_constructible_v<T> && std::is_trivially_destructible_v<T>) {
 				std::memmove(mAllocated.get() + construct_count(), from, safe_count * sizeof(T));
 			} else {
@@ -380,7 +379,8 @@ inline AlignedMemoryBlock<T, A> allocate_n(std::size_t size) noexcept {
 	static_assert(A <= MAX_ALIGN,
 		"Exceeded maximum allowed alignment.");
 
-	void* ptr{ size ? ::operator new[](size * sizeof(T), std::align_val_t(A), std::nothrow) : nullptr };
+	void* ptr = !size ? nullptr : ::operator new[](
+		size * sizeof(T), std::align_val_t(A), std::nothrow);
 	return { static_cast<T*>(ptr), { ptr != nullptr ? size : 0 } };
 }
 

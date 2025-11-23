@@ -33,7 +33,7 @@ struct TransienceGain {
 
 	constexpr TransienceGain() noexcept = default;
 	constexpr TransienceGain(bool intro, bool outro, bool fallback) noexcept
-		: intro{ intro }, outro{ outro }, fallback{ fallback }
+		: intro(intro), outro(outro), fallback(fallback)
 	{}
 
 	constexpr auto calculate(unsigned sample_idx, float step = 0.01f) const noexcept {
@@ -91,7 +91,7 @@ public:
 	void* userdata{};
 
 	Voice(float master_gain = 0.2f) noexcept
-		: mVolumeGain{ 1.0f }
+		: mVolumeGain(1.0f)
 	{ setMasterGain(master_gain); }
 
 	// Get the volume of the voice, in range of: [0..1]
@@ -138,7 +138,7 @@ struct GeneratorBundle {
 	Voice* voice;
 
 	GeneratorBundle(SampleGenerator p, Voice* v) noexcept
-		: functor{ p }, voice{ v }
+		: functor(p), voice(v)
 	{}
 
 	template <IsContiguousContainerOf<float> T>

@@ -14,11 +14,11 @@ const char* getHomePath(
 	const char* org,
 	const char* app
 ) noexcept {
-	static auto* homePath{ SDL_GetPrefPath(org, app) };
+	static auto* homePath = SDL_GetPrefPath(org, app);
 	return homePath;
 }
 
 const char* getBasePath() noexcept {
-	static auto* basePath{ SDL_GetBasePath() };
+	static auto* basePath = SDL_GetBasePath();
 	return basePath;
 }

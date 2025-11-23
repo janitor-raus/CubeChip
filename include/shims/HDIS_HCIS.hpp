@@ -17,11 +17,11 @@
 #endif
 
 #ifdef __cpp_lib_hardware_interference_size
-	constexpr static auto HDIS{ std::hardware_destructive_interference_size };
-	constexpr static auto HCIS{ std::hardware_constructive_interference_size };
+	constexpr static auto HDIS = std::hardware_destructive_interference_size;
+	constexpr static auto HCIS = std::hardware_constructive_interference_size;
 #else
-	constexpr static auto HDIS{ std::size_t(64) };
-	constexpr static auto HCIS{ std::size_t(64) };
+	constexpr static auto HDIS = std::size_t(64);
+	constexpr static auto HCIS = std::size_t(64);
 #endif
 
 #if defined(__GNUC__) && !defined(__clang__)

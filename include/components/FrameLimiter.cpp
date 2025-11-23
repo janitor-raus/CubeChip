@@ -15,7 +15,7 @@
 static constexpr auto millis = std::chrono::milliseconds(1);
 
 // 99.5% of 1ms sleeps measure below this value
-static constexpr auto spin_threshold{ 2.3f };
+static constexpr auto spin_threshold = 2.3f;
 
 static auto current_time() noexcept { return std::chrono::steady_clock::now(); }
 
@@ -64,7 +64,7 @@ auto FrameLimiter::getElapsedMicrosSince() const noexcept {
 /*==================================================================*/
 
 bool FrameLimiter::hasTargetPeriodElapsed() noexcept {
-	const auto currentTimePoint{ current_time() };
+	const auto currentTimePoint = current_time();
 
 	if (!doneFirstRunSetup) [[unlikely]] {
 		previousFrameTime = currentTimePoint;

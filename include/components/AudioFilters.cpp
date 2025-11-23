@@ -13,12 +13,12 @@ LowPassFilter::LowPassFilter(float sampleRate, float cutoffFreq) noexcept
 	{ setCoefficient(sampleRate, cutoffFreq); }
 
 void LowPassFilter::setCoefficient(float sampleRate, float cutoffFreq) noexcept {
-	if (sampleRate <= 1.0f)
-		{ mCoefficient = 0.0f; }
-	else {
-		const auto dt{ 1.0f / sampleRate };
-		const auto rc{ 1.0f / (2.0f * float(std::numbers::pi) \
-			* (cutoffFreq ? cutoffFreq : sampleRate * 0.01f)) };
+	if (sampleRate <= 1.0f) {
+		mCoefficient = 0.0f;
+	} else {
+		const auto dt = 1.0f / sampleRate;
+		const auto rc = 1.0f / (2.0f * float(std::numbers::pi) \
+			* (cutoffFreq ? cutoffFreq : sampleRate * 0.01f));
 		mCoefficient = dt / (rc + dt);
 	}
 }
@@ -41,9 +41,9 @@ void HighPassFilter::setCoefficient(float sampleRate, float cutoffFreq) noexcept
 	if (sampleRate <= 1.0f)
 		{ mCoefficient = 0.0f; }
 	else {
-		const auto dt{ 1.0f / sampleRate };
-		const auto rc{ 1.0f / (2.0f * float(std::numbers::pi) \
-			* (cutoffFreq ? cutoffFreq : sampleRate * 0.01f)) };
+		const auto dt = 1.0f / sampleRate;
+		const auto rc = 1.0f / (2.0f * float(std::numbers::pi) \
+			* (cutoffFreq ? cutoffFreq : sampleRate * 0.01f));
 		mCoefficient = rc / (rc + dt);
 	}
 }
@@ -51,7 +51,7 @@ void HighPassFilter::setCoefficient(float sampleRate, float cutoffFreq) noexcept
 float HighPassFilter::filterSample(float sample) noexcept {
 	if (mCoefficient <= 0.0f) { return sample; }
 	else [[likely]] {
-		const auto output{ mCoefficient * (mLastSampleO + sample - mLastSampleI) };
+		const auto output = mCoefficient * (mLastSampleO + sample - mLastSampleI);
 		mLastSampleI = sample;
 		mLastSampleO = output;
 		return output;

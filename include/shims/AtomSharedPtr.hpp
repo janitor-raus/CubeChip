@@ -30,6 +30,7 @@ using SharedPtr = std::shared_ptr<T>;
 	/*
 		Semi-functional mutex-based stub for unfortunate situations where
 		std::atomic<std::shared_ptr<T>> is not yet officially supported
+		despite alleged C++20 compliance. Looking at you, MacOS.
 	*/
 	template <typename T>
 	class AtomSharedPtr {
@@ -38,15 +39,15 @@ using SharedPtr = std::shared_ptr<T>;
 
 	public:
 		AtomSharedPtr()
-			: mSharedPtr{ nullptr }
+			: mSharedPtr(nullptr)
 		{}
 
 		explicit AtomSharedPtr(const SharedPtr& new_ptr)
-			: mSharedPtr{ new_ptr }
+			: mSharedPtr(new_ptr)
 		{}
 
 		explicit AtomSharedPtr(SharedPtr&& new_ptr)
-			: mSharedPtr{ std::move(new_ptr) }
+			: mSharedPtr(std::move(new_ptr))
 		{}
 
 		inline void store(const SharedPtr& new_ptr, std::memory_order = std::memory_order_seq_cst) {
@@ -66,14 +67,14 @@ using SharedPtr = std::shared_ptr<T>;
 
 		auto exchange(const SharedPtr& new_ptr, std::memory_order = std::memory_order_seq_cst) {
 			std::unique_lock lock(mLock);
-			auto old{ mSharedPtr };
+			auto old = mSharedPtr;
 			mSharedPtr = new_ptr;
 			return old;
 		}
 
 		auto exchange(SharedPtr&& new_ptr, std::memory_order = std::memory_order_seq_cst) {
 			std::unique_lock lock(mLock);
-			auto old{ std::move(mSharedPtr) };
+			auto old = std::move(mSharedPtr);
 			mSharedPtr = std::move(new_ptr);
 			return old;
 		}

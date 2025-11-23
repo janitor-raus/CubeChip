@@ -100,22 +100,22 @@ namespace EzMaths {
 
 namespace EzMaths {
 	inline constexpr auto intersect(const Rect& lhs, const Rect& rhs) noexcept {
-		auto x1{ std::max(lhs.x, rhs.x) };
-		auto y1{ std::max(lhs.y, rhs.y) };
-		auto x2{ std::min(lhs.x + lhs.w, rhs.x + rhs.w) };
-		auto y2{ std::min(lhs.y + lhs.h, rhs.y + rhs.h) };
+		auto x1 = std::max(lhs.x, rhs.x);
+		auto y1 = std::max(lhs.y, rhs.y);
+		auto x2 = std::min(lhs.x + lhs.w, rhs.x + rhs.w);
+		auto y2 = std::min(lhs.y + lhs.h, rhs.y + rhs.h);
 
-		auto w{ std::max(0, x2 - x1) };
-		auto h{ std::max(0, y2 - y1) };
-		auto x{ w > 0 ? x1 : 0 };
-		auto y{ h > 0 ? y1 : 0 };
+		auto w = std::max(0, x2 - x1);
+		auto h = std::max(0, y2 - y1);
+		auto x = w > 0 ? x1 : 0;
+		auto y = h > 0 ? y1 : 0;
 
 		return Rect(x, y, w, h);
 	}
 
 	inline constexpr auto distance(const Point& lhs, const Point& rhs) noexcept {
-		s64 dx{ lhs.x - rhs.x };
-		s64 dy{ lhs.y - rhs.y };
+		s64 dx = lhs.x - rhs.x;
+		s64 dy = lhs.y - rhs.y;
 		return u64(dx * dx) + u64(dy * dy);
 	}
 }
@@ -148,7 +148,7 @@ namespace EzMaths {
 	template<typename T>
 		requires (std::is_unsigned_v<T>)
 	inline constexpr T peak_mirror_fold(T value, std::size_t max) noexcept {
-		auto wrapped{ value % (max * 2) };
+		auto wrapped = value % (max * 2);
 		return T(wrapped < max ? wrapped : (2 * max - 1) - wrapped);
 	}
 }
@@ -170,7 +170,7 @@ namespace EzMaths {
 
 	template <std::integral T>
 	inline constexpr T fixedLerpN(T x, T y, Weight w, T full_hue, T half_hue) noexcept {
-		const auto shortest{ (y - x + half_hue) % full_hue - half_hue };
+		const auto shortest = (y - x + half_hue) % full_hue - half_hue;
 		return T((x + T(shortest * w.as_fp()) + full_hue) % full_hue);
 	}
 }

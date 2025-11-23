@@ -39,13 +39,13 @@ struct alignas(4) RGBA {
 
 	constexpr RGBA() noexcept = default;
 	constexpr RGBA(Packed color) noexcept
-		: R{ u8(color >> 24) }
-		, G{ u8(color >> 16) }
-		, B{ u8(color >>  8) }
-		, A{ u8(color >>  0) }
+		: R(u8(color >> 24))
+		, G(u8(color >> 16))
+		, B(u8(color >>  8))
+		, A(u8(color >>  0))
 	{}
 	constexpr RGBA(u8 R, u8 G, u8 B, u8 A = Opaque) noexcept
-		: R{ R }, G{ G }, B{ B }, A{ A }
+		: R(R), G(G), B(B), A(A)
 	{}
 
 	constexpr Packed RGB_()     const noexcept { return R << 24 | G << 16 | B << 8 | Opaque; }
@@ -76,8 +76,8 @@ struct alignas(4) RGBA {
 		[[nodiscard]] static constexpr
 		auto x8(T x) noexcept { return u8(~x); }
 
-		static constexpr auto MIN{   0 };
-		static constexpr auto MAX{ 255 };
+		static constexpr auto MIN =   0;
+		static constexpr auto MAX = 255;
 
 	public:
 		[[nodiscard]] static constexpr
@@ -206,7 +206,7 @@ struct alignas(4) RGBA {
 	 */
 	[[nodiscard]] static constexpr
 	RGBA compositeBlend(RGBA src, RGBA dst, BlendFunc func, Weight weight = Opaque) noexcept {
-		if (auto alpha{ ez::fixedMul8(src.A, weight) }) [[likely]]
+		if (auto alpha = ez::fixedMul8(src.A, weight)) [[likely]]
 			{ return blendWeightedAlpha(channelBlend(src, dst, func), dst, alpha); }
 		return dst;
 	}
@@ -255,8 +255,8 @@ struct alignas(4) HSV {
 	using Packed = ez::u32;
 	using Weight = ez::Weight;
 
-	static constexpr auto full_hue{ Type_H(0x600u) };
-	static constexpr auto half_hue{ Type_H(full_hue >> 1) };
+	static constexpr auto full_hue = Type_H(0x600u);
+	static constexpr auto half_hue = Type_H(full_hue >> 1);
 
 	Type_H H{};
 	Type_S S{};
@@ -264,12 +264,12 @@ struct alignas(4) HSV {
 
 	constexpr HSV() noexcept = default;
 	constexpr HSV(Packed color) noexcept
-		: H{ Type_H(color >> 16) }
-		, S{ Type_S(color >>  8) }
-		, V{ Type_V(color >>  0) }
+		: H(Type_H(color >> 16))
+		, S(Type_S(color >>  8))
+		, V(Type_V(color >>  0))
 	{}
 	constexpr HSV(Type_H H, Type_S S, Type_V V) noexcept
-		: H{ H }, S{ S }, V{ V }
+		: H(H), S(S), V(V)
 	{}
 
 	constexpr operator Packed() const noexcept { return Packed(H) << 16 | S << 8 | V; }
@@ -292,7 +292,7 @@ struct OKLAB {
 
 	constexpr OKLAB() noexcept = default;
 	constexpr OKLAB(Type_F L, Type_F A, Type_F B) noexcept
-		: L{ L }, A{ A }, B{ B }
+		: L(L), A(A), B(B)
 	{}
 
 	static CONSTEXPR_MATH Type_F gamma_def(Type_F x) noexcept {
@@ -324,12 +324,12 @@ struct OKLCH {
 
 	constexpr OKLCH() noexcept = default;
 	constexpr OKLCH(Type_F L, Type_F C, Type_F H) noexcept
-		: L{ L }, C{ C }, H{ H }
+		: L(L), C(C), H(H)
 	{}
 
 	static constexpr OKLCH lerp(OKLCH x, OKLCH y, Weight w) noexcept {
-		const auto delta{ ez::fmod(y.H - x.H + \
-			std::numbers::pi * 3, std::numbers::pi * 2) - std::numbers::pi };
+		const auto delta = ez::fmod(y.H - x.H + \
+			std::numbers::pi * 3, std::numbers::pi * 2) - std::numbers::pi;
 		return OKLCH(
 			std::lerp(x.L, y.L, w.as_fp()),
 			std::lerp(x.C, y.C, w.as_fp()),
@@ -348,14 +348,14 @@ struct OKLCH {
 /*==================================================================*/
 
 inline constexpr HSV to_HSV(RGBA in) noexcept {
-	const auto maxV{ std::max({ in.R, in.G, in.B }) };
-	const auto minV{ std::min({ in.R, in.G, in.B }) };
-	const auto diff{ maxV - minV };
+	const auto maxV = std::max({ in.R, in.G, in.B });
+	const auto minV = std::min({ in.R, in.G, in.B });
+	const auto diff = maxV - minV;
 
 	if (diff == 0)
 		{ return HSV(0, 0, maxV); }
 
-	auto hueV{ 0 };
+	auto hueV = 0;
 
 	/**/ if (maxV == in.R)
 		{ hueV = 0x000 + ((in.G - in.B) * 0x100 / diff); }
@@ -372,11 +372,11 @@ inline constexpr RGBA to_RGBA(HSV in) noexcept {
 	if (in.S == 0x00) [[unlikely]]
 		{ return RGBA(in.V, in.V, in.V); }
 
-	const auto hueV{ in.H & 0xFF };
+	const auto hueV = in.H & 0xFF;
 
-	const auto valP{ RGBA::u8((in.V * (0x00FF - in.S)                  + 0x007F) / 0x00FF) };
-	const auto valQ{ RGBA::u8((in.V * (0xFF00 - in.S *          hueV)  + 0x7FFF) / 0xFF00) };
-	const auto valT{ RGBA::u8((in.V * (0xFF00 - in.S * (0x100 - hueV)) + 0x7FFF) / 0xFF00) };
+	const auto valP = RGBA::u8((in.V * (0x00FF - in.S)                  + 0x007F) / 0x00FF);
+	const auto valQ = RGBA::u8((in.V * (0xFF00 - in.S *          hueV)  + 0x7FFF) / 0xFF00);
+	const auto valT = RGBA::u8((in.V * (0xFF00 - in.S * (0x100 - hueV)) + 0x7FFF) / 0xFF00);
 
 	switch (in.H >> 8) {
 		case 0:  return RGBA(in.V, valT, valP);
@@ -390,13 +390,13 @@ inline constexpr RGBA to_RGBA(HSV in) noexcept {
 }
 
 inline CONSTEXPR_MATH OKLAB to_OKLAB(RGBA in) noexcept {
-	const auto R{ OKLAB::gamma_def(in.R / 255.0f) };
-	const auto G{ OKLAB::gamma_def(in.G / 255.0f) };
-	const auto B{ OKLAB::gamma_def(in.B / 255.0f) };
+	const auto R = OKLAB::gamma_def(in.R / 255.0f);
+	const auto G = OKLAB::gamma_def(in.G / 255.0f);
+	const auto B = OKLAB::gamma_def(in.B / 255.0f);
 
-	const auto L{ std::cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B) };
-	const auto M{ std::cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B) };
-	const auto S{ std::cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B) };
+	const auto L = std::cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B);
+	const auto M = std::cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B);
+	const auto S = std::cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
 
 	return OKLAB(
 		0.2104542553 * L + 0.7936177850 * M - 0.0040720468 * S,
@@ -418,13 +418,13 @@ inline CONSTEXPR_MATH OKLCH to_OKLCH(RGBA in) noexcept {
 }
 
 inline CONSTEXPR_MATH RGBA to_RGBA(OKLAB in) noexcept {
-	const auto L{ std::pow(in.L + in.A * 0.39633778 + in.B * 0.21580376, 3.0) };
-	const auto M{ std::pow(in.L - in.A * 0.10556113 - in.B * 0.06385417, 3.0) };
-	const auto S{ std::pow(in.L - in.A * 0.08948418 - in.B * 1.29148554, 3.0) };
+	const auto L = std::pow(in.L + in.A * 0.39633778 + in.B * 0.21580376, 3.0);
+	const auto M = std::pow(in.L - in.A * 0.10556113 - in.B * 0.06385417, 3.0);
+	const auto S = std::pow(in.L - in.A * 0.08948418 - in.B * 1.29148554, 3.0);
 
-	const auto R{ +4.07674 * L - 3.30771 * M + 0.23097 * S };
-	const auto G{ -1.26844 * L + 2.60976 * M - 0.34132 * S };
-	const auto B{ -0.00439 * L - 0.70342 * M + 1.70758 * S };
+	const auto R = +4.07674 * L - 3.30771 * M + 0.23097 * S;
+	const auto G = -1.26844 * L + 2.60976 * M - 0.34132 * S;
+	const auto B = -0.00439 * L - 0.70342 * M + 1.70758 * S;
 
 	return RGBA(
 		RGBA::u8(ez::round(255.0 * OKLAB::gamma_inv(R))),

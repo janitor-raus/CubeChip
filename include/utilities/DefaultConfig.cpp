@@ -23,9 +23,9 @@ auto config::writeToFile(
 auto config::parseFromFile(
 	const char* filename
 ) noexcept -> toml::parse_result {
-	const auto rawData{ ::readFileData(filename ? filename : "") };
-	const std::string_view tableData{ rawData
-		? std::string_view{ rawData.value().data(), rawData.value().size() } : "" };
+	const auto rawData = ::readFileData(filename ? filename : "");
+	const std::string_view tableData = !rawData ? "" :
+		std::string_view(rawData.value().data(), rawData.value().size());
 
 	return toml::parse(tableData);
 }
@@ -34,7 +34,7 @@ auto config::parseFromFile(
 
 void config::safeTableUpdate(toml::table& dst, const toml::table& src) {
 	for (auto&& [key, dst_val] : dst) {
-		if (const auto* src_val{ src.get(key) }) {
+		if (const auto* src_val = src.get(key)) {
 			if (dst_val.is_table() && src_val->is_table()) {
 				safeTableUpdate(*dst_val.as_table(), *src_val->as_table());
 			} else {
@@ -49,7 +49,7 @@ void config::safeTableUpdate(toml::table& dst, const toml::table& src) {
 
 void config::safeTableInsert(toml::table& dst, const toml::table& src) {
 	for (auto&& [key, src_val] : src) {
-		if (auto it{ dst.find(key) }; it == dst.end()) {
+		if (auto it = dst.find(key); it == dst.end()) {
 			if (src_val.is_table())
 				{dst.insert(key, *src_val.as_table());}
 			else

@@ -32,23 +32,20 @@ bool AudioDevice::addAudioStream(
 ) {
 	SDL_AudioSpec spec{ SDL_AUDIO_F32, signed(channels), signed(frequency) };
 
-	auto* ptr{ SDL_OpenAudioDeviceStream(
-		device ? device : SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK
-		, &spec, nullptr, nullptr) };
+	auto* ptr = SDL_OpenAudioDeviceStream(
+		device ? device : SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr);
 
 	if (!ptr) {
 		blog.newEntry<BLOG::WRN>("Failed to open audio stream: {}", SDL_GetError());
 		return false;
 	}
 
-	if (auto slot{ at(streamID) }) {
+	if (auto slot = at(streamID)) {
 		*slot = Stream(ptr, spec.format, spec.freq, spec.channels);
 		return true;
 	} else {
-		auto result{ audioStreams.try_emplace(streamID,
-			ptr, spec.format, spec.freq, spec.channels) };
-
-		return result.second;
+		return (audioStreams.try_emplace(streamID, ptr,
+			spec.format, spec.freq, spec.channels)).second;
 	}
 }
 
@@ -74,10 +71,10 @@ AudioDevice::Stream::Stream(
 	SDL_AudioStream* ptr,
 	unsigned format, unsigned freq, unsigned channels
 ) noexcept
-	: ptr     { ptr      }
-	, format  { format   }
-	, freq    { freq     }
-	, channels{ channels }
+	: ptr     (ptr     )
+	, format  (format  )
+	, freq    (freq    )
+	, channels(channels)
 {}
 
 auto AudioDevice::Stream::getSpec() const noexcept -> SDL_AudioSpec {
@@ -85,7 +82,7 @@ auto AudioDevice::Stream::getSpec() const noexcept -> SDL_AudioSpec {
 }
 
 bool AudioDevice::Stream::isPaused() const noexcept {
-	const auto deviceID{ SDL_GetAudioStreamDevice(ptr) };
+	const auto deviceID = SDL_GetAudioStreamDevice(ptr);
 	return deviceID ? SDL_AudioDevicePaused(deviceID) : true;
 }
 
@@ -101,9 +98,9 @@ float AudioDevice::Stream::getRawSampleRate(float framerate) const noexcept {
 unsigned AudioDevice::Stream::getNextBufferSize(float framerate) noexcept {
 	if (framerate < 1.0f) { return 0u; }
 
-	static constexpr auto scale_factor{ 1ull << 24 };
+	static constexpr auto scale_factor = 1ull << 24;
 	::assign_cast_add(accumulator, freq / framerate * scale_factor);
-	const auto sample_amount{ accumulator >> 24 };
+	const auto sample_amount = accumulator >> 24;
 	::assign_cast_and(accumulator, scale_factor - 1);
 
 	return unsigned(sample_amount * channels);

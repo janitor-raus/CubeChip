@@ -66,10 +66,10 @@ public:
 
 private:
 	void push_(std::size_t index, SharedPtr<T>&& ptr) noexcept {
-		std::shared_lock lock{ mGuard };
+		std::shared_lock lock(mGuard);
 		mBuffer[index & (N - 1)].store(std::move(ptr), mo::release);
 
-		auto expected{ head() };
+		auto expected = head();
 		while (expected < index && !mReadHead.compare_exchange_weak \
 			(expected, index, mo::acq_rel, mo::acquire)) {}
 	}
@@ -90,16 +90,16 @@ private:
 			: buf{ buf }, count{ count } {}
 
 		auto snapshot() const noexcept {
-			const auto head{ buf.head() };
+			const auto head = buf.head();
 			if (head == 0) { return std::vector<T>{}; }
 
-			const auto dist{ std::min(head + 1, N) };
-			const auto size{ count ? std::min(count, dist) : dist };
+			const auto dist = std::min(head + 1, N);
+			const auto size = count ? std::min(count, dist) : dist;
 
 			std::vector<T> output;
 			output.reserve(size);
 
-			for (std::size_t i{}; i < size; ++i)
+			for (std::size_t i = 0; i < size; ++i)
 				{ output.push_back(buf.at_(size - 1 - i, head)); }
 
 			return output;
@@ -117,7 +117,7 @@ private:
 		}
 
 		[[nodiscard]] auto safe() const noexcept {
-			std::unique_lock lock{ buf.mGuard };
+			std::unique_lock lock(buf.mGuard);
 			return snapshot();
 		}
 	};
@@ -129,19 +129,19 @@ private:
 
 		friend class SlidingRingBuffer;
 		ProxySnap_Range(const self& buf, std::size_t count, std::size_t begin) noexcept
-			: buf{ buf }, count{ count }, begin{ begin } {}
+			: buf(buf), count(count), begin(begin) {}
 
 		auto snapshot() const noexcept {
-			const auto head{ buf.head() };
+			const auto head = buf.head();
 			if (head == 0 || begin > head) { return std::vector<T>{}; }
 
-			const auto dist{ std::min((head - begin) + 1, N) };
-			const auto size{ count ? std::min(count, dist) : dist };
+			const auto dist = std::min((head - begin) + 1, N);
+			const auto size = count ? std::min(count, dist) : dist;
 
 			std::vector<T> output;
 			output.reserve(size);
 
-			for (std::size_t i{}; i < size; ++i)
+			for (std::size_t i = 0; i < size; ++i)
 				{ output.push_back(buf.at_(begin + i)); }
 
 			return output;
@@ -158,7 +158,7 @@ private:
 		}
 
 		[[nodiscard]] auto safe() const noexcept {
-			std::unique_lock lock{ buf.mGuard };
+			std::unique_lock lock(buf.mGuard);
 			return snapshot();
 		}
 	};
@@ -169,9 +169,9 @@ public:
 	 * @note This method is thread-safe, but cannot run concurrently with push() or safe_snapshot_*() calls.
 	 */
 	void clear_buffer() noexcept {
-		std::unique_lock lock{ mGuard };
+		std::unique_lock lock(mGuard);
 		const static auto sDefaultT
-			{ std::make_shared<T>(T{}) };
+			= std::make_shared<T>(T{});
 
 		for (auto& entry : mBuffer)
 			{ entry.store(sDefaultT, mo::relaxed); }

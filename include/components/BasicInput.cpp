@@ -22,7 +22,7 @@ void BasicKeyboard::updateStates() noexcept {
 void BasicMouse::updateStates() noexcept {
 	mOldState = mCurState;
 
-	const auto oldX{ mPosX }, oldY{ mPosY };
+	const auto oldX = mPosX, oldY = mPosY;
 	mCurState = SDL_GetMouseState(&mPosX, &mPosY);
 	mRelX = mPosX - oldX; mRelY = mPosY - oldY;
 }
