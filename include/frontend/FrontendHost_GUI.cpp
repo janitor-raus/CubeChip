@@ -16,6 +16,7 @@
 #include "BasicLogger.hpp"
 #include "Millis.hpp"
 #include "ColorOps.hpp"
+#include "Thread.hpp"
 
 #include <imgui.h>
 #include <ranges>
@@ -39,10 +40,15 @@ void FrontendHost::initializeInterface() noexcept {
 
 	static auto sMenu_File_Data = FrontendInterface::registerMenu("", "File",
 	[&]() noexcept {
-		if (ImGui::MenuItem("Open Data Folder...")) {
-			if (!SDL_OpenURL(HomeDirManager::getHomeDirectoryURL().c_str())) {
-				blog.newEntry<BLOG::ERR>("Failed to open Data folder! [{}]", SDL_GetError());
-			}
+		static std::atomic<bool> sOpeningURL{};
+		if (ImGui::MenuItem("Open Data Folder...", nullptr, nullptr, !sOpeningURL.load(mo::acquire))) {
+			sOpeningURL.store(true, mo::release);
+			Thread([url = HomeDirManager::getHomeDirectoryURL()]() noexcept {
+				if (!SDL_OpenURL(url.c_str())) {
+					blog.newEntry<BLOG::ERR>("Failed to open Data folder! [{}]", SDL_GetError());
+				}
+				sOpeningURL.store(false, mo::release);
+			}).detach();
 		}
 	});
 
