@@ -25,7 +25,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(PROJECT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
-set(PROJECT_VENDOR_DIR "${PROJECT_INCLUDE_DIR}/vendor")
+set(PROJECT_VENDOR_DIR "${CMAKE_BINARY_DIR}/include/vendor")
 
 include("cmake/_project_filelist.cmake")
 include("cmake/_vendor_utils.cmake")
@@ -74,7 +74,7 @@ target_include_directories(
 	"${PROJECT_INCLUDE_DIR}/services"
 	"${PROJECT_INCLUDE_DIR}/systems"
 	"${PROJECT_INCLUDE_DIR}/frontend"
-	"${PROJECT_VENDOR_DIR}/jthread" # hardcoded
+	"${PROJECT_INCLUDE_DIR}/vendor/jthread" # hardcoded
 )
 
 target_link_libraries(

@@ -301,11 +301,11 @@ public:
  *   - A swap buffer (for atomic publishing)
  *
  * The class provides single-shot access methods:
- *   - `read(Fn&&)` — locks the read buffer, invokes a callable with an
- *     `auto` argument exposing const access to the buffer and
- *     a compile-time `dirty` flag.
- *   - `write(Fn&&)` — locks the work buffer, invokes a callable with a
- *     mutable `auto&` argument, and publishes the buffer atomically
+ *   - read(Fn&&) - locks the read buffer, invokes a callable with an
+ *     auto argument exposing const access to the buffer and
+ *     a compile-time dirty flag.
+ *   - write(Fn&&) - locks the work buffer, invokes a callable with a
+ *     mutable auto& argument, and publishes the buffer atomically
  *     after the callable returns.
  *
  * Thread-safety:
@@ -371,8 +371,8 @@ public:
 	 * The callable is invoked with a single BufferView<DIRTY> argument,
 	 * and exposes the following access methods:
 	 *
-	 *   - dirty() — whether the buffer was updated (dirty) since the last read.
-	 *   - buffer() — returns a const reference to the underlying buffer object.
+	 *   - dirty() - whether the buffer was updated (dirty) since the last read.
+	 *   - buffer() - returns a const reference to the underlying buffer object.
 	 *
 	 * Callers are recommended to accept the argument as auto to handle both
 	 * BufferView<true> and BufferView<false> cases transparently.
@@ -382,7 +382,7 @@ public:
 	 *
 	 * @param function  The callable to execute under the read lock.
 	 *
-	 * @return decltype(auto) — forwards whatever the callable returns.
+	 * @return decltype(auto) - forwards whatever the callable returns.
 	 *
 	 * Thread-safety: The read buffer is locked for the entire duration
 	 *                of the callable.
@@ -425,7 +425,7 @@ public:
 	 *
 	 * @param function  The callable to execute under the work lock.
 	 *
-	 * @return decltype(auto) — forwards whatever the callable returns.
+	 * @return decltype(auto) - forwards whatever the callable returns.
 	 *
 	 * Thread-safety: The work buffer is locked for the entire duration of the
 	 *                callable and is published atomically afterward.

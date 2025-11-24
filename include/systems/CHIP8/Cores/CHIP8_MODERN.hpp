@@ -14,7 +14,7 @@
 /*==================================================================*/
 
 class CHIP8_MODERN final : public Chip8_CoreInterface {
-	static constexpr u32 cTotalMemory = 4_KiB;
+	static constexpr u64 cTotalMemory = 4_KiB;
 	static constexpr u32 cGameLoadPos =   512;
 	static constexpr u32 cStartOffset =   512;
 	static constexpr f32 cRefreshRate = 60.0f;
