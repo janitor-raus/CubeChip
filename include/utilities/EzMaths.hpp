@@ -34,7 +34,7 @@ namespace EzMaths {
 		s32 x{}, y{};
 
 		constexpr Point(s32 x = 0, s32 y = 0) noexcept
-			: x{ x }, y{ y }
+			: x(x), y(y)
 		{}
 
 		constexpr auto operator+(const Point& other) const noexcept
@@ -45,8 +45,8 @@ namespace EzMaths {
 		s32 w{}, h{};
 
 		constexpr Frame(s32 w = 0, s32 h = 0) noexcept
-			: w{ w < 0 ? 0 : w }
-			, h{ h < 0 ? 0 : h }
+			: w(w < 0 ? 0 : w)
+			, h(h < 0 ? 0 : h)
 		{}
 
 		constexpr auto area() const noexcept { return 1ull * w * h; }
@@ -84,8 +84,8 @@ namespace EzMaths {
 
 	public:
 		template <std::integral Int>
-		constexpr Weight(Int value) noexcept : mWeight{ u8(value) } {}
-		constexpr Weight(f64 value) noexcept : mWeight{ u8(value * 255.0) } {}
+		constexpr Weight(Int value) noexcept : mWeight(u8(value)) {}
+		constexpr Weight(f64 value) noexcept : mWeight(u8(value * 255.0)) {}
 
 		// Cast weight to floating-point [0..1] value
 		constexpr auto as_fp() const noexcept {
@@ -212,7 +212,7 @@ namespace EzMaths{
 		f32 value{};
 
 	public:
-		constexpr EMA() : value{ std::numeric_limits<f32>::quiet_NaN() } {}
+		constexpr EMA() : value(std::numeric_limits<f32>::quiet_NaN()) {}
 
 		constexpr void set_alpha(f32 v) noexcept
 			{ alpha = 2.0f / std::max(v, 0.0f); }

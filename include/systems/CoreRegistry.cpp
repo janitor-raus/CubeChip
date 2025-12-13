@@ -19,14 +19,14 @@ Json CoreRegistry::sCoreConfig{};
 
 bool CoreRegistry::validateProgramByHash(const char* fileData, size_type fileSize, const Str& fileSHA1) noexcept {
 	/* placeholder logic */
-	[[maybe_unused]] const auto& _1{ fileData };
-	[[maybe_unused]] const auto& _2{ fileSize };
-	[[maybe_unused]] const auto& _3{ fileSHA1 };
+	[[maybe_unused]] const auto& _1 = fileData;
+	[[maybe_unused]] const auto& _2 = fileSize;
+	[[maybe_unused]] const auto& _3 = fileSHA1;
 	return false;
 }
 
 bool CoreRegistry::validateProgramByType(const char* fileData, size_type fileSize, const Str& fileType) noexcept {
-	const auto matchingCores{ findEligibleCores(fileType) };
+	const auto matchingCores = findEligibleCores(fileType);
 
 	if (!matchingCores || matchingCores->empty()) {
 		blog.newEntry<BLOG::WRN>(
@@ -91,8 +91,8 @@ SystemInterface* CoreRegistry::constructCore(size_type idx) noexcept {
 }
 
 void CoreRegistry::loadProgramDB(const Path& dbPath) noexcept {
-	static const auto defaultPath{ ::getBasePath() / Path("programDB.json") };
-	const auto& checkPath{ dbPath.empty() ? defaultPath : dbPath };
+	static const auto defaultPath = ::getBasePath() / Path("programDB.json");
+	const auto& checkPath = dbPath.empty() ? defaultPath : dbPath;
 
 	if (!loadJsonFromFile(checkPath, sProgramDB)) {
 		sProgramDB.clear();

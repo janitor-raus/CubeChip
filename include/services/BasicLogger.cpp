@@ -77,7 +77,7 @@ class LoggerInstance {
 		for (const auto& entry : snapshot) {
 			fmt::print(mLogFile, "{0}) {1} {3:>{2}} > {4}\n",
 				entry.index, NanoTime(entry.time).format(),
-				BLOG::LENGTH, entry.level.to_string(), entry.message);
+				BLOG::STR_LEN, entry.level.to_string(), entry.message);
 		}
 
 		mLogFile.flush();

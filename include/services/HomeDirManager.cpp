@@ -31,7 +31,7 @@ HomeDirManager::HomeDirManager(
 	blog.createLog("program.log", sHomePath);
 
 	if (configName.empty()) { configName = "settings.toml"; }
-	sConfPath = (Path{ sHomePath } / configName).string();
+	sConfPath = (Path(sHomePath) / configName).string();
 }
 
 void HomeDirManager::triggerFatalError(const char* error) noexcept {
@@ -42,12 +42,12 @@ void HomeDirManager::triggerFatalError(const char* error) noexcept {
 
 bool HomeDirManager::isLocationWritable(const char* path) noexcept {
 	if (!path) { return false; }
-	const auto file{ Path{ path } / "__DELETE_ME__" };
-	std::ofstream test{ file };
+	const auto file = Path(path) / "__DELETE_ME__";
+	std::ofstream test(file);
 
 	if (test.is_open()) {
 		test.close();
-		const auto result{ fs::remove(file) };
+		const auto result = fs::remove(file);
 		return result && result.value();
 	} else {
 		return false;
@@ -78,7 +78,7 @@ bool HomeDirManager::setHomePath(StrV overrideHome, bool forcePortable, StrV org
 	}
 
 	if (::getBasePath()) {
-		const auto fileExists{ fs::exists(Path{ ::getBasePath() } / "portable.txt") };
+		const auto fileExists = fs::exists(Path(::getBasePath()) / "portable.txt");
 		if (fileExists && fileExists.value()) {
 			if (isLocationWritable(::getBasePath())) {
 				sHomePath = ::getBasePath();
@@ -103,7 +103,7 @@ bool HomeDirManager::setHomePath(StrV overrideHome, bool forcePortable, StrV org
 }
 
 void HomeDirManager::parseMainAppConfig() const noexcept {
-	if (const auto result{ config::parseFromFile(sConfPath.c_str()) }) {
+	if (const auto result = config::parseFromFile(sConfPath.c_str())) {
 		config::safeTableUpdate(sMainAppConfig, result.table());
 		blog.newEntry<BLOG::INF>(
 			"[TOML] App Config found, previous settings loaded!");
@@ -114,7 +114,7 @@ void HomeDirManager::parseMainAppConfig() const noexcept {
 }
 
 void HomeDirManager::writeMainAppConfig() const noexcept {
-	if (const auto result{ config::writeToFile(sMainAppConfig, sConfPath.c_str()) }) {
+	if (const auto result = config::writeToFile(sMainAppConfig, sConfPath.c_str())) {
 		blog.newEntry<BLOG::INF>(
 			"[TOML] App Config written to file successfully!");
 	} else {
@@ -124,17 +124,17 @@ void HomeDirManager::writeMainAppConfig() const noexcept {
 }
 
 void HomeDirManager::insertIntoMainAppConfig(const SettingsMap& map) const noexcept {
-	for (auto const& pair : map) {
-		const auto& key{ pair.first };
-		const auto& ref{ pair.second };
+	for (const auto& pair : map) {
+		const auto& key = pair.first;
+		const auto& ref = pair.second;
 		ref.visit([&](auto* ptr) { config::set(sMainAppConfig, key, *ptr); });
 	}
 }
 
 void HomeDirManager::updateFromMainAppConfig(const SettingsMap& map) const noexcept {
-	for (auto const& pair : map) {
-		const auto& key{ pair.first };
-		const auto& ref{ pair.second };
+	for (const auto& pair : map) {
+		const auto& key = pair.first;
+		const auto& ref = pair.second;
 		ref.visit([&](auto* ptr) { config::get(sMainAppConfig, key, *ptr); });
 	}
 }
@@ -151,18 +151,17 @@ HomeDirManager* HomeDirManager::initialize(
 const Path* HomeDirManager::addSystemDir(const Path& sub, const Path& sys) noexcept {
 	if (sub.empty()) { return nullptr; }
 
-	const auto newDirPath{ sHomePath / sys / sub };
+	const auto newDirPath = sHomePath / sys / sub;
 
-	const auto it{ std::find_if(EXEC_POLICY(unseq)
+	const auto it = std::find_if(EXEC_POLICY(unseq)
 		mDirectories.begin(), mDirectories.end(),
-		[&newDirPath](const Path& dirEntry) noexcept
-			{ return dirEntry == newDirPath; }
-	) };
+		[&](const Path& dirEntry) noexcept { return dirEntry == newDirPath; }
+	);
 
 	if (it != mDirectories.end())
 		{ return &(*it); }
 
-	if (const auto dirCreated{ fs::create_directories(newDirPath) }) {
+	if (const auto dirCreated = fs::create_directories(newDirPath)) {
 		mDirectories.push_back(newDirPath);
 		return &mDirectories.back();
 	} else {
@@ -179,7 +178,7 @@ void HomeDirManager::clearCachedFileData() noexcept {
 }
 
 bool HomeDirManager::validateGameFile(const Path& gamePath) noexcept {
-	const auto fileExists{ fs::is_regular_file(gamePath) };
+	const auto fileExists = fs::is_regular_file(gamePath);
 	if (!fileExists) {
 		blog.newEntry<BLOG::WRN>("Path is ineligible: \"{}\" [{}]",
 			gamePath.string(), fileExists.error().message());
@@ -191,7 +190,7 @@ bool HomeDirManager::validateGameFile(const Path& gamePath) noexcept {
 		return false;
 	}
 
-	const auto fileSize{ fs::file_size(gamePath) };
+	const auto fileSize = fs::file_size(gamePath);
 	if (!fileSize) {
 		blog.newEntry<BLOG::WRN>("Path is ineligible: \"{}\" [{}]",
 			gamePath.string(), fileExists.error().message());
@@ -206,7 +205,7 @@ bool HomeDirManager::validateGameFile(const Path& gamePath) noexcept {
 		return false;
 	}
 
-	auto fileData{ ::readFileData(gamePath) };
+	auto fileData = ::readFileData(gamePath);
 	if (!fileData) {
 		blog.newEntry<BLOG::WRN>("Path is ineligible: \"{}\" [{}]",
 			gamePath.string(), fileData.error().message());
@@ -215,7 +214,7 @@ bool HomeDirManager::validateGameFile(const Path& gamePath) noexcept {
 		mFileData = std::move(fileData.value());
 	}
 
-	const auto tempSHA1{ SHA1::from_data(getFileData(), getFileSize()) };
+	const auto tempSHA1 = SHA1::from_data(getFileData(), getFileSize());
 	blog.newEntry<BLOG::INF>("File SHA1: {}", tempSHA1);
 
 	if (sCheckGame(

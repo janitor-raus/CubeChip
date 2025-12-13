@@ -9,7 +9,7 @@
 #include <algorithm>
 
 #include "Concepts.hpp"
-#include "ColorOps.hpp"
+#include "Waveforms.hpp"
 #include "AudioDevice.hpp"
 
 /*==================================================================*/

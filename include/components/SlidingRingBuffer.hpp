@@ -39,7 +39,7 @@
  */
 template <typename T, std::size_t N = 8>
 	requires (std::is_nothrow_default_constructible_v<T>)
-class SlidingRingBuffer {
+class alignas(HDIS) SlidingRingBuffer {
 	static_assert(std::has_single_bit(N),
 		"Buffer size (N) must be a power of two.");
 	static_assert(N >= 16,
@@ -171,7 +171,7 @@ public:
 	void clear_buffer() noexcept {
 		std::unique_lock lock(mGuard);
 		const static auto sDefaultT
-			= std::make_shared<T>(T{});
+			= std::make_shared<T>();
 
 		for (auto& entry : mBuffer)
 			{ entry.store(sDefaultT, mo::relaxed); }
