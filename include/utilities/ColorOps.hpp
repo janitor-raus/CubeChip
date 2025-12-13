@@ -6,7 +6,10 @@
 
 #pragma once
 
-#include "Waveforms.hpp"
+#include <numbers>
+#include <cmath>
+#include <bit>
+
 #include "EzMaths.hpp"
 
 /*==================================================================*/
@@ -32,8 +35,12 @@ struct alignas(4) RGBA {
 	using Packed = ez::u32;
 	using Weight = ez::Weight;
 
-	static constexpr u8 Opaque{ 0xFF };
-	static constexpr u8 Transparent{ 0x00 };
+	static constexpr u8 Opaque_A = 0xFF;
+	static constexpr u8 Transparent_A = 0x0;
+
+	static constexpr Packed Transparent = 0x00000000;
+	static constexpr Packed Black = 0x000000FF;
+	static constexpr Packed White = 0xFFFFFFFF;
 
 	u8 R{}, G{}, B{}, A{};
 
@@ -44,23 +51,45 @@ struct alignas(4) RGBA {
 		, B(u8(color >>  8))
 		, A(u8(color >>  0))
 	{}
-	constexpr RGBA(u8 R, u8 G, u8 B, u8 A = Opaque) noexcept
+	constexpr RGBA(u8 R, u8 G, u8 B, u8 A = Opaque_A) noexcept
 		: R(R), G(G), B(B), A(A)
 	{}
 
-	constexpr Packed RGB_()     const noexcept { return R << 24 | G << 16 | B << 8 | Opaque; }
-	constexpr Packed RBG_()     const noexcept { return R << 24 | B << 16 | G << 8 | Opaque; }
-	constexpr Packed GRB_()     const noexcept { return G << 24 | R << 16 | B << 8 | Opaque; }
-	constexpr Packed GBR_()     const noexcept { return G << 24 | B << 16 | R << 8 | Opaque; }
-	constexpr Packed BRG_()     const noexcept { return B << 24 | R << 16 | G << 8 | Opaque; }
-	constexpr Packed BGR_()     const noexcept { return B << 24 | G << 16 | R << 8 | Opaque; }
+private:
+	constexpr Packed pack(u8 c1, u8 c2, u8 c3, u8 c4) const noexcept {
+		return (Packed(c1) << 24) | (Packed(c2) << 16) | (Packed(c3) << 8) | Packed(c4);
+	}
 
-	constexpr Packed RBGA()     const noexcept { return R << 24 | B << 16 | G << 8 | A; }
-	constexpr Packed GRBA()     const noexcept { return G << 24 | R << 16 | B << 8 | A; }
-	constexpr Packed GBRA()     const noexcept { return G << 24 | B << 16 | R << 8 | A; }
-	constexpr Packed BRGA()     const noexcept { return B << 24 | R << 16 | G << 8 | A; }
-	constexpr Packed BGRA()     const noexcept { return B << 24 | G << 16 | R << 8 | A; }
-	constexpr operator Packed() const noexcept { return R << 24 | G << 16 | B << 8 | A; }
+public:
+	constexpr Packed raw()      const noexcept { return std::bit_cast<Packed>(*this); }
+	constexpr operator Packed() const noexcept { return raw(); }
+
+	constexpr Packed XRGB()     const noexcept { return pack(Opaque_A, R, G, B); }
+	constexpr Packed XRBG()     const noexcept { return pack(Opaque_A, R, B, G); }
+	constexpr Packed XGRB()     const noexcept { return pack(Opaque_A, G, R, B); }
+	constexpr Packed XGBR()     const noexcept { return pack(Opaque_A, G, B, R); }
+	constexpr Packed XBRG()     const noexcept { return pack(Opaque_A, B, R, G); }
+	constexpr Packed XBGR()     const noexcept { return pack(Opaque_A, B, G, R); }
+
+	constexpr Packed RGBX()     const noexcept { return pack(R, G, B, Opaque_A); }
+	constexpr Packed RBGX()     const noexcept { return pack(R, B, G, Opaque_A); }
+	constexpr Packed GRBX()     const noexcept { return pack(G, R, B, Opaque_A); }
+	constexpr Packed GBRX()     const noexcept { return pack(G, B, R, Opaque_A); }
+	constexpr Packed BRGX()     const noexcept { return pack(B, R, G, Opaque_A); }
+	constexpr Packed BGRX()     const noexcept { return pack(B, G, R, Opaque_A); }
+
+	constexpr Packed ARGB()     const noexcept { return pack(A, R, G, B); }
+	constexpr Packed ARBG()     const noexcept { return pack(A, R, B, G); }
+	constexpr Packed AGRB()     const noexcept { return pack(A, G, R, B); }
+	constexpr Packed AGBR()     const noexcept { return pack(A, G, B, R); }
+	constexpr Packed ABRG()     const noexcept { return pack(A, B, R, G); }
+	constexpr Packed ABGR()     const noexcept { return pack(A, B, G, R); }
+
+	constexpr Packed RBGA()     const noexcept { return pack(R, B, G, A); }
+	constexpr Packed GRBA()     const noexcept { return pack(G, R, B, A); }
+	constexpr Packed GBRA()     const noexcept { return pack(G, B, R, A); }
+	constexpr Packed BRGA()     const noexcept { return pack(B, R, G, A); }
+	constexpr Packed BGRA()     const noexcept { return pack(B, G, R, A); }
 
 	static constexpr RGBA lerp(RGBA x, RGBA y, Weight w) noexcept {
 		return RGBA(
@@ -161,11 +190,11 @@ struct alignas(4) RGBA {
 	 */
 	[[nodiscard]] static constexpr
 	RGBA channelBlend(RGBA src, RGBA dst, BlendFunc func) noexcept {
-		return RGBA{
+		return RGBA(
 			func(src.R, dst.R),
 			func(src.G, dst.G),
 			func(src.B, dst.B)
-		};
+		);
 	}
 
 	/**
@@ -176,9 +205,9 @@ struct alignas(4) RGBA {
 	[[nodiscard]] static constexpr
 	RGBA blendAlpha(RGBA src, RGBA dst) noexcept {
 		switch (src.A) {
-			case Opaque:      return src;
-			case Transparent: return dst;
-			default:          return lerp(dst, src, src.A);
+			case Opaque_A:      return src;
+			case Transparent_A: return dst;
+			default:            return lerp(dst, src, src.A);
 		}
 	}
 
@@ -191,9 +220,9 @@ struct alignas(4) RGBA {
 	[[nodiscard]] static constexpr
 	RGBA blendWeightedAlpha(RGBA src, RGBA dst, Weight weight) noexcept {
 		switch (weight) {
-			case Opaque:      return src;
-			case Transparent: return dst;
-			default:          return lerp(dst, src, weight);
+			case Opaque_A:      return src;
+			case Transparent_A: return dst;
+			default:            return lerp(dst, src, weight);
 		}
 	}
 
@@ -205,7 +234,7 @@ struct alignas(4) RGBA {
 	 * @param[in] weight :: Custom weight bias. If 0, default to source alpha.
 	 */
 	[[nodiscard]] static constexpr
-	RGBA compositeBlend(RGBA src, RGBA dst, BlendFunc func, Weight weight = Opaque) noexcept {
+	RGBA compositeBlend(RGBA src, RGBA dst, BlendFunc func, Weight weight = Opaque_A) noexcept {
 		if (auto alpha = ez::fixedMul8(src.A, weight)) [[likely]]
 			{ return blendWeightedAlpha(channelBlend(src, dst, func), dst, alpha); }
 		return dst;
@@ -218,12 +247,12 @@ struct alignas(4) RGBA {
 	 */
 	[[nodiscard]] static constexpr
 	RGBA premul(RGBA src, Weight weight) noexcept {
-		return RGBA{
+		return RGBA(
 			ez::fixedMul8(src.R, weight),
 			ez::fixedMul8(src.G, weight),
 			ez::fixedMul8(src.B, weight),
 			weight
-		};
+		);
 	}
 
 	/**
@@ -232,12 +261,12 @@ struct alignas(4) RGBA {
 	 */
 	[[nodiscard]] static constexpr
 	RGBA premul(RGBA src) noexcept {
-		return RGBA{
+		return RGBA(
 			ez::fixedMul8(src.R, src.A),
 			ez::fixedMul8(src.G, src.A),
 			ez::fixedMul8(src.B, src.A),
 			src.A
-		};
+		);
 	}
 };
 
