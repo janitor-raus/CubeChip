@@ -53,30 +53,30 @@
 /*==================================================================*/
 
 struct ProjectVersion {
-	constexpr static inline auto major_i{ PROJECT_VERSION_MAJOR_I };
-	constexpr static inline auto minor_i{ PROJECT_VERSION_MINOR_I };
-	constexpr static inline auto patch_i{ PROJECT_VERSION_PATCH_I };
-	constexpr static inline auto tweak_i{ PROJECT_VERSION_TWEAK_I };
+	constexpr static inline auto major_i = PROJECT_VERSION_MAJOR_I;
+	constexpr static inline auto minor_i = PROJECT_VERSION_MINOR_I;
+	constexpr static inline auto patch_i = PROJECT_VERSION_PATCH_I;
+	constexpr static inline auto tweak_i = PROJECT_VERSION_TWEAK_I;
 
-	constexpr static inline auto* major{ PROJECT_VERSION_MAJOR };
-	constexpr static inline auto* minor{ PROJECT_VERSION_MINOR };
-	constexpr static inline auto* patch{ PROJECT_VERSION_PATCH };
-	constexpr static inline auto* tweak{ PROJECT_VERSION_TWEAK };
+	constexpr static inline auto* major = PROJECT_VERSION_MAJOR;
+	constexpr static inline auto* minor = PROJECT_VERSION_MINOR;
+	constexpr static inline auto* patch = PROJECT_VERSION_PATCH;
+	constexpr static inline auto* tweak = PROJECT_VERSION_TWEAK;
 
-	constexpr static inline auto* ghash{ PROJECT_VERSION_GHASH };
+	constexpr static inline auto* ghash = PROJECT_VERSION_GHASH;
 
-	constexpr static inline auto* with_date{ PROJECT_VERSION_WITH_DATE };
-	constexpr static inline auto* with_hash{ PROJECT_VERSION_WITH_HASH };
+	constexpr static inline auto* with_date = PROJECT_VERSION_WITH_DATE;
+	constexpr static inline auto* with_hash = PROJECT_VERSION_WITH_HASH;
 };
 
-constexpr static inline auto AppVer{ ProjectVersion() };
+constexpr static inline ProjectVersion AppVer{};
 
 #if !defined(NDEBUG) || defined(DEBUG)
-	constexpr auto* AppName{ "[DEBUG] " PROJECT_NAME };
+	constexpr auto* AppName = "[DEBUG] " PROJECT_NAME;
 #else
-	constexpr auto* AppName{ PROJECT_NAME };
+	constexpr auto* AppName = PROJECT_NAME;
 #endif
-	constexpr auto* OrgName{ "" };
+	constexpr auto* OrgName = "";
 
 /*==================================================================*/
 
@@ -130,8 +130,8 @@ private:
 	void replaceCore();
 
 public:
-	static auto* initialize(const Path& gamePath) noexcept {
-		static FrontendHost self(gamePath);
+	static auto* initialize(const Path& filepath) noexcept {
+		static FrontendHost self(filepath);
 		return &self;
 	}
 

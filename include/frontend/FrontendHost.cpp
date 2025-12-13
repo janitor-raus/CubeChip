@@ -22,14 +22,21 @@
 
 /*==================================================================*/
 
-FrontendHost::FrontendHost(const Path& gamePath) noexcept {
+static std::vector<Str> sPendingFileDrops{};
+
+static void addPendingFile(const Str& filepath) noexcept {
+	if (!filepath.empty()) { sPendingFileDrops.push_back(filepath); }
+}
+
+/*==================================================================*/
+
+FrontendHost::FrontendHost(const Path& filepath) noexcept {
 	SystemInterface::assignComponents(HDM, BVS);
+	BVS->setMainWindowTitle(AppName);
 	HDM->setValidator(CoreRegistry::validateProgram);
 	CoreRegistry::loadProgramDB();
 
-
-	if (!gamePath.empty()) { loadGameFile(gamePath); }
-	if (!mSystemCore) { BVS->setMainWindowTitle(AppName, "Waiting for file..."); }
+	addPendingFile(filepath.string());
 }
 
 void FrontendHost::StopSystemThread::operator()(SystemInterface* ptr) noexcept {
@@ -58,12 +65,7 @@ auto FrontendHost::exportSettings() const noexcept -> Settings {
 
 void FrontendHost::discardCore() {
 	mSystemCore.reset();
-
-	BVS->setMainWindowTitle(AppName, "Waiting for file...");
-	BVS->resetMainWindow();
-
 	CoreRegistry::clearEligibleCores();
-
 	HDM->clearCachedFileData();
 }
 
@@ -71,7 +73,7 @@ void FrontendHost::replaceCore() {
 	mSystemCore.reset(); // ensures previous thread quits first!
 	mSystemCore.reset(CoreRegistry::constructCore());
 	if (mSystemCore) {
-		BVS->setMainWindowTitle(AppName, HDM->getFileStem());
+		BVS->raiseMainWindow(); // bring to front when we get a core!
 		BVS->displayBuffer.resize(mSystemCore->getDisplaySize());
 		toggleSystemLimiter(); toggleSystemOSD();
 		mSystemCore->startWorker();
@@ -81,7 +83,6 @@ void FrontendHost::replaceCore() {
 /*==================================================================*/
 
 void FrontendHost::loadGameFile(const Path& gameFile) {
-	BVS->raiseMainWindow();
 	blog.newEntry<BLOG::INF>("Attempting to load: \"{}\"", gameFile.string());
 	if (HDM->validateGameFile(gameFile)) {
 		blog.newEntry<BLOG::INF>("File has been accepted!");
@@ -143,7 +144,7 @@ s32  FrontendHost::processEvents(void* event) noexcept {
 				return SDL_APP_SUCCESS;
 
 			case SDL_EVENT_DROP_FILE:
-				loadGameFile(sdl_event->drop.data);
+				addPendingFile(sdl_event->drop.data);
 				break;
 
 			case SDL_EVENT_WINDOW_MINIMIZED:
@@ -172,6 +173,11 @@ s32  FrontendHost::processFrame() {
 
 	const auto dialogResult = HDM->getProbableFile();
 	if (dialogResult) { loadGameFile(*dialogResult); }
+	else if (sPendingFileDrops.size() > 0) {
+		// we only allow a single file load a time (for now?)
+		loadGameFile(sPendingFileDrops[0]);
+		sPendingFileDrops.clear();
+	}
 
 	return BVS->renderPresent(!!mSystemCore, (mSystemCore && mToggleOSD)
 		? mSystemCore->copyOverlayData().c_str() : nullptr
@@ -182,22 +188,8 @@ void FrontendHost::handleHotkeyActions() {
 	static BasicKeyboard Input;
 	Input.updateStates();
 
-	if (Input.isPressed(KEY(UP)))
-		{ GAB->addGlobalGain(+0.0625f); }
-	if (Input.isPressed(KEY(DOWN)))
-		{ GAB->addGlobalGain(-0.0625f); }
-	if (Input.isPressed(KEY(RIGHT)))
-		{ BVS->rotateViewport(+1); }
-	if (Input.isPressed(KEY(LEFT)))
-		{ BVS->rotateViewport(-1); }
 	if (Input.isPressed(KEY(F9)))
 		{ CoreRegistry::loadProgramDB(); }
-	if (Input.isPressed(KEY(F1)))
-		{ BVS->toggleUsingScanlines(); }
-	if (Input.isPressed(KEY(F2)))
-		{ BVS->toggleIntegerScaling(); }
-	if (Input.isPressed(KEY(F3)))
-		{ BVS->cycleViewportScaleMode(); }
 
 	if (mSystemCore) {
 		if (Input.isPressed(KEY(ESCAPE))) {
@@ -212,7 +204,7 @@ void FrontendHost::handleHotkeyActions() {
 				"Emulator core restarted successfully.");
 			return;
 		}
-		if (Input.isPressed(KEY(F4))) {
+		if (Input.isPressed(KEY(F9))) {
 			if (auto paused = mSystemCore->tryPauseSystem()) {
 				blog.newEntry<BLOG::INF>("System has been {} by hotkey!",
 					*paused ? "paused" : "unpaused");
