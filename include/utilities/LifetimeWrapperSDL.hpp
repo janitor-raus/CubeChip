@@ -6,8 +6,6 @@
 
 #pragma once
 
-#include "FriendlyUnique.hpp"
-
 /*==================================================================*/
 
 #define USE_FRIENDLY_UNIQUE
@@ -55,6 +53,28 @@ template <> struct SDL_Deleter<char>
 
 template <> struct SDL_Deleter<const char>
 	{ void operator()(const char*) const noexcept; };
+
+/*==================================================================*/
+
+template <typename T>
+struct SDL_Holder {
+	SDL_Unique<T> ptr;
+
+	constexpr SDL_Holder() noexcept = default;
+	explicit SDL_Holder(T* ptr) noexcept : ptr(ptr) {}
+
+	SDL_Holder(const SDL_Holder&) = delete;
+	SDL_Holder& operator=(const SDL_Holder&) = delete;
+
+	~SDL_Holder() noexcept;
+
+	constexpr operator bool() const noexcept { return bool(ptr); }
+	constexpr operator T* ()  const noexcept { return ptr.get(); }
+
+	T* get()        const noexcept { return ptr.get(); }
+	T* operator->() const noexcept { return ptr.get(); }
+	T& operator*()  const noexcept { return *ptr; }
+};
 
 /*==================================================================*/
 

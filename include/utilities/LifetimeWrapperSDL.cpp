@@ -17,3 +17,14 @@ void SDL_Deleter<SDL_AudioStream>::operator()(SDL_AudioStream* ptr) const noexce
 void SDL_Deleter<unsigned>       ::operator()(unsigned*        ptr) const noexcept { SDL_free(ptr); }
 void SDL_Deleter<char>           ::operator()(char*            ptr) const noexcept { SDL_free(ptr); }
 void SDL_Deleter<const char>     ::operator()(const char*      ptr) const noexcept { SDL_free(const_cast<char*>(ptr)); }
+
+template <typename T>
+SDL_Holder<T>::~SDL_Holder() noexcept = default;
+
+template struct SDL_Holder<SDL_Window>;
+template struct SDL_Holder<SDL_Renderer>;
+template struct SDL_Holder<SDL_Texture>;
+template struct SDL_Holder<SDL_AudioStream>;
+template struct SDL_Holder<unsigned>;
+template struct SDL_Holder<char>;
+template struct SDL_Holder<const char>;
