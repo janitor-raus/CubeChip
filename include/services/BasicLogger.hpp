@@ -42,7 +42,7 @@ public:
 	constexpr BLOG(LEVEL level) noexcept : value(level) {}
 
 	// Severity string representations
-	constexpr const char* to_string() const noexcept {
+	constexpr const char* as_string() const noexcept {
 		switch (value) {
 			case DBG: return "DEBUG";
 			case INF: return "INFO";
@@ -53,7 +53,7 @@ public:
 		}
 	}
 	// Severity color codes in RGBA format
-	constexpr std::uint32_t to_color() const noexcept {
+	constexpr std::uint32_t as_color() const noexcept {
 		switch (value) {
 			case DBG: return 0x77DDDDFF;
 			case INF: return 0x44BB00FF;
@@ -67,30 +67,25 @@ public:
 
 /*==================================================================*/
 
-template <typename LogLevelType>
-	requires (sizeof(LogLevelType) <= sizeof(int))
-struct alignas(HDIS) LogEntry {
-	std::uint64_t hash{};  // thread hash, to be filled in automatically
-	std::int64_t  time{};  // timestamp, expected to be ns
-	std::uint32_t index{}; // entry index, expected to be monotonic
-	LogLevelType  level{}; // log level, usually tied to an enum
-	const void* userdata{}; // pointer to additional data, if any
-	std::string message{};  // self-explanatory
+struct LogEntry {
+	const std::uint64_t hash{};  // thread hash, to be filled in automatically
+	const std::int64_t  time{};  // timestamp, expected to be ns
+	const std::uint32_t index{}; // entry index, expected to be monotonic
+	const BLOG::LEVEL   level{}; // severity level, has additional methods
+	const std::string message{};  // self-explanatory
 
 	constexpr LogEntry() noexcept = default;
 	LogEntry(
 		std::uint32_t index,
-		LogLevelType  level,
-		const void* userdata,
+		BLOG::LEVEL   level,
 		std::string message
 	) noexcept;
+
+	std::string as_string() const noexcept;
 };
 
 /*==================================================================*/
 	#pragma region BasicLogger Singleton Class
-
-using LogBufferT = SlidingRingBuffer
-	<LogEntry<BLOG>, 512>;
 
 class LoggerInstance;
 
@@ -105,13 +100,16 @@ class BasicLogger final {
 		<LoggerInstance> mMainLog{};
 
 public:
+	using LogBuffer = SlidingRingBuffer<LogEntry, 1024>;
+
+public:
 	static auto* initialize() noexcept {
 		static BasicLogger self;
 		return &self;
 	}
 
-	const LogBufferT& buffer() const noexcept;
-	const LogBufferT* operator->() const noexcept { return &buffer(); }
+	auto buffer() const noexcept -> const LogBuffer&;
+	auto operator->() const noexcept -> const LogBuffer* { return &buffer(); }
 
 	void createLog(const std::string& filename, const std::string& directory) noexcept;
 

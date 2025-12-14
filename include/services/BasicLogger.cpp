@@ -25,31 +25,40 @@ static auto monotonicCount() noexcept {
 	return counter.fetch_add(1, std::memory_order::relaxed);
 }
 
+static thread_local fmt::basic_memory_buffer<char, 480> sFormatBuffer;
+
+static void standard_string_formatter_for_LogEntry(const LogEntry& entry) noexcept {
+	sFormatBuffer.clear();
+	fmt::format_to(sFormatBuffer.begin(), "{0}) {1} {3:>{2}} > {4}\n",
+		entry.index, NanoTime(entry.time).format(), BLOG::STR_LEN,
+		BLOG(entry.level).as_string(), entry.message);
+}
+
 /*==================================================================*/
 
-template <typename LogLevelType>
-	requires (sizeof(LogLevelType) <= sizeof(int))
-LogEntry<LogLevelType>::LogEntry(
+LogEntry::LogEntry(
 	std::uint32_t index,
-	LogLevelType  level,
-	const void* userdata,
+	BLOG::LEVEL   level,
 	std::string message
 ) noexcept
 	: hash    (std::hash<std::thread::id>()(std::this_thread::get_id()))
 	, time    (Millis::raw())
 	, index   (index)
 	, level   (level)
-	, userdata(userdata)
 	, message (std::move(message))
 {}
+
+std::string LogEntry::as_string() const noexcept {
+	::standard_string_formatter_for_LogEntry(*this);
+	return std::string(sFormatBuffer.data(), sFormatBuffer.size());
+}
 
 /*==================================================================*/
 
 class LoggerInstance {
 	friend class BasicLogger;
 
-	using LogBufferT = SlidingRingBuffer
-		<LogEntry<BLOG>, 512>;
+	using LogBuffer = BasicLogger::LogBuffer;
 
 	std::ofstream mLogFile;
 	Thread mFlusherThread;
@@ -57,7 +66,7 @@ class LoggerInstance {
 	std::size_t mLastFlushPos{};
 	std::size_t mLastFlushTime{};
 
-	LogBufferT mLogBuffer;
+	LogBuffer mLogBuffer;
 
 	bool testFlushSize() const noexcept {
 		const auto head = mLogBuffer.head();
@@ -75,9 +84,8 @@ class LoggerInstance {
 		const auto snapshot = mLogBuffer.snapshot(0, mLastFlushPos).fast();
 		if (snapshot.size() == 0) { mLastFlushTime = Millis::now(); return; }
 		for (const auto& entry : snapshot) {
-			fmt::print(mLogFile, "{0}) {1} {3:>{2}} > {4}\n",
-				entry.index, NanoTime(entry.time).format(),
-				BLOG::STR_LEN, entry.level.to_string(), entry.message);
+			standard_string_formatter_for_LogEntry(entry);
+			mLogFile.write(sFormatBuffer.data(), sFormatBuffer.size());
 		}
 
 		mLogFile.flush();
@@ -136,19 +144,20 @@ public:
 		flushLogBuffer();
 	}
 
-	auto& buffer() noexcept { return mLogBuffer; }
+	auto buffer() const noexcept -> const auto& { return mLogBuffer; }
+	auto buffer()       noexcept ->       auto& { return mLogBuffer; }
 };
 
 /*==================================================================*/
 	#pragma region BasicLogger Singleton Class
 
 BasicLogger::BasicLogger() noexcept
-	: mMainLog{ std::make_unique<LoggerInstance>() }
+	: mMainLog(std::make_unique<LoggerInstance>())
 {}
 
 BasicLogger::~BasicLogger() noexcept {}
 
-const LogBufferT& BasicLogger::buffer() const noexcept {
+auto BasicLogger::buffer() const noexcept -> const LogBuffer& {
 	return mMainLog->buffer();
 }
 
@@ -158,8 +167,7 @@ void BasicLogger::createLog(const std::string& filename, const std::string& dire
 
 template <BLOG::LEVEL LOG_LEVEL>
 void BasicLogger::newEntry_(std::string&& message) noexcept {
-	mMainLog->buffer().push(LogEntry(
-		monotonicCount(), BLOG(LOG_LEVEL), nullptr, message));
+	mMainLog->buffer().push(LogEntry(monotonicCount(), LOG_LEVEL, message));
 }
 
 template void BasicLogger::newEntry_<BLOG::DBG>(std::string&&) noexcept;

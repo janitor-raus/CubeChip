@@ -132,7 +132,7 @@ void FrontendHost::initializeInterface() noexcept {
 					}
 				}
 
-				static auto renderTable{ [](auto& entry) {
+				static auto renderTable = [](auto& entry) {
 					ImGui::TableNextRow();
 
 					ImGui::TableSetColumnIndex(0);
@@ -144,12 +144,12 @@ void FrontendHost::initializeInterface() noexcept {
 
 					ImGui::TableSetColumnIndex(2);
 					ImGui::TextColored(RGBA_to_ImVec4(
-						entry.level.to_color()), "%s",
-						entry.level.to_string());
+						BLOG(entry.level).as_color()), "%s",
+						BLOG(entry.level).as_string());
 
 					ImGui::TableSetColumnIndex(3);
 					ImGui::TextUnformatted(entry.message.c_str());
-				} };
+				};
 
 				if (sortDescending) {
 					namespace rv = std::ranges::views;
