@@ -42,17 +42,17 @@ struct alignas(4) RGBA {
 	static constexpr Packed Black = 0x000000FF;
 	static constexpr Packed White = 0xFFFFFFFF;
 
-	u8 R{}, G{}, B{}, A{};
+	u8 A{}, B{}, G{}, R{};
 
 	constexpr RGBA() noexcept = default;
 	constexpr RGBA(Packed color) noexcept
-		: R(u8(color >> 24))
-		, G(u8(color >> 16))
+		: A(u8(color >>  0))
 		, B(u8(color >>  8))
-		, A(u8(color >>  0))
+		, G(u8(color >> 16))
+		, R(u8(color >> 24))
 	{}
 	constexpr RGBA(u8 R, u8 G, u8 B, u8 A = Opaque_A) noexcept
-		: R(R), G(G), B(B), A(A)
+		: A(A), B(B), G(G), R(R)
 	{}
 
 private:
