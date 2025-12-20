@@ -60,11 +60,8 @@ template <typename T>
 struct SDL_Holder {
 	SDL_Unique<T> ptr;
 
-	constexpr SDL_Holder() noexcept = default;
+	constexpr SDL_Holder() = default;
 	explicit SDL_Holder(T* ptr) noexcept : ptr(ptr) {}
-
-	SDL_Holder(const SDL_Holder&) = delete;
-	SDL_Holder& operator=(const SDL_Holder&) = delete;
 
 	~SDL_Holder() noexcept;
 

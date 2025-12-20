@@ -47,9 +47,9 @@ class alignas(HDIS) SlidingRingBuffer {
 
 	using self = SlidingRingBuffer;
 
-	alignas(HDIS) AtomSharedPtr<T>  mBuffer[N]{};
-	alignas(HDIS) Atom<std::size_t> mPushHead{};
-	alignas(HDIS) Atom<std::size_t> mReadHead{};
+	alignas(HDIS) AtomSharedPtr<T> mBuffer[N]{};
+	alignas(HDIS) std::atomic<std::size_t> mPushHead{};
+	alignas(HDIS) std::atomic<std::size_t> mReadHead{};
 	alignas(HDIS) mutable std::shared_mutex mGuard;
 
 public:
@@ -65,7 +65,7 @@ public:
 	constexpr auto head() const noexcept { return mReadHead.load(mo::acquire); }
 
 private:
-	void push_(std::size_t index, SharedPtr<T>&& ptr) noexcept {
+	void push_(std::size_t index, std::shared_ptr<T>&& ptr) noexcept {
 		std::shared_lock lock(mGuard);
 		mBuffer[index & (N - 1)].store(std::move(ptr), mo::release);
 

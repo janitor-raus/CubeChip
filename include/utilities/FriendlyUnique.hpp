@@ -22,8 +22,8 @@ public:
 	using deleter_type = UniqueType::deleter_type;
 
 	constexpr FriendlyUnique(T* ptr = nullptr) noexcept : mPtr(ptr, D()) {}
-	constexpr FriendlyUnique(FriendlyUnique&&) noexcept = default;
-	constexpr FriendlyUnique& operator=(FriendlyUnique&&) noexcept = default;
+	constexpr FriendlyUnique(FriendlyUnique&&) = default;
+	constexpr FriendlyUnique& operator=(FriendlyUnique&&) = default;
 	constexpr FriendlyUnique& operator=(T* ptr) noexcept { reset(ptr); return *this; }
 
 	FriendlyUnique(const FriendlyUnique&) = delete;
