@@ -7,7 +7,6 @@
 #include "CHIP8E.hpp"
 #if defined(ENABLE_CHIP8_SYSTEM) && defined(ENABLE_CHIP8E)
 
-#include "BasicVideoSpec.hpp"
 #include "CoreRegistry.hpp"
 
 REGISTER_CORE(CHIP8E, ".c8e")
@@ -21,7 +20,6 @@ void CHIP8E::initializeSystem() noexcept {
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
 	copyFontToMemory(mMemoryBank.data(), 80);
 
-	setViewportSizes(true, cScreenSizeX, cScreenSizeY, cResSizeMult, 2);
 	setBaseSystemFramerate(cRefreshRate);
 
 	mVoices[VOICE::ID_0].userdata = &mAudioTimers[VOICE::ID_0];
@@ -31,6 +29,16 @@ void CHIP8E::initializeSystem() noexcept {
 
 	mCurrentPC = cStartOffset;
 	mTargetCPF = cInstSpeedHi;
+
+	mDisplayWindow.metadata_staging
+		.set_viewport(cDisplayW, cDisplayH)
+		.set_scaling(8).set_padding(4)
+		.set_texture_tint(sBitColors[0])
+		.enabled = true;
+	mDisplayWindow.SetOverlayCallable([&]() {
+		if (!hasSystemState(EmuState::STATS)) { return; }
+		SimpleStatOverlay(copyOverlayData());
+	});
 }
 
 void CHIP8E::handleCycleLoop() noexcept
@@ -238,20 +246,21 @@ void CHIP8E::renderAudioData() {
 		{ makePulseWave, &mVoices[VOICE::BUZZER] },
 	});
 
-	setDisplayBorderColor(sBitColors[!!::accumulate(mAudioTimers)]);
+	mDisplayWindow.metadata_staging.set_border_color_if(
+		!!::accumulate(mAudioTimers), sBitColors[1]);
 }
 
 void CHIP8E::renderVideoData() {
-	BVS->displayBuffer.write(mDisplayBuffer, isUsingPixelTrails()
-		? [](u32 pixel) noexcept
-			{ return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
-		: [](u32 pixel) noexcept
-			{ return sBitColors[pixel >> 3]; }
-	);
+	mDisplayWindow.swapchain.acquire([&](auto& frame) noexcept {
+		frame.metadata = mDisplayWindow.metadata_staging;
+		frame.copy_from(mDisplayBuffer, isUsingPixelTrails()
+			? [](u32 pixel) noexcept { return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
+			: [](u32 pixel) noexcept { return sBitColors[pixel >> 3]; }
+		);
+	});
 
 	std::for_each(EXEC_POLICY(unseq)
-		mDisplayBuffer.begin(),
-		mDisplayBuffer.end(),
+		mDisplayBuffer.begin(), mDisplayBuffer.end(),
 		[](auto& pixel) noexcept
 			{ ::assign_cast(pixel, (pixel & 0x8) | (pixel >> 1)); }
 	);
@@ -479,7 +488,7 @@ void CHIP8E::renderVideoData() {
 						if (!((mDisplayBuffer(X, Y) ^= 0x8) & 0x8))
 							{ mRegisterV[0xF] = 1; }
 					}
-					if (++X == cScreenSizeX) { return; }
+					if (++X == cDisplayW) { return; }
 				}
 				return;
 		}
@@ -488,8 +497,8 @@ void CHIP8E::renderVideoData() {
 	void CHIP8E::instruction_DxyN(s32 X, s32 Y, s32 N) noexcept {
 		triggerInterrupt(Interrupt::FRAME);
 
-		auto pX = mRegisterV[X] & (cScreenSizeX - 1);
-		auto pY = mRegisterV[Y] & (cScreenSizeY - 1);
+		auto pX = mRegisterV[X] & (cDisplayW - 1);
+		auto pY = mRegisterV[Y] & (cDisplayH - 1);
 
 		mRegisterV[0xF] = 0;
 
@@ -507,7 +516,7 @@ void CHIP8E::renderVideoData() {
 				for (auto H = 0; H < N; ++H)
 				{
 					drawByte(pX, pY, mMemoryBank[mRegisterI + H]);
-					if (++pY == cScreenSizeY) { return; }
+					if (++pY == cDisplayH) { return; }
 				}
 				return;
 		}

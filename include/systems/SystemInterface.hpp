@@ -29,6 +29,7 @@
 #include "SimpleTimer.hpp"
 #include "BasicInput.hpp"
 #include "Well512.hpp"
+#include "DisplayWindow.hpp"
 
 #include "CoreRegistry.hpp"
 
@@ -68,11 +69,10 @@ class alignas(HDIS) SystemInterface {
 	Thread mSystemThread;
 	Thread mTimingThread;
 
-	Atom<f32> mFrameBusyTime{ 0.0f }; // wtf was this even for???
-	Atom<u8> mGlobalState{ EmuState::NORMAL };
+	std::atomic<u8> mGlobalState = EmuState::NORMAL;
 
-	Atom<bool> mNextFrame{};
-	Atom<bool> mStopFrame{};
+	std::atomic<bool> mNextFrame{};
+	std::atomic<bool> mStopFrame{};
 
 protected:
 	SimpleTimer mTimer{};
@@ -80,11 +80,7 @@ protected:
 private:
 	Str mOverlayDataBuffer{};
 	AtomSharedPtr<Str>
-		mOverlayData{ nullptr };
-
-protected:
-	Str* getOverlayDataBuffer() noexcept
-		{ return &mOverlayDataBuffer; }
+		mOverlayData = nullptr;
 
 protected:
 	static inline HomeDirManager* HDM{};
@@ -98,8 +94,8 @@ public:
 	void stopWorker() noexcept;
 
 protected:
-	Atom<f32> mBaseSystemFramerate{};
-	Atom<f32> mFramerateMultiplier{ 1.0f };
+	std::atomic<f32> mBaseSystemFramerate{};
+	std::atomic<f32> mFramerateMultiplier = 1.0f;
 
 	u32 mBenchedFrames{};
 	u32 mElapsedFrames{};
@@ -143,11 +139,6 @@ public:
 		return !xorSystemState(EmuState::PAUSED);
 	}
 
-	virtual s32 getMaxDisplayW() const noexcept = 0;
-	virtual s32 getMaxDisplayH() const noexcept = 0;
-	virtual s32 getDisplaySize() const noexcept { return getMaxDisplayW() * getMaxDisplayH(); }
-
-
 protected: void setBaseSystemFramerate(f32 value) noexcept;
 public:    void setFramerateMultiplier(f32 value) noexcept;
 
@@ -171,10 +162,6 @@ private:
 	}
 
 protected:
-	void setViewportSizes(bool cond, u32 W, u32 H, u32 mult, u32 ppad) noexcept;
-
-	void setDisplayBorderColor(u32 color) noexcept;
-
 	virtual void mainSystemLoop() = 0;
 	virtual void initializeSystem() noexcept = 0;
 
@@ -182,7 +169,7 @@ protected:
 	template <typename... Args>
 	void formatOverlayData(std::string&& message, Args&&... args) noexcept {
 		try {
-			fmt::vformat_to(std::back_inserter(*getOverlayDataBuffer()),
+			fmt::vformat_to(std::back_inserter(mOverlayDataBuffer),
 				message, fmt::make_format_args(args...));
 		} catch (...) { /* ignore */ }
 	}
@@ -190,7 +177,7 @@ protected:
 	template <typename... Args>
 	void formatOverlayData(const std::string& message, Args&&... args) noexcept {
 		try {
-			fmt::vformat_to(std::back_inserter(*getOverlayDataBuffer()),
+			fmt::vformat_to(std::back_inserter(mOverlayDataBuffer),
 				message, fmt::make_format_args(args...));
 		} catch (...) { /* ignore */ }
 	}
@@ -198,9 +185,7 @@ protected:
 protected:
 	virtual void appendOverlayData() noexcept;
 	/*****/ void makeOverlayData() noexcept;
-
-public:
-	Str copyOverlayData() const noexcept;
+	/*****/ Str  copyOverlayData() const noexcept;
 };
 
 

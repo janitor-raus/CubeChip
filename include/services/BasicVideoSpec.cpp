@@ -33,23 +33,6 @@
 
 /*==================================================================*/
 
-static auto to_FRect(const ez::Frame& rect) noexcept {
-	return SDL_FRect{ 0.0f, 0.0f, float(rect.w), float(rect.h) };
-}
-
-static auto to_FRect(const BasicVideoSpec::Viewport& viewport) noexcept {
-	return SDL_FRect{ float(viewport.pxpad), float(viewport.pxpad),
-		float(viewport.frame.w * viewport.multi), float(viewport.frame.h * viewport.multi) };
-}
-
-static auto to_Frame(SDL_Texture* texture) noexcept {
-	float w, h;
-	SDL_GetTextureSize(texture, &w, &h);
-	return ez::Frame(int(w), int(h));
-}
-
-/*==================================================================*/
-
 struct FatalError : public std::runtime_error {
 	using std::runtime_error::runtime_error;
 };
@@ -70,13 +53,9 @@ void throwFatalError(unsigned line, const char* function) noexcept(false) {
 
 BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept {
 	try {
-		if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) \
-			{ throwFatalError(__LINE__, __func__); }
-
-		mViewportScaleMode = std::max(0, settings.viewport.filtering % 3);
-
-		mIntegerScaling    = settings.viewport.int_scale;
-		mUsingScanlines    = settings.viewport.scanlines;
+		if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) { \
+			throwFatalError(__LINE__, __func__);
+		}
 
 		mMainWindow = SDL_CreateWindow(nullptr, 0, 0, SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE); \
 		if (!mMainWindow) { throwFatalError(__LINE__, __func__); }
@@ -134,7 +113,7 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 
 		FrontendInterface::InitVideo(mMainWindow, mMainRenderer);
 
-		resetMainWindow();
+		SDL_ShowWindow(mMainWindow);
 	}
 	catch (const FatalError&) {
 		success = false; return;
@@ -160,9 +139,6 @@ SettingsMap BasicVideoSpec::Settings::map() noexcept {
 		makeSetting("Window.W", &window.w),
 		makeSetting("Window.H", &window.h),
 		makeSetting("Window.FirstRun", &first_run),
-		makeSetting("Viewport.Filtering", &viewport.filtering),
-		makeSetting("Viewport.Int_Scale", &viewport.int_scale),
-		makeSetting("Viewport.Scanlines", &viewport.scanlines),
 	};
 }
 
@@ -176,16 +152,13 @@ auto BasicVideoSpec::exportSettings() const noexcept -> Settings {
 
 	SDL_GetWindowPosition(mMainWindow, &out.window.x, &out.window.y);
 	SDL_GetWindowSize(mMainWindow, &out.window.w, &out.window.h);
-	out.viewport.filtering = mViewportScaleMode;
-	out.viewport.int_scale = mIntegerScaling;
-	out.viewport.scanlines = mUsingScanlines;
 	out.first_run = false;
 
 	return out;
 }
 
-void BasicVideoSpec::setMainWindowTitle(const std::string& title, const std::string& desc) {
-	SDL_SetWindowTitle(mMainWindow, (desc.empty() ? title : title + " :: " + desc).c_str());
+void BasicVideoSpec::setMainWindowTitle(const std::string& title) noexcept {
+	SDL_SetWindowTitle(mMainWindow, title.c_str());
 }
 
 bool BasicVideoSpec::isMainWindowID(unsigned id) const noexcept {
@@ -279,159 +252,62 @@ void BasicVideoSpec::raiseMainWindow() noexcept {
 	SDL_RaiseWindow(mMainWindow);
 }
 
-void BasicVideoSpec::resetMainWindow() noexcept {
-	SDL_ShowWindow(mMainWindow);
-	//SDL_SyncWindow(mMainWindow);
-
-	mCurViewport = { Settings::defaults.w, Settings::defaults.h, 1, 0 };
-	mViewportRotation = 0;
-
-	mSystemTexture.reset();
-	mWindowTexture.reset();
-}
-
-void BasicVideoSpec::setViewportAlpha(unsigned alpha) noexcept {
-	mTextureAlpha.store(ez::u8(alpha), mo::release);
-}
-
-void BasicVideoSpec::setViewportSizes(int W, int H, int mult, int ppad) noexcept {
-	mNewViewport.store(Viewport::pack(W, H, mult, ppad), mo::release);
-}
-
-auto BasicVideoSpec::getViewportSizes() const noexcept -> BasicVideoSpec::Viewport {
-	return Viewport::unpack(mNewViewport.load(mo::acquire));
-}
-
-void BasicVideoSpec::setViewportScaleMode(int mode) noexcept {
-	switch (mode) {
-		case SDL_SCALEMODE_NEAREST:
-		case SDL_SCALEMODE_LINEAR:
-			SDL_SetTextureScaleMode(mSystemTexture,
-				static_cast<SDL_ScaleMode>(mode));
-			mViewportScaleMode = mode;
-			[[fallthrough]];
-		default: return;
+SDL_Texture* BasicVideoSpec::makeDisplayTexture(SDL_Renderer* renderer, int w, int h) noexcept {
+	if (!renderer) { return nullptr; }
+	try {
+		auto* texture = SDL_CreateTexture(renderer, \
+			SDL_PIXELFORMAT_RGBX8888, SDL_TEXTUREACCESS_STREAMING, w, h); \
+		if (!texture) { throwFatalError(__LINE__, __func__); }
+		return texture;
+	}
+	catch (const FatalError&) {
+		return nullptr;
+	}
+	catch (const std::exception& e) {
+		blog.newEntry<BLOG::FTL>("{}(): Unknown exception caught: {}",
+			__func__, e.what());
+		return nullptr;
 	}
 }
 
-void BasicVideoSpec::cycleViewportScaleMode() noexcept {
-	switch (mViewportScaleMode) {
-		case SDL_SCALEMODE_NEAREST:
-			setViewportScaleMode(SDL_SCALEMODE_LINEAR);
-			break;
-		default:
-			setViewportScaleMode(SDL_SCALEMODE_NEAREST);
-			break;
-	}
-}
+void BasicVideoSpec::renderStreamTexture(
+	SDL_Renderer* renderer, SDL_Texture* texture, const std::byte* src_buffer
+) noexcept {
+	if (!renderer || !texture) { return; }
 
-void BasicVideoSpec::setBorderColor(unsigned color) noexcept {
-	mOutlineColor.store(color, mo::release);
+	void* pixels_ptr; int pitch;
+
+	if (!SDL_LockTexture(texture, nullptr, &pixels_ptr, &pitch)) { \
+		throwFatalError(__LINE__, __func__);
+	} else {
+		const auto total_rows = texture->h;
+		const auto row_length = texture->w * SDL_BYTESPERPIXEL(texture->format);
+
+		for (int y = 0; y < total_rows; ++y) {
+			std::memcpy(static_cast<std::byte*>(pixels_ptr) + y * pitch,
+				src_buffer + y * row_length, row_length);
+		}
+
+		SDL_UnlockTexture(texture);
+	}
+
+	const SDL_FRect dest_frect = { 0.0f, 0.0f,
+		float(texture->w), float(texture->h) };
+
+	SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
+	SDL_RenderTexture(renderer, texture, nullptr, &dest_frect);
 }
 
 /*==================================================================*/
 
-void BasicVideoSpec::prepareWindowTexture() noexcept(false) {
-	const auto fullViewportFrame = mCurViewport.padded();
-
-	if (to_Frame(mWindowTexture) != fullViewportFrame)
-	{
-		mWindowTexture = SDL_CreateTexture(mMainRenderer, \
-			SDL_PIXELFORMAT_RGBX8888, SDL_TEXTUREACCESS_TARGET, \
-			fullViewportFrame.w, fullViewportFrame.h); \
-		if (!mWindowTexture) { throwFatalError(__LINE__, __func__); }
-
-		else {
-			SDL_SetTextureScaleMode(mWindowTexture, SDL_SCALEMODE_NEAREST);
-			SDL_SetRenderTarget(mMainRenderer, mWindowTexture);
-			SDL_SetRenderDrawColor(mMainRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-			SDL_RenderClear(mMainRenderer);
-		}
-	}
-}
-
-void BasicVideoSpec::prepareSystemTexture() noexcept(false) {
-	if (!mWindowTexture) { return; }
-
-	if (to_Frame(mSystemTexture) != mCurViewport.frame)
-	{
-		mSystemTexture = SDL_CreateTexture(mMainRenderer, \
-			SDL_PIXELFORMAT_RGBX8888, SDL_TEXTUREACCESS_STREAMING, \
-			mCurViewport.frame.w, mCurViewport.frame.h); \
-		if (!mSystemTexture) { throwFatalError(__LINE__, __func__); }
-
-		else {
-			SDL_SetTextureScaleMode(mSystemTexture, static_cast<SDL_ScaleMode>(mViewportScaleMode));
-			SDL_SetTextureAlphaMod(mSystemTexture, mTextureAlpha.load(mo::acquire));
-		}
-	}
-}
-
-void BasicVideoSpec::renderViewport() noexcept(false) {
-	if (mWindowTexture) {
-		SDL_SetRenderTarget(mMainRenderer, mWindowTexture);
-
-		const RGBA Color = mOutlineColor.load(mo::acquire);
-		SDL_SetRenderDrawColor(mMainRenderer, Color.R, Color.G, Color.B, SDL_ALPHA_OPAQUE);
-		const auto outerFRect = to_FRect(mCurViewport.padded());
-		SDL_RenderFillRect(mMainRenderer, &outerFRect);
-	}
-
-	if (mSystemTexture) {
-		SDL_SetRenderDrawColor(mMainRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-		const auto innerFRect = to_FRect(mCurViewport);
-		SDL_RenderFillRect(mMainRenderer, &innerFRect);
-
-		{
-			void* pixels{}; int pitch;
-
-			if (!SDL_LockTexture(mSystemTexture, nullptr, &pixels, &pitch)) \
-				{ throwFatalError(__LINE__, __func__); }
-			else {
-				displayBuffer.read(static_cast<unsigned*>(pixels), mCurViewport.frame.area());
-				SDL_UnlockTexture(mSystemTexture);
-			}
-		}
-
-		SDL_RenderTexture(mMainRenderer, mSystemTexture, nullptr, &innerFRect);
-
-		if (mUsingScanlines && mCurViewport.pxpad >= 2) {
-			SDL_SetRenderDrawBlendMode(mMainRenderer, SDL_BLENDMODE_BLEND);
-			SDL_SetRenderDrawColor(mMainRenderer, 0, 0, 0, 0x20);
-
-			const auto outerFRect = to_FRect(mCurViewport.padded());
-			const auto drawLimit = int(outerFRect.h);
-			for (auto y = 0; y < drawLimit; y += mCurViewport.pxpad) {
-				SDL_RenderLine(mMainRenderer,
-					outerFRect.x, float(y),
-					outerFRect.w, float(y));
-			}
-		}
-	}
-}
-
-bool BasicVideoSpec::renderPresent(bool core, const char* overlay_data) noexcept {
+bool BasicVideoSpec::renderPresent() noexcept {
 	try {
-		mCurViewport = getViewportSizes();
-
-		if (core) { prepareWindowTexture(); }
-		if (core) { prepareSystemTexture(); }
-
-		renderViewport();
-		SDL_SetRenderTarget(mMainRenderer, nullptr);
-
-		const auto outerRect = mCurViewport.rotate_if(mViewportRotation & 1).padded();
-
 		FrontendInterface::NewFrame();
-		FrontendInterface::PrepareViewport(
-			mWindowTexture, mIntegerScaling,
-			outerRect.w, outerRect.h, mViewportRotation,
-			overlay_data, mWindowTexture
-		);
 		FrontendInterface::RenderFrame(mMainRenderer);
 
-		if (!SDL_RenderPresent(mMainRenderer))
-			{ throwFatalError(__LINE__, __func__); }
+		if (!SDL_RenderPresent(mMainRenderer)) { \
+			throwFatalError(__LINE__, __func__);
+		}
 
 		return true;
 	}

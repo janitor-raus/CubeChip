@@ -18,7 +18,6 @@ void MEGACHIP::initializeSystem() noexcept {
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
 	copyFontToMemory(mMemoryBank.data(), 180);
 
-	setViewportSizes(true, cScreenMegaX, cScreenMegaY, cResSizeMult, 2);
 	setBaseSystemFramerate(cRefreshRate);
 
 	mVoices[VOICE::UNIQUE].userdata = &mAudioTimers[VOICE::UNIQUE];
@@ -27,6 +26,15 @@ void MEGACHIP::initializeSystem() noexcept {
 	mCurrentPC = cStartOffset;
 
 	prepDisplayArea(Resolution::LO);
+
+	mDisplayWindow.metadata_staging
+		.set_scaling(2).set_padding(4)
+		.enabled = true;
+
+	mDisplayWindow.SetOverlayCallable([&]() {
+		if (!hasSystemState(EmuState::STATS)) { return; }
+		SimpleStatOverlay(copyOverlayData());
+	});
 }
 
 void MEGACHIP::handleCycleLoop() noexcept
@@ -288,7 +296,8 @@ void MEGACHIP::renderAudioData() {
 			{ makePulseWave, &mVoices[VOICE::BUZZER] },
 		});
 
-		setDisplayBorderColor(sBitColors[!!mAudioTimers[VOICE::BUZZER]]);
+		mDisplayWindow.metadata_staging.set_border_color_if(
+			!!mAudioTimers[VOICE::BUZZER], sBitColors[1]);
 	}
 	else {
 		mixAudioData({
@@ -298,28 +307,34 @@ void MEGACHIP::renderAudioData() {
 			{ makePulseWave, &mVoices[VOICE::BUZZER] },
 		});
 
-		setDisplayBorderColor(sBitColors[!!::accumulate(mAudioTimers)]);
+		mDisplayWindow.metadata_staging.set_border_color_if(
+			!!::accumulate(mAudioTimers), sBitColors[1]);
 	}
 }
 
 void MEGACHIP::renderVideoData() {
 	if (!isManualRefresh()) {
+		auto calc_color = isUsingPixelTrails()
+			? [](u8 pixel) { return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
+			: [](u8 pixel) { return sBitColors[pixel >> 3]; };
+
 		for (auto i = 0u; i < mDisplayBuffer.size(); ++i) {
 			auto pixel = mDisplayBuffer[i];
-			auto color = isUsingPixelTrails()
-				? RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel])
-				: sBitColors[pixel >> 3];
+			auto color = calc_color(pixel);
 
-			auto x = (i % cScreenSizeX) * 2;
-			auto y = (i / cScreenSizeX) * 2;
+			auto x = (i % cDisplayW_C8) * 2;
+			auto y = (i / cDisplayW_C8) * 2;
 
-			mBackgroundBuffer(x + 0, y + 32) = color;
-			mBackgroundBuffer(x + 1, y + 32) = color;
-			mBackgroundBuffer(x + 0, y + 33) = color;
-			mBackgroundBuffer(x + 1, y + 33) = color;
+			mBackgroundBuffer(x + 0, y + 0) = color;
+			mBackgroundBuffer(x + 1, y + 0) = color;
+			mBackgroundBuffer(x + 0, y + 1) = color;
+			mBackgroundBuffer(x + 1, y + 1) = color;
 		}
 
-		BVS->displayBuffer.write(mBackgroundBuffer);
+		mDisplayWindow.swapchain.acquire([&](auto& frame) noexcept {
+			frame.metadata = mDisplayWindow.metadata_staging;
+			frame.copy_from(mBackgroundBuffer);
+		});
 	}
 }
 
@@ -328,10 +343,17 @@ void MEGACHIP::prepDisplayArea(Resolution mode) {
 	isResolutionChanged(wasManualRefresh != isManualRefresh());
 
 	if (isManualRefresh()) {
+		mDisplayWindow.metadata_staging
+			.set_viewport(cDisplayW_M8, cDisplayH_M8)
+			.set_texture_tint(RGBA::Black);
 		Quirk.waitVblank = false;
 		mTargetCPF = cInstSpeedMC;
 	}
 	else {
+		mDisplayWindow.metadata_staging
+			.set_viewport(cDisplayW_M8, cDisplayW_M8 >> 1)
+			.set_texture_tint(cBitColors[0]);
+
 		isLargerDisplay(mode != Resolution::LO);
 
 		Quirk.waitVblank = !isLargerDisplay();
@@ -396,19 +418,21 @@ void MEGACHIP::scrapAllVideoBuffers() {
 }
 
 void MEGACHIP::flushAllVideoBuffers() {
-	BVS->displayBuffer.write(mBackgroundBuffer);
+	mDisplayWindow.swapchain.acquire([&](auto& frame) noexcept {
+		frame.metadata = mDisplayWindow.metadata_staging;
+		frame.copy_from(mBackgroundBuffer);
+	});
 
 	mLastRenderBuffer = mBackgroundBuffer;
 	mBackgroundBuffer.initialize();
 	mCollisionMap.initialize();
 }
 
-void MEGACHIP::blendAndFlushBuffers() const {
-	BVS->displayBuffer.write(
-		mLastRenderBuffer,
-		mBackgroundBuffer,
-		RGBA::blendAlpha
-	);
+void MEGACHIP::blendAndFlushBuffers() {
+	mDisplayWindow.swapchain.acquire([&](auto& frame) noexcept {
+		frame.metadata = mDisplayWindow.metadata_staging;
+		frame.copy_from(mLastRenderBuffer, mBackgroundBuffer, RGBA::blendAlpha);
+	});
 }
 
 void MEGACHIP::startAudioTrack(bool repeat) noexcept {
@@ -556,7 +580,7 @@ void MEGACHIP::scrollBuffersRT() {
 		mTexture.H = NN ? NN : 256;
 	}
 	void MEGACHIP::instruction_05NN(s32 NN) noexcept {
-		BVS->setViewportAlpha(NN);
+		::assign_cast(mDisplayWindow.metadata_staging.texture_tint.A, NN);
 	}
 	void MEGACHIP::instruction_060N(s32 N) noexcept {
 		startAudioTrack(N == 0);
@@ -748,7 +772,7 @@ void MEGACHIP::scrollBuffersRT() {
 				auto& pixel = mDisplayBuffer(offsetX, originY);
 				if (!((pixel ^= 0x8) & 0x8)) { collided = true; }
 			}
-			if (offsetX == cScreenSizeX - 1) { return collided; }
+			if (offsetX == cDisplayW_C8 - 1) { return collided; }
 		}
 		return collided;
 	}
@@ -772,7 +796,7 @@ void MEGACHIP::scrollBuffersRT() {
 			} else {
 				pixelLO = pixelHI;
 			}
-			if (offsetX == cScreenSizeX - 1) { return collided; }
+			if (offsetX == cDisplayW_C8 - 1) { return collided; }
 		}
 		return collided;
 	}
@@ -787,12 +811,12 @@ void MEGACHIP::scrollBuffersRT() {
 
 			mRegisterV[0xF] = 0;
 
-			if (!Quirk.wrapSprite && originY >= cScreenMegaY) { return; }
+			if (!Quirk.wrapSprite && originY >= cDisplayH_M8) { return; }
 			if (mTexture.fontOffset != mRegisterI) [[likely]] { goto paintTexture; }
 
 			for (auto rowN = 0, offsetY = originY; rowN < N; ++rowN)
 			{
-				if (Quirk.wrapSprite && offsetY >= cScreenMegaY) { continue; }
+				if (Quirk.wrapSprite && offsetY >= cDisplayH_M8) { continue; }
 				const auto octoPixelBatch = mMemoryBank[mRegisterI + rowN];
 
 				for (auto colN = 7, offsetX = originX; colN >= 0; --colN)
@@ -800,11 +824,11 @@ void MEGACHIP::scrollBuffersRT() {
 					if (octoPixelBatch >> colN & 0x1)
 						{ mBackgroundBuffer(offsetX, offsetY) = mFontColor[rowN]; }
 
-					if (!Quirk.wrapSprite && offsetX == (cScreenMegaX - 1))
-						{ break; } else { ++offsetX &= (cScreenMegaX - 1); }
+					if (!Quirk.wrapSprite && offsetX == (cDisplayW_M8 - 1))
+						{ break; } else { ++offsetX &= (cDisplayW_M8 - 1); }
 				}
-				if (!Quirk.wrapSprite && offsetY == (cScreenMegaX - 1))
-					{ break; } else { ++offsetY &= (cScreenMegaX - 1); }
+				if (!Quirk.wrapSprite && offsetY == (cDisplayW_M8 - 1))
+					{ break; } else { ++offsetY &= (cDisplayW_M8 - 1); }
 			}
 			return;
 
@@ -814,7 +838,7 @@ void MEGACHIP::scrollBuffersRT() {
 
 			for (auto rowN = 0, offsetY = originY; rowN < mTexture.H; ++rowN)
 			{
-				if (Quirk.wrapSprite && offsetY >= cScreenMegaY) { continue; }
+				if (Quirk.wrapSprite && offsetY >= cDisplayH_M8) { continue; }
 				const auto offsetI = rowN * mTexture.W;
 
 				for (auto colN = 0, offsetX = originX; colN < mTexture.W; ++colN)
@@ -831,11 +855,11 @@ void MEGACHIP::scrollBuffersRT() {
 						backbufCoord = RGBA::compositeBlend(mColorPalette(sourceColorIdx), \
 							backbufCoord, mBlendFunc, u8(mTexture.opacity));
 					}
-					if (!Quirk.wrapSprite && offsetX == (cScreenMegaX - 1))
-						{ break; } else { ++offsetX &= (cScreenMegaX - 1); }
+					if (!Quirk.wrapSprite && offsetX == (cDisplayW_M8 - 1))
+						{ break; } else { ++offsetX &= (cDisplayW_M8 - 1); }
 				}
-				if (!Quirk.wrapSprite && offsetY == (cScreenMegaY - 1))
-					{ break; } else { ++offsetY %= cScreenMegaY; }
+				if (!Quirk.wrapSprite && offsetY == (cDisplayH_M8 - 1))
+					{ break; } else { ++offsetY %= cDisplayH_M8; }
 			}
 		} else {
 			if (isLargerDisplay()) {
@@ -854,7 +878,7 @@ void MEGACHIP::scrollBuffersRT() {
 							mMemoryBank[mRegisterI + 2 * rowN + 1] << 0
 						) << offsetX);
 
-						if (offsetY == (cScreenSizeY - 1)) { break; }
+						if (offsetY == (cDisplayH_C8 - 1)) { break; }
 					}
 				} else {
 					for (auto rowN = 0; rowN < N; ++rowN) {
@@ -863,7 +887,7 @@ void MEGACHIP::scrollBuffersRT() {
 						collisions += drawSingleBytes(originX, offsetY, offsetX ? 16 : 8,
 							mMemoryBank[mRegisterI + rowN] << offsetX);
 
-						if (offsetY == (cScreenSizeY - 1)) { break; }
+						if (offsetY == (cDisplayH_C8 - 1)) { break; }
 					}
 				}
 				::assign_cast(mRegisterV[0xF], collisions);
@@ -882,7 +906,7 @@ void MEGACHIP::scrollBuffersRT() {
 					collisions += drawDoubleBytes(originX, offsetY, 0x20,
 						ez::bitDup8(mMemoryBank[mRegisterI + rowN]) << offsetX);
 
-					if (offsetY == (cScreenSizeY - 2)) { break; }
+					if (offsetY == (cDisplayH_C8 - 2)) { break; }
 				}
 				::assign_cast(mRegisterV[0xF], collisions != 0);
 			}
@@ -914,8 +938,12 @@ void MEGACHIP::scrollBuffersRT() {
 	void MEGACHIP::instruction_Fx0A(s32 X) noexcept {
 		triggerInterrupt(Interrupt::INPUT);
 		mInputReg = &mRegisterV[X];
-		if (isManualRefresh()) [[unlikely]]
-			{ BVS->displayBuffer.write(mBackgroundBuffer); }
+		if (isManualRefresh()) [[unlikely]] {
+			mDisplayWindow.swapchain.acquire([&](auto& frame) noexcept {
+				frame.metadata = mDisplayWindow.metadata_staging;
+				frame.copy_from(mBackgroundBuffer);
+			});
+		}
 	}
 	void MEGACHIP::instruction_Fx15(s32 X) noexcept {
 		::assign_cast(mDelayTimer, mRegisterV[X]);

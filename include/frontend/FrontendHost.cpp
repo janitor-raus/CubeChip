@@ -74,7 +74,6 @@ void FrontendHost::replaceCore() {
 	mSystemCore.reset(CoreRegistry::constructCore());
 	if (mSystemCore) {
 		BVS->raiseMainWindow(); // bring to front when we get a core!
-		BVS->displayBuffer.resize(mSystemCore->getDisplaySize());
 		toggleSystemLimiter(); toggleSystemOSD();
 		mSystemCore->startWorker();
 	}
@@ -179,9 +178,7 @@ s32  FrontendHost::processFrame() {
 		sPendingFileDrops.clear();
 	}
 
-	return BVS->renderPresent(!!mSystemCore, (mSystemCore && mToggleOSD)
-		? mSystemCore->copyOverlayData().c_str() : nullptr
-	) ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
+	return BVS->renderPresent() ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
 }
 
 void FrontendHost::handleHotkeyActions() {

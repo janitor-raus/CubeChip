@@ -15,28 +15,32 @@
 
 class SCHIP_LEGACY final : public Chip8_CoreInterface {
 	static constexpr u64 cTotalMemory = 4_KiB;
-	static constexpr u32 cGameLoadPos =   512;
-	static constexpr u32 cStartOffset =   512;
+	static constexpr u32 cGameLoadPos = 0x200;
+	static constexpr u32 cStartOffset = 0x200;
 	static constexpr f32 cRefreshRate = 64.0f;
 
-	static constexpr s32 cResSizeMult =   4;
-	static constexpr s32 cScreenSizeX = 128;
-	static constexpr s32 cScreenSizeY =  64;
-	static constexpr s32 cInstSpeedHi =  45;
-	static constexpr s32 cInstSpeedLo =  32;
+	static constexpr s32 cDisplayW = 128;
+	static constexpr s32 cDisplayH =  64;
+	static constexpr s32 cInstSpeedHi = 45;
+	static constexpr s32 cInstSpeedLo = 32;
 
 /*==================================================================*/
 
-	FixedMap2D<u8, cScreenSizeX, cScreenSizeY>
+	FixedMap2D<u8, cDisplayW, cDisplayH>
 		mDisplayBuffer;
 
 	MemoryBank<cTotalMemory>
 		mMemoryBank{};
 
+	DisplayWindow
+		mDisplayWindow;
+
 /*==================================================================*/
 
 public:
-	SCHIP_LEGACY() {}
+	SCHIP_LEGACY()
+		: mDisplayWindow(DisplayWindow::Create<cDisplayW, cDisplayH>("SCHIP LEGACY"))
+	{}
 
 	static constexpr bool validateProgram(
 		const char* fileData,
@@ -45,9 +49,6 @@ public:
 		if (!fileData || !fileSize) { return false; }
 		return fileSize + cGameLoadPos <= cTotalMemory;
 	}
-
-	s32 getMaxDisplayW() const noexcept override { return cScreenSizeX; }
-	s32 getMaxDisplayH() const noexcept override { return cScreenSizeY; }
 
 private:
 	void initializeSystem() noexcept override;

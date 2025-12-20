@@ -7,7 +7,6 @@
 #include "CHIP8_MODERN.hpp"
 #if defined(ENABLE_CHIP8_SYSTEM) && defined(ENABLE_CHIP8_MODERN)
 
-#include "BasicVideoSpec.hpp"
 #include "CoreRegistry.hpp"
 
 REGISTER_CORE(CHIP8_MODERN, ".ch8")
@@ -18,7 +17,6 @@ void CHIP8_MODERN::initializeSystem() noexcept {
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
 	copyFontToMemory(mMemoryBank.data(), 80);
 
-	setViewportSizes(true, cScreenSizeX, cScreenSizeY, cResSizeMult, 2);
 	setBaseSystemFramerate(cRefreshRate);
 
 	mVoices[VOICE::ID_0].userdata = &mAudioTimers[VOICE::ID_0];
@@ -28,6 +26,17 @@ void CHIP8_MODERN::initializeSystem() noexcept {
 
 	mCurrentPC = cStartOffset;
 	mTargetCPF = Quirk.waitVblank ? cInstSpeedHi : cInstSpeedLo;
+
+	mDisplayWindow.metadata_staging
+		.set_viewport(cDisplayW, cDisplayH)
+		.set_scaling(8).set_padding(4)
+		.set_texture_tint(sBitColors[0])
+		.enabled = true;
+
+	mDisplayWindow.SetOverlayCallable([&]() {
+		if (!hasSystemState(EmuState::STATS)) { return; }
+		SimpleStatOverlay(copyOverlayData());
+	});
 }
 
 void CHIP8_MODERN::handleCycleLoop() noexcept
@@ -191,20 +200,21 @@ void CHIP8_MODERN::renderAudioData() {
 		{ makePulseWave, &mVoices[VOICE::BUZZER] },
 	});
 
-	setDisplayBorderColor(sBitColors[!!::accumulate(mAudioTimers)]);
+	mDisplayWindow.metadata_staging.set_border_color_if(
+		!!::accumulate(mAudioTimers), sBitColors[1]);
 }
 
 void CHIP8_MODERN::renderVideoData() {
-	BVS->displayBuffer.write(mDisplayBuffer, isUsingPixelTrails()
-		? [](u32 pixel) noexcept
-			{ return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
-		: [](u32 pixel) noexcept
-			{ return sBitColors[pixel >> 3]; }
-	);
+	mDisplayWindow.swapchain.acquire([&](auto& frame) noexcept {
+		frame.metadata = mDisplayWindow.metadata_staging;
+		frame.copy_from(mDisplayBuffer, isUsingPixelTrails()
+			? [](u32 pixel) noexcept { return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
+			: [](u32 pixel) noexcept { return sBitColors[pixel >> 3]; }
+		);
+	});
 
 	std::for_each(EXEC_POLICY(unseq)
-		mDisplayBuffer.begin(),
-		mDisplayBuffer.end(),
+		mDisplayBuffer.begin(), mDisplayBuffer.end(),
 		[](auto& pixel) noexcept
 			{ ::assign_cast(pixel, (pixel & 0x8) | (pixel >> 1)); }
 	);
@@ -402,12 +412,12 @@ void CHIP8_MODERN::renderVideoData() {
 
 			[[unlikely]]
 			default:
-				for (auto B = 0; B < 8; ++B, ++X &= (cScreenSizeX - 1)) {
+				for (auto B = 0; B < 8; ++B, ++X &= (cDisplayW - 1)) {
 					if (DATA & 0x80 >> B) {
 						if (!((mDisplayBuffer(X, Y) ^= 0x8) & 0x8))
 							[[unlikely]] { mRegisterV[0xF] = 1; }
 					}
-					if (!Quirk.wrapSprite && X == (cScreenSizeX - 1)) { return; }
+					if (!Quirk.wrapSprite && X == (cDisplayW - 1)) { return; }
 				}
 				return;
 		}
@@ -417,8 +427,8 @@ void CHIP8_MODERN::renderVideoData() {
 		if (Quirk.waitVblank) [[unlikely]]
 			{ triggerInterrupt(Interrupt::FRAME); }
 
-		auto pX = mRegisterV[X] & (cScreenSizeX - 1);
-		auto pY = mRegisterV[Y] & (cScreenSizeY - 1);
+		auto pX = mRegisterV[X] & (cDisplayW - 1);
+		auto pY = mRegisterV[Y] & (cDisplayH - 1);
 
 		mRegisterV[0xF] = 0;
 
@@ -430,21 +440,21 @@ void CHIP8_MODERN::renderVideoData() {
 
 			[[unlikely]]
 			case 0:
-				for (auto H = 0, I = 0; H < 16; ++H, ++pY &= (cScreenSizeY - 1))
+				for (auto H = 0, I = 0; H < 16; ++H, ++pY &= (cDisplayH - 1))
 				{
 					drawByte(pX + 0, pY, mMemoryBank[mRegisterI + I++]);
 					drawByte(pX + 8, pY, mMemoryBank[mRegisterI + I++]);
 
-					if (!Quirk.wrapSprite && pY == (cScreenSizeY - 1)) { return; }
+					if (!Quirk.wrapSprite && pY == (cDisplayH - 1)) { return; }
 				}
 				return;
 
 			[[unlikely]]
 			default:
-				for (auto H = 0; H < N; ++H, ++pY &= (cScreenSizeY - 1))
+				for (auto H = 0; H < N; ++H, ++pY &= (cDisplayH - 1))
 				{
 					drawByte(pX, pY, mMemoryBank[mRegisterI + H]);
-					if (!Quirk.wrapSprite && pY == (cScreenSizeY - 1)) { return; }
+					if (!Quirk.wrapSprite && pY == (cDisplayH - 1)) { return; }
 				}
 				return;
 		}

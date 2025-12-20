@@ -7,8 +7,6 @@
 #include "XOCHIP.hpp"
 #if defined(ENABLE_CHIP8_SYSTEM) && defined(ENABLE_XOCHIP)
 
-#include "BasicVideoSpec.hpp"
-
 #include "CoreRegistry.hpp"
 
 REGISTER_CORE(XOCHIP, ".xo8")
@@ -23,7 +21,6 @@ void XOCHIP::initializeSystem() noexcept {
 	copyColorsToCore(mBitColors.data());
 
 	mDisplay.set(cScreenSizeX, cScreenSizeY);
-	setViewportSizes(true, cScreenSizeX, cScreenSizeY, cResSizeMult, 2);
 	setBaseSystemFramerate(cRefreshRate);
 
 	setPatternPitch(64);
@@ -33,6 +30,17 @@ void XOCHIP::initializeSystem() noexcept {
 
 	mCurrentPC = cStartOffset;
 	mTargetCPF = cInstSpeedLo;
+
+	prepDisplayArea(Resolution::LO);
+
+	mDisplayWindow.metadata_staging
+		.set_texture_tint(mBitColors[0])
+		.enabled = true;
+
+	mDisplayWindow.SetOverlayCallable([&]() {
+		if (!hasSystemState(EmuState::STATS)) { return; }
+		SimpleStatOverlay(copyOverlayData());
+	});
 }
 
 void XOCHIP::handleCycleLoop() noexcept
@@ -252,17 +260,19 @@ void XOCHIP::renderAudioData() {
 		{ makePulseWave,   &mVoices[VOICE::BUZZER] },
 	});
 
-	setDisplayBorderColor(mBitColors[!!mAudioTimers[VOICE::BUZZER].get()]);
+	mDisplayWindow.metadata_staging.set_border_color_if(
+		!!mAudioTimers[VOICE::BUZZER], mBitColors[1]);
 }
 
 void XOCHIP::renderVideoData() {
-	std::vector<u8> textureBuffer(mDisplay.pixels());
+	std::array<u8, cDisplayW * cDisplayH> tempBuffer{};
+	//std::vector<u8> textureBuffer(mDisplay.pixels());
 
 	std::for_each(EXEC_POLICY(unseq)
-		textureBuffer.begin(),
-		textureBuffer.end(),
+		tempBuffer.data(),
+		tempBuffer.data() + mDisplay.pixels(),
 		[&](auto& pixel) noexcept {
-			const auto idx = &pixel - textureBuffer.data();
+			const auto idx = &pixel - tempBuffer.data();
 			::assign_cast(pixel,
 				mDisplayBuffer[3](idx) << 3 |
 				mDisplayBuffer[2](idx) << 2 |
@@ -272,22 +282,22 @@ void XOCHIP::renderVideoData() {
 		}
 	);
 
-	BVS->displayBuffer.write(textureBuffer,
-		[pBitColors = mBitColors.data()](u32 pixel) noexcept {
-			return u32(0xFFu | pBitColors[pixel]);
-		}
-	);
-
-	setViewportSizes(isResolutionChanged(false), mDisplay.W, mDisplay.H,
-		isLargerDisplay() ? cResSizeMult / 2 : cResSizeMult, 2);
+	mDisplayWindow.swapchain.acquire([&](auto& frame) noexcept {
+		frame.metadata = mDisplayWindow.metadata_staging;
+		frame.copy_from(tempBuffer, [&](auto pixel) noexcept { return mBitColors[pixel]; });
+	});
 }
 
 void XOCHIP::prepDisplayArea(const Resolution mode) {
 	const bool wasLargerDisplay = isLargerDisplay(mode != Resolution::LO);
 	isResolutionChanged(wasLargerDisplay != isLargerDisplay());
 
-	const auto W = isLargerDisplay() ? cScreenSizeX * 2 : cScreenSizeX;
-	const auto H = isLargerDisplay() ? cScreenSizeY * 2 : cScreenSizeY;
+	const auto W = isLargerDisplay() ? cDisplayW : cDisplayW / 2;
+	const auto H = isLargerDisplay() ? cDisplayH : cDisplayH / 2;
+
+	mDisplayWindow.metadata_staging.set_viewport(W, H)
+		.set_padding(4)
+		.set_scaling(isLargerDisplay() ? 4 : 8);
 
 	mDisplay.set(W, H);
 

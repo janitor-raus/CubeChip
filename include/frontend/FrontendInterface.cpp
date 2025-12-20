@@ -7,6 +7,7 @@
 #include <cmath>
 #include <algorithm>
 #include <string>
+#include <numeric>
 
 #include "FrontendInterface.hpp"
 #include "HomeDirManager.hpp"
@@ -21,9 +22,29 @@
 
 /*==================================================================*/
 
+Vec2::Vec2(const ImVec2& vec2) noexcept
+	: x(vec2.x), y(vec2.y)
+{}
+
+Vec2::Vec2(ImVec2&& vec2) noexcept
+	: x(vec2.x), y(vec2.y)
+{}
+
+Vec2::operator ImVec2() const noexcept {
+	return ImVec2(x, y);
+}
+
+Vec4::Vec4(const ImVec4& vec4) noexcept
+	: x(vec4.x), y(vec4.y), z(vec4.z), w(vec4.w)
+{}
+
+Vec4::operator ImVec4() const noexcept {
+	return ImVec4(x, y, z, w);
+}
+
+/*==================================================================*/
+
 static ImGuiID sMainDockID{};
-static ImGuiID sTaskbarDockID{};
-static float   sTaskbarSize{};
 
 namespace ImGui {
 	ImVec2 clamp(const ImVec2& value, const ImVec2& min, const ImVec2& max) noexcept {
@@ -50,91 +71,89 @@ namespace ImGui {
 }
 
 namespace ImGui {
-	[[maybe_unused]]
-	static void writeText(
-		const std::string& textString,
-		ImVec2 textAlign   = ImVec2{ 0.5f, 0.5f },
-		ImVec4 textColor   = ImVec4{ 1.0f, 1.0f, 1.0f, 1.0f },
-		ImVec2 textPadding = ImVec2{ 6.0f, 6.0f }
-	) {
-		using namespace ImGui;
-		const auto textPos{ (
-			GetWindowSize() - CalcTextSize(textString.c_str()) - textPadding * 2
-		) * textAlign + textPadding };
+	void TextUnformatted(const char* text, unsigned color, const char* text_end) noexcept {
+		PushStyleColor(ImGuiCol_Text, color);
+		TextUnformatted(text, text_end);
+		PopStyleColor();
+	}
 
-		PushStyleColor(ImGuiCol_Text, textColor);
+	void writeText(
+		const std::string& textString, RGBA textColor,
+		Vec2 textAlign, Vec2 textPadding
+	) noexcept {
+		using namespace ImGui;
+		const auto textPos = GetCursorPos() + textPadding + textAlign * (
+			GetContentRegionAvail() - CalcTextSize(textString.c_str()) - textPadding * 2);
+
 		SetCursorPos(textPos);
-		TextUnformatted(textString.c_str());
-		PopStyleColor();
+		TextUnformatted(textString.c_str(), textColor);
 	}
 
-	[[maybe_unused]]
-	static void writeShadowedText(
-		const std::string& textString,
-		ImVec2 textAlign   = ImVec2{ 0.5f, 0.5f },
-		ImVec4 textColor   = ImVec4{ 1.0f, 1.0f, 1.0f, 1.0f },
-		ImVec2 textPadding = ImVec2{ 6.0f, 6.0f },
-		ImVec2 shadowDist  = ImVec2{ 2.0f, 2.0f }
-	) {
+	void writeShadowedText(
+		const std::string& textString, RGBA textColor,
+		Vec2 textAlign, Vec2 textPadding, Vec2 shadowDist
+	) noexcept {
 		using namespace ImGui;
-		const auto textPos{ (
-			GetWindowSize() - CalcTextSize(textString.c_str()) - textPadding * 2
-		) * textAlign + textPadding };
+		const auto textPos = GetCursorPos() + textPadding + textAlign * (
+			GetContentRegionAvail() - CalcTextSize(textString.c_str()) - textPadding * 2);
+		const auto shadowOffset = shadowDist * 0.5f;
 
-		const auto shadowOffset{ shadowDist * 0.5f };
-		PushStyleColor(ImGuiCol_Text, { 0.0f, 0.0f, 0.0f, 1.0f });
 		SetCursorPos(textPos + shadowOffset);
-		TextUnformatted(textString.c_str());
-		PopStyleColor();
+		TextUnformatted(textString.c_str(), IM_COL32_BLACK);
 
-		PushStyleColor(ImGuiCol_Text, textColor);
 		SetCursorPos(textPos - shadowOffset);
-		TextUnformatted(textString.c_str());
-		PopStyleColor();
+		TextUnformatted(textString.c_str(), textColor);
 	}
 
-	static void DrawRotatedImage(void* texture, const ImVec2& dimensions, int rotation) {
-		static constexpr ImVec2 TL{ 0, 0 };
-		static constexpr ImVec2 TR{ 1, 0 };
-		static constexpr ImVec2 BL{ 0, 1 };
-		static constexpr ImVec2 BR{ 1, 1 };
+	void DrawRotatedImage(
+		void* texture, const ImVec2& dims, unsigned rotation,
+		const ImVec2& uv0, const ImVec2& uv1, unsigned tint
+	) noexcept {
+		const ImVec2 TL = ImGui::GetCursorScreenPos();
+		const ImVec2 TR = { TL.x + dims.x, TL.y          };
+		const ImVec2 BR = { TL.x + dims.x, TL.y + dims.y };
+		const ImVec2 BL = { TL.x,          TL.y + dims.y };
 
-		const auto pos = ImGui::GetCursorScreenPos();
+		static constexpr int rotLUT[4][4] = {
+			{ 0, 1, 3, 2 }, //   0 deg : TL TR BR BL
+			{ 3, 0, 1, 2 }, //  90 deg
+			{ 2, 3, 0, 1 }, // 180 deg
+			{ 1, 2, 3, 0 }, // 270 deg
+		};
 
-		const ImVec2 A{ pos.x,                pos.y };
-		const ImVec2 B{ pos.x + dimensions.x, pos.y };
-		const ImVec2 C{ pos.x + dimensions.x, pos.y + dimensions.y };
-		const ImVec2 D{ pos.x,                pos.y + dimensions.y };
+		const ImVec2 uvs[] = {
+			{ uv0.x, uv0.y }, // TL
+			{ uv1.x, uv0.y }, // TR
+			{ uv0.x, uv1.y }, // BL
+			{ uv1.x, uv1.y }, // BR
+		};
+		const auto& m = rotLUT[rotation & 3];
 
-		switch (rotation & 3) {
-			case 0:
-				ImGui::GetWindowDrawList()->AddImageQuad(
-					reinterpret_cast<ImTextureID>(texture), A, B, C, D, TL, TR, BR, BL);
-				break;
+		ImGui::GetWindowDrawList()->AddImageQuad(
+			reinterpret_cast<ImTextureID>(texture), TL, TR, BR, BL,
+			uvs[m[0]], uvs[m[1]], uvs[m[2]], uvs[m[3]], tint
+		);
+	}
 
-			case 1:
-				ImGui::GetWindowDrawList()->AddImageQuad(
-					reinterpret_cast<ImTextureID>(texture), A, B, C, D, BL, TL, TR, BR);
-				break;
+	void DrawRect(const ImVec2& dims, float width, float round, unsigned color) noexcept {
+		const auto origin = ImGui::GetCursorScreenPos();
 
-			case 2:
-				ImGui::GetWindowDrawList()->AddImageQuad(
-					reinterpret_cast<ImTextureID>(texture), A, B, C, D, BR, BL, TL, TR);
-				break;
+		ImGui::GetWindowDrawList()->AddRect(origin, origin + dims,
+			color, round, ImDrawFlags_RoundCornersAll, width);
+	}
 
-			case 3:
-				ImGui::GetWindowDrawList()->AddImageQuad(
-					reinterpret_cast<ImTextureID>(texture), A, B, C, D, TR, BR, BL, TL);
-				break;
-		}
-		ImGui::Dummy(dimensions);
+	void DrawRectFilled(const ImVec2& dims, float round, unsigned color) noexcept {
+		const auto origin = ImGui::GetCursorScreenPos();
+
+		ImGui::GetWindowDrawList()->AddRectFilled(origin, origin + dims,
+			color, round, ImDrawFlags_RoundCornersAll);
 	}
 }
 
 /*==================================================================*/
 
 bool FrontendInterface::mergeOverflowingWindows() noexcept {
-	std::unique_lock lock{ sHooks->windows.overflow_lock };
+	std::unique_lock lock(sHooks->windows.overflow_lock);
 
 	auto& src_windows = sHooks->windows.overflow.buffer;
 	if (src_windows.empty()) { return false; }
@@ -153,7 +172,7 @@ bool FrontendInterface::mergeOverflowingWindows() noexcept {
 }
 
 void FrontendInterface::invokeRegisteredWindows() noexcept {
-	std::unique_lock lock{ sHooks->windows.registry_lock };
+	std::unique_lock lock(sHooks->windows.registry_lock);
 
 	auto& windows = sHooks->windows.registry;
 
@@ -172,7 +191,7 @@ void FrontendInterface::invokeRegisteredWindows() noexcept {
 }
 
 bool FrontendInterface::mergeOverflowingMenus(const Key& tag) noexcept {
-	std::unique_lock lock{ sHooks->menus.overflow_lock };
+	std::unique_lock lock(sHooks->menus.overflow_lock);
 
 	auto& src_window = sHooks->menus.overflow[tag];
 	if (src_window.empty()) {
@@ -198,7 +217,7 @@ bool FrontendInterface::mergeOverflowingMenus(const Key& tag) noexcept {
 }
 
 void FrontendInterface::invokeRegisteredMenus(const Key& tag) noexcept {
-	std::unique_lock lock{ sHooks->menus.registry_lock };
+	std::unique_lock lock(sHooks->menus.registry_lock);
 
 	auto window = sHooks->menus.registry.find(tag);
 	if (window == sHooks->menus.registry.end()) { return; }
@@ -230,7 +249,7 @@ void FrontendInterface::invokeRegisteredMenus(const Key& tag) noexcept {
 void FrontendInterface::SetScaleFactor(float scale) noexcept {
 	ImGui::GetStyle().FontScaleMain = scale;
 }
-float& FrontendInterface::GetScaleFactor() noexcept {
+float FrontendInterface::GetScaleFactor() noexcept {
 	return ImGui::GetStyle().FontScaleMain;
 }
 
@@ -257,7 +276,6 @@ void FrontendInterface::InitContext(const char* home_dir) {
 	sMainFont = io.Fonts->AddFontFromMemoryCompressedTTF
 		(FontData::Roboto_Mono, std::size(FontData::Roboto_Mono), 16.0f);
 
-	io.Fonts->Build();
 	io.FontDefault = sMainFont;
 }
 
@@ -266,13 +284,12 @@ void FrontendInterface::QuitContext() {
 }
 
 void FrontendInterface::InitVideo(SDL_Window* window, SDL_Renderer* renderer) {
-	//UpdateFontScale();
-
 	ImGui::StyleColorsDark();
 	//ImGui::StyleColorsLight();
 
 	ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
 	ImGui_ImplSDLRenderer3_Init(renderer);
+	sRenderer = renderer;
 }
 
 void FrontendInterface::QuitVideo() {
@@ -292,9 +309,24 @@ void FrontendInterface::NewFrame() {
 
 	ImGui::NewFrame();
 
-	sTaskbarSize = ImGui::GetFrameHeight();
+	if (ImGui::BeginMainMenuBar()) {
+		invokeRegisteredMenus("");
+		ImGui::EndMainMenuBar();
+	}
 
-	initializeMainDockspace();
+	const auto& viewport = *ImGui::GetMainViewport();
+	ImGui::SetNextWindowPos({ viewport.Pos.x, viewport.Pos.y + ImGui::GetFrameHeight() });
+	ImGui::SetNextWindowSize({ viewport.Size.x, viewport.Size.y - ImGui::GetFrameHeight() });
+	ImGui::SetNextWindowViewport(viewport.ID);
+
+	ImGui::Begin("MainDockspace", nullptr, ImGuiWindowFlags_NoSavedSettings
+		| ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs
+		| ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+	sMainDockID = ImGui::GetID("MainDockspace");
+	ImGui::DockSpace(sMainDockID);
+	ImGui::End();
+
 	invokeRegisteredWindows();
 }
 
@@ -303,89 +335,7 @@ void FrontendInterface::RenderFrame(SDL_Renderer* renderer) {
 	ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
 }
 
-/*==================================================================*/
-
-void FrontendInterface::PrepareViewport(
-	bool enable, bool integer_scaling,
-	int width, int height, int rotation,
-	const char* overlay_data, SDL_Texture* texture
-) {
-	ImGui::SetNextWindowDockID(sMainDockID, ImGuiCond_FirstUseEver);
-
-	ImGui::Begin("ViewportFrame", nullptr,
-		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-
-	if (enable) {
-		using namespace ImGui;
-		const ImVec2 windowArea{ GetContentRegionAvail() };
-
-		auto rawAspectRatio{ std::min(windowArea.x / width, windowArea.y / height) };
-		const auto normalizedRatio{ std::max((integer_scaling
-			? std::floor(rawAspectRatio)
-			: rawAspectRatio
-		), 1.0f) };
-
-		const ImVec2 textureArea{ width * normalizedRatio, height * normalizedRatio };
-
-		SetCursorPos(floor(GetCursorPos() + (windowArea - textureArea) / 2.0f));
-		DrawRotatedImage(texture, textureArea, rotation);
-
-		if (overlay_data) { writeShadowedText(overlay_data, { 0.0f, 1.0f }); }
-	}
-
-	ImGui::End();
-}
-
-void FrontendInterface::initializeMainDockspace() {
-	const auto& viewport = *ImGui::GetMainViewport();
-	ImGui::SetNextWindowPos(viewport.Pos);
-	ImGui::SetNextWindowSize({
-		viewport.Size.x,
-		viewport.Size.y - sTaskbarSize
-	});
-	ImGui::SetNextWindowViewport(viewport.ID);
-
-	ImGui::Begin("MainDockspace", nullptr,
-		ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking |
-		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
-		ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
-		ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
-		ImGuiWindowFlags_NoSavedSettings);
-
-	if (ImGui::BeginMainMenuBar()) {
-		invokeRegisteredMenus("");
-
-		ImGui::EndMainMenuBar();
-	}
-
-	sMainDockID = ImGui::GetID("MainDockspace");
-	ImGui::DockSpace(sMainDockID, { 0.0f, 0.0f });
-	ImGui::End();
-
-	/*==================================================================*/
-
-	ImGui::SetNextWindowPos({
-		viewport.Pos.x,
-		viewport.Pos.y + viewport.Size.y - ImGui::GetFrameHeight() * 2
-	});
-	ImGui::SetNextWindowSize({ viewport.Size.x, ImGui::GetFrameHeight() * 2 });
-	ImGui::SetNextWindowViewport(viewport.ID);
-
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{});
-	ImGui::Begin("TaskbarDockspace", nullptr,
-		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
-		ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-		ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
-		ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings
-	);
-	ImGui::PopStyleVar();
-
-	sTaskbarDockID = ImGui::GetID("TaskbarDockspace");
-	ImGui::DockSpace(sTaskbarDockID, { 0.0f, 0.0f },
-		ImGuiDockNodeFlags_NoDockingInCentralNode | ImGuiDockNodeFlags_NoResize |
-		ImGuiDockNodeFlags_NoDockingSplit
-		//| ImGuiDockNodeFlags_NoUndocking
-	);
-	ImGui::End();
+void FrontendInterface::SetNextWindowDockingTo(unsigned id, bool first_time) noexcept {
+	ImGui::SetNextWindowDockID(id ? id : sMainDockID,
+		first_time ? ImGuiCond_FirstUseEver : ImGuiCond_Always);
 }

@@ -25,8 +25,8 @@ BytePusher_CoreInterface::BytePusher_CoreInterface() noexcept {
 void BytePusher_CoreInterface::mainSystemLoop() {
 	instructionLoop();
 	renderAudioData();
-	renderVideoData();
 	makeOverlayData();
+	renderVideoData();
 }
 
 void BytePusher_CoreInterface::loadPresetBinds() noexcept {

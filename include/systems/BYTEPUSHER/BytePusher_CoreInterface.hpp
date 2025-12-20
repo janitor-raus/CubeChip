@@ -18,12 +18,12 @@ class BytePusher_CoreInterface : public SystemInterface {
 protected:
 	static inline Path sSavestatePath{};
 
+	enum STREAM { MAIN };
+	enum VOICE { ID_0, COUNT };
+
 	AudioDevice mAudioDevice;
 
 	std::vector<SimpleKeyMapping> mCustomBinds;
-
-	enum STREAM { MAIN };
-	enum VOICE { ID_0, COUNT };
 
 	u32  getKeyStates() noexcept;
 	void loadPresetBinds() noexcept;
@@ -47,7 +47,7 @@ public:
 	void mainSystemLoop() override;
 
 protected:
-	static constexpr RGBA cBitsColor[]{
+	static constexpr RGBA cBitColors[]{
 		0x000000FF, 0x000033FF, 0x000066FF, 0x000099FF,
 		0x0000CCFF, 0x0000FFFF, 0x003300FF, 0x003333FF,
 		0x003366FF, 0x003399FF, 0x0033CCFF, 0x0033FFFF,

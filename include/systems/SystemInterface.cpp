@@ -5,7 +5,6 @@
 */
 
 #include "ThreadAffinity.hpp"
-#include "BasicVideoSpec.hpp"
 #include "FrameLimiter.hpp"
 #include "BasicLogger.hpp"
 
@@ -66,25 +65,17 @@ void SystemInterface::stopWorker() noexcept {
 }
 
 SystemInterface::SystemInterface() noexcept
-	: mOverlayData{ std::make_shared<Str>() }
+	: mOverlayData(std::make_shared<Str>())
 {
 	static thread_local auto sRNG   = std::make_unique<Well512>();
 	static thread_local auto sInput = std::make_unique<BasicKeyboard>();
 	RNG   = sRNG.get();
 	Input = sInput.get();
+
+	mOverlayDataBuffer.reserve(1_KiB);
 }
 
 /*==================================================================*/
-
-void SystemInterface::setViewportSizes(bool cond, u32 W, u32 H, u32 mult, u32 ppad) noexcept {
-	// should go through VideoDevice later instead
-	if (cond) { BVS->setViewportSizes(s32(W), s32(H), s32(mult), s32(ppad)); }
-}
-
-void SystemInterface::setDisplayBorderColor(u32 color) noexcept {
-	// should go through VideoDevice later instead
-	BVS->setBorderColor(color);
-}
 
 f32 SystemInterface::getBaseSystemFramerate() const noexcept
 	{ return mBaseSystemFramerate.load(mo::relaxed); }
@@ -120,7 +111,6 @@ void SystemInterface::makeOverlayData() noexcept {
 	mOverlayData.store(std::make_shared<Str> \
 		(std::move(mOverlayDataBuffer)), mo::release);
 	mOverlayDataBuffer.clear();
-	mOverlayDataBuffer.reserve(1_KiB);
 }
 
 Str SystemInterface::copyOverlayData() const noexcept {

@@ -15,28 +15,29 @@
 
 class CHIP8E final : public Chip8_CoreInterface {
 	static constexpr u64 cTotalMemory = 4_KiB;
-	static constexpr u32 cGameLoadPos =   512;
-	static constexpr u32 cStartOffset =   512;
+	static constexpr u32 cGameLoadPos = 0x200;
+	static constexpr u32 cStartOffset = 0x200;
 	static constexpr f32 cRefreshRate = 60.0f;
 
-	static constexpr s32 cResSizeMult =  8;
-	static constexpr s32 cScreenSizeX = 64;
-	static constexpr s32 cScreenSizeY = 32;
+	static constexpr s32 cDisplayW = 64;
+	static constexpr s32 cDisplayH = 32;
 	static constexpr s32 cInstSpeedHi = 30;
 	static constexpr s32 cInstSpeedLo = 15;
 
-	static constexpr u32 cMaxDisplayW = 64;
-	static constexpr u32 cMaxDisplayH = 32;
-
 private:
-	FixedMap2D<u8, cScreenSizeX, cScreenSizeY>
+	FixedMap2D<u8, cDisplayW, cDisplayH>
 		mDisplayBuffer{};
 
 	MemoryBank<cTotalMemory>
 		mMemoryBank{};
 
+	DisplayWindow
+		mDisplayWindow;
+
 public:
-	CHIP8E() {}
+	CHIP8E()
+		: mDisplayWindow(DisplayWindow::Create<cDisplayW, cDisplayH>("CHIP-8E"))
+	{}
 
 	static constexpr bool validateProgram(
 		const char* fileData,
@@ -45,9 +46,6 @@ public:
 		if (!fileData || !fileSize) { return false; }
 		return fileSize + cGameLoadPos <= cTotalMemory;
 	}
-
-	s32 getMaxDisplayW() const noexcept override { return cMaxDisplayW; }
-	s32 getMaxDisplayH() const noexcept override { return cMaxDisplayH; }
 
 private:
 	void initializeSystem() noexcept override;

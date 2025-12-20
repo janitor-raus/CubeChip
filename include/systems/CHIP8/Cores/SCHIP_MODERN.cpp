@@ -19,7 +19,6 @@ void SCHIP_MODERN::initializeSystem() noexcept {
 	copyFontToMemory(mMemoryBank.data(), 240);
 
 	mDisplay.set(cScreenSizeX, cScreenSizeY);
-	setViewportSizes(true, cScreenSizeX, cScreenSizeY, cResSizeMult, 2);
 	setBaseSystemFramerate(cRefreshRate);
 
 	mVoices[VOICE::ID_0].userdata = &mAudioTimers[VOICE::ID_0];
@@ -29,6 +28,19 @@ void SCHIP_MODERN::initializeSystem() noexcept {
 
 	mCurrentPC = cStartOffset;
 	mTargetCPF = cInstSpeedLo;
+
+	prepDisplayArea(Resolution::LO);
+
+	mDisplayWindow.metadata_staging
+		.set_viewport(64, 32)
+		.set_padding(4)
+		.set_texture_tint(sBitColors[0])
+		.enabled = true;
+
+	mDisplayWindow.SetOverlayCallable([&]() {
+		if (!hasSystemState(EmuState::STATS)) { return; }
+		SimpleStatOverlay(copyOverlayData());
+	});
 }
 
 void SCHIP_MODERN::handleCycleLoop() noexcept
@@ -219,19 +231,18 @@ void SCHIP_MODERN::renderAudioData() {
 		{ makePulseWave, &mVoices[VOICE::BUZZER] },
 	});
 
-	setDisplayBorderColor(sBitColors[!!::accumulate(mAudioTimers)]);
+	mDisplayWindow.metadata_staging.set_border_color_if(
+		!!::accumulate(mAudioTimers), sBitColors[1]);
 }
 
 void SCHIP_MODERN::renderVideoData() {
-	BVS->displayBuffer.write(mDisplayBuffer, isUsingPixelTrails()
-		? [](u32 pixel) noexcept
-			{ return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
-		: [](u32 pixel) noexcept
-			{ return sBitColors[pixel >> 3]; }
-	);
-
-	setViewportSizes(isResolutionChanged(false), mDisplay.W, mDisplay.H,
-		isLargerDisplay() ? cResSizeMult / 2 : cResSizeMult, 2);
+	mDisplayWindow.swapchain.acquire([&](auto& frame) noexcept {
+		frame.metadata = mDisplayWindow.metadata_staging;
+		frame.copy_from(mDisplayBuffer, isUsingPixelTrails()
+			? [](u32 pixel) noexcept { return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
+			: [](u32 pixel) noexcept { return sBitColors[pixel >> 3]; }
+		);
+	});
 
 	std::for_each(EXEC_POLICY(unseq)
 		mDisplayBuffer.begin(),
@@ -245,8 +256,11 @@ void SCHIP_MODERN::prepDisplayArea(const Resolution mode) {
 	const bool wasLargerDisplay = isLargerDisplay(mode != Resolution::LO);
 	isResolutionChanged(wasLargerDisplay != isLargerDisplay());
 
-	const auto W = isLargerDisplay() ? cScreenSizeX * 2 : cScreenSizeX;
-	const auto H = isLargerDisplay() ? cScreenSizeY * 2 : cScreenSizeY;
+	const auto W = isLargerDisplay() ? cDisplayW : cDisplayW / 2;
+	const auto H = isLargerDisplay() ? cDisplayH : cDisplayH / 2;
+
+	mDisplayWindow.metadata_staging.set_viewport(W, H)
+		.set_scaling(isLargerDisplay() ? 4 : 8);
 
 	mDisplay.set(W, H);
 

@@ -15,13 +15,13 @@
 
 class CHIP8X final : public Chip8_CoreInterface {
 	static constexpr u64 cTotalMemory = 4_KiB;
-	static constexpr u32 cGameLoadPos =   768;
-	static constexpr u32 cStartOffset =   768;
+	static constexpr u32 cGameLoadPos = 0x300;
+	static constexpr u32 cStartOffset = 0x300;
 	static constexpr f32 cRefreshRate = 61.0f;
 
 	static constexpr s32 cResSizeMult =  8;
-	static constexpr s32 cScreenSizeX = 64;
-	static constexpr s32 cScreenSizeY = 32;
+	static constexpr s32 cDisplayW = 64;
+	static constexpr s32 cDisplayH = 32;
 	static constexpr s32 cInstSpeedHi = 30;
 	static constexpr s32 cInstSpeedLo = 15;
 
@@ -29,17 +29,20 @@ class CHIP8X final : public Chip8_CoreInterface {
 	static constexpr u32 cMaxDisplayH = 32;
 
 private:
-	FixedMap2D<RGBA, (cScreenSizeX >> 3), cScreenSizeY>
-		mColoredBuffer{};
-
 	u32 mBackgroundColor = 0x00;
 	u32 mColorResolution = 0xFC;
 
-	FixedMap2D<u8, cScreenSizeX, cScreenSizeY>
+	FixedMap2D<RGBA, (cDisplayW >> 3), cDisplayH>
+		mColoredBuffer{};
+
+	FixedMap2D<u8, cDisplayW, cDisplayH>
 		mDisplayBuffer{};
 
 	MemoryBank<cTotalMemory>
 		mMemoryBank{};
+
+	DisplayWindow
+		mDisplayWindow;
 
 	void setBuzzerPitch(s32 pitch) noexcept;
 
@@ -47,7 +50,9 @@ private:
 	void drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept;
 
 public:
-	CHIP8X() {}
+	CHIP8X()
+		: mDisplayWindow(DisplayWindow::Create<cDisplayW, cDisplayH>("CHIP-8X"))
+	{}
 
 	static constexpr bool validateProgram(
 		const char* fileData,
@@ -56,9 +61,6 @@ public:
 		if (!fileData || !fileSize) { return false; }
 		return fileSize + cGameLoadPos <= cTotalMemory;
 	}
-
-	s32 getMaxDisplayW() const noexcept override { return cMaxDisplayW; }
-	s32 getMaxDisplayH() const noexcept override { return cMaxDisplayH; }
 
 private:
 	void initializeSystem() noexcept override;

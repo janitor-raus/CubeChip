@@ -20,8 +20,8 @@ class BYTEPUSHER_STANDARD final : public BytePusher_CoreInterface {
 
 	static constexpr s32 cAudioLength = 256;
 	static constexpr s32 cResSizeMult =   2;
-	static constexpr s32 cScreenSizeX = 256;
-	static constexpr s32 cScreenSizeY = 256;
+	static constexpr s32 cDisplayW = 256;
+	static constexpr s32 cDisplayH = 256;
 
 	static constexpr u32 cMaxDisplayW = 256;
 	static constexpr u32 cMaxDisplayH = 256;
@@ -29,6 +29,8 @@ class BYTEPUSHER_STANDARD final : public BytePusher_CoreInterface {
 private:
 	std::array<u8, cTotalMemory + cSafezoneOOB>
 		mMemoryBank{};
+
+	DisplayWindow mDisplayWindow;
 
 	template<u32 T> requires (T >= 1 && T <= 3)
 		u32 readData(u32 pos) const noexcept {
@@ -49,7 +51,9 @@ private:
 	void renderVideoData() override;
 
 public:
-	BYTEPUSHER_STANDARD() {}
+	BYTEPUSHER_STANDARD()
+		: mDisplayWindow(DisplayWindow::Create(cDisplayW, cDisplayH, "BytePusher Standard"))
+	{}
 
 	static constexpr bool validateProgram(
 		const char* fileData,
@@ -58,9 +62,6 @@ public:
 		if (!fileData || !fileSize) { return false; }
 		return fileSize <= cTotalMemory;
 	}
-
-	s32 getMaxDisplayW() const noexcept override { return cScreenSizeX; }
-	s32 getMaxDisplayH() const noexcept override { return cScreenSizeY; }
 
 private:
 	void initializeSystem() noexcept override;

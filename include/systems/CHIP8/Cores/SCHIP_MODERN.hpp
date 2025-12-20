@@ -15,18 +15,16 @@
 
 class SCHIP_MODERN final : public Chip8_CoreInterface {
 	static constexpr u64 cTotalMemory = 4_KiB;
-	static constexpr u32 cGameLoadPos =   512;
-	static constexpr u32 cStartOffset =   512;
+	static constexpr u32 cGameLoadPos = 0x200;
+	static constexpr u32 cStartOffset = 0x200;
 	static constexpr f32 cRefreshRate = 60.0f;
 
-	static constexpr s32 cResSizeMult =  8;
+	static constexpr s32 cDisplayW = 128;
+	static constexpr s32 cDisplayH = 64;
 	static constexpr s32 cScreenSizeX = 64;
 	static constexpr s32 cScreenSizeY = 32;
 	static constexpr s32 cInstSpeedHi = 45;
 	static constexpr s32 cInstSpeedLo = 30;
-
-	static constexpr u32 cMaxDisplayW = 128;
-	static constexpr u32 cMaxDisplayH =  64;
 
 /*==================================================================*/
 
@@ -35,11 +33,22 @@ class SCHIP_MODERN final : public Chip8_CoreInterface {
 	MemoryBank<cTotalMemory>
 		mMemoryBank{};
 
+	DisplayWindow
+		mDisplayWindow;
+
+	struct DisplayRes final {
+		s32 W{}, H{};
+		constexpr s32 pixels() const noexcept { return W * H; }
+		constexpr void clear() noexcept { W = H = 0; }
+		constexpr void set(u32 w, u32 h) noexcept { W = w; H = h; }
+	} mDisplay;
+
 /*==================================================================*/
 
 public:
 	SCHIP_MODERN()
 		: mDisplayBuffer{ cScreenSizeX, cScreenSizeY }
+		, mDisplayWindow(DisplayWindow::Create<cDisplayW, cDisplayH>("SCHIP MODERN"))
 	{}
 
 	static constexpr bool validateProgram(
@@ -49,9 +58,6 @@ public:
 		if (!fileData || !fileSize) { return false; }
 		return fileSize + cGameLoadPos <= cTotalMemory;
 	}
-
-	s32 getMaxDisplayW() const noexcept override { return cMaxDisplayW; }
-	s32 getMaxDisplayH() const noexcept override { return cMaxDisplayH; }
 
 private:
 	void initializeSystem() noexcept override;

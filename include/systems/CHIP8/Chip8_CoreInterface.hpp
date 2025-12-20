@@ -24,7 +24,7 @@ protected:
 
 	static inline thread_local Path sPermaRegsPath{};
 	static inline thread_local Path sSavestatePath{};
-	static constexpr f32 sTonalOffset{ 160.0f };
+	static constexpr f32 sTonalOffset = 160.0f;
 
 	std::vector<SimpleKeyMapping> mCustomBinds;
 
@@ -126,13 +126,6 @@ protected:
 	u32 mCycleCount{};
 	Interrupt mInterrupt{};
 
-	struct DisplayRes final {
-		s32 W{}, H{};
-		constexpr s32 pixels() const noexcept { return W * H; }
-		constexpr void clear() noexcept { W = H = 0; }
-		constexpr void set(u32 w, u32 h) noexcept { W = w; H = h; }
-	} mDisplay;
-
 	u32 mCurrentPC{};
 	u32 mRegisterI{};
 
@@ -150,10 +143,6 @@ protected:
 	std::array<u8, 16>
 		mRegisterV{};
 
-	//u64 : (8 * 8); // padding
-	u64 : (8 * 8); // padding
-
-	alignas(64)
 	std::array<u32, 16>
 		mStackBank{};
 
@@ -214,7 +203,7 @@ protected:
 	} else {											\
 		LOOP_FUNCTION([this]() noexcept					\
 			{ return !hasInterrupt() && mCycleCount < mTargetCPF; }); \
-	}													\
+	}
 
 protected:
 	Chip8_CoreInterface() noexcept;
@@ -225,10 +214,10 @@ public:
 	void appendOverlayData() noexcept override final;
 
 protected:
-	static constexpr auto cSmallFontOffset{ 0x00 };
-	static constexpr auto cLargeFontOffset{ 0x50 };
+	static constexpr auto cSmallFontOffset = 0x00;
+	static constexpr auto cLargeFontOffset = 0x50;
 
-	static constexpr std::array<u8, 240> cFontsData{ {
+	static constexpr std::array<u8, 240> cFontsData = {
 		0x60, 0xA0, 0xA0, 0xA0, 0xC0, // 0
 		0x40, 0xC0, 0x40, 0x40, 0xE0, // 1
 		0xC0, 0x20, 0x40, 0x80, 0xE0, // 2
@@ -263,24 +252,24 @@ protected:
 		0xF8, 0x6C, 0x66, 0x66, 0x66, 0x66, 0x66, 0x6C, 0xF8, 0x00, // D
 		0xFE, 0x62, 0x60, 0x64, 0x7C, 0x64, 0x60, 0x62, 0xFE, 0x00, // E
 		0xFE, 0x66, 0x62, 0x64, 0x7C, 0x64, 0x60, 0x60, 0xF0, 0x00, // F
-	} };
-	static inline thread_local std::array<u8, 240> sFontsData{ cFontsData };
+	};
+	static inline thread_local std::array<u8, 240> sFontsData = cFontsData;
 
-	static constexpr std::array<RGBA, 16> cBitColors{ { // 0-1 monochrome, 0-15 palette color
-		0x181C2000, 0xE4DCD400, 0x8C888400, 0x403C3800,
-		0xD8201000, 0x40D02000, 0x1040D000, 0xE0C81800,
-		0x50101000, 0x10501000, 0x50B0C000, 0xF0801000,
-		0xE0609000, 0xE0F09000, 0xB050F000, 0x70402000,
-	} };
-	static inline thread_local std::array<RGBA, 16> sBitColors{ cBitColors };
+	static constexpr std::array<RGBA, 16> cBitColors = { // 0-1 monochrome, 0-15 palette color
+		0x181C20FF, 0xE4DCD4FF, 0x8C8884FF, 0x403C38FF,
+		0xD82010FF, 0x40D020FF, 0x1040D0FF, 0xE0C818FF,
+		0x501010FF, 0x105010FF, 0x50B0C0FF, 0xF08010FF,
+		0xE06090FF, 0xE0F090FF, 0xB050F0FF, 0x704020FF,
+	};
+	static inline thread_local std::array<RGBA, 16> sBitColors = cBitColors;
 
-	static constexpr std::array<RGBA,  8> cForeColor{ { // CHIP-8X foreground colors
-		0x00000000, 0xEE111100, 0x1111EE00, 0xEE11EE00,
-		0x11EE1100, 0xEEEE1100, 0x11EEEE00, 0xEEEEEE00,
-	} };
-	static constexpr std::array<RGBA,  4> cBackColor{ { // CHIP-8X background colors
-		0x11113300, 0x11111100, 0x11331100, 0x33111100,
-	} };
+	static constexpr std::array<RGBA,  8> cForeColor = { // CHIP-8X foreground colors
+		0x000000FF, 0xEE1111FF, 0x1111EEFF, 0xEE11EEFF,
+		0x11EE11FF, 0xEEEE11FF, 0x11EEEEFF, 0xEEEEEEFF,
+	};
+	static constexpr std::array<RGBA,  4> cBackColor = { // CHIP-8X background colors
+		0x111133FF, 0x111111FF, 0x113311FF, 0x331111FF,
+	};
 
 	#define PX_1 0x37
 	#define PX_2 0x67
@@ -288,12 +277,12 @@ protected:
 	#define PX_4 0xFF
 
 	// Premul table for pixel trails
-	static constexpr std::array<u32, 16> cBitWeight{ {
+	static constexpr std::array<u32, 16> cBitWeight = {
 		PX_4, PX_1, PX_2, PX_2,
 		PX_3, PX_3, PX_3, PX_3,
 		PX_4, PX_4, PX_4, PX_4,
 		PX_4, PX_4, PX_4, PX_4,
-	} };
+	};
 
 	#undef PX_1
 	#undef PX_2

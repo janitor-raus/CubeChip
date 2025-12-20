@@ -173,8 +173,8 @@ void Chip8_CoreInterface::mainSystemLoop() {
 	handleEndFrameInterrupt();
 
 	renderAudioData();
-	renderVideoData();
 	makeOverlayData();
+	renderVideoData();
 }
 
 void Chip8_CoreInterface::appendOverlayData() noexcept {

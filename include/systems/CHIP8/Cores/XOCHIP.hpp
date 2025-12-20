@@ -25,10 +25,29 @@ class XOCHIP final : public Chip8_CoreInterface {
 	static constexpr s32 cInstSpeedHi = 50000;
 	static constexpr s32 cInstSpeedLo =  1000;
 
-	static constexpr u32 cMaxDisplayW = 128;
-	static constexpr u32 cMaxDisplayH =  64;
+	static constexpr u32 cDisplayW = 128;
+	static constexpr u32 cDisplayH =  64;
 
 private:
+	static inline thread_local u32 mPlanarMask = 0x1;
+
+	Map2D<u8> mDisplayBuffer[4];
+
+	MemoryBank<cTotalMemory>
+		mMemoryBank{};
+
+	DisplayWindow
+		mDisplayWindow;
+
+	struct DisplayRes final {
+		s32 W{}, H{};
+		constexpr s32 pixels() const noexcept { return W * H; }
+		constexpr void clear() noexcept { W = H = 0; }
+		constexpr void set(u32 w, u32 h) noexcept { W = w; H = h; }
+	} mDisplay;
+
+/*==================================================================*/
+
 	std::array<RGBA, 16> mBitColors{};
 
 	// 332 RGB color mapping: SHR 5 | SHR 2 | SHR 0
@@ -191,15 +210,6 @@ private:
 
 /*==================================================================*/
 
-	static inline thread_local u32 mPlanarMask = 0x1;
-
-	Map2D<u8> mDisplayBuffer[4];
-
-	MemoryBank<cTotalMemory>
-		mMemoryBank{};
-
-/*==================================================================*/
-
 	auto NNNN() const noexcept { return mMemoryBank[mCurrentPC] << 8 | mMemoryBank[mCurrentPC + 1]; }
 
 public:
@@ -210,6 +220,7 @@ public:
 			{cScreenSizeX, cScreenSizeY},
 			{cScreenSizeX, cScreenSizeY},
 		}
+		, mDisplayWindow(DisplayWindow::Create<cDisplayW, cDisplayH>("XOCHIP"))
 	{}
 
 	static constexpr bool validateProgram(
@@ -219,9 +230,6 @@ public:
 		if (!fileData || !fileSize) { return false; }
 		return fileSize + cGameLoadPos <= cTotalMemory;
 	}
-
-	s32 getMaxDisplayW() const noexcept override { return cMaxDisplayW; }
-	s32 getMaxDisplayH() const noexcept override { return cMaxDisplayH; }
 
 private:
 	void initializeSystem() noexcept override;

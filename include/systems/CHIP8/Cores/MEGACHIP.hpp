@@ -15,22 +15,18 @@
 
 class MEGACHIP final : public Chip8_CoreInterface {
 	static constexpr u64 cTotalMemory = 16_MiB;
-	static constexpr u32 cGameLoadPos =   512;
-	static constexpr u32 cStartOffset =   512;
+	static constexpr u32 cGameLoadPos = 0x200;
+	static constexpr u32 cStartOffset = 0x200;
 	static constexpr f32 cRefreshRate = 60.0f;
 
-	static constexpr s32 cResSizeMult =   2;
-	static constexpr s32 cScreenSizeX = 128;
-	static constexpr s32 cScreenSizeY =  64;
+	static constexpr s32 cDisplayW_C8 = 128;
+	static constexpr s32 cDisplayH_C8 =  64;
 	static constexpr s32 cInstSpeedHi =  45;
 	static constexpr s32 cInstSpeedLo =  30;
 
-	static constexpr s32 cScreenMegaX =  256;
-	static constexpr s32 cScreenMegaY =  192;
+	static constexpr s32 cDisplayW_M8 =  256;
+	static constexpr s32 cDisplayH_M8 =  192;
 	static constexpr s32 cInstSpeedMC = 3000;
-
-	static constexpr u32 cMaxDisplayW = 256;
-	static constexpr u32 cMaxDisplayH = 192;
 
 /*==================================================================*/
 
@@ -52,13 +48,13 @@ class MEGACHIP final : public Chip8_CoreInterface {
 		MULTIPLY     = 5,
 	};
 
-	RGBA::BlendFunc mBlendFunc;
+	RGBA::BlendFunc mBlendFunc{};
 
 	void selectBlendingAlgo(s32 mode) noexcept;
 
 	void scrapAllVideoBuffers();
 	void flushAllVideoBuffers();
-	void blendAndFlushBuffers() const;
+	void blendAndFlushBuffers();
 
 	struct TrackData {
 		u8*  data{};
@@ -79,14 +75,14 @@ class MEGACHIP final : public Chip8_CoreInterface {
 
 	static void makeByteWave(f32* data, u32 size, Voice* voice, Stream*) noexcept;
 
-	FixedMap2D<u8, cScreenSizeX, cScreenSizeY>
+	FixedMap2D<u8, cDisplayW_C8, cDisplayH_C8>
 		mDisplayBuffer; // legacy 128x64 buffer
 
-	FixedMap2D<RGBA, cScreenMegaX, cScreenMegaY>
+	FixedMap2D<RGBA, cDisplayW_M8, cDisplayH_M8>
 		mLastRenderBuffer; // buffer of last rendered frame
-	FixedMap2D<RGBA, cScreenMegaX, cScreenMegaY>
+	FixedMap2D<RGBA, cDisplayW_M8, cDisplayH_M8>
 		mBackgroundBuffer; // primary draw buffer
-	FixedMap2D<u8, cScreenMegaX, cScreenMegaY>
+	FixedMap2D<u8, cDisplayW_M8, cDisplayH_M8>
 		mCollisionMap; // collision detection map based on palette index
 	FixedMap2D<RGBA, 256, 1>
 		mColorPalette; // 256-color palette
@@ -96,12 +92,17 @@ class MEGACHIP final : public Chip8_CoreInterface {
 	MemoryBank<cTotalMemory>
 		mMemoryBank{};
 
+	DisplayWindow
+		mDisplayWindow;
+
 /*==================================================================*/
 
 	auto NNNN() const noexcept { return mMemoryBank[mCurrentPC] << 8 | mMemoryBank[mCurrentPC + 1]; }
 
 public:
-	MEGACHIP() {}
+	MEGACHIP()
+		: mDisplayWindow(DisplayWindow::Create<cDisplayW_M8, cDisplayH_M8>("MEGACHIP"))
+	{}
 
 	static constexpr bool validateProgram(
 		const char* fileData,
@@ -110,9 +111,6 @@ public:
 		if (!fileData || !fileSize) { return false; }
 		return fileSize + cGameLoadPos <= cTotalMemory;
 	}
-
-	s32 getMaxDisplayW() const noexcept override { return cMaxDisplayW; }
-	s32 getMaxDisplayH() const noexcept override { return cMaxDisplayH; }
 
 private:
 	void initializeSystem() noexcept override;

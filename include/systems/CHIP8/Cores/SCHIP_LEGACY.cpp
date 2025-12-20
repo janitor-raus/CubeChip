@@ -7,7 +7,6 @@
 #include "SCHIP_LEGACY.hpp"
 #if defined(ENABLE_CHIP8_SYSTEM) && defined(ENABLE_SCHIP_LEGACY)
 
-#include "BasicVideoSpec.hpp"
 #include "CoreRegistry.hpp"
 
 REGISTER_CORE(SCHIP_LEGACY, ".sc8")
@@ -21,7 +20,6 @@ void SCHIP_LEGACY::initializeSystem() noexcept {
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
 	copyFontToMemory(mMemoryBank.data(), 180);
 
-	setViewportSizes(true, cScreenSizeX, cScreenSizeY, cResSizeMult, 2);
 	setBaseSystemFramerate(cRefreshRate);
 
 	mVoices[VOICE::ID_0].userdata = &mAudioTimers[VOICE::ID_0];
@@ -32,6 +30,17 @@ void SCHIP_LEGACY::initializeSystem() noexcept {
 	mCurrentPC = cStartOffset;
 
 	prepDisplayArea(Resolution::LO);
+
+	mDisplayWindow.metadata_staging
+		.set_viewport(cDisplayW, cDisplayH)
+		.set_scaling(4).set_padding(4)
+		.set_texture_tint(sBitColors[0])
+		.enabled = true;
+
+	mDisplayWindow.SetOverlayCallable([&]() {
+		if (!hasSystemState(EmuState::STATS)) { return; }
+		SimpleStatOverlay(copyOverlayData());
+	});
 }
 
 void SCHIP_LEGACY::handleCycleLoop() noexcept
@@ -222,20 +231,21 @@ void SCHIP_LEGACY::renderAudioData() {
 		{ makePulseWave, &mVoices[VOICE::BUZZER] },
 	});
 
-	setDisplayBorderColor(sBitColors[!!::accumulate(mAudioTimers)]);
+	mDisplayWindow.metadata_staging.set_border_color_if(
+		!!::accumulate(mAudioTimers), sBitColors[1]);
 }
 
 void SCHIP_LEGACY::renderVideoData() {
-	BVS->displayBuffer.write(mDisplayBuffer, isUsingPixelTrails()
-		? [](u32 pixel) noexcept
-			{ return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
-		: [](u32 pixel) noexcept
-			{ return sBitColors[pixel >> 3]; }
-	);
+	mDisplayWindow.swapchain.acquire([&](auto& frame) noexcept {
+		frame.metadata = mDisplayWindow.metadata_staging;
+		frame.copy_from(mDisplayBuffer, isUsingPixelTrails()
+			? [](u32 pixel) noexcept { return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
+			: [](u32 pixel) noexcept { return sBitColors[pixel >> 3]; }
+		);
+	});
 
 	std::for_each(EXEC_POLICY(unseq)
-		mDisplayBuffer.begin(),
-		mDisplayBuffer.end(),
+		mDisplayBuffer.begin(), mDisplayBuffer.end(),
 		[](auto& pixel) noexcept
 			{ ::assign_cast(pixel, (pixel & 0x8) | (pixel >> 1)); }
 	);
@@ -466,7 +476,7 @@ void SCHIP_LEGACY::scrollDisplayRT() {
 				auto& pixel = mDisplayBuffer(offsetX, originY);
 				if (!((pixel ^= 0x8) & 0x8)) { collided = true; }
 			}
-			if (offsetX == (cScreenSizeX - 1)) { return collided; }
+			if (offsetX == (cDisplayW - 1)) { return collided; }
 		}
 		return collided;
 	}
@@ -490,7 +500,7 @@ void SCHIP_LEGACY::scrollDisplayRT() {
 			} else {
 				pixelLO = pixelHI;
 			}
-			if (offsetX == (cScreenSizeX - 1)) { return collided; }
+			if (offsetX == (cDisplayW - 1)) { return collided; }
 		}
 		return collided;
 	}
@@ -515,7 +525,7 @@ void SCHIP_LEGACY::scrollDisplayRT() {
 						mMemoryBank[mRegisterI + 2 * rowN + 1] << 0
 					) << offsetX);
 
-					if (offsetY == (cScreenSizeY - 1)) { break; }
+					if (offsetY == (cDisplayH - 1)) { break; }
 				}
 			} else {
 				for (auto rowN = 0; rowN < N; ++rowN) {
@@ -524,7 +534,7 @@ void SCHIP_LEGACY::scrollDisplayRT() {
 					collisions += drawSingleBytes(originX, offsetY, offsetX ? 16 : 8,
 						mMemoryBank[mRegisterI + rowN] << offsetX);
 
-					if (offsetY == (cScreenSizeY - 1)) { break; }
+					if (offsetY == (cDisplayH - 1)) { break; }
 				}
 			}
 			::assign_cast(mRegisterV[0xF], collisions);
@@ -543,7 +553,7 @@ void SCHIP_LEGACY::scrollDisplayRT() {
 				collisions += drawDoubleBytes(originX, offsetY, 0x20,
 					ez::bitDup8(mMemoryBank[mRegisterI + rowN]) << offsetX);
 
-				if (offsetY == (cScreenSizeY - 2)) { break; }
+				if (offsetY == (cDisplayH - 2)) { break; }
 			}
 			::assign_cast(mRegisterV[0xF], collisions != 0);
 		}

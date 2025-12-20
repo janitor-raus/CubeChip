@@ -17,13 +17,20 @@ REGISTER_CORE(BYTEPUSHER_STANDARD, ".BytePusher")
 void BYTEPUSHER_STANDARD::initializeSystem() noexcept {
 	copyGameToMemory(mMemoryBank.data());
 
-	setDisplayBorderColor(cBitsColor[0]);
-
-	setViewportSizes(true, cScreenSizeX, cScreenSizeY, cResSizeMult, 2);
 	setBaseSystemFramerate(cRefreshRate);
 
 	mAudioDevice.addAudioStream(STREAM::MAIN, u32(getRealSystemFramerate() * cAudioLength));
 	mAudioDevice.resumeStreams();
+
+	mDisplayWindow.metadata_staging
+		.set_viewport(cDisplayW, cDisplayH)
+		.set_scaling(2).set_padding(4)
+		.set_texture_tint(cBitColors[0])
+		.enabled = true;
+	mDisplayWindow.SetOverlayCallable([&]() {
+		if (!hasSystemState(EmuState::STATS)) { return; }
+		SimpleStatOverlay(copyOverlayData());
+	});
 }
 
 /*==================================================================*/
@@ -60,8 +67,12 @@ void BYTEPUSHER_STANDARD::renderAudioData() {
 }
 
 void BYTEPUSHER_STANDARD::renderVideoData() {
-	BVS->displayBuffer.write(mMemoryBank.data() + (readData<1>(5) << 16), cScreenSizeX * cScreenSizeY,
-		[](u32 pixel) noexcept { return cBitsColor[pixel]; });
+	mDisplayWindow.swapchain.acquire([&](auto& frame) noexcept {
+		frame.metadata = mDisplayWindow.metadata_staging;
+		frame.copy_from(mMemoryBank.data() + (readData<1>(5) << 16), cDisplayW * cDisplayH,
+			[](u32 pixel) noexcept { return cBitColors[pixel]; }
+		);
+	});
 }
 
 #endif

@@ -7,7 +7,6 @@
 #include "CHIP8X.hpp"
 #if defined(ENABLE_CHIP8_SYSTEM) && defined(ENABLE_CHIP8X)
 
-#include "BasicVideoSpec.hpp"
 #include "CoreRegistry.hpp"
 
 REGISTER_CORE(CHIP8X, ".c8x")
@@ -21,7 +20,6 @@ void CHIP8X::initializeSystem() noexcept {
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
 	copyFontToMemory(mMemoryBank.data(), 80);
 
-	setViewportSizes(true, cScreenSizeX, cScreenSizeY, cResSizeMult, 2);
 	setBaseSystemFramerate(cRefreshRate);
 
 	mVoices[VOICE::UNIQUE].userdata = &mAudioTimers[VOICE::UNIQUE];
@@ -32,6 +30,17 @@ void CHIP8X::initializeSystem() noexcept {
 
 	// test first color rect as the original hardware did
 	mColoredBuffer(0, 0) = cForeColor[2];
+
+	mDisplayWindow.metadata_staging
+		.set_viewport(cDisplayW, cDisplayH)
+		.set_scaling(8).set_padding(4)
+		.set_texture_tint(cBackColor[mBackgroundColor])
+		.enabled = true;
+
+	mDisplayWindow.SetOverlayCallable([&]() {
+		if (!hasSystemState(EmuState::STATS)) { return; }
+		SimpleStatOverlay(copyOverlayData());
+	});
 }
 
 void CHIP8X::handleCycleLoop() noexcept
@@ -222,21 +231,24 @@ void CHIP8X::renderAudioData() {
 	});
 
 	static constexpr u32 idx[]{ 2, 7, 4, 1 };
-	setDisplayBorderColor(::accumulate(mAudioTimers)
-		? cForeColor[idx[mBackgroundColor]] : cBackColor[mBackgroundColor]);
+	mDisplayWindow.metadata_staging.set_border_color_if(
+		!!::accumulate(mAudioTimers), cForeColor[idx[mBackgroundColor]]);
 }
 
 void CHIP8X::renderVideoData() {
 	if (isUsingPixelTrails()) {
-		BVS->displayBuffer.write(mDisplayBuffer, [this](auto& pixel) noexcept {
-			if (pixel == 0) {
-				return cBackColor[mBackgroundColor];
-			} else {
-				const auto idx = &pixel - mDisplayBuffer.data();
-				const auto Y = (idx / cScreenSizeX) & mColorResolution;
-				const auto X = (idx % cScreenSizeX) >> 3;
-				return RGBA::premul(mColoredBuffer(X, Y), cBitWeight[pixel]);
-			}
+		mDisplayWindow.swapchain.acquire([&](auto& frame) noexcept {
+			frame.metadata = mDisplayWindow.metadata_staging;
+			frame.copy_from(mDisplayBuffer, [&](auto& pixel) noexcept {
+				if (pixel == 0) {
+					return cBackColor[mBackgroundColor];
+				} else {
+					const auto idx = &pixel - mDisplayBuffer.data();
+					const auto Y = (idx / cDisplayW) & mColorResolution;
+					const auto X = (idx % cDisplayW) >> 3;
+					return RGBA::premul(mColoredBuffer(X, Y), cBitWeight[pixel]);
+				}
+			});
 		});
 
 		std::for_each(EXEC_POLICY(unseq)
@@ -244,15 +256,18 @@ void CHIP8X::renderVideoData() {
 			[](auto& pixel) noexcept { ::assign_cast(pixel, (pixel & 0x8) | (pixel >> 1)); }
 		);
 	} else {
-		BVS->displayBuffer.write(mDisplayBuffer, [this](auto& pixel) noexcept {
-			if (pixel == 0) {
-				return cBackColor[mBackgroundColor];
-			} else {
-				const auto idx = &pixel - mDisplayBuffer.data();
-				const auto Y = (idx / cScreenSizeX) & mColorResolution;
-				const auto X = (idx % cScreenSizeX) >> 3;
-				return mColoredBuffer(X, Y);
-			}
+		mDisplayWindow.swapchain.acquire([&](auto& frame) noexcept {
+			frame.metadata = mDisplayWindow.metadata_staging;
+			frame.copy_from(mDisplayBuffer, [&](auto& pixel) noexcept {
+				if (pixel == 0) {
+					return cBackColor[mBackgroundColor];
+				} else {
+					const auto idx = &pixel - mDisplayBuffer.data();
+					const auto Y = (idx / cDisplayW) & mColorResolution;
+					const auto X = (idx % cDisplayW) >> 3;
+					return mColoredBuffer(X, Y);
+				}
+			});
 		});
 	}
 }
@@ -292,7 +307,8 @@ void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 		mCurrentPC = mStackBank[--mStackTop & 0xF];
 	}
 	void CHIP8X::instruction_02A0() noexcept {
-		setDisplayBorderColor(cBackColor[++mBackgroundColor &= 0x3]);
+		mDisplayWindow.metadata_staging.texture_tint =
+			cBackColor[++mBackgroundColor &= 0x3];
 	}
 
 	#pragma endregion
@@ -484,7 +500,7 @@ void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 						if (!((mDisplayBuffer(X, Y) ^= 0x8) & 0x8))
 							{ mRegisterV[0xF] = 1; }
 					}
-					if (++X == cScreenSizeX) { return; }
+					if (++X == cDisplayW) { return; }
 				}
 				return;
 		}
@@ -493,8 +509,8 @@ void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 	void CHIP8X::instruction_DxyN(s32 X, s32 Y, s32 N) noexcept {
 		triggerInterrupt(Interrupt::FRAME);
 
-		auto pX = mRegisterV[X] & (cScreenSizeX - 1);
-		auto pY = mRegisterV[Y] & (cScreenSizeY - 1);
+		auto pX = mRegisterV[X] & (cDisplayW - 1);
+		auto pY = mRegisterV[Y] & (cDisplayH - 1);
 
 		mRegisterV[0xF] = 0;
 
@@ -512,7 +528,7 @@ void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 				for (auto H = 0; H < N; ++H)
 				{
 					drawByte(pX, pY, mMemoryBank[mRegisterI + H]);
-					if (++pY == cScreenSizeY) { return; }
+					if (++pY == cDisplayH) { return; }
 				}
 				return;
 		}
