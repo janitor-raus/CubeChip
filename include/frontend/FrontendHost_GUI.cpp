@@ -18,13 +18,17 @@
 #include "ColorOps.hpp"
 #include "Thread.hpp"
 
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 #include <ranges>
 
 /*==================================================================*/
 
 static constexpr auto RGBA_to_ImVec4(RGBA color) noexcept {
-	return ImVec4{ color.R / 255.0f, color.G / 255.0f, color.B / 255.0f, 1.0f };
+	return ImVec4(
+		color.R / 255.0f, color.G / 255.0f,
+		color.B / 255.0f, color.A / 255.0f
+	);
 }
 
 /*==================================================================*/
@@ -68,6 +72,33 @@ void FrontendHost::initializeInterface() noexcept {
 		}
 	});
 
+	static auto sMenu_AboutApp = FrontendInterface::registerMenu("", "Debug",
+	[&]() noexcept {
+		if (ImGui::BeginMenu("About...")) {
+			ImGui::PushFont(nullptr, 21.0f);
+			ImGui::TextUnformatted(AppName);
+			ImGui::PopFont();
+
+			ImGui::Spacing(); ImGui::Spacing();
+
+			ImGui::TextUnformatted("Version: ");
+			ImGui::SameLine();
+			ImGui::TextUnformatted(AppVer.with_hash);
+
+			ImGui::Spacing(); ImGui::Spacing();
+
+			ImGui::TextLinkOpenURL("License",
+				"https://github.com/janitor-raus/CubeChip/blob/master/LICENSE.txt");
+			ImGui::SameLine();
+			ImGui::TextUnformatted("|");
+			ImGui::SameLine();
+			ImGui::TextLinkOpenURL("GitHub",
+				"https://github.com/janitor-raus/CubeChip");
+
+			ImGui::EndMenu();
+		}
+	});
+
 	static auto sMenu_Settings_ScaleUI = FrontendInterface::registerMenu("", "Settings",
 	[&]() noexcept {
 		static int  scale_factor{};
@@ -102,7 +133,9 @@ void FrontendHost::initializeInterface() noexcept {
 		static bool autoScroll = true;
 		static bool scrollToBottom{};
 
-		if (ImGui::Begin("Application Log##Logger", &sShowLogWindow, ImGuiWindowFlags_NoCollapse)) {
+		if (ImGui::Begin("Application Log##Logger", &sShowLogWindow,
+			ImGuiWindowFlags_NoCollapse
+		)) {
 			if (ImGui::Button("Scroll to Bottom")) { scrollToBottom = true; }
 
 			ImGui::SameLine();
