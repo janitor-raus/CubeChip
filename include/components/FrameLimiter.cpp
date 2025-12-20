@@ -12,6 +12,19 @@
 
 /*==================================================================*/
 
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386) || defined(_M_IX86)
+	#include <immintrin.h>
+	#define cpu_relax() _mm_pause()
+#elif defined(__aarch64__) || defined(__arm__)
+	#define cpu_relax() asm volatile("yield")
+#elif defined(__riscv) && defined(__riscv_zihintpause)
+	#define cpu_relax() asm volatile("pause")
+#else
+	#define cpu_relax() ((void)0)
+#endif
+
+/*==================================================================*/
+
 static constexpr auto millis = std::chrono::milliseconds(1);
 
 // 99.5% of 1ms sleeps measure below this value
@@ -42,6 +55,7 @@ bool FrameLimiter::isFrameReady(bool lazy) noexcept {
 		std::this_thread::sleep_for(millis);
 		return false;
 	} else {
+		for (auto i = 0; ++i <= 128;) { cpu_relax(); }
 		std::this_thread::yield();
 		return false;
 	}
