@@ -6,9 +6,6 @@
 
 #pragma once
 
-#include <new>
-#include <cstddef>
-
 /*==================================================================*/
 
 #if defined(__GNUC__) && !defined(__clang__)
@@ -17,9 +14,11 @@
 #endif
 
 #ifdef __cpp_lib_hardware_interference_size
+	#include <new>
 	constexpr static auto HDIS = std::hardware_destructive_interference_size;
 	constexpr static auto HCIS = std::hardware_constructive_interference_size;
 #else
+	#include <cstddef>
 	constexpr static auto HDIS = std::size_t(64);
 	constexpr static auto HCIS = std::size_t(64);
 #endif
