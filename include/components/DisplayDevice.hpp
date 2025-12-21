@@ -18,7 +18,7 @@
 
 class DisplayDevice {
 	using Callable  = FrontendInterface::Func;
-	using Swapchain = TripleBufferX<FramePacket>;
+	using Swapchain = TripleBuffer<FramePacket>;
 
 	struct DisplayContext {
 		AtomSharedPtr<std::string> m_display_name;

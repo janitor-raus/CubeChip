@@ -7,12 +7,10 @@
 #pragma once
 
 #include <mutex>
-#include <shared_mutex>
 #include <cstdint>
-#include <algorithm>
+#include <type_traits>
 
-#include "Concepts.hpp"
-#include "Aligned.hpp"
+#include "HDIS_HCIS.hpp"
 
 #ifdef _MSC_VER
 	#pragma warning(push)
@@ -25,7 +23,7 @@
  * @brief A thread-safe, Mailbox-style Triple Buffer implementation
  *        that operates flexibly with a given fixed-size Buffer type.
  *
- * TripleBufferX maintains three copies of the Buffer:
+ * TripleBuffer maintains three copies of the Buffer:
  *   - A read buffer (for consumers)
  *   - A work buffer (for producers)
  *   - A swap buffer (for atomic publishing)
@@ -43,37 +41,38 @@
  *   - Dirty-flag propagation ensures consumers know when new data is available.
  */
 template <class Buffer>
-class TripleBufferX {
-	struct alignas(HDIS) StateBody {
+class TripleBuffer {
+	struct alignas(HDIS) TripleBufferContext {
 		using AtomBuf = std::atomic<Buffer*>;
 
-		Buffer mWorkBuffer;
-		Buffer mReadBuffer;
-		Buffer mSwapBuffer;
+		Buffer m_work_buffer;
+		Buffer m_read_buffer;
+		Buffer m_swap_buffer;
 
-		alignas(HDIS) mutable std::mutex mReadLock;
-		alignas(HDIS) mutable std::mutex mWorkLock;
+		alignas(HDIS) mutable std::mutex m_reader_lock;
+		alignas(HDIS) mutable std::mutex m_worker_lock;
 
-		alignas(HDIS) mutable Buffer* mpWork = &mWorkBuffer;
-		alignas(HDIS) mutable AtomBuf mpRead = &mReadBuffer;
-		alignas(HDIS) mutable AtomBuf mpSwap = &mSwapBuffer;
+		alignas(HDIS) mutable Buffer* m_work_ptr = &m_work_buffer;
+		alignas(HDIS) mutable AtomBuf m_read_ptr = &m_read_buffer;
+		alignas(HDIS) mutable AtomBuf m_swap_ptr = &m_swap_buffer;
 
 		template <typename... Args>
-		StateBody(Args&&... args) noexcept(std::is_nothrow_constructible_v<Buffer, Args...>)
-			: mWorkBuffer(std::forward<Args>(args)...)
-			, mReadBuffer(std::forward<Args>(args)...)
-			, mSwapBuffer(std::forward<Args>(args)...) {
+		TripleBufferContext(Args&&... args) noexcept(std::is_nothrow_constructible_v<Buffer, Args...>)
+			: m_work_buffer(std::forward<Args>(args)...)
+			, m_read_buffer(std::forward<Args>(args)...)
+			, m_swap_buffer(std::forward<Args>(args)...) {
 		}
 	};
 
-	std::unique_ptr<StateBody>
-		mState;
+	std::unique_ptr<TripleBufferContext>
+		m_context;
+
 
 private:
 	static constexpr std::uintptr_t sNewDataFlag = 1ull;
 
 	static_assert((alignof(Buffer) & sNewDataFlag) == 0,
-		"TripleBufferX: Buffer alignment must permit pointer tagging (LSB == 0).");
+		"TripleBuffer: Buffer alignment must permit pointer tagging (LSB == 0).");
 
 	constexpr bool getFlag(Buffer* ptr) const noexcept {
 		return reinterpret_cast<std::uintptr_t>(ptr) & sNewDataFlag;
@@ -92,15 +91,10 @@ private:
 
 public:
 	template <typename... Args>
-	TripleBufferX(Args&&... args) noexcept(std::is_nothrow_constructible_v<Buffer, Args...>)
-		: mState(std::make_unique<StateBody>(std::forward<Args>(args)...))
+	TripleBuffer(Args&&... args) noexcept(std::is_nothrow_constructible_v<Buffer, Args...>)
+		: m_context(std::make_unique<TripleBufferContext>(std::forward<Args>(args)...))
 	{}
 
-	explicit TripleBufferX(TripleBufferX&&) noexcept = default;
-	TripleBufferX& operator=(TripleBufferX&& other) noexcept = default;
-
-	explicit TripleBufferX(const TripleBufferX&) = delete;
-	TripleBufferX& operator=(const TripleBufferX&) = delete;
 
 private:
 	template <bool DIRTY>
@@ -142,17 +136,17 @@ public:
 		std::is_nothrow_invocable_v<Fn, BufferView<true>> &&
 		std::is_nothrow_invocable_v<Fn, BufferView<false>>
 	) {
-		std::unique_lock lock(mState->mReadLock);
+		std::unique_lock lock(m_context->m_reader_lock);
 
-		if (getFlag(mState->mpSwap.load(std::memory_order::acquire))) {
-			mState->mpRead.store(subFlag(mState->mpSwap.exchange(mState->mpRead,
-				std::memory_order::acq_rel)), std::memory_order::release);
+		if (getFlag(m_context->m_swap_ptr.load(std::memory_order::acquire))) {
+			m_context->m_read_ptr.store(subFlag(m_context->m_swap_ptr.exchange(
+				m_context->m_read_ptr, std::memory_order::acq_rel)), std::memory_order::release);
 
 			return std::forward<Fn>(function)(
-				BufferView<true>{ *mState->mpRead.load(std::memory_order::acquire) });
+				BufferView<true>{ *m_context->m_read_ptr.load(std::memory_order::acquire) });
 		} else {
 			return std::forward<Fn>(function)(
-				BufferView<false>{ *mState->mpRead.load(std::memory_order::acquire) });
+				BufferView<false>{ *m_context->m_read_ptr.load(std::memory_order::acquire) });
 		}
 	}
 
@@ -181,15 +175,17 @@ public:
 	decltype(auto) acquire(Fn&& function) noexcept(
 		std::is_nothrow_invocable_v<Fn, Buffer&>
 	) {
-		std::unique_lock lock(mState->mWorkLock);
+		std::unique_lock lock(m_context->m_worker_lock);
 
 		if constexpr (std::is_void_v<std::invoke_result_t<Fn, Buffer&>>) {
-			std::forward<Fn>(function)(*mState->mpWork);
-			mState->mpWork = subFlag(mState->mpSwap.exchange(addFlag(mState->mpWork), std::memory_order::acq_rel));
+			std::forward<Fn>(function)(*m_context->m_work_ptr);
+			m_context->m_work_ptr = subFlag(m_context->m_swap_ptr.exchange(
+				addFlag(m_context->m_work_ptr), std::memory_order::acq_rel));
 		}
 		else {
-			decltype(auto) result = std::forward<Fn>(function)(*mState->mpWork);
-			mState->mpWork = subFlag(mState->mpSwap.exchange(addFlag(mState->mpWork), std::memory_order::acq_rel));
+			decltype(auto) result = std::forward<Fn>(function)(*m_context->m_work_ptr);
+			m_context->m_work_ptr = subFlag(m_context->m_swap_ptr.exchange(
+				addFlag(m_context->m_work_ptr), std::memory_order::acq_rel));
 			return result;
 		}
 	}
