@@ -4,7 +4,7 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "DisplayWindow.hpp"
+#include "DisplayDevice.hpp"
 #include "FrontendInterface.hpp"
 #include "BasicVideoSpec.hpp"
 #include "BasicLogger.hpp"
