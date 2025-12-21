@@ -31,16 +31,11 @@ void CHIP8X::initializeSystem() noexcept {
 	// test first color rect as the original hardware did
 	mColoredBuffer(0, 0) = cForeColor[2];
 
-	mDisplayWindow.metadata_staging
+	mDisplayDevice.metadata_staging
 		.set_viewport(cDisplayW, cDisplayH)
 		.set_scaling(8).set_padding(4)
 		.set_texture_tint(cBackColor[mBackgroundColor])
 		.enabled = true;
-
-	mDisplayWindow.SetOverlayCallable([&]() {
-		if (!hasSystemState(EmuState::STATS)) { return; }
-		SimpleStatOverlay(copyOverlayData());
-	});
 }
 
 void CHIP8X::handleCycleLoop() noexcept
@@ -231,14 +226,14 @@ void CHIP8X::renderAudioData() {
 	});
 
 	static constexpr u32 idx[]{ 2, 7, 4, 1 };
-	mDisplayWindow.metadata_staging.set_border_color_if(
+	mDisplayDevice.metadata_staging.set_border_color_if(
 		!!::accumulate(mAudioTimers), cForeColor[idx[mBackgroundColor]]);
 }
 
 void CHIP8X::renderVideoData() {
 	if (isUsingPixelTrails()) {
-		mDisplayWindow.swapchain.acquire([&](auto& frame) noexcept {
-			frame.metadata = mDisplayWindow.metadata_staging;
+		mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
+			frame.metadata = mDisplayDevice.metadata_staging;
 			frame.copy_from(mDisplayBuffer, [&](auto& pixel) noexcept {
 				if (pixel == 0) {
 					return cBackColor[mBackgroundColor];
@@ -256,8 +251,8 @@ void CHIP8X::renderVideoData() {
 			[](auto& pixel) noexcept { ::assign_cast(pixel, (pixel & 0x8) | (pixel >> 1)); }
 		);
 	} else {
-		mDisplayWindow.swapchain.acquire([&](auto& frame) noexcept {
-			frame.metadata = mDisplayWindow.metadata_staging;
+		mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
+			frame.metadata = mDisplayDevice.metadata_staging;
 			frame.copy_from(mDisplayBuffer, [&](auto& pixel) noexcept {
 				if (pixel == 0) {
 					return cBackColor[mBackgroundColor];
@@ -307,7 +302,7 @@ void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 		mCurrentPC = mStackBank[--mStackTop & 0xF];
 	}
 	void CHIP8X::instruction_02A0() noexcept {
-		mDisplayWindow.metadata_staging.texture_tint =
+		mDisplayDevice.metadata_staging.texture_tint =
 			cBackColor[++mBackgroundColor &= 0x3];
 	}
 

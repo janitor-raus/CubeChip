@@ -29,7 +29,7 @@
 #include "SimpleTimer.hpp"
 #include "BasicInput.hpp"
 #include "Well512.hpp"
-#include "DisplayWindow.hpp"
+#include "DisplayDevice.hpp"
 
 #include "CoreRegistry.hpp"
 

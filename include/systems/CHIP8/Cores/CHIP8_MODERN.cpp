@@ -27,16 +27,11 @@ void CHIP8_MODERN::initializeSystem() noexcept {
 	mCurrentPC = cStartOffset;
 	mTargetCPF = Quirk.waitVblank ? cInstSpeedHi : cInstSpeedLo;
 
-	mDisplayWindow.metadata_staging
+	mDisplayDevice.metadata_staging
 		.set_viewport(cDisplayW, cDisplayH)
 		.set_scaling(8).set_padding(4)
 		.set_texture_tint(sBitColors[0])
 		.enabled = true;
-
-	mDisplayWindow.SetOverlayCallable([&]() {
-		if (!hasSystemState(EmuState::STATS)) { return; }
-		SimpleStatOverlay(copyOverlayData());
-	});
 }
 
 void CHIP8_MODERN::handleCycleLoop() noexcept
@@ -200,13 +195,13 @@ void CHIP8_MODERN::renderAudioData() {
 		{ makePulseWave, &mVoices[VOICE::BUZZER] },
 	});
 
-	mDisplayWindow.metadata_staging.set_border_color_if(
+	mDisplayDevice.metadata_staging.set_border_color_if(
 		!!::accumulate(mAudioTimers), sBitColors[1]);
 }
 
 void CHIP8_MODERN::renderVideoData() {
-	mDisplayWindow.swapchain.acquire([&](auto& frame) noexcept {
-		frame.metadata = mDisplayWindow.metadata_staging;
+	mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
+		frame.metadata = mDisplayDevice.metadata_staging;
 		frame.copy_from(mDisplayBuffer, isUsingPixelTrails()
 			? [](u32 pixel) noexcept { return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
 			: [](u32 pixel) noexcept { return sBitColors[pixel >> 3]; }

@@ -32,14 +32,11 @@ class SCHIP_LEGACY final : public Chip8_CoreInterface {
 	MemoryBank<cTotalMemory>
 		mMemoryBank{};
 
-	DisplayWindow
-		mDisplayWindow;
-
 /*==================================================================*/
 
 public:
-	SCHIP_LEGACY()
-		: mDisplayWindow(DisplayWindow::Create<cDisplayW, cDisplayH>("SCHIP LEGACY"))
+	SCHIP_LEGACY() noexcept
+		: Chip8_CoreInterface(DisplayDevice(cDisplayW, cDisplayH, "SCHIP Legacy"))
 	{}
 
 	static constexpr bool validateProgram(

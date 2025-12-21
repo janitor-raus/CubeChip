@@ -30,8 +30,6 @@ private:
 	std::array<u8, cTotalMemory + cSafezoneOOB>
 		mMemoryBank{};
 
-	DisplayWindow mDisplayWindow;
-
 	template<u32 T> requires (T >= 1 && T <= 3)
 		u32 readData(u32 pos) const noexcept {
 		if        constexpr (T == 1) {
@@ -51,8 +49,8 @@ private:
 	void renderVideoData() override;
 
 public:
-	BYTEPUSHER_STANDARD()
-		: mDisplayWindow(DisplayWindow::Create(cDisplayW, cDisplayH, "BytePusher Standard"))
+	BYTEPUSHER_STANDARD() noexcept
+		: BytePusher_CoreInterface(DisplayDevice(cDisplayW, cDisplayH, "BytePusher Standard"))
 	{}
 
 	static constexpr bool validateProgram(

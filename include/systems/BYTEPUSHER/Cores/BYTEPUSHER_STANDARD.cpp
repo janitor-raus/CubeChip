@@ -22,15 +22,11 @@ void BYTEPUSHER_STANDARD::initializeSystem() noexcept {
 	mAudioDevice.addAudioStream(STREAM::MAIN, u32(getRealSystemFramerate() * cAudioLength));
 	mAudioDevice.resumeStreams();
 
-	mDisplayWindow.metadata_staging
+	mDisplayDevice.metadata_staging
 		.set_viewport(cDisplayW, cDisplayH)
 		.set_scaling(2).set_padding(4)
 		.set_texture_tint(cBitColors[0])
 		.enabled = true;
-	mDisplayWindow.SetOverlayCallable([&]() {
-		if (!hasSystemState(EmuState::STATS)) { return; }
-		SimpleStatOverlay(copyOverlayData());
-	});
 }
 
 /*==================================================================*/
@@ -67,8 +63,8 @@ void BYTEPUSHER_STANDARD::renderAudioData() {
 }
 
 void BYTEPUSHER_STANDARD::renderVideoData() {
-	mDisplayWindow.swapchain.acquire([&](auto& frame) noexcept {
-		frame.metadata = mDisplayWindow.metadata_staging;
+	mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
+		frame.metadata = mDisplayDevice.metadata_staging;
 		frame.copy_from(mMemoryBank.data() + (readData<1>(5) << 16), cDisplayW * cDisplayH,
 			[](u32 pixel) noexcept { return cBitColors[pixel]; }
 		);

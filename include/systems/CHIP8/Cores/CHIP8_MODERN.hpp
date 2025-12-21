@@ -31,12 +31,9 @@ private:
 	MemoryBank<cTotalMemory>
 		mMemoryBank{};
 
-	DisplayWindow
-		mDisplayWindow;
-
 public:
-	CHIP8_MODERN()
-		: mDisplayWindow(DisplayWindow::Create<cDisplayW, cDisplayH>("CHIP-8 Modern"))
+	CHIP8_MODERN() noexcept
+		: Chip8_CoreInterface(DisplayDevice(cDisplayW, cDisplayH, "CHIP-8 Modern"))
 	{}
 
 	static constexpr bool validateProgram(

@@ -92,16 +92,13 @@ class MEGACHIP final : public Chip8_CoreInterface {
 	MemoryBank<cTotalMemory>
 		mMemoryBank{};
 
-	DisplayWindow
-		mDisplayWindow;
-
 /*==================================================================*/
 
 	auto NNNN() const noexcept { return mMemoryBank[mCurrentPC] << 8 | mMemoryBank[mCurrentPC + 1]; }
 
 public:
-	MEGACHIP()
-		: mDisplayWindow(DisplayWindow::Create<cDisplayW_M8, cDisplayH_M8>("MEGACHIP"))
+	MEGACHIP() noexcept
+		: Chip8_CoreInterface(DisplayDevice(cDisplayW_M8, cDisplayH_M8, "MEGACHIP"))
 	{}
 
 	static constexpr bool validateProgram(

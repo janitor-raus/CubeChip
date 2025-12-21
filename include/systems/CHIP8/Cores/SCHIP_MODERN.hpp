@@ -33,9 +33,6 @@ class SCHIP_MODERN final : public Chip8_CoreInterface {
 	MemoryBank<cTotalMemory>
 		mMemoryBank{};
 
-	DisplayWindow
-		mDisplayWindow;
-
 	struct DisplayRes final {
 		s32 W{}, H{};
 		constexpr s32 pixels() const noexcept { return W * H; }
@@ -46,9 +43,9 @@ class SCHIP_MODERN final : public Chip8_CoreInterface {
 /*==================================================================*/
 
 public:
-	SCHIP_MODERN()
-		: mDisplayBuffer{ cScreenSizeX, cScreenSizeY }
-		, mDisplayWindow(DisplayWindow::Create<cDisplayW, cDisplayH>("SCHIP MODERN"))
+	SCHIP_MODERN() noexcept
+		: Chip8_CoreInterface(DisplayDevice(cDisplayW, cDisplayH, "SCHIP MODERN"))
+		, mDisplayBuffer{ cScreenSizeX, cScreenSizeY }
 	{}
 
 	static constexpr bool validateProgram(

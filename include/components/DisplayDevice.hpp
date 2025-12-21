@@ -16,26 +16,43 @@
 
 /*==================================================================*/
 
-class DisplayWindow {
-	using Callable = FrontendInterface::Func;
+class DisplayDevice {
+	using Callable  = FrontendInterface::Func;
+	using Swapchain = TripleBufferX<FramePacket>;
 
-	AtomSharedPtr<std::string> mWindowName;
-	AtomSharedPtr<Callable>    mCallable;
-	FrontendInterface::Hook    mRenderHook;
-	SDL_Holder<SDL_Texture>    mTexture;
+	struct DisplayContext {
+		AtomSharedPtr<std::string> m_display_name;
+		AtomSharedPtr<Callable>    m_osd_callable;
+		FrontendInterface::Hook    m_render_hook;
+		SDL_Holder<SDL_Texture>    m_sdl_texture;
 
-	std::atomic<int>  mScreenRotation{};
-	std::atomic<bool> mIntegerScaling{};
-	std::atomic<bool> mCallShaderPass{};
+		std::atomic<int>  m_screen_rotation{};
+		std::atomic<bool> m_integer_scaling{};
+		std::atomic<bool> m_utilize_shaders{};
+
+		DisplayContext(
+			std::size_t W, std::size_t H,
+			const char* name, std::size_t bpp
+		) noexcept;
+
+		/**
+		 * @brief TripleBuffer swapchain with a fixed-size buffer of T and
+		 * an instance of metadata to propagate both data and state. Refer
+		 * to the 'acquire()' and 'present()' member methods for use info.
+		 */
+		Swapchain m_swapchain;
+
+	private:
+		void render_display_window() noexcept;
+	};
+
+	std::unique_ptr<DisplayContext> m_context;
 
 public:
-	/**
-	 * @brief TripleBuffer swapchain with a fixed-size buffer of T and
-	 * an instance of metadata to propagate both data and state. Refer
-	 * to the 'acquire()' and 'present()' member methods for use info.
-	 */
-	TripleBufferX<FramePacket> swapchain;
+	auto swapchain()       noexcept ->       Swapchain& { return m_context->m_swapchain; }
+	auto swapchain() const noexcept -> const Swapchain& { return m_context->m_swapchain; }
 
+public:
 	/**
 	 * @brief Staging area for metadata, serving both as persistent
 	 * storage, as well as for writing to the swapchain's internal
@@ -43,38 +60,32 @@ public:
 	**/
 	FrameMetadata metadata_staging;
 
-
 public:
-	DisplayWindow(std::size_t W, std::size_t H, const char* name) noexcept;
-
-public:
-	template <std::size_t W, std::size_t H>
-	[[nodiscard]] static
-	DisplayWindow Create(const char* name) noexcept {
-		static_assert(W > 0 && H > 0, "W and H must be greater than zero.");
-		static_assert(W <= 8192 && H <= 8192, "W and H are capped to 8192.");
-
-		return DisplayWindow(W, H, name);
-	}
-
-	[[nodiscard]] static
-	DisplayWindow Create(std::size_t W, std::size_t H, const char* name) noexcept;
-
-public:
-	void SetScreenRotation(int rotation) noexcept;
-	void SetIntegerScaling(bool enable) noexcept;
-	void SetCallShaderPass(bool enable) noexcept;
-
-	void SetWindowName(std::string_view name) noexcept;
-	void SetOverlayCallable(Callable&& callable) noexcept;
+	DisplayDevice(
+		std::size_t W, std::size_t H,
+		const char* name = nullptr, std::size_t bpp = 4
+	) noexcept;
 
 private:
-	void RenderDisplayWindow() noexcept;
+	DisplayDevice(
+		std::size_t W, std::size_t H,
+		const char* name, std::size_t bpp, int
+	) noexcept;
+
+public:
+	void set_screen_rotation(int rotation) noexcept;
+	void set_integer_scaling(bool enable)  noexcept;
+	void set_utilize_shaders(bool enable)  noexcept;
+
+	void set_display_name(std::string_view name) noexcept;
+	void set_osd_callable(Callable&& callable)   noexcept;
 };
 
 /*==================================================================*/
 
-void SimpleStatOverlay(const std::string& overlay_data) noexcept;
+namespace osd {
+	void simple_stat_overlay(const std::string& overlay_data) noexcept;
+}
 
 /*==================================================================*/
 

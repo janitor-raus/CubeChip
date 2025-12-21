@@ -41,17 +41,14 @@ private:
 	MemoryBank<cTotalMemory>
 		mMemoryBank{};
 
-	DisplayWindow
-		mDisplayWindow;
-
 	void setBuzzerPitch(s32 pitch) noexcept;
 
 	void drawLoresColor(s32 X, s32 Y, s32 idx)        noexcept;
 	void drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept;
 
 public:
-	CHIP8X()
-		: mDisplayWindow(DisplayWindow::Create<cDisplayW, cDisplayH>("CHIP-8X"))
+	CHIP8X() noexcept
+		: Chip8_CoreInterface(DisplayDevice(cDisplayW, cDisplayH, "CHIP-8X"))
 	{}
 
 	static constexpr bool validateProgram(

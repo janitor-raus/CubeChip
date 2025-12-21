@@ -36,9 +36,6 @@ private:
 	MemoryBank<cTotalMemory>
 		mMemoryBank{};
 
-	DisplayWindow
-		mDisplayWindow;
-
 	struct DisplayRes final {
 		s32 W{}, H{};
 		constexpr s32 pixels() const noexcept { return W * H; }
@@ -213,14 +210,14 @@ private:
 	auto NNNN() const noexcept { return mMemoryBank[mCurrentPC] << 8 | mMemoryBank[mCurrentPC + 1]; }
 
 public:
-	XOCHIP()
-		: mDisplayBuffer{
+	XOCHIP() noexcept
+		: Chip8_CoreInterface(DisplayDevice(cDisplayW, cDisplayH, "XOCHIP"))
+		, mDisplayBuffer{
 			{cScreenSizeX, cScreenSizeY},
 			{cScreenSizeX, cScreenSizeY},
 			{cScreenSizeX, cScreenSizeY},
 			{cScreenSizeX, cScreenSizeY},
 		}
-		, mDisplayWindow(DisplayWindow::Create<cDisplayW, cDisplayH>("XOCHIP"))
 	{}
 
 	static constexpr bool validateProgram(

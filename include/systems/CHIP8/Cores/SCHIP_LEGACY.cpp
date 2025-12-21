@@ -31,16 +31,11 @@ void SCHIP_LEGACY::initializeSystem() noexcept {
 
 	prepDisplayArea(Resolution::LO);
 
-	mDisplayWindow.metadata_staging
+	mDisplayDevice.metadata_staging
 		.set_viewport(cDisplayW, cDisplayH)
 		.set_scaling(4).set_padding(4)
 		.set_texture_tint(sBitColors[0])
 		.enabled = true;
-
-	mDisplayWindow.SetOverlayCallable([&]() {
-		if (!hasSystemState(EmuState::STATS)) { return; }
-		SimpleStatOverlay(copyOverlayData());
-	});
 }
 
 void SCHIP_LEGACY::handleCycleLoop() noexcept
@@ -231,13 +226,13 @@ void SCHIP_LEGACY::renderAudioData() {
 		{ makePulseWave, &mVoices[VOICE::BUZZER] },
 	});
 
-	mDisplayWindow.metadata_staging.set_border_color_if(
+	mDisplayDevice.metadata_staging.set_border_color_if(
 		!!::accumulate(mAudioTimers), sBitColors[1]);
 }
 
 void SCHIP_LEGACY::renderVideoData() {
-	mDisplayWindow.swapchain.acquire([&](auto& frame) noexcept {
-		frame.metadata = mDisplayWindow.metadata_staging;
+	mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
+		frame.metadata = mDisplayDevice.metadata_staging;
 		frame.copy_from(mDisplayBuffer, isUsingPixelTrails()
 			? [](u32 pixel) noexcept { return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
 			: [](u32 pixel) noexcept { return sBitColors[pixel >> 3]; }

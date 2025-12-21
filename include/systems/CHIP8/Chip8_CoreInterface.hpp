@@ -26,8 +26,6 @@ protected:
 	static inline thread_local Path sSavestatePath{};
 	static constexpr f32 sTonalOffset = 160.0f;
 
-	std::vector<SimpleKeyMapping> mCustomBinds;
-
 	struct TriBCD final {
 		// 2 = hundreds | 1 = tens | 0 = ones
 		u8 digit[3];
@@ -42,6 +40,28 @@ protected:
 	private:
 		u32 temp_val;
 	};
+
+/*==================================================================*/
+
+	DisplayDevice mDisplayDevice;
+
+	AudioDevice mAudioDevice;
+
+	std::array<Voice, VOICE::COUNT>
+		mVoices{};
+
+	std::array<AudioTimer, VOICE::COUNT>
+		mAudioTimers{};
+
+	void startVoice(s32 duration, s32 tone = 0) noexcept;
+	void startVoiceAt(u32 voice_index, u32 duration, u32 tone = 0) noexcept;
+
+	void mixAudioData(VoiceGenerators processors) noexcept;
+	static void makePulseWave(f32* data, u32 size, Voice* voice, Stream* stream) noexcept;
+
+/*==================================================================*/
+
+	std::vector<SimpleKeyMapping> mCustomBinds;
 
 private:
 	u32  mTickLast{};
@@ -69,7 +89,7 @@ protected:
 
 /*==================================================================*/
 
-	struct PlatformQuirks final {
+	struct alignas(int) PlatformQuirks final {
 		bool clearVF{};
 		bool jmpRegX{};
 		bool shiftVX{};
@@ -80,11 +100,10 @@ protected:
 		bool wrapSprite{};
 	} Quirk;
 
-	struct PlatformTraits final {
+	struct alignas(int) PlatformTraits final {
 		bool largerDisplay{};
 		bool manualRefresh{};
 		bool usingPixelTrails{};
-		bool resolutionChanged{};
 	} Trait;
 
 	enum class Interrupt {
@@ -114,11 +133,9 @@ protected:
 	bool isLargerDisplay()     const noexcept { return Trait.largerDisplay; }
 	bool isManualRefresh()     const noexcept { return Trait.manualRefresh; }
 	bool isUsingPixelTrails()  const noexcept { return Trait.usingPixelTrails; }
-	bool isResolutionChanged() const noexcept { return Trait.resolutionChanged; }
 	bool isLargerDisplay    (bool state) noexcept { return std::exchange(Trait.largerDisplay, state);     }
 	bool isManualRefresh    (bool state) noexcept { return std::exchange(Trait.manualRefresh, state);     }
 	bool isUsingPixelTrails (bool state) noexcept { return std::exchange(Trait.usingPixelTrails, state);  }
-	bool isResolutionChanged(bool state) noexcept { return std::exchange(Trait.resolutionChanged, state); }
 
 /*==================================================================*/
 
@@ -143,24 +160,9 @@ protected:
 	std::array<u8, 16>
 		mRegisterV{};
 
+	alignas(HDIS)
 	std::array<u32, 16>
 		mStackBank{};
-
-/*==================================================================*/
-
-	AudioDevice mAudioDevice;
-
-	std::array<Voice, VOICE::COUNT>
-		mVoices{};
-
-	std::array<AudioTimer, VOICE::COUNT>
-		mAudioTimers{};
-
-	void startVoice(s32 duration, s32 tone = 0) noexcept;
-	void startVoiceAt(u32 voice_index, u32 duration, u32 tone = 0) noexcept;
-
-	void mixAudioData(VoiceGenerators processors) noexcept;
-	static void makePulseWave(f32* data, u32 size, Voice* voice, Stream* stream) noexcept;
 
 /*==================================================================*/
 
@@ -198,20 +200,22 @@ protected:
 #define LOOP_DISPATCH(LOOP_FUNCTION)					\
 	if (hasSystemState(EmuState::BENCH)) [[likely]] {	\
 		setStopFrame(hasInterrupt());					\
-		LOOP_FUNCTION([this]() noexcept					\
+		LOOP_FUNCTION([&]() noexcept					\
 			{ return !getStopFrame(); });				\
 	} else {											\
-		LOOP_FUNCTION([this]() noexcept					\
+		LOOP_FUNCTION([&]() noexcept					\
 			{ return !hasInterrupt() && mCycleCount < mTargetCPF; }); \
 	}
 
 protected:
-	Chip8_CoreInterface() noexcept;
+	Chip8_CoreInterface(DisplayDevice display_device) noexcept;
 
 public:
 	void mainSystemLoop() override final;
 
 	void appendOverlayData() noexcept override final;
+
+/*==================================================================*/
 
 protected:
 	static constexpr auto cSmallFontOffset = 0x00;
@@ -270,6 +274,8 @@ protected:
 	static constexpr std::array<RGBA,  4> cBackColor = { // CHIP-8X background colors
 		0x111133FF, 0x111111FF, 0x113311FF, 0x331111FF,
 	};
+
+/*==================================================================*/
 
 	#define PX_1 0x37
 	#define PX_2 0x67

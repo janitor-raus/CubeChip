@@ -33,14 +33,9 @@ void XOCHIP::initializeSystem() noexcept {
 
 	prepDisplayArea(Resolution::LO);
 
-	mDisplayWindow.metadata_staging
+	mDisplayDevice.metadata_staging
 		.set_texture_tint(mBitColors[0])
 		.enabled = true;
-
-	mDisplayWindow.SetOverlayCallable([&]() {
-		if (!hasSystemState(EmuState::STATS)) { return; }
-		SimpleStatOverlay(copyOverlayData());
-	});
 }
 
 void XOCHIP::handleCycleLoop() noexcept
@@ -260,7 +255,7 @@ void XOCHIP::renderAudioData() {
 		{ makePulseWave,   &mVoices[VOICE::BUZZER] },
 	});
 
-	mDisplayWindow.metadata_staging.set_border_color_if(
+	mDisplayDevice.metadata_staging.set_border_color_if(
 		!!mAudioTimers[VOICE::BUZZER], mBitColors[1]);
 }
 
@@ -282,20 +277,19 @@ void XOCHIP::renderVideoData() {
 		}
 	);
 
-	mDisplayWindow.swapchain.acquire([&](auto& frame) noexcept {
-		frame.metadata = mDisplayWindow.metadata_staging;
+	mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
+		frame.metadata = mDisplayDevice.metadata_staging;
 		frame.copy_from(tempBuffer, [&](auto pixel) noexcept { return mBitColors[pixel]; });
 	});
 }
 
 void XOCHIP::prepDisplayArea(const Resolution mode) {
-	const bool wasLargerDisplay = isLargerDisplay(mode != Resolution::LO);
-	isResolutionChanged(wasLargerDisplay != isLargerDisplay());
+	isLargerDisplay(mode != Resolution::LO);
 
 	const auto W = isLargerDisplay() ? cDisplayW : cDisplayW / 2;
 	const auto H = isLargerDisplay() ? cDisplayH : cDisplayH / 2;
 
-	mDisplayWindow.metadata_staging.set_viewport(W, H)
+	mDisplayDevice.metadata_staging.set_viewport(W, H)
 		.set_padding(4)
 		.set_scaling(isLargerDisplay() ? 4 : 8);
 

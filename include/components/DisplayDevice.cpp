@@ -14,66 +14,71 @@
 
 /*==================================================================*/
 
-DisplayWindow::DisplayWindow(std::size_t W, std::size_t H, const char* name) noexcept
-	: mWindowName(std::make_shared<std::string>(
-		name ? name : "Unnamed Display"))
-	, mCallable(std::make_shared<Callable>())
-	, mRenderHook(FrontendInterface::registerWindow(
-		[&]() noexcept { RenderDisplayWindow(); }))
-	, mTexture(BasicVideoSpec::makeDisplayTexture(
-		FrontendInterface::GetCurrentRenderer(), int(W), int(H)))
-	, swapchain(sizeof(int), int(W), int(H))
-	, metadata_staging(int(W), int(H))
+DisplayDevice::DisplayContext::DisplayContext(std::size_t W, std::size_t H, const char* name, std::size_t bpp) noexcept
+	: m_display_name(std::make_shared<std::string>(name))
+	, m_osd_callable(std::make_shared<Callable>())
+	, m_render_hook(FrontendInterface::registerWindow(
+		[&]() noexcept { render_display_window(); }))
+	, m_sdl_texture(BasicVideoSpec::makeDisplayTexture(
+		FrontendInterface::GetCurrentRenderer(),
+		static_cast<int>(W), static_cast<int>(H)))
+	, m_swapchain(bpp, static_cast<int>(W), static_cast<int>(H))
 {}
 
-DisplayWindow DisplayWindow::Create(std::size_t W, std::size_t H, const char* name) noexcept {
-	if (W <= std::size_t(0) || H <= std::size_t(0) || W > std::size_t(8192) || H > std::size_t(8192)) {
+DisplayDevice::DisplayDevice(std::size_t W, std::size_t H, const char* name, std::size_t bpp) noexcept
+	: DisplayDevice(
+		std::clamp(W, std::size_t(1), std::size_t(8192)),
+		std::clamp(H, std::size_t(1), std::size_t(8192)),
+		name ? name : "Unnamed Display",
+		std::clamp(bpp, std::size_t(1), std::size_t(6)), 0
+	)
+{
+	if (metadata_staging.get_base_frame().area() != (W * H)) {
 		blog.newEntry<BLOG::ERR>("Display W/H out of size bounds, clamping!");
-		W = std::clamp(W, std::size_t(1), std::size_t(8192));
-		H = std::clamp(H, std::size_t(1), std::size_t(8192));
 	}
-
-	return DisplayWindow(W, H, name ? name : "Unnamed Display");
 }
 
-void DisplayWindow::SetScreenRotation(int rotation) noexcept {
-	mScreenRotation.store(rotation & 3, mo::relaxed);
+DisplayDevice::DisplayDevice(std::size_t W, std::size_t H, const char* name, std::size_t bpp, int) noexcept
+	: m_context(std::make_unique<DisplayContext>(W, H, name, bpp))
+	, metadata_staging(static_cast<int>(W), static_cast<int>(H))
+{}
+
+void DisplayDevice::set_screen_rotation(int rotation) noexcept {
+	m_context->m_screen_rotation.store(rotation & 3, mo::relaxed);
 }
 
-void DisplayWindow::SetIntegerScaling(bool enable) noexcept {
-	mIntegerScaling.store(enable, mo::relaxed);
+void DisplayDevice::set_integer_scaling(bool enable) noexcept {
+	m_context->m_integer_scaling.store(enable, mo::relaxed);
 }
 
-void DisplayWindow::SetCallShaderPass(bool enable) noexcept {
-	mCallShaderPass.store(enable, mo::relaxed);
+void DisplayDevice::set_utilize_shaders(bool enable) noexcept {
+	m_context->m_utilize_shaders.store(enable, mo::relaxed);
 }
 
-void DisplayWindow::SetWindowName(std::string_view name) noexcept {
-	mWindowName.store(std::make_shared<std::string>(name), mo::relaxed);
+void DisplayDevice::set_display_name(std::string_view name) noexcept {
+	m_context->m_display_name.store(std::make_shared<std::string>(name), mo::relaxed);
 }
 
-void DisplayWindow::SetOverlayCallable(Callable&& callable) noexcept {
-	mCallable = std::make_shared<Callable>(std::move(callable));
+void DisplayDevice::set_osd_callable(Callable&& callable) noexcept {
+	m_context->m_osd_callable = std::make_shared<Callable>(std::move(callable));
 }
 
-void DisplayWindow::RenderDisplayWindow() noexcept {
-	if (!mTexture) { return; }
-
-	swapchain.present([&](auto frame) noexcept {
+void DisplayDevice::DisplayContext::render_display_window() noexcept {
+	m_swapchain.present([&](auto frame) noexcept {
 		const auto& metadata = frame.buffer.metadata;
 
 		BasicVideoSpec::renderStreamTexture(
 			FrontendInterface::GetCurrentRenderer(),
-			mTexture, frame.buffer.data());
+			m_sdl_texture, frame.buffer.data());
 
 		FrontendInterface::SetNextWindowDockingTo(0, true);
 
-		auto window_name = mWindowName.load(mo::relaxed);
+		auto window_name = m_display_name.load(mo::relaxed);
 		if (ImGui::Begin(window_name->c_str(), nullptr,
 			ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoCollapse
 		)) {
-			const auto rotation = mScreenRotation.load(mo::relaxed);
-			const auto integer  = mIntegerScaling.load(mo::relaxed);
+			const auto rotation = m_screen_rotation.load(mo::relaxed);
+			const auto integer  = m_integer_scaling.load(mo::relaxed);
 			const auto scaling  = float(metadata.get_scaling());
 			const auto padding  = float(metadata.get_padding());
 
@@ -130,7 +135,7 @@ void DisplayWindow::RenderDisplayWindow() noexcept {
 				ImGui::SetCursorPos(origin_point +
 					ImGui::floor((display_zone - texture_area) * 0.5f));
 
-				ImGui::DrawRotatedImage(mTexture, texture_area, rotation,
+				ImGui::DrawRotatedImage(m_sdl_texture, texture_area, rotation,
 					uv0, uv1, RGBA(0xFF, 0xFF, 0xFF, metadata.texture_tint.A));
 			}
 
@@ -148,13 +153,13 @@ void DisplayWindow::RenderDisplayWindow() noexcept {
 			ImGui::Dummy(display_zone);
 			ImGui::SetCursorPos(origin_point);
 
-			auto display_callable = mCallable.load(mo::relaxed);
-			if (display_callable) { (*display_callable)(); }
+			auto osd_callable = m_osd_callable.load(mo::relaxed);
+			if (osd_callable) { (*osd_callable)(); }
 		}
 		ImGui::End();
 	});
 }
 
-void SimpleStatOverlay(const std::string& overlay_data) noexcept {
+void osd::simple_stat_overlay(const std::string& overlay_data) noexcept {
 	ImGui::writeShadowedText(overlay_data, RGBA::White, { 0.0f, 1.0f });
 }

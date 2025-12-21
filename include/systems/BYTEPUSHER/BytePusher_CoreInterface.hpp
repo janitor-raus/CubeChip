@@ -21,6 +21,8 @@ protected:
 	enum STREAM { MAIN };
 	enum VOICE { ID_0, COUNT };
 
+	DisplayDevice mDisplayDevice;
+
 	AudioDevice mAudioDevice;
 
 	std::vector<SimpleKeyMapping> mCustomBinds;
@@ -41,7 +43,7 @@ protected:
 	virtual void renderVideoData() = 0;
 
 protected:
-	BytePusher_CoreInterface() noexcept;
+	BytePusher_CoreInterface(DisplayDevice display_device) noexcept;
 
 public:
 	void mainSystemLoop() override;

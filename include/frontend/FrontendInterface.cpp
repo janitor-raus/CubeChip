@@ -109,6 +109,8 @@ namespace ImGui {
 		void* texture, const ImVec2& dims, unsigned rotation,
 		const ImVec2& uv0, const ImVec2& uv1, unsigned tint
 	) noexcept {
+		if (!texture) { return; }
+
 		const ImVec2 TL = ImGui::GetCursorScreenPos();
 		const ImVec2 TR = { TL.x + dims.x, TL.y          };
 		const ImVec2 BR = { TL.x + dims.x, TL.y + dims.y };

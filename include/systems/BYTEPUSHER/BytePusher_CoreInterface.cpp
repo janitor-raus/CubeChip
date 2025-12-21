@@ -13,7 +13,9 @@
 
 /*==================================================================*/
 
-BytePusher_CoreInterface::BytePusher_CoreInterface() noexcept {
+BytePusher_CoreInterface::BytePusher_CoreInterface(DisplayDevice display_device) noexcept
+	: mDisplayDevice(std::move(display_device))
+{
 	if (auto* path = HDM->addSystemDir("savestate", "BYTEPUSHER"))
 		{ sSavestatePath = *path / HDM->getFileSHA1(); }
 

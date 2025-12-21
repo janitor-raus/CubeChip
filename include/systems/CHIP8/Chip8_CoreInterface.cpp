@@ -14,12 +14,19 @@
 
 /*==================================================================*/
 
-Chip8_CoreInterface::Chip8_CoreInterface() noexcept {
+Chip8_CoreInterface::Chip8_CoreInterface(DisplayDevice display_device) noexcept
+	: mDisplayDevice(std::move(display_device))
+{
 	if (auto* path = HDM->addSystemDir("savestate", "CHIP8"))
 		{ sSavestatePath = *path / HDM->getFileSHA1(); }
 
 	if (auto* path = HDM->addSystemDir("permaRegs", "CHIP8"))
 		{ sPermaRegsPath = *path / HDM->getFileSHA1(); }
+
+	mDisplayDevice.set_osd_callable([&]() {
+		if (!hasSystemState(EmuState::STATS)) { return; }
+		osd::simple_stat_overlay(copyOverlayData());
+	});
 
 	mAudioDevice.addAudioStream(STREAM::MAIN, 48'000);
 	mAudioDevice.resumeStreams();
