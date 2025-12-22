@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "Typedefs.hpp"
+#include "SimpleMRU.hpp"
 #include "SettingWrapper.hpp"
 
 /*==================================================================*/
@@ -100,6 +101,11 @@ class FrontendHost final {
 		<SystemInterface, StopSystemThread>;
 
 	SystemCore mSystemCore;
+
+private:
+
+
+	static inline SimpleMRU<FileItem, 5> m_file_mru;
 
 public:
 	static inline HomeDirManager*  HDM{};

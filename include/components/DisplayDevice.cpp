@@ -17,10 +17,10 @@
 DisplayDevice::DisplayContext::DisplayContext(std::size_t W, std::size_t H, const char* name, std::size_t bpp) noexcept
 	: m_display_name(std::make_shared<std::string>(name))
 	, m_osd_callable(std::make_shared<Callable>())
-	, m_render_hook(FrontendInterface::registerWindow(
+	, m_render_hook(FrontendInterface::register_window(
 		[&]() noexcept { render_display_window(); }))
 	, m_sdl_texture(BasicVideoSpec::makeDisplayTexture(
-		FrontendInterface::GetCurrentRenderer(),
+		FrontendInterface::get_current_renderer(),
 		static_cast<int>(W), static_cast<int>(H)))
 	, m_swapchain(bpp, static_cast<int>(W), static_cast<int>(H))
 {}
@@ -68,10 +68,10 @@ void DisplayDevice::DisplayContext::render_display_window() noexcept {
 		const auto& metadata = frame.buffer.metadata;
 
 		BasicVideoSpec::renderStreamTexture(
-			FrontendInterface::GetCurrentRenderer(),
+			FrontendInterface::get_current_renderer(),
 			m_sdl_texture, frame.buffer.data());
 
-		FrontendInterface::SetNextWindowDockingTo(0, true);
+		FrontendInterface::dock_next_window_to(0, true);
 
 		auto window_name = m_display_name.load(mo::relaxed);
 		if (ImGui::Begin(window_name->c_str(), nullptr,
@@ -115,8 +115,8 @@ void DisplayDevice::DisplayContext::render_display_window() noexcept {
 			const auto borders_area = texture_area + padding_vec2;
 
 			if (padding >= 1) {
-				ImGui::SetCursorPos(origin_point +
-					ImGui::floor((display_zone - borders_area) * 0.5f));
+				ImGui::SetCursorPos(origin_point + ImGui::floor(
+					(display_zone - borders_area) * 0.5f));
 
 				ImGui::DrawRectFilled(borders_area,
 					padding, metadata.texture_tint.XBGR());
@@ -132,16 +132,16 @@ void DisplayDevice::DisplayContext::render_display_window() noexcept {
 					(base_texture_dimensions.y + base_texture_dimensions.h) / float(metadata.get_base_frame().h)
 				);
 
-				ImGui::SetCursorPos(origin_point +
-					ImGui::floor((display_zone - texture_area) * 0.5f));
+				ImGui::SetCursorPos(origin_point + ImGui::floor(
+					(display_zone - texture_area) * 0.5f));
 
 				ImGui::DrawRotatedImage(m_sdl_texture, texture_area, rotation,
 					uv0, uv1, RGBA(0xFF, 0xFF, 0xFF, metadata.texture_tint.A));
 			}
 
 			if (metadata.border_width >= 1.0f) {
-				ImGui::SetCursorPos(origin_point +
-					ImGui::floor((display_zone - borders_area) * 0.5f));
+				ImGui::SetCursorPos(origin_point + ImGui::floor(
+					(display_zone - borders_area) * 0.5f));
 
 				ImGui::DrawRect(borders_area,
 					metadata.border_width, padding,

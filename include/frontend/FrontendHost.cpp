@@ -56,7 +56,7 @@ SettingsMap FrontendHost::Settings::map() noexcept {
 auto FrontendHost::exportSettings() const noexcept -> Settings {
 	Settings out;
 
-	out.ui_scale = FrontendInterface::GetScaleFactor();
+	out.ui_scale = FrontendInterface::get_ui_scale_factor();
 
 	return out;
 }
@@ -85,6 +85,7 @@ void FrontendHost::loadGameFile(const Path& gameFile) {
 	blog.newEntry<BLOG::INF>("Attempting to load: \"{}\"", gameFile.string());
 	if (HDM->validateGameFile(gameFile)) {
 		blog.newEntry<BLOG::INF>("File has been accepted!");
+		m_file_mru.insert(gameFile);
 		replaceCore();
 	} else {
 		blog.newEntry<BLOG::INF>("Path has been rejected!");
@@ -96,7 +97,7 @@ bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forc
 		overrideHome, configName, forcePortable, OrgName, AppName);
 	if (!HDM) { return false; }
 
-	FrontendInterface::InitContext(HomeDirManager::getHomePath());
+	FrontendInterface::init_context(HomeDirManager::getHomePath());
 
 	GlobalAudioBase::Settings GAB_settings;
 	BasicVideoSpec ::Settings BVS_settings;
@@ -115,7 +116,7 @@ bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forc
 	BVS = BasicVideoSpec::initialize(BVS_settings);
 	if (!BVS) { return false; }
 
-	FrontendInterface::SetScaleFactor(FE_settings.ui_scale);
+	FrontendInterface::set_ui_scale_factor(FE_settings.ui_scale);
 
 	return true;
 }
@@ -133,7 +134,7 @@ void FrontendHost::quitApplication() noexcept {
 /*==================================================================*/
 
 s32  FrontendHost::processEvents(void* event) noexcept {
-	FrontendInterface::ProcessEvent(event);
+	FrontendInterface::process_event(event);
 
 	auto sdl_event = reinterpret_cast<SDL_Event*>(event);
 	if (BVS->isMainWindowID(sdl_event->window.windowID)) {

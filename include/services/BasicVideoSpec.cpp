@@ -111,7 +111,7 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 		mMainRenderer = SDL_CreateRenderer(mMainWindow, nullptr); \
 		if (!mMainRenderer) { throwFatalError(__LINE__, __func__); }
 
-		FrontendInterface::InitVideo(mMainWindow, mMainRenderer);
+		FrontendInterface::init_video(mMainWindow, mMainRenderer);
 
 		SDL_ShowWindow(mMainWindow);
 	}
@@ -126,8 +126,8 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 }
 
 BasicVideoSpec::~BasicVideoSpec() noexcept {
-	FrontendInterface::QuitVideo();
-	FrontendInterface::QuitContext();
+	FrontendInterface::quit_video();
+	FrontendInterface::quit_context();
 
 	SDL_QuitSubSystem(SDL_INIT_VIDEO);
 }
@@ -302,8 +302,8 @@ void BasicVideoSpec::renderStreamTexture(
 
 bool BasicVideoSpec::renderPresent() noexcept {
 	try {
-		FrontendInterface::NewFrame();
-		FrontendInterface::RenderFrame(mMainRenderer);
+		FrontendInterface::begin_new_frame();
+		FrontendInterface::render_frame(mMainRenderer);
 
 		if (!SDL_RenderPresent(mMainRenderer)) { \
 			throwFatalError(__LINE__, __func__);

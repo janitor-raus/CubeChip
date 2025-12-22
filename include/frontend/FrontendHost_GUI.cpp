@@ -34,7 +34,7 @@ static constexpr auto RGBA_to_ImVec4(RGBA color) noexcept {
 /*==================================================================*/
 
 void FrontendHost::initializeInterface() noexcept {
-	static auto sMenu_File_Open = FrontendInterface::registerMenu("", "File",
+	static auto sMenu_File_Open = FrontendInterface::register_menu("", "File",
 	[&]() noexcept {
 		if (ImGui::MenuItem("Open File...")) {
 			SDL_ShowOpenFileDialog(HomeDirManager::probableFileCallback,
@@ -42,7 +42,7 @@ void FrontendHost::initializeInterface() noexcept {
 		}
 	});
 
-	static auto sMenu_File_Data = FrontendInterface::registerMenu("", "File",
+	static auto sMenu_File_Data = FrontendInterface::register_menu("", "File",
 	[&]() noexcept {
 		static std::atomic<bool> sOpeningURL{};
 		if (ImGui::MenuItem("Open Data Folder...", nullptr, nullptr, !sOpeningURL.load(mo::acquire))) {
@@ -56,8 +56,29 @@ void FrontendHost::initializeInterface() noexcept {
 		}
 	});
 
+	static auto sMenu_Recent_Files = FrontendInterface::register_menu("", "File",
+	[&]() noexcept {
+		if (!m_file_mru.size()) { return; }
+		ImGui::Spacing();
+		ImGui::Separator();
+		ImGui::Spacing();
+		ImGui::TextUnformatted("Recently opened:");
+		ImGui::Spacing(); ImGui::Spacing();
+		if (FrontendInterface::was_menu_clicked()) {
+			for (auto& e : m_file_mru.span()) { e.exists(); }
+		}
+		bool clicked = FrontendInterface::was_menu_clicked();
+		for (auto& entry : m_file_mru.span()) {
+			if (ImGui::MenuItem(entry->filename().string().c_str(),
+				nullptr, nullptr, clicked ? entry.exists() : entry))
+			{
+				loadGameFile(entry);
+			}
+		}
+	});
+
 	static bool sShowDemoWindow{};
-	static auto sMenu_Debug_Demo = FrontendInterface::registerMenu("", "Debug",
+	static auto sMenu_Debug_Demo = FrontendInterface::register_menu("", "Debug",
 	[&]() noexcept {
 		if (ImGui::MenuItem("ImGUI Demo...", nullptr, sShowDemoWindow)) {
 			sShowDemoWindow = !sShowDemoWindow;
@@ -65,14 +86,14 @@ void FrontendHost::initializeInterface() noexcept {
 	});
 
 	static bool sShowLogWindow{};
-	static auto sMenu_Debug_Log = FrontendInterface::registerMenu("", "Debug",
+	static auto sMenu_Debug_Log = FrontendInterface::register_menu("", "Debug",
 	[&]() noexcept {
 		if (ImGui::MenuItem("Show Logs...", nullptr, sShowLogWindow)) {
 			sShowLogWindow = !sShowLogWindow;
 		}
 	});
 
-	static auto sMenu_AboutApp = FrontendInterface::registerMenu("", "Debug",
+	static auto sMenu_AboutApp = FrontendInterface::register_menu("", "Debug",
 	[&]() noexcept {
 		if (ImGui::BeginMenu("About...")) {
 			ImGui::PushFont(nullptr, 21.0f);
@@ -99,34 +120,34 @@ void FrontendHost::initializeInterface() noexcept {
 		}
 	});
 
-	static auto sMenu_Settings_ScaleUI = FrontendInterface::registerMenu("", "Settings",
+	static auto sMenu_Settings_ScaleUI = FrontendInterface::register_menu("", "Settings",
 	[&]() noexcept {
 		static int  scale_factor{};
 		static bool click_active{};
 
-		if (!click_active) { scale_factor = int(FrontendInterface::GetScaleFactor() * 100); }
+		if (!click_active) { scale_factor = int(FrontendInterface::get_ui_scale_factor() * 100); }
 		ImGui::SliderInt(" UI Scale", &scale_factor, 100, 300, "%d%%");
 
 		click_active = ImGui::IsItemActive();
 		if (ImGui::IsItemDeactivatedAfterEdit()) {
-			FrontendInterface::SetScaleFactor(scale_factor * 0.01f);
+			FrontendInterface::set_ui_scale_factor(scale_factor * 0.01f);
 		}
 	});
 
-	static auto sMenu_Settings_MasterVol = FrontendInterface::registerMenu("", "Settings",
+	static auto sMenu_Settings_MasterVol = FrontendInterface::register_menu("", "Settings",
 	[&]() noexcept {
 		auto global_gain = int(GAB->getGlobalGain() * 100);
 		if (ImGui::SliderInt(" Master Volume", &global_gain, 0, 100, "%d%%"))
 			{ GAB->setGlobalGain(global_gain * 0.01f); }
 	});
 
-	static auto sWindow_Demo = FrontendInterface::registerWindow(
+	static auto sWindow_Demo = FrontendInterface::register_window(
 	[&]() noexcept {
 		if (!sShowDemoWindow) { return; }
 		ImGui::ShowDemoWindow(&sShowDemoWindow);
 	});
 
-	static auto sWindow_Log = FrontendInterface::registerWindow(
+	static auto sWindow_Log = FrontendInterface::register_window(
 	[&]() noexcept {
 		if (!sShowLogWindow) { return; }
 

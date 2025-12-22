@@ -154,13 +154,13 @@ namespace ImGui {
 
 /*==================================================================*/
 
-bool FrontendInterface::mergeOverflowingWindows() noexcept {
-	std::unique_lock lock(sHooks->windows.overflow_lock);
+bool FrontendInterface::merge_overflowing_windows() noexcept {
+	std::unique_lock lock(s_hooks->windows.overflow_lock);
 
-	auto& src_windows = sHooks->windows.overflow.buffer;
+	auto& src_windows = s_hooks->windows.overflow.buffer;
 	if (src_windows.empty()) { return false; }
 
-	auto& dst_windows = sHooks->windows.registry.buffer;
+	auto& dst_windows = s_hooks->windows.registry.buffer;
 
 	blog.newEntry<BLOG::DBG>("{} overflow windows found.", src_windows.size());
 
@@ -173,10 +173,10 @@ bool FrontendInterface::mergeOverflowingWindows() noexcept {
 	return true;
 }
 
-void FrontendInterface::invokeRegisteredWindows() noexcept {
-	std::unique_lock lock(sHooks->windows.registry_lock);
+void FrontendInterface::invoke_registered_windows() noexcept {
+	std::unique_lock lock(s_hooks->windows.registry_lock);
 
-	auto& windows = sHooks->windows.registry;
+	auto& windows = s_hooks->windows.registry;
 
 	do {
 		while (windows.offset < windows.buffer.size()) {
@@ -187,22 +187,22 @@ void FrontendInterface::invokeRegisteredWindows() noexcept {
 				windows.buffer.erase(windows.buffer.begin() + windows.offset);
 			}
 		}
-	} while (mergeOverflowingWindows());
+	} while (merge_overflowing_windows());
 
 	windows.offset = 0;
 }
 
-bool FrontendInterface::mergeOverflowingMenus(const Key& tag) noexcept {
-	std::unique_lock lock(sHooks->menus.overflow_lock);
+bool FrontendInterface::merge_overflowing_menus(const Key& tag) noexcept {
+	std::unique_lock lock(s_hooks->menus.overflow_lock);
 
-	auto& src_window = sHooks->menus.overflow[tag];
+	auto& src_window = s_hooks->menus.overflow[tag];
 	if (src_window.empty()) {
 		 return false; }
 
 	unsigned migration_count = 0;
 	for (auto& [menu_title, src_hooks] : src_window) {
 		if (src_hooks.buffer.empty()) { continue; }
-		auto& dst_hooks = sHooks->menus.registry[tag][menu_title];
+		auto& dst_hooks = s_hooks->menus.registry[tag][menu_title];
 
 		blog.newEntry<BLOG::DBG>("{} overflow hooks for menu \"{}\" found.",
 			src_hooks.buffer.size(), menu_title);
@@ -218,29 +218,37 @@ bool FrontendInterface::mergeOverflowingMenus(const Key& tag) noexcept {
 	return !!migration_count;
 }
 
-void FrontendInterface::invokeRegisteredMenus(const Key& tag) noexcept {
-	std::unique_lock lock(sHooks->menus.registry_lock);
+void FrontendInterface::invoke_registered_menus(const Key& tag) noexcept {
+	std::unique_lock lock(s_hooks->menus.registry_lock);
 
-	auto window = sHooks->menus.registry.find(tag);
-	if (window == sHooks->menus.registry.end()) { return; }
+	auto window = s_hooks->menus.registry.find(tag);
+	if (window == s_hooks->menus.registry.end()) { return; }
 
 	do {
 		for (auto& [menu_title, hooks] : window->second) {
 			if (hooks.buffer.empty()) { continue; }
-			if (!ImGui::BeginMenu(menu_title.c_str())) { continue; }
 
-			while (hooks.offset < hooks.buffer.size()) {
-				auto& entry = hooks.buffer[hooks.offset];
-				if (auto shared_ptr = entry.lock()) {
-					(*shared_ptr)(); ++hooks.offset;
-				} else {
-					hooks.buffer.erase(hooks.buffer.begin() + hooks.offset);
+			if (ImGui::BeginMenu(menu_title.c_str())) {
+				hooks.first_hit = !std::exchange(hooks.has_focus, true);
+				s_active_menu = &hooks;
+
+				while (hooks.offset < hooks.buffer.size()) {
+					auto& entry = hooks.buffer[hooks.offset];
+					if (auto shared_ptr = entry.lock()) {
+						(*shared_ptr)(); ++hooks.offset;
+					} else {
+						hooks.buffer.erase(hooks.buffer.begin() + hooks.offset);
+					}
 				}
-			}
 
-			ImGui::EndMenu();
+				ImGui::EndMenu();
+			} else {
+				s_active_menu = nullptr;
+				hooks.has_focus = false;
+				continue;
+			}
 		}
-	} while (mergeOverflowingMenus(tag));
+	} while (merge_overflowing_menus(tag));
 
 	for (auto& [_, hooks] : window->second)
 		{ hooks.offset = 0; } // reset for next frame
@@ -248,10 +256,10 @@ void FrontendInterface::invokeRegisteredMenus(const Key& tag) noexcept {
 
 /*==================================================================*/
 
-void FrontendInterface::SetScaleFactor(float scale) noexcept {
+void FrontendInterface::set_ui_scale_factor(float scale) noexcept {
 	ImGui::GetStyle().FontScaleMain = scale;
 }
-float FrontendInterface::GetScaleFactor() noexcept {
+float FrontendInterface::get_ui_scale_factor() noexcept {
 	return ImGui::GetStyle().FontScaleMain;
 }
 
@@ -259,7 +267,7 @@ float FrontendInterface::GetScaleFactor() noexcept {
 
 static ImFont* sMainFont{};
 
-void FrontendInterface::InitContext(const char* home_dir) {
+void FrontendInterface::init_context(const char* home_dir) {
 	static Str ini_path = home_dir ? Str(home_dir) + "imgui.ini" : Str();
 	static Str log_path = home_dir ? Str(home_dir) + "imgui.log" : Str();
 
@@ -273,7 +281,7 @@ void FrontendInterface::InitContext(const char* home_dir) {
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-	sHooks = std::make_unique<RegistryAggregate>();
+	s_hooks = std::make_unique<RegistryAggregate>();
 
 	sMainFont = io.Fonts->AddFontFromMemoryCompressedTTF
 		(FontData::Roboto_Mono, std::size(FontData::Roboto_Mono), 16.0f);
@@ -281,38 +289,38 @@ void FrontendInterface::InitContext(const char* home_dir) {
 	io.FontDefault = sMainFont;
 }
 
-void FrontendInterface::QuitContext() {
+void FrontendInterface::quit_context() {
 	ImGui::DestroyContext();
 }
 
-void FrontendInterface::InitVideo(SDL_Window* window, SDL_Renderer* renderer) {
+void FrontendInterface::init_video(SDL_Window* window, SDL_Renderer* renderer) {
 	ImGui::StyleColorsDark();
 	//ImGui::StyleColorsLight();
 
 	ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
 	ImGui_ImplSDLRenderer3_Init(renderer);
-	sRenderer = renderer;
+	s_current_renderer = renderer;
 }
 
-void FrontendInterface::QuitVideo() {
+void FrontendInterface::quit_video() {
 	ImGui_ImplSDLRenderer3_Shutdown();
 	ImGui_ImplSDL3_Shutdown();
 }
 
 /*==================================================================*/
 
-void FrontendInterface::ProcessEvent(void* event) {
+void FrontendInterface::process_event(void* event) {
 	ImGui_ImplSDL3_ProcessEvent(reinterpret_cast<SDL_Event*>(event));
 }
 
-void FrontendInterface::NewFrame() {
+void FrontendInterface::begin_new_frame() {
 	ImGui_ImplSDLRenderer3_NewFrame();
 	ImGui_ImplSDL3_NewFrame();
 
 	ImGui::NewFrame();
 
 	if (ImGui::BeginMainMenuBar()) {
-		invokeRegisteredMenus("");
+		invoke_registered_menus("");
 		ImGui::EndMainMenuBar();
 	}
 
@@ -329,15 +337,15 @@ void FrontendInterface::NewFrame() {
 	ImGui::DockSpace(sMainDockID);
 	ImGui::End();
 
-	invokeRegisteredWindows();
+	invoke_registered_windows();
 }
 
-void FrontendInterface::RenderFrame(SDL_Renderer* renderer) {
+void FrontendInterface::render_frame(SDL_Renderer* renderer) {
 	ImGui::Render();
 	ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
 }
 
-void FrontendInterface::SetNextWindowDockingTo(unsigned id, bool first_time) noexcept {
+void FrontendInterface::dock_next_window_to(unsigned id, bool first_time) noexcept {
 	ImGui::SetNextWindowDockID(id ? id : sMainDockID,
 		first_time ? ImGuiCond_FirstUseEver : ImGuiCond_Always);
 }

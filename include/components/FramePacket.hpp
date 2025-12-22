@@ -10,7 +10,6 @@
 #include "ColorOps.hpp"
 #include "Aligned.hpp"
 #include "Concepts.hpp"
-#include "AtomSharedPtr.hpp"
 
 /*==================================================================*/
 

@@ -60,8 +60,8 @@ class TripleBuffer {
 		TripleBufferContext(Args&&... args) noexcept(std::is_nothrow_constructible_v<Buffer, Args...>)
 			: m_work_buffer(std::forward<Args>(args)...)
 			, m_read_buffer(std::forward<Args>(args)...)
-			, m_swap_buffer(std::forward<Args>(args)...) {
-		}
+			, m_swap_buffer(std::forward<Args>(args)...)
+		{}
 	};
 
 	std::unique_ptr<TripleBufferContext>
