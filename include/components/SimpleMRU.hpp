@@ -19,7 +19,8 @@ template <typename T, std::size_t Capacity> requires(
 	std::is_nothrow_move_constructible_v<T>
 )
 class SimpleMRU {
-	static_assert(Capacity > 1, "MRU capacity must be more than 1.");
+	static_assert(Capacity > 1 && Capacity <= 50,
+		"SimpleMRU has a capacity limit of 1 < X <= 50.");
 
 	std::array<T, Capacity> m_items{};
 	std::size_t m_size{};
@@ -40,22 +41,15 @@ public:
 	void insert(U&& entry) noexcept { insert_impl(std::forward<U>(entry)); }
 
 private:
-	auto find(const T& entry) const noexcept {
-		for (std::size_t i = 0; i < m_size; ++i) {
-			if (m_items[i] == entry) { return i; }
-		}
-		return Capacity;
+	auto find(const T* entry) const noexcept {
+		return std::distance(m_items.begin(), std::find(
+			m_items.begin(), m_items.end(), *entry));
 	}
 
-	void insert(T entry) noexcept {
+	void insert_in_front(T* entry) noexcept {
 		if (m_size < Capacity) { ++m_size; }
 
-		//for (std::size_t i = m_size - 1; i > 0; --i) {
-		//	m_items[i] = std::move(m_items[i - 1]);
-		//}
-		//
-		//m_items[0] = std::move(entry);
-		m_items[m_size - 1] = std::move(entry);
+		m_items[m_size - 1] = std::move(*entry);
 		std::rotate(
 			m_items.begin(),
 			m_items.begin() + (m_size - 1),
@@ -71,13 +65,13 @@ private:
 		);
 	}
 
-	void insert_impl(T value) noexcept {
-		auto pos = find(value);
+	void insert_impl(T&& value) noexcept {
+		auto pos = find(&value);
 
 		switch (pos) {
 			case 0: return;
-			case Capacity: insert(std::move(value)); break;
-			default:       promote_existing(pos);    break;
+			case Capacity: insert_in_front(&value); break;
+			default:       promote_existing(pos);   break;
 		}
 	}
 };

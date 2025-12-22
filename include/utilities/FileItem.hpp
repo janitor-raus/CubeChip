@@ -30,8 +30,6 @@ public:
 
 	bool operator==(const FileItem& other) const noexcept { return m_path == other.m_path; }
 
-	friend bool operator==(const FileItem& a, const FileItem& b) noexcept { return *a == *b; }
-
 	operator fs::Path() const noexcept { return m_path; }
 	operator bool()     const noexcept { return m_exists; }
 };

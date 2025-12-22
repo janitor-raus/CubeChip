@@ -10,6 +10,7 @@
 
 #include "Typedefs.hpp"
 #include "SimpleMRU.hpp"
+#include "FileItem.hpp"
 #include "SettingWrapper.hpp"
 
 /*==================================================================*/
