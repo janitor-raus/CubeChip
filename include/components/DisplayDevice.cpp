@@ -16,7 +16,7 @@
 
 /*==================================================================*/
 
-struct DisplayContext {
+struct DisplayDevice::DisplayContext {
 	using Callable = DisplayDevice::Callable;
 
 	AtomSharedPtr<std::string> m_display_name;
@@ -187,10 +187,8 @@ void DisplayDevice::set_display_name(std::string_view name) noexcept {
 }
 
 void DisplayDevice::set_osd_callable(Callable&& callable) noexcept {
-	m_context->m_osd_callable = std::make_shared<Callable>(std::move(callable));
+	m_context->m_osd_callable.store(std::make_shared<Callable>(std::move(callable)), mo::relaxed);
 }
-
-/*==================================================================*/
 
 /*==================================================================*/
 

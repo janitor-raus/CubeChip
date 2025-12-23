@@ -49,7 +49,7 @@ namespace EzMaths {
 			, h(h < 0 ? 0 : h)
 		{}
 
-		constexpr auto area() const noexcept { return 1ull * w * h; }
+		constexpr auto area() const noexcept { return u64(w * h); }
 		constexpr auto half() const noexcept { return Point(w / 2, h / 2); }
 
 		constexpr bool operator==(const Frame& other) const noexcept

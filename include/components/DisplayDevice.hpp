@@ -19,6 +19,7 @@ class DisplayDevice {
 	using Callable  = FrontendInterface::Func;
 	using Swapchain = TripleBuffer<FramePacket>;
 
+	struct DisplayContext; // make *real* clang happy
 	friend struct DisplayContext;
 
 	std::unique_ptr<DisplayContext> m_context;

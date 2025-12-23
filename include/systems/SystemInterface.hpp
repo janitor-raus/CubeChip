@@ -80,7 +80,7 @@ protected:
 private:
 	Str mOverlayDataBuffer{};
 	AtomSharedPtr<Str>
-		mOverlayData = nullptr;
+		mOverlayData{};
 
 protected:
 	static inline HomeDirManager* HDM{};

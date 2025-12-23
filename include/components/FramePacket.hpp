@@ -181,7 +181,7 @@ public:
 
 private:
 	auto clamp_count(std::size_t count) const noexcept {
-		return count ? std::min(count, size()) : size();
+		return count ? std::min<std::size_t>(count, size()) : size();
 	}
 
 public:
