@@ -192,7 +192,7 @@ void FrontendInterface::invoke_registered_windows() noexcept {
 	windows.offset = 0;
 }
 
-bool FrontendInterface::merge_overflowing_menus(const Key& tag) noexcept {
+bool FrontendInterface::merge_overflowing_menus(const PlainKey& tag) noexcept {
 	std::unique_lock lock(s_hooks->menus.overflow_lock);
 
 	auto& src_window = s_hooks->menus.overflow[tag];
@@ -205,7 +205,7 @@ bool FrontendInterface::merge_overflowing_menus(const Key& tag) noexcept {
 		auto& dst_hooks = s_hooks->menus.registry[tag][menu_title];
 
 		blog.newEntry<BLOG::DBG>("{} overflow hooks for menu \"{}\" found.",
-			src_hooks.buffer.size(), menu_title);
+			src_hooks.buffer.size(), menu_title.second.c_str());
 
 		dst_hooks.buffer.insert(dst_hooks.buffer.end(),
 			std::make_move_iterator(src_hooks.buffer.begin()),
@@ -218,7 +218,7 @@ bool FrontendInterface::merge_overflowing_menus(const Key& tag) noexcept {
 	return !!migration_count;
 }
 
-void FrontendInterface::invoke_registered_menus(const Key& tag) noexcept {
+void FrontendInterface::invoke_registered_menus(const PlainKey& tag) noexcept {
 	std::unique_lock lock(s_hooks->menus.registry_lock);
 
 	auto window = s_hooks->menus.registry.find(tag);
@@ -228,7 +228,7 @@ void FrontendInterface::invoke_registered_menus(const Key& tag) noexcept {
 		for (auto& [menu_title, hooks] : window->second) {
 			if (hooks.buffer.empty()) { continue; }
 
-			if (ImGui::BeginMenu(menu_title.c_str())) {
+			if (ImGui::BeginMenu(menu_title.second.c_str())) {
 				hooks.first_hit = !std::exchange(hooks.has_focus, true);
 				s_active_menu = &hooks;
 

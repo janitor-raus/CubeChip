@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <map>
 #include <unordered_map>
 #include <mutex>
 #include <vector>
@@ -96,7 +97,8 @@ class FrontendInterface {
 public:
 	using Func = std::function<void()>;
 	using Hook = std::shared_ptr<Func>;
-	using Key  = std::string;
+	using PlainKey = std::string;
+	using OrderKey = std::pair<std::size_t, std::string>;
 
 private:
 	struct HookRegistry {
@@ -113,7 +115,7 @@ private:
 	};
 
 	using HookRegistryMapped = std::unordered_map
-		<Key, std::unordered_map<Key, HookRegistry>>;
+		<PlainKey, std::map<OrderKey, HookRegistry>>;
 
 	template <typename T>
 	struct RegistryBox {
@@ -160,7 +162,7 @@ public:
 	 * When the Hook is destroyed, the function is unregistered automatically.
 	 */
 	template <VoidInvocable Fn> [[nodiscard]]
-	static Hook register_menu(const Key& window_tag, const Key& menu_title, Fn&& fn) noexcept {
+	static Hook register_menu(const PlainKey& window_tag, const OrderKey& menu_title, Fn&& fn) noexcept {
 		auto shared_ptr = std::make_shared<Func>(std::forward<Fn>(fn));
 
 		if (s_hooks->menus.registry_lock.try_lock()) { // may fail spuriously (fine)
@@ -185,8 +187,8 @@ private:
 	static bool merge_overflowing_windows() noexcept;
 	static void invoke_registered_windows() noexcept;
 
-	static bool merge_overflowing_menus(const Key& tag) noexcept;
-	static void invoke_registered_menus(const Key& tag) noexcept;
+	static bool merge_overflowing_menus(const PlainKey& tag) noexcept;
+	static void invoke_registered_menus(const PlainKey& tag) noexcept;
 
 public:
 	static void init_context(const char*);

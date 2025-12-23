@@ -34,7 +34,7 @@ static constexpr auto RGBA_to_ImVec4(RGBA color) noexcept {
 /*==================================================================*/
 
 void FrontendHost::initializeInterface() noexcept {
-	static auto sMenu_File_Open = FrontendInterface::register_menu("", "File",
+	static auto sMenu_File_Open = FrontendInterface::register_menu("", { 0, "File" },
 	[&]() noexcept {
 		if (ImGui::MenuItem("Open File...")) {
 			SDL_ShowOpenFileDialog(HomeDirManager::probableFileCallback,
@@ -42,8 +42,8 @@ void FrontendHost::initializeInterface() noexcept {
 		}
 	});
 
-	static auto sMenu_File_Data = FrontendInterface::register_menu("", "File",
-	[&]() noexcept {
+	static auto sMenu_File_Data = FrontendInterface::register_menu("",
+	{ 0, "File" }, [&]() noexcept {
 		static std::atomic<bool> sOpeningURL{};
 		if (ImGui::MenuItem("Open Data Folder...", nullptr, nullptr, !sOpeningURL.load(mo::acquire))) {
 			sOpeningURL.store(true, mo::release);
@@ -56,8 +56,8 @@ void FrontendHost::initializeInterface() noexcept {
 		}
 	});
 
-	static auto sMenu_Recent_Files = FrontendInterface::register_menu("", "File",
-	[&]() noexcept {
+	static auto sMenu_Recent_Files = FrontendInterface::register_menu("",
+	{ 0, "File" }, [&]() noexcept {
 		if (!m_file_mru.size()) { return; }
 		ImGui::Spacing();
 		ImGui::Separator();
@@ -78,23 +78,23 @@ void FrontendHost::initializeInterface() noexcept {
 	});
 
 	static bool sShowDemoWindow{};
-	static auto sMenu_Debug_Demo = FrontendInterface::register_menu("", "Debug",
-	[&]() noexcept {
+	static auto sMenu_Debug_Demo = FrontendInterface::register_menu("",
+	{ 10, "Debug" }, [&]() noexcept {
 		if (ImGui::MenuItem("ImGUI Demo...", nullptr, sShowDemoWindow)) {
 			sShowDemoWindow = !sShowDemoWindow;
 		}
 	});
 
 	static bool sShowLogWindow{};
-	static auto sMenu_Debug_Log = FrontendInterface::register_menu("", "Debug",
-	[&]() noexcept {
+	static auto sMenu_Debug_Log = FrontendInterface::register_menu("",
+	{ 10, "Debug" }, [&]() noexcept {
 		if (ImGui::MenuItem("Show Logs...", nullptr, sShowLogWindow)) {
 			sShowLogWindow = !sShowLogWindow;
 		}
 	});
 
-	static auto sMenu_AboutApp = FrontendInterface::register_menu("", "Debug",
-	[&]() noexcept {
+	static auto sMenu_AboutApp = FrontendInterface::register_menu("",
+	{ 10, "Debug" }, [&]() noexcept {
 		if (ImGui::BeginMenu("About...")) {
 			ImGui::PushFont(nullptr, 21.0f);
 			ImGui::TextUnformatted(AppName);
@@ -120,8 +120,8 @@ void FrontendHost::initializeInterface() noexcept {
 		}
 	});
 
-	static auto sMenu_Settings_ScaleUI = FrontendInterface::register_menu("", "Settings",
-	[&]() noexcept {
+	static auto sMenu_Settings_ScaleUI = FrontendInterface::register_menu("",
+	{ 20, "Settings" }, [&]() noexcept {
 		static int  scale_factor{};
 		static bool click_active{};
 
@@ -134,8 +134,8 @@ void FrontendHost::initializeInterface() noexcept {
 		}
 	});
 
-	static auto sMenu_Settings_MasterVol = FrontendInterface::register_menu("", "Settings",
-	[&]() noexcept {
+	static auto sMenu_Settings_MasterVol = FrontendInterface::register_menu("",
+	{ 20, "Settings" }, [&]() noexcept {
 		auto global_gain = int(GAB->getGlobalGain() * 100);
 		if (ImGui::SliderInt(" Master Volume", &global_gain, 0, 100, "%d%%"))
 			{ GAB->setGlobalGain(global_gain * 0.01f); }
