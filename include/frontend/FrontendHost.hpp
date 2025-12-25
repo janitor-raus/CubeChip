@@ -104,9 +104,18 @@ class FrontendHost final {
 	SystemCore mSystemCore;
 
 private:
+	static constexpr std::size_t s_mru_limit = 5;
+	static inline SimpleMRU<FileItem, s_mru_limit> s_file_mru;
 
+	static void import_mru(std::string* src) noexcept {
+		for (std::size_t i = 0; i < s_mru_limit; ++i) {
+			s_file_mru.insert(src[s_mru_limit - 1 - i]); }
+	}
 
-	static inline SimpleMRU<FileItem, 5> m_file_mru;
+	static void export_mru(std::string* src) noexcept {
+		for (std::size_t i = 0; i < s_mru_limit; ++i) {
+			src[i] = s_file_mru[i]->string(); }
+	}
 
 public:
 	static inline HomeDirManager*  HDM{};
@@ -115,6 +124,8 @@ public:
 
 	struct Settings {
 		float ui_scale = 1.5f;
+		std::array<std::string, s_mru_limit>
+			file_mru_cache{};
 
 		SettingsMap map() noexcept;
 	};

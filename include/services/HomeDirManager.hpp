@@ -14,9 +14,6 @@
 
 #include "AtomSharedPtr.hpp"
 
-#define TOML_EXCEPTIONS 0
-#include <toml++/toml.hpp>
-
 /*==================================================================*/
 	#pragma region HomeDirManager Singleton Class
 
@@ -64,7 +61,6 @@ public:
 
 private:
 	static inline GameValidator sCheckGame{};
-	static inline toml::table   sMainAppConfig{};
 
 private:
 	static inline Str sHomePath{};

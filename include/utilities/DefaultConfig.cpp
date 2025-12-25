@@ -9,7 +9,7 @@
 
 /*==================================================================*/
 
-auto config::writeToFile(
+auto TomlConfig::writeToFile(
 	const toml::table& table,
 	const char* filename
 ) noexcept -> Expected<bool, std::error_code> {
@@ -20,7 +20,7 @@ auto config::writeToFile(
 	catch (...) { return ::make_unexpected(std::make_error_code(std::errc::io_error)); }
 }
 
-auto config::parseFromFile(
+auto TomlConfig::parseFromFile(
 	const char* filename
 ) noexcept -> toml::parse_result {
 	const auto rawData = ::readFileData(filename ? filename : "");
@@ -32,14 +32,17 @@ auto config::parseFromFile(
 
 /*==================================================================*/
 
-void config::safeTableUpdate(toml::table& dst, const toml::table& src) {
+void TomlConfig::safeTableUpdate(toml::table& dst, const toml::table& src) {
 	for (auto&& [key, dst_val] : dst) {
 		if (const auto* src_val = src.get(key)) {
 			if (dst_val.is_table() && src_val->is_table()) {
 				safeTableUpdate(*dst_val.as_table(), *src_val->as_table());
-			} else {
-				if (dst_val.is_value() && src_val->is_value()
-					&& dst_val.type() == src_val->type()) {
+			}
+			else if (dst_val.is_array() && src_val->is_array()) {
+				dst.insert_or_assign(key, *src_val);
+			}
+			else if (dst_val.is_value() && src_val->is_value()) {
+				if (dst_val.type() == src_val->type()) {
 					dst.insert_or_assign(key, *src_val);
 				}
 			}
@@ -47,17 +50,19 @@ void config::safeTableUpdate(toml::table& dst, const toml::table& src) {
 	}
 }
 
-void config::safeTableInsert(toml::table& dst, const toml::table& src) {
+void TomlConfig::safeTableInsert(toml::table& dst, const toml::table& src) {
 	for (auto&& [key, src_val] : src) {
 		if (auto it = dst.find(key); it == dst.end()) {
-			if (src_val.is_table())
-				{dst.insert(key, *src_val.as_table());}
-			else
-				{ dst.insert(key, src_val); }
+			if (src_val.is_table()) {
+				dst.insert(key, *src_val.as_table());
+			} else {
+				dst.insert(key, src_val);
+			}
 		}
 		else {
-			if (src_val.is_table() && it->second.is_table())
-				{ safeTableInsert(*it->second.as_table(), *src_val.as_table()); }
+			if (src_val.is_table() && it->second.is_table()) {
+				safeTableInsert(*it->second.as_table(), *src_val.as_table());
+			}
 		}
 	}
 }

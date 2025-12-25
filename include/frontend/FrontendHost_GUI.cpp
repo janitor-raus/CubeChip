@@ -58,17 +58,17 @@ void FrontendHost::initializeInterface() noexcept {
 
 	static auto sMenu_Recent_Files = FrontendInterface::register_menu("",
 	{ 0, "File" }, [&]() noexcept {
-		if (!m_file_mru.size()) { return; }
+		if (!s_file_mru.size()) { return; }
 		ImGui::Spacing();
 		ImGui::Separator();
 		ImGui::Spacing();
 		ImGui::TextUnformatted("Recently opened:");
 		ImGui::Spacing(); ImGui::Spacing();
 		if (FrontendInterface::was_menu_clicked()) {
-			for (auto& e : m_file_mru.span()) { e.exists(); }
+			for (auto& e : s_file_mru.span()) { e.exists(); }
 		}
 		bool clicked = FrontendInterface::was_menu_clicked();
-		for (auto& entry : m_file_mru.span()) {
+		for (auto& entry : s_file_mru.span()) {
 			if (ImGui::MenuItem(entry->filename().string().c_str(),
 				nullptr, nullptr, clicked ? entry.exists() : entry))
 			{

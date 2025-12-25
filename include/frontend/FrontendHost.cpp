@@ -50,6 +50,7 @@ void FrontendHost::StopSystemThread::operator()(SystemInterface* ptr) noexcept {
 SettingsMap FrontendHost::Settings::map() noexcept {
 	return {
 		makeSetting("Frontend.Interface.Scale", &ui_scale),
+		makeSetting("Frontend.Interface.FileMRU", file_mru_cache.data(), s_mru_limit),
 	};
 }
 
@@ -57,6 +58,7 @@ auto FrontendHost::exportSettings() const noexcept -> Settings {
 	Settings out;
 
 	out.ui_scale = FrontendInterface::get_ui_scale_factor();
+	FrontendHost::export_mru(out.file_mru_cache.data());
 
 	return out;
 }
@@ -85,7 +87,7 @@ void FrontendHost::loadGameFile(const Path& gameFile) {
 	blog.newEntry<BLOG::INF>("Attempting to load: \"{}\"", gameFile.string());
 	if (HDM->validateGameFile(gameFile)) {
 		blog.newEntry<BLOG::INF>("File has been accepted!");
-		m_file_mru.insert(gameFile);
+		s_file_mru.insert(gameFile);
 		replaceCore();
 	} else {
 		blog.newEntry<BLOG::INF>("Path has been rejected!");
@@ -101,12 +103,12 @@ bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forc
 
 	GlobalAudioBase::Settings GAB_settings;
 	BasicVideoSpec ::Settings BVS_settings;
-	FrontendHost   ::Settings FE_settings;
+	FrontendHost   ::Settings FEH_settings;
 
 	HDM->parseMainAppConfig(
 		GAB_settings.map(),
 		BVS_settings.map(),
-		FE_settings.map()
+		FEH_settings.map()
 	);
 
 	GAB = GlobalAudioBase::initialize(GAB_settings);
@@ -116,7 +118,8 @@ bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forc
 	BVS = BasicVideoSpec::initialize(BVS_settings);
 	if (!BVS) { return false; }
 
-	FrontendInterface::set_ui_scale_factor(FE_settings.ui_scale);
+	FrontendInterface::set_ui_scale_factor(FEH_settings.ui_scale);
+	FrontendHost::import_mru(FEH_settings.file_mru_cache.data());
 
 	return true;
 }

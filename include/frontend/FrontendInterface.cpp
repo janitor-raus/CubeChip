@@ -325,8 +325,8 @@ void FrontendInterface::begin_new_frame() {
 	}
 
 	const auto& viewport = *ImGui::GetMainViewport();
-	ImGui::SetNextWindowPos({ viewport.Pos.x, viewport.Pos.y + ImGui::GetFrameHeight() });
-	ImGui::SetNextWindowSize({ viewport.Size.x, viewport.Size.y - ImGui::GetFrameHeight() });
+	ImGui::SetNextWindowPos(ImVec2(viewport.Pos.x, viewport.Pos.y + ImGui::GetFrameHeight()));
+	ImGui::SetNextWindowSize(ImVec2(viewport.Size.x, viewport.Size.y - ImGui::GetFrameHeight()));
 	ImGui::SetNextWindowViewport(viewport.ID);
 
 	ImGui::Begin("MainDockspace", nullptr, ImGuiWindowFlags_NoSavedSettings

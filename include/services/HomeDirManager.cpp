@@ -18,6 +18,13 @@
 #include <SDL3/SDL_messagebox.h>
 
 /*==================================================================*/
+
+#define TOML_EXCEPTIONS 0
+#include <toml++/toml.hpp>
+
+static toml::table s_toml_config{};
+
+/*==================================================================*/
 	#pragma region HomeDirManager Class
 
 HomeDirManager::HomeDirManager(
@@ -103,8 +110,8 @@ bool HomeDirManager::setHomePath(StrV overrideHome, bool forcePortable, StrV org
 }
 
 void HomeDirManager::parseMainAppConfig() const noexcept {
-	if (const auto result = config::parseFromFile(sConfPath.c_str())) {
-		config::safeTableUpdate(sMainAppConfig, result.table());
+	if (const auto result = TomlConfig::parseFromFile(sConfPath.c_str())) {
+		TomlConfig::safeTableUpdate(s_toml_config, result.table());
 		blog.newEntry<BLOG::INF>(
 			"[TOML] App Config found, previous settings loaded!");
 	} else {
@@ -114,7 +121,7 @@ void HomeDirManager::parseMainAppConfig() const noexcept {
 }
 
 void HomeDirManager::writeMainAppConfig() const noexcept {
-	if (const auto result = config::writeToFile(sMainAppConfig, sConfPath.c_str())) {
+	if (const auto result = TomlConfig::writeToFile(s_toml_config, sConfPath.c_str())) {
 		blog.newEntry<BLOG::INF>(
 			"[TOML] App Config written to file successfully!");
 	} else {
@@ -124,18 +131,18 @@ void HomeDirManager::writeMainAppConfig() const noexcept {
 }
 
 void HomeDirManager::insertIntoMainAppConfig(const SettingsMap& map) const noexcept {
-	for (const auto& pair : map) {
-		const auto& key = pair.first;
-		const auto& ref = pair.second;
-		ref.visit([&](auto* ptr) { config::set(sMainAppConfig, key, *ptr); });
+	for (const auto& [key, setting] : map) {
+		setting.visit([&](auto* ptr) noexcept {
+			TomlConfig::set(s_toml_config, key, ptr, setting.elem_count());
+		});
 	}
 }
 
 void HomeDirManager::updateFromMainAppConfig(const SettingsMap& map) const noexcept {
-	for (const auto& pair : map) {
-		const auto& key = pair.first;
-		const auto& ref = pair.second;
-		ref.visit([&](auto* ptr) { config::get(sMainAppConfig, key, *ptr); });
+	for (const auto& [key, setting] : map) {
+		setting.visit([&](auto* ptr) noexcept {
+			TomlConfig::get(s_toml_config, key, ptr, setting.elem_count());
+		});
 	}
 }
 
