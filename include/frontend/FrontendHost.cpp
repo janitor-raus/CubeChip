@@ -140,9 +140,9 @@ s32  FrontendHost::processEvents(void* event) noexcept {
 	FrontendInterface::process_event(event);
 
 	auto sdl_event = reinterpret_cast<SDL_Event*>(event);
+
 	if (BVS->isMainWindowID(sdl_event->window.windowID)) {
 		switch (sdl_event->type) {
-			case SDL_EVENT_QUIT:
 			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
 				return SDL_APP_SUCCESS;
 
@@ -162,6 +162,11 @@ s32  FrontendHost::processEvents(void* event) noexcept {
 			case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
 				// Check if ImGui updates DPI scaling automatically
 				break;
+		}
+	} else {
+		switch (sdl_event->type) {
+			case SDL_EVENT_QUIT:
+				return SDL_APP_SUCCESS;
 		}
 	}
 
