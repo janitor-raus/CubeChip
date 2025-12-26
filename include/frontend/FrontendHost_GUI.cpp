@@ -34,24 +34,28 @@ static constexpr auto RGBA_to_ImVec4(RGBA color) noexcept {
 /*==================================================================*/
 
 void FrontendHost::initializeInterface() noexcept {
-	static auto sMenu_File_Open = FrontendInterface::register_menu("", { 0, "File" },
-	[&]() noexcept {
+	static auto sMenu_File_Open = FrontendInterface::register_menu("",
+	{ 0, "File" }, [&]() noexcept {
 		if (ImGui::MenuItem("Open File...")) {
-			SDL_ShowOpenFileDialog(HomeDirManager::probableFileCallback,
-				nullptr, BVS->getMainWindow(), nullptr, 0, nullptr, false);
+			SDL_ShowOpenFileDialog([](void*, const char* const* file_list, int) noexcept {
+				if (file_list && file_list[0]) { set_open_file_dialog_result(file_list[0]); }
+			}, nullptr, BVS->getMainWindow(), nullptr, 0, nullptr, false);
 		}
 	});
 
 	static auto sMenu_File_Data = FrontendInterface::register_menu("",
 	{ 0, "File" }, [&]() noexcept {
-		static std::atomic<bool> sOpeningURL{};
-		if (ImGui::MenuItem("Open Data Folder...", nullptr, nullptr, !sOpeningURL.load(mo::acquire))) {
-			sOpeningURL.store(true, mo::release);
-			Thread([url = HomeDirManager::getHomeDirectoryURL()]() noexcept {
-				if (!SDL_OpenURL(url.c_str())) {
+		static std::atomic<bool> s_opening_url{};
+		static auto s_home_url = "file:///" + HomeDirManager::get_home_path();
+
+		if (ImGui::MenuItem("Open Data Folder...", nullptr, nullptr, !s_opening_url.load(mo::acquire))) {
+			s_opening_url.store(true, mo::release);
+
+			Thread([]() noexcept {
+				if (!SDL_OpenURL(s_home_url.c_str())) {
 					blog.newEntry<BLOG::ERR>("Failed to open Data folder! [{}]", SDL_GetError());
 				}
-				sOpeningURL.store(false, mo::release);
+				s_opening_url.store(false, mo::release);
 			}).detach();
 		}
 	});
@@ -64,10 +68,13 @@ void FrontendHost::initializeInterface() noexcept {
 		ImGui::Spacing();
 		ImGui::TextUnformatted("Recently opened:");
 		ImGui::Spacing(); ImGui::Spacing();
+
 		if (FrontendInterface::was_menu_clicked()) {
 			for (auto& e : s_file_mru.span()) { e.exists(); }
 		}
+
 		bool clicked = FrontendInterface::was_menu_clicked();
+
 		for (auto& entry : s_file_mru.span()) {
 			if (ImGui::MenuItem(entry->filename().string().c_str(),
 				nullptr, nullptr, clicked ? entry.exists() : entry))

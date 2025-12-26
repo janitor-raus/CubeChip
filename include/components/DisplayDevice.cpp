@@ -22,7 +22,7 @@ struct DisplayDevice::DisplayContext {
 	AtomSharedPtr<std::string> m_display_name;
 	AtomSharedPtr<Callable>    m_osd_callable;
 	FrontendInterface::Hook    m_render_hook;
-	SDL_Holder<SDL_Texture>    m_sdl_texture;
+	SDL_Unique<SDL_Texture>    m_sdl_texture;
 	DisplayDevice::Swapchain   m_swapchain;
 
 	std::atomic<int>  m_screen_rotation{};
@@ -155,7 +155,7 @@ DisplayDevice::DisplayDevice(std::size_t W, std::size_t H, const char* name, std
 	)
 {
 	if (metadata_staging.get_base_frame().area() != (W * H)) {
-		blog.newEntry<BLOG::ERR>("Display W/H out of size bounds, clamping!");
+		blog.newEntry<BLOG::WRN>("Display W/H out of size bounds, clamping!");
 	}
 }
 
@@ -186,7 +186,7 @@ void DisplayDevice::set_display_name(std::string_view name) noexcept {
 	m_context->m_display_name.store(std::make_shared<std::string>(name), mo::relaxed);
 }
 
-void DisplayDevice::set_osd_callable(Callable&& callable) noexcept {
+void DisplayDevice::set_osd_callable(Callable callable) noexcept {
 	m_context->m_osd_callable.store(std::make_shared<Callable>(std::move(callable)), mo::relaxed);
 }
 

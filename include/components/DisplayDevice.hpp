@@ -58,7 +58,7 @@ public:
 	void set_utilize_shaders(bool enable)  noexcept;
 
 	void set_display_name(std::string_view name) noexcept;
-	void set_osd_callable(Callable&& callable)   noexcept;
+	void set_osd_callable(Callable callable)   noexcept;
 };
 
 /*==================================================================*/

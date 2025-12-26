@@ -17,6 +17,7 @@
 
 /*==================================================================*/
 
+// DEPRECTATED, FOR FUTURE REFERENCE ONLY
 enum class GameFileType {
 	c2x, // CHIP-8X 2-page
 	c4x, // CHIP-8X 4-page
@@ -31,7 +32,6 @@ enum class GameFileType {
 	gc8, // GIGACHIP
 	xo8, // XO-CHIP
 	hwc, // HYPERWAVE-CHIP
-	bnc,
 	BytePusher,
 	gb, gbc // GAMEBOY/GAMEBOY COLOR
 };
@@ -40,22 +40,26 @@ enum class GameFileType {
 
 class SystemInterface;
 
+// simple callable to construct a Core instance, returning SystemInterface*
 using CoreConstructor = SystemInterface* (*)();
-using ProgramTester   = bool (*)(const char*, size_type);
-using FileExtList     = std::vector<Str>;
+// simple callable to statically check a game's compatibility with the Core
+using GameFileTester  = bool (*)(const char*, std::size_t);
+// plain vector of file extensions usually associated with a Core or System
+using KnownExtensions = std::vector<std::string>;
 
+// simple struct of a Core's basic details -- very wip
 struct CoreDetails {
-	CoreConstructor constructCore{};
-	ProgramTester   testProgram{};
-	FileExtList     fileExtensions{};
+	CoreConstructor construct_core{};
+	GameFileTester  test_game_file{};
+	KnownExtensions known_extensions{};
 
-	Str coreName{};
-	Str coreDesc{};
+	std::string coreName{};
+	std::string coreDesc{};
 
 	void clear() noexcept {
-		constructCore = nullptr;
-		testProgram   = nullptr;
-		fileExtensions.clear();
+		construct_core = nullptr;
+		test_game_file = nullptr;
+		known_extensions.clear();
 		coreName.clear();
 		coreDesc.clear();
 	}
@@ -68,7 +72,7 @@ using Json        = nlohmann::json;
 
 #define REGISTER_CORE(CoreType, ...) \
 static auto CONCAT_TOKENS(sCoreRegID_, __COUNTER__) = \
-	CoreRegistry::registerCore( \
+	CoreRegistry::register_new_core( \
 		[]() -> SystemInterface* { \
 			return new (std::align_val_t(HDIS), std::nothrow) CoreType(); \
 		}, CoreType::validateProgram, { __VA_ARGS__ } \
@@ -77,55 +81,50 @@ static auto CONCAT_TOKENS(sCoreRegID_, __COUNTER__) = \
 /*==================================================================*/
 
 class CoreRegistry {
-	using Registrations = std::unordered_map<Str, CoreRegList>;
-	static Registrations& getRegistry() noexcept {
-		static Registrations sRegistry{};
-		return sRegistry;
+	using RegistryKey = std::string;
+	using Registrations = std::unordered_map<RegistryKey, CoreRegList>;
+
+	static auto& get_registry_map() noexcept {
+		static Registrations s_core_registry{};
+		return s_core_registry;
 	}
 
-	static inline CoreRegList   sEligible{};
-	static inline CoreDetails   sCurrentCore{};
+	static inline CoreRegList   s_potential_cores{};
+	static inline CoreDetails   s_selected_core{};
 
-	static Json sProgramDB;
-	static Json sCoreConfig;
+	static Json s_game_database;
+	static Json s_custom_core_cfg;
 
 	CoreRegistry()                               = delete;
 	CoreRegistry(const CoreRegistry&)            = delete;
 	CoreRegistry& operator=(const CoreRegistry&) = delete;
 
-	static bool validateProgramByHash(const char* fileData, size_type fileSize, const Str& fileSHA1) noexcept;
-	static bool validateProgramByType(const char* fileData, size_type fileSize, const Str& fileType) noexcept;
+	static bool validate_by_sha1_hash(const char* fileData, std::size_t fileSize, const std::string& fileSHA1) noexcept;
+	static bool validate_by_extension(const char* fileData, std::size_t fileSize, const std::string& fileType) noexcept;
 
 public:
-	static bool validateProgram(const char* fileData, size_type fileSize, const Str& fileType, const Str& fileSHA1) noexcept;
+	static bool validate_game_file(const char* fileData, std::size_t fileSize, const std::string& fileType, const std::string& fileSHA1) noexcept;
 
-public:
-	static void loadProgramDB(const Path& dbPath = {}) noexcept;
-private:
-	static bool loadJsonFromFile(const Path& path, Json& output) noexcept;
+	static void load_game_database(const Path& dbPath = {}) noexcept;
+
+	static bool register_new_core(CoreConstructor&& ctor,
+		GameFileTester&& tester, KnownExtensions exts) noexcept;
+
+	[[nodiscard]] static
+	SystemInterface* construct_new_core(std::size_t idx = 0) noexcept;
 
 	/*==================================================================*/
 
-public:
-	static bool registerCore(CoreConstructor&& ctor, ProgramTester&& tester, FileExtList exts) noexcept;
-
-	static const CoreRegList* findEligibleCores(const Str& ext) noexcept;
-
-	[[nodiscard]]
-	static SystemInterface* constructCore(size_type idx = 0) noexcept;
-
-	/*==================================================================*/
-
-	static void clearEligibleCores() noexcept {
-		sEligible.clear();
-		sCurrentCore.clear();
+	static void clear_eligible_cores() noexcept {
+		s_potential_cores.clear();
+		s_selected_core.clear();
 	}
-	static void clearCurrentCore() noexcept {
-		sCurrentCore.clear();
+	static void clear_current_core() noexcept {
+		s_selected_core.clear();
 	}
 
 	[[nodiscard]]
-	static const auto& getEligibleCores() noexcept { return sEligible; }
+	static const auto& get_eligible_core_list() noexcept { return s_potential_cores; }
 	[[nodiscard]]
-	static const auto& getCurrentCore() noexcept { return sCurrentCore; }
+	static const auto& get_selected_core() noexcept { return s_selected_core; }
 };

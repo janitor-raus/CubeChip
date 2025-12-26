@@ -17,11 +17,11 @@
 Chip8_CoreInterface::Chip8_CoreInterface(DisplayDevice display_device) noexcept
 	: mDisplayDevice(std::move(display_device))
 {
-	if (auto* path = HDM->addSystemDir("savestate", "CHIP8"))
-		{ sSavestatePath = *path / HDM->getFileSHA1(); }
+	if (auto* path = HDM->add_user_directory("savestate", "CHIP8"))
+		{ sSavestatePath = *path / HDM->get_loaded_file_sha1(); }
 
-	if (auto* path = HDM->addSystemDir("permaRegs", "CHIP8"))
-		{ sPermaRegsPath = *path / HDM->getFileSHA1(); }
+	if (auto* path = HDM->add_user_directory("permaRegs", "CHIP8"))
+		{ sPermaRegsPath = *path / HDM->get_loaded_file_sha1(); }
 
 	mDisplayDevice.set_osd_callable([&]() {
 		if (!hasSystemState(EmuState::STATS)) { return; }
@@ -319,7 +319,7 @@ void Chip8_CoreInterface::getPermaRegs(u32 X) noexcept {
 /*==================================================================*/
 
 void Chip8_CoreInterface::copyGameToMemory(void* dest) noexcept {
-	std::memcpy(dest, HDM->getFileData(), HDM->getFileSize());
+	std::memcpy(dest, HDM->get_loaded_file_data(), HDM->get_loaded_file_size());
 }
 
 void Chip8_CoreInterface::copyFontToMemory(void* dest, size_type size) noexcept {

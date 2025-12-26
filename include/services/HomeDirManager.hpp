@@ -12,114 +12,95 @@
 #include "Typedefs.hpp"
 #include "SettingWrapper.hpp"
 
-#include "AtomSharedPtr.hpp"
-
 /*==================================================================*/
 	#pragma region HomeDirManager Singleton Class
 
 class HomeDirManager final {
 	HomeDirManager(
-		StrV overrideHome, StrV configName,
-		bool forcePortable, StrV org, StrV app,
+		std::string_view overrideHome, std::string_view configName,
+		bool forcePortable, std::string_view org, std::string_view app,
 		bool& initError
 	) noexcept;
+
 	HomeDirManager(const HomeDirManager&) = delete;
 	HomeDirManager& operator=(const HomeDirManager&) = delete;
 
 	using GameValidator = bool (*)(
-		const char* fileData,
-		const size_type fileSize,
-		const Str&  fileExts,
-		const Str&  fileSHA1
+		const char* file_data,
+		const std::size_t file_size,
+		const std::string& file_exts,
+		const std::string& file_sha1
 	) noexcept;
 
-	Path mFilePath{};
-	Str  mFileSHA1{};
+	Path m_file_path{};
+	std::string m_file_sha1{};
 
-	std::vector<char>
-		mFileData{};
+	std::vector<char> // probably should be mmapped later..
+		m_file_data{};
 
 	std::vector<Path>
-		mDirectories{};
-
-	static inline AtomSharedPtr<Str>
-		mProbableFile{ nullptr };
-
-public:
-	[[nodiscard]]
-	static auto getProbableFile() noexcept
-		{ return mProbableFile.exchange(nullptr, mo::relaxed); }
-
-	static void setProbableFile(StrV file) noexcept
-		{ mProbableFile.store(std::make_shared<Str>(file), mo::relaxed); }
-
-	static void probableFileCallback(void*, const char* const* filelist, int) noexcept
-		{ if (filelist && filelist[0]) { setProbableFile(filelist[0]); } }
-
-	static auto getHomeDirectoryURL() noexcept
-		{ return "file:///" + sHomePath; }
+		m_user_directories{};
 
 private:
-	static inline GameValidator sCheckGame{};
+	static inline
+	GameValidator s_validator{};
+
+	static inline
+	std::string s_home_path{};
+
+	static inline
+	std::string s_config_at{};
 
 private:
-	static inline Str sHomePath{};
-	static inline Str sConfPath{};
-
-	static void triggerFatalError(const char* error) noexcept;
-	static bool isLocationWritable(const char* path) noexcept;
+	bool set_home_path(std::string_view override, bool portable,
+		std::string_view org, std::string_view app) noexcept;
+public:
+	static const auto& get_home_path() noexcept { return s_home_path; }
 
 private:
-	bool setHomePath(StrV override, bool portable, StrV org, StrV app) noexcept;
-public:
-	static auto* getHomePath() noexcept { return sHomePath.empty() ? nullptr : sHomePath.c_str(); }
+	void parse_app_config_file() const noexcept;
 
 public:
-	void parseMainAppConfig() const noexcept;
-
-	template <typename... Maps>
-		requires (std::same_as<Maps, SettingsMap> && ...)
-	void parseMainAppConfig(const Maps&... maps) const noexcept {
-		(insertIntoMainAppConfig(maps), ...);
-		parseMainAppConfig();
-		(updateFromMainAppConfig(maps), ...);
-	}
-
-	void writeMainAppConfig() const noexcept;
-
-	template <typename... Maps>
-		requires (std::same_as<Maps, SettingsMap> && ...)
-	void writeMainAppConfig(const Maps&... maps) const noexcept {
-		(insertIntoMainAppConfig(maps), ...);
-		writeMainAppConfig();
+	template <typename... Maps> requires (std::same_as<Maps, SettingsMap> && ...)
+	void parse_app_config_file(const Maps&... maps) const noexcept {
+		(insert_map_into_config(maps), ...);
+		parse_app_config_file();
+		(update_map_from_config(maps), ...);
 	}
 
 private:
-	void insertIntoMainAppConfig(const SettingsMap& map) const noexcept;
-	void updateFromMainAppConfig(const SettingsMap& map) const noexcept;
+	void write_app_config_file() const noexcept;
+
+public:
+	template <typename... Maps> requires (std::same_as<Maps, SettingsMap> && ...)
+	void write_app_config_file(const Maps&... maps) const noexcept {
+		(insert_map_into_config(maps), ...);
+		write_app_config_file();
+	}
+
+private:
+	void insert_map_into_config(const SettingsMap& map) const noexcept;
+	void update_map_from_config(const SettingsMap& map) const noexcept;
 
 public:
 	static HomeDirManager* initialize(
-		StrV overrideHome, StrV configName,
-		bool forcePortable, StrV org, StrV app
+		std::string_view overrideHome, std::string_view configName,
+		bool forcePortable, std::string_view org, std::string_view app
 	) noexcept;
 
-	const Path* addSystemDir(const Path& sub, const Path& sys = Path{}) noexcept;
+	// returns path pointer to added directory, or nullptr on failure
+	const Path* add_user_directory(const Path& sub, const Path& sys = Path{}) noexcept;
 
-	auto getFullPath() const noexcept { return mFilePath; }
-	auto getFilePath() const noexcept { return mFilePath.string(); }
-	auto getFileName() const noexcept { return mFilePath.filename().string(); }
-	auto getFileStem() const noexcept { return mFilePath.stem().string(); }
-	auto getFileExts() const noexcept { return mFilePath.extension().string(); }
-	auto getFileSpan() const noexcept { return std::span{ mFileData }; }
-	auto getFileSize() const noexcept { return mFileData.size(); }
-	auto getFileData() const noexcept { return mFileData.data(); }
-	auto getFileSHA1() const noexcept { return mFileSHA1; }
+	const auto& get_loaded_file_path() const noexcept { return m_file_path; }
+	/***/ auto  get_loaded_file_span() const noexcept { return std::span(m_file_data); }
+	/***/ auto  get_loaded_file_data() const noexcept { return m_file_data.data(); }
+	/***/ auto  get_loaded_file_size() const noexcept { return m_file_data.size(); }
+	const auto& get_loaded_file_sha1() const noexcept { return m_file_sha1; }
 
-	void setValidator(GameValidator func) noexcept { sCheckGame = func; }
+	void set_validator_callable(GameValidator func) noexcept { s_validator = std::move(func); }
 
-	void clearCachedFileData() noexcept;
-	bool validateGameFile(const Path& gamePath) noexcept;
+	void clear_cached_file_data() noexcept;
+	bool load_and_validate_file(const Path& gamePath) noexcept;
 };
 
 	#pragma endregion

@@ -22,10 +22,11 @@
 
 /*==================================================================*/
 
-static std::vector<Str> sPendingFileDrops{};
+static std::vector<Str>
+	s_pending_file_drops{};
 
-static void addPendingFile(const Str& filepath) noexcept {
-	if (!filepath.empty()) { sPendingFileDrops.push_back(filepath); }
+static void push_back_pending_file_drops(const Str& filepath) noexcept {
+	if (!filepath.empty()) { s_pending_file_drops.push_back(filepath); }
 }
 
 /*==================================================================*/
@@ -33,10 +34,10 @@ static void addPendingFile(const Str& filepath) noexcept {
 FrontendHost::FrontendHost(const Path& filepath) noexcept {
 	SystemInterface::assignComponents(HDM, BVS);
 	BVS->setMainWindowTitle(AppName);
-	HDM->setValidator(CoreRegistry::validateProgram);
-	CoreRegistry::loadProgramDB();
+	HDM->set_validator_callable(CoreRegistry::validate_game_file);
+	CoreRegistry::load_game_database();
 
-	addPendingFile(filepath.string());
+	::push_back_pending_file_drops(filepath.string());
 }
 
 void FrontendHost::StopSystemThread::operator()(SystemInterface* ptr) noexcept {
@@ -49,8 +50,8 @@ void FrontendHost::StopSystemThread::operator()(SystemInterface* ptr) noexcept {
 
 SettingsMap FrontendHost::Settings::map() noexcept {
 	return {
-		makeSetting("Frontend.Interface.Scale", &ui_scale),
-		makeSetting("Frontend.Interface.FileMRU", file_mru_cache.data(), s_mru_limit),
+		::make_setting_link("Frontend.Interface.Scale", &ui_scale),
+		::make_setting_link("Frontend.Interface.FileMRU", file_mru_cache.data(), s_mru_limit),
 	};
 }
 
@@ -65,15 +66,16 @@ auto FrontendHost::exportSettings() const noexcept -> Settings {
 
 /*==================================================================*/
 
-void FrontendHost::discardCore() {
+void FrontendHost::discard_active_core() {
 	mSystemCore.reset();
-	CoreRegistry::clearEligibleCores();
-	HDM->clearCachedFileData();
+	CoreRegistry::clear_eligible_cores();
+	HDM->clear_cached_file_data();
 }
 
-void FrontendHost::replaceCore() {
+void FrontendHost::replace_active_core() {
 	mSystemCore.reset(); // ensures previous thread quits first!
-	mSystemCore.reset(CoreRegistry::constructCore());
+	mSystemCore.reset(CoreRegistry::construct_new_core()); // need a gui here to list and select cores!
+
 	if (mSystemCore) {
 		BVS->raiseMainWindow(); // bring to front when we get a core!
 		toggleSystemLimiter(); toggleSystemOSD();
@@ -85,10 +87,10 @@ void FrontendHost::replaceCore() {
 
 void FrontendHost::loadGameFile(const Path& gameFile) {
 	blog.newEntry<BLOG::INF>("Attempting to load: \"{}\"", gameFile.string());
-	if (HDM->validateGameFile(gameFile)) {
+	if (HDM->load_and_validate_file(gameFile)) {
 		blog.newEntry<BLOG::INF>("File has been accepted!");
 		s_file_mru.insert(gameFile);
-		replaceCore();
+		replace_active_core();
 	} else {
 		blog.newEntry<BLOG::INF>("Path has been rejected!");
 	}
@@ -99,13 +101,13 @@ bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forc
 		overrideHome, configName, forcePortable, OrgName, AppName);
 	if (!HDM) { return false; }
 
-	FrontendInterface::init_context(HomeDirManager::getHomePath());
+	FrontendInterface::init_context(HomeDirManager::get_home_path().c_str());
 
 	GlobalAudioBase::Settings GAB_settings;
 	BasicVideoSpec ::Settings BVS_settings;
 	FrontendHost   ::Settings FEH_settings;
 
-	HDM->parseMainAppConfig(
+	HDM->parse_app_config_file(
 		GAB_settings.map(),
 		BVS_settings.map(),
 		FEH_settings.map()
@@ -127,7 +129,7 @@ bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forc
 void FrontendHost::quitApplication() noexcept {
 	mSystemCore.reset();
 
-	HDM->writeMainAppConfig(
+	HDM->write_app_config_file(
 		GAB->exportSettings().map(),
 		BVS->exportSettings().map(),
 		this->exportSettings().map()
@@ -147,7 +149,7 @@ s32  FrontendHost::processEvents(void* event) noexcept {
 				return SDL_APP_SUCCESS;
 
 			case SDL_EVENT_DROP_FILE:
-				addPendingFile(sdl_event->drop.data);
+				::push_back_pending_file_drops(sdl_event->drop.data);
 				break;
 
 			case SDL_EVENT_WINDOW_MINIMIZED:
@@ -179,12 +181,13 @@ s32  FrontendHost::processFrame() {
 	initializeInterface();
 	handleHotkeyActions();
 
-	const auto dialogResult = HDM->getProbableFile();
+	const auto dialogResult = get_open_file_dialog_result();
 	if (dialogResult) { loadGameFile(*dialogResult); }
-	else if (sPendingFileDrops.size() > 0) {
+
+	else if (s_pending_file_drops.size() > 0) {
 		// we only allow a single file load a time (for now?)
-		loadGameFile(sPendingFileDrops[0]);
-		sPendingFileDrops.clear();
+		loadGameFile(s_pending_file_drops[0]);
+		s_pending_file_drops.clear();
 	}
 
 	return BVS->renderPresent() ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
@@ -195,17 +198,17 @@ void FrontendHost::handleHotkeyActions() {
 	Input.updateStates();
 
 	if (Input.isPressed(KEY(F9)))
-		{ CoreRegistry::loadProgramDB(); }
+		{ CoreRegistry::load_game_database(); }
 
 	if (mSystemCore) {
 		if (Input.isPressed(KEY(ESCAPE))) {
-			discardCore();
+			discard_active_core();
 			blog.newEntry<BLOG::INF>(
 				"Emulator core exited successfully.");
 			return;
 		}
 		if (Input.isPressed(KEY(BACKSPACE))) {
-			replaceCore();
+			replace_active_core();
 			blog.newEntry<BLOG::INF>(
 				"Emulator core restarted successfully.");
 			return;

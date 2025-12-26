@@ -30,8 +30,8 @@ GlobalAudioBase::~GlobalAudioBase() noexcept
 
 SettingsMap GlobalAudioBase::Settings::map() noexcept {
 	return {
-		makeSetting("Audio.Volume", &volume),
-		makeSetting("Audio.Muted",  &muted),
+		::make_setting_link("Audio.Volume", &volume),
+		::make_setting_link("Audio.Muted",  &muted),
 	};
 }
 

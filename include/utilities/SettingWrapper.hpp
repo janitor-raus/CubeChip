@@ -86,6 +86,6 @@ template<typename T, typename Variant>
 concept VariantCompatible = requires { Variant(std::in_place_type<T>); };
 
 template <typename T> requires (VariantCompatible<T*, SettingVariant>)
-inline auto makeSetting(const std::string& key, T* const ptr, std::size_t elem_count = 1) noexcept {
+inline auto make_setting_link(const std::string& key, T* const ptr, std::size_t elem_count = 1) noexcept {
 	return std::pair(key, SettingWrapper(ptr, elem_count));
 }

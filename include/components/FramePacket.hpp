@@ -169,13 +169,13 @@ struct FramePacket {
 
 private:
 	AlignedUniqueArray
-		<value_type> buffer;
+		<value_type> m_buffer;
 
 public:
 	Metadata metadata;
 
-	pointer data()       noexcept { return buffer.get(); }
-	pointer data() const noexcept { return buffer.get(); }
+	pointer data()       noexcept { return m_buffer.get(); }
+	pointer data() const noexcept { return m_buffer.get(); }
 
 	auto size() const noexcept { return metadata.get_base_frame().area(); }
 
@@ -186,8 +186,8 @@ private:
 
 public:
 	FramePacket(std::size_t SIZE, std::size_t W, std::size_t H) noexcept
-		: buffer(::allocate_n<value_type>(W * H * SIZE).as_value().release())
-		, metadata(int(W), int(H))
+		: m_buffer(::allocate_n<value_type>(W * H * SIZE).as_value().release())
+		, metadata(static_cast<int>(W), static_cast<int>(H))
 	{}
 
 public:

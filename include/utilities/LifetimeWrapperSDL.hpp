@@ -16,10 +16,14 @@ struct SDL_Deleter;
 #ifdef USE_FRIENDLY_UNIQUE
 	#include "FriendlyUnique.hpp"
 
+	// SDL_Unique is a unique pointer wrapper with SDL-specific deleters and
+	// in this case, through a FriendlyUnique wrapper for better usability.
 	template <typename T>
 	using SDL_Unique = FriendlyUnique<T, SDL_Deleter<T>>;
 #else
 	#include <memory>
+
+	// SDL_Unique is a unique pointer with SDL-specific deleters.
 	template <typename T>
 	using SDL_Unique = std::unique_ptr<T, SDL_Deleter<T>>;
 #endif // USE_FRIENDLY_UNIQUE
@@ -56,21 +60,28 @@ template <> struct SDL_Deleter<const char>
 
 /*==================================================================*/
 
+/*
+	@brief SDL_Holder is a simple RAII wrapper around SDL_Unique. Ideal for
+	situations where you need an SDL_Unique in a templated class without having
+	to define templated destructors or copy/move operations in the header which
+	would require leaking SDL header includes.
+*/
 template <typename T>
-struct SDL_Holder {
-	SDL_Unique<T> ptr;
+class SDL_Holder {
+	SDL_Unique<T> m_ptr;
 
+public:
 	constexpr SDL_Holder() = default;
-	explicit SDL_Holder(T* ptr) noexcept : ptr(ptr) {}
+	explicit SDL_Holder(T* ptr) noexcept : m_ptr(ptr) {}
 
 	~SDL_Holder() noexcept;
 
-	constexpr operator bool() const noexcept { return bool(ptr); }
-	constexpr operator T* ()  const noexcept { return ptr.get(); }
+	constexpr operator bool() const noexcept { return bool(m_ptr); }
+	constexpr operator T* ()  const noexcept { return m_ptr.get(); }
 
-	T* get()        const noexcept { return ptr.get(); }
-	T* operator->() const noexcept { return ptr.get(); }
-	T& operator*()  const noexcept { return *ptr; }
+	T* get()        const noexcept { return m_ptr.get(); }
+	T* operator->() const noexcept { return m_ptr.get(); }
+	T& operator*()  const noexcept { return *m_ptr; }
 };
 
 /*==================================================================*/
@@ -78,6 +89,6 @@ struct SDL_Holder {
 namespace sdl {
 	template <typename T>
 	[[nodiscard]] constexpr
-	auto make_unique(T* ptr) noexcept
+	auto make_unique(T* ptr) noexcept \
 		{ return SDL_Unique<T>(ptr); }
 }

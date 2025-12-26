@@ -45,9 +45,9 @@ class TripleBuffer {
 	struct alignas(HDIS) TripleBufferContext {
 		using AtomBuf = std::atomic<Buffer*>;
 
-		Buffer m_work_buffer;
-		Buffer m_read_buffer;
-		Buffer m_swap_buffer;
+		alignas(HDIS) Buffer m_work_buffer;
+		alignas(HDIS) Buffer m_read_buffer;
+		alignas(HDIS) Buffer m_swap_buffer;
 
 		alignas(HDIS) mutable std::mutex m_reader_lock;
 		alignas(HDIS) mutable std::mutex m_worker_lock;

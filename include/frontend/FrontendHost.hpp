@@ -12,6 +12,7 @@
 #include "SimpleMRU.hpp"
 #include "FileItem.hpp"
 #include "SettingWrapper.hpp"
+#include "AtomSharedPtr.hpp"
 
 /*==================================================================*/
 
@@ -103,6 +104,8 @@ class FrontendHost final {
 
 	SystemCore mSystemCore;
 
+	/*==================================================================*/
+
 private:
 	static constexpr std::size_t s_mru_limit = 5;
 	static inline SimpleMRU<FileItem, s_mru_limit> s_file_mru;
@@ -116,6 +119,24 @@ private:
 		for (std::size_t i = 0; i < s_mru_limit; ++i) {
 			src[i] = s_file_mru[i]->string(); }
 	}
+
+	/*==================================================================*/
+
+private:
+	static inline
+	AtomSharedPtr<std::string>
+		s_open_file_result{};
+
+	[[nodiscard]]
+	static auto get_open_file_dialog_result() noexcept {
+		return s_open_file_result.exchange(nullptr, mo::relaxed);
+	}
+
+	static void set_open_file_dialog_result(std::string_view file) noexcept {
+		s_open_file_result.store(std::make_shared<std::string>(file), mo::relaxed);
+	}
+
+	/*==================================================================*/
 
 public:
 	static inline HomeDirManager*  HDM{};
@@ -133,6 +154,8 @@ public:
 private:
 	auto exportSettings() const noexcept -> Settings;
 
+	/*==================================================================*/
+
 private:
 	static inline bool mToggleOSD{};
 	static inline bool mUnlimited{};
@@ -144,8 +167,11 @@ private:
 	void toggleSystemOSD()     noexcept;
 	void toggleSystemHidden(bool state) noexcept;
 
-	void discardCore();
-	void replaceCore();
+	void discard_active_core();
+	void replace_active_core();
+
+/*==================================================================*/
+
 
 public:
 	static auto* initialize(const Path& filepath) noexcept {

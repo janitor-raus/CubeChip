@@ -21,10 +21,10 @@ void SDL_Deleter<const char>     ::operator()(const char*      ptr) const noexce
 template <typename T>
 SDL_Holder<T>::~SDL_Holder() noexcept = default;
 
-template struct SDL_Holder<SDL_Window>;
-template struct SDL_Holder<SDL_Renderer>;
-template struct SDL_Holder<SDL_Texture>;
-template struct SDL_Holder<SDL_AudioStream>;
-template struct SDL_Holder<unsigned>;
-template struct SDL_Holder<char>;
-template struct SDL_Holder<const char>;
+template class SDL_Holder<SDL_Window>;
+template class SDL_Holder<SDL_Renderer>;
+template class SDL_Holder<SDL_Texture>;
+template class SDL_Holder<SDL_AudioStream>;
+template class SDL_Holder<unsigned>;
+template class SDL_Holder<char>;
+template class SDL_Holder<const char>;

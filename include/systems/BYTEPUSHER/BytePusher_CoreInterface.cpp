@@ -16,8 +16,8 @@
 BytePusher_CoreInterface::BytePusher_CoreInterface(DisplayDevice display_device) noexcept
 	: mDisplayDevice(std::move(display_device))
 {
-	if (auto* path = HDM->addSystemDir("savestate", "BYTEPUSHER"))
-		{ sSavestatePath = *path / HDM->getFileSHA1(); }
+	if (auto* path = HDM->add_user_directory("savestate", "BYTEPUSHER"))
+		{ sSavestatePath = *path / HDM->get_loaded_file_sha1(); }
 
 	mDisplayDevice.set_osd_callable([&]() {
 		if (!hasSystemState(EmuState::STATS)) { return; }
@@ -63,7 +63,7 @@ u32  BytePusher_CoreInterface::getKeyStates() noexcept {
 
 void BytePusher_CoreInterface::copyGameToMemory(u8* dest) noexcept {
 	std::copy_n(EXEC_POLICY(unseq)
-		HDM->getFileData(), HDM->getFileSize(), dest);
+		HDM->get_loaded_file_data(), HDM->get_loaded_file_size(), dest);
 }
 
 #endif
