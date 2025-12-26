@@ -31,7 +31,7 @@ struct DisplayDevice::DisplayContext {
 
 	DisplayContext(std::size_t W, std::size_t H, const char* name, std::size_t bpp) noexcept
 		: m_display_name(std::make_shared<std::string>(name))
-		, m_osd_callable(std::make_shared<Callable>())
+		, m_osd_callable(nullptr)
 		, m_render_hook(FrontendInterface::register_window(
 			[&]() noexcept { render_display_window(); }))
 		, m_sdl_texture(BasicVideoSpec::makeDisplayTexture(

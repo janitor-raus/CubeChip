@@ -19,6 +19,11 @@ BytePusher_CoreInterface::BytePusher_CoreInterface(DisplayDevice display_device)
 	if (auto* path = HDM->addSystemDir("savestate", "BYTEPUSHER"))
 		{ sSavestatePath = *path / HDM->getFileSHA1(); }
 
+	mDisplayDevice.set_osd_callable([&]() {
+		if (!hasSystemState(EmuState::STATS)) { return; }
+		osd::simple_stat_overlay(copyOverlayData());
+	});
+
 	loadPresetBinds();
 }
 
