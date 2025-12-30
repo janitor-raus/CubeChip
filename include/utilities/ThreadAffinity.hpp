@@ -10,6 +10,12 @@
 
 namespace thread_affinity {
 	/**
+	 * @brief Attempt to grab the current process ID. Defaults to 0.
+	 * @return Process ID number.
+	 */
+	unsigned get_process_id() noexcept;
+
+	/**
 	 * @brief Guesstimate of amount of logical cores the system has. Defaults to 1.
 	 * @return Amount of logical cores.
 	 */
@@ -17,7 +23,7 @@ namespace thread_affinity {
 
 	/**
 	 * @brief Guesstimate of which logical processor core the current thread runs on. Defaults to 0.
-	 * @return Processor ID number.
+	 * @return Processor core ID number.
 	 */
 	unsigned get_current_core() noexcept;
 

@@ -29,6 +29,16 @@
 
 /*==================================================================*/
 
+unsigned thread_affinity::get_process_id() noexcept {
+#if defined(_WIN32)
+	return static_cast<unsigned>(GetCurrentProcessId());
+#elif defined(__linux__) || defined(__APPLE__)
+	return static_cast<unsigned>(getpid());
+#else
+	return 0; // Web or unknown
+#endif
+}
+
 unsigned thread_affinity::get_logical_core_count() noexcept {
 #if defined(_WIN32)
 	SYSTEM_INFO sysinfo;
