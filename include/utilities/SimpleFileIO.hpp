@@ -19,20 +19,28 @@
 
 namespace fs {
 	using Path = std::filesystem::path;
+	using Time = std::filesystem::file_time_type;
 
 	/* Get last modification date of file at the designated path, if any. */
 	[[maybe_unused]]
 	inline auto last_write_time(const Path& filePath) noexcept {
 		std::error_code error;
-		auto value{ std::filesystem::last_write_time(filePath, error) };
+		auto value = std::filesystem::last_write_time(filePath, error);
 		return ::make_expected(std::move(value), std::move(error));
+	}
+
+	[[maybe_unused]]
+	inline auto last_write_time(const Path& filePath, Time time) noexcept {
+		std::error_code error;
+		std::filesystem::last_write_time(filePath, time, error);
+		return ::make_expected(true, std::move(error));
 	}
 
 	/* Get size of file at the designated path, if any. */
 	[[maybe_unused]]
 	inline auto file_size(const Path& filePath) noexcept {
 		std::error_code error;
-		auto value{ std::filesystem::file_size(filePath, error) };
+		auto value = std::filesystem::file_size(filePath, error);
 		return ::make_expected(std::move(value), std::move(error));
 	}
 
@@ -50,7 +58,7 @@ namespace fs {
 	[[maybe_unused]]
 	inline auto remove(const Path& filePath) noexcept {
 		std::error_code error;
-		auto value{ std::filesystem::remove(filePath, error) };
+		auto value = std::filesystem::remove(filePath, error);
 		return ::make_expected(std::move(value), std::move(error));
 	}
 
@@ -58,21 +66,21 @@ namespace fs {
 	[[maybe_unused]]
 	inline auto remove_all(const Path& filePath) noexcept {
 		std::error_code error;
-		auto value{ std::filesystem::remove_all(filePath, error) };
+		auto value = std::filesystem::remove_all(filePath, error);
 		return ::make_expected(std::move(value), std::move(error));
 	}
 
 	[[maybe_unused]]
 	inline auto create_directory(const Path& filePath) noexcept {
 		std::error_code error;
-		auto value{ std::filesystem::create_directory(filePath, error) };
+		auto value = std::filesystem::create_directory(filePath, error);
 		return ::make_expected(std::move(value), std::move(error));
 	}
 
 	[[maybe_unused]]
 	inline auto create_directory(const Path& filePath1, const Path& filePath2) noexcept {
 		std::error_code error;
-		auto value{ std::filesystem::create_directory(filePath1, filePath2, error) };
+		auto value = std::filesystem::create_directory(filePath1, filePath2, error);
 		return ::make_expected(std::move(value), std::move(error));
 	}
 
@@ -80,7 +88,7 @@ namespace fs {
 	[[maybe_unused]]
 	inline auto create_directories(const Path& filePath) noexcept {
 		std::error_code error;
-		auto value{ std::filesystem::create_directories(filePath, error) };
+		auto value = std::filesystem::create_directories(filePath, error);
 		return ::make_expected(std::move(value), std::move(error));
 	}
 
@@ -88,7 +96,7 @@ namespace fs {
 	[[maybe_unused]]
 	inline auto exists(const Path& filePath) noexcept {
 		std::error_code error;
-		auto value{ std::filesystem::exists(filePath, error) };
+		auto value = std::filesystem::exists(filePath, error);
 		return ::make_expected(std::move(value), std::move(error));
 	}
 
@@ -96,7 +104,7 @@ namespace fs {
 	[[maybe_unused]]
 	inline auto is_regular_file(const Path& filePath) noexcept {
 		std::error_code error;
-		auto value{ std::filesystem::is_regular_file(filePath, error) };
+		auto value = std::filesystem::is_regular_file(filePath, error);
 		return ::make_expected(std::move(value), std::move(error));
 	}
 }
@@ -118,7 +126,7 @@ inline auto readFileData(
 	std::streamoff dataReadOffset = 0
 ) noexcept -> Expected<std::vector<char>, std::error_code> {
 	try {
-		auto fileModStampBegin{ fs::last_write_time(filePath) };
+		auto fileModStampBegin = fs::last_write_time(filePath);
 		if (!fileModStampBegin) { return ::make_unexpected(std::move(fileModStampBegin.error())); }
 
 		std::ifstream inFile(filePath, std::ios::binary | std::ios::in);
@@ -141,7 +149,7 @@ inline auto readFileData(
 			}
 		}
 
-		auto fileModStampEnd{ fs::last_write_time(filePath) };
+		auto fileModStampEnd = fs::last_write_time(filePath);
 		if (!fileModStampEnd) { return ::make_unexpected(std::move(fileModStampEnd.error())); }
 
 		if (fileModStampBegin.value() != fileModStampEnd.value()) {
