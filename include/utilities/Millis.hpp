@@ -10,6 +10,12 @@
 
 namespace Millis {
 	/**
+	 * @brief Returns the initial timestamp in nanoseconds since epoch.
+	 */
+	[[nodiscard]]
+	long long initial() noexcept;
+
+	/**
 	 * @brief Returns the current time in milliseconds since application start.
 	 */
 	[[nodiscard]]

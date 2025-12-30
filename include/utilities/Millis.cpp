@@ -16,6 +16,10 @@ static const auto sInitialApplicationTimestamp
 
 /*==================================================================*/
 
+long long Millis::initial() noexcept {
+	return sInitialApplicationTimestamp.time_since_epoch().count();;
+}
+
 long long Millis::now() noexcept {
 	return std::chrono::duration_cast<std::chrono::milliseconds>
 		(std::chrono::steady_clock::now() - sInitialApplicationTimestamp).count();
