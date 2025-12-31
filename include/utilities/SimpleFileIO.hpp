@@ -107,6 +107,33 @@ namespace fs {
 		auto value = std::filesystem::is_regular_file(filePath, error);
 		return ::make_expected(std::move(value), std::move(error));
 	}
+
+	/**
+	 * @brief Iterates through each directory entry in the given directory path,
+	 * invoking the provided callable for each entry. Said callable must take care to
+	 * read and handle the error code at all times, as iterating itself  may produce errors.
+	 * @tparam Fn Non-throwing allable type that accepts a directory_entry reference and
+	 * an error_code reference, which returns bool indicating whether to stop iteration (true)
+	 * or continue (false).
+	 * @param dir The directory path to iterate through.
+	 * @param fn The callable to invoke for each directory entry.
+	 */
+	template <class Fn> requires (std::is_nothrow_invocable_r_v
+		<bool, Fn, std::filesystem::directory_entry&, std::error_code&>)
+	void for_each_dir_entry(const std::filesystem::path& dir, Fn&& fn) noexcept {
+		std::error_code ec;
+
+		std::filesystem::directory_iterator
+			files(dir, ec);
+
+		while (files != std::filesystem::directory_iterator()) {
+			if (!std::forward<Fn>(fn)(*files, ec)) {
+				files.increment(ec);
+				continue;
+			}
+			break;
+		}
+	}
 }
 
 /*==================================================================*/
