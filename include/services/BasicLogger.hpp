@@ -75,11 +75,7 @@ struct LogEntry {
 	const std::string message{};  // self-explanatory
 
 	constexpr LogEntry() noexcept = default;
-	LogEntry(
-		std::uint32_t index,
-		BLOG::LEVEL   level,
-		std::string message
-	) noexcept;
+	LogEntry(BLOG::LEVEL level, std::string message) noexcept;
 
 	std::string as_string() const noexcept;
 };
@@ -87,7 +83,7 @@ struct LogEntry {
 /*==================================================================*/
 	#pragma region BasicLogger Singleton Class
 
-class LoggerInstance;
+class BasicLoggerContext;
 
 class BasicLogger final {
 	BasicLogger() noexcept;
@@ -96,8 +92,7 @@ class BasicLogger final {
 	BasicLogger(const BasicLogger&) = delete;
 	BasicLogger& operator=(const BasicLogger&) = delete;
 
-	const std::unique_ptr
-		<LoggerInstance> mMainLog{};
+	std::unique_ptr<BasicLoggerContext> m_context{};
 
 public:
 	using LogBuffer = SlidingRingBuffer<LogEntry, 1024>;
@@ -108,10 +103,12 @@ public:
 		return &self;
 	}
 
-	auto buffer() const noexcept -> const LogBuffer&;
-	auto operator->() const noexcept -> const LogBuffer* { return &buffer(); }
+	void shutdown() noexcept;
 
-	void createLog(const std::string& filename, const std::string& directory) noexcept;
+	auto buffer() const noexcept -> const LogBuffer*;
+	auto operator->() const noexcept -> const LogBuffer* { return buffer(); }
+
+	void create_log(const std::string& filename, const std::string& directory) noexcept;
 
 private:
 	template <BLOG::LEVEL LOG_LEVEL>

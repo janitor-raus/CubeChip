@@ -15,6 +15,7 @@
 #include "BasicVideoSpec.hpp"
 #include "GlobalAudioBase.hpp"
 #include "HDIS_HCIS.hpp"
+#include "ThreadAffinity.hpp"
 
 #include "FrontendHost.hpp"
 #include "SystemInterface.hpp"
@@ -100,6 +101,10 @@ bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forc
 	HDM = HomeDirManager::initialize(
 		overrideHome, configName, forcePortable, OrgName, AppName);
 	if (!HDM) { return false; }
+
+
+	blog.create_log(std::to_string(thread_affinity::get_process_id()),
+		(Path(HDM->get_home_path()) / "logs").string());
 
 	FrontendInterface::init_context(HomeDirManager::get_home_path().c_str());
 

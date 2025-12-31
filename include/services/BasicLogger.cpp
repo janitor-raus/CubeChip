@@ -14,9 +14,27 @@
 #include <fstream>
 
 #include "BasicLogger.hpp"
+#include "SimpleFileIO.hpp"
 #include "ThreadAffinity.hpp"
 #include "Millis.hpp"
 #include "Thread.hpp"
+
+/*==================================================================*/
+
+static thread_local std::string sFormatBuffer(512, '\0');
+
+static void standard_string_formatter_for_LogEntry(const LogEntry& entry) noexcept {
+	sFormatBuffer.clear();
+	fmt::format_to(std::back_inserter(sFormatBuffer), "{0}) {1} {3:>{2}} > {4}\n",
+		entry.index, NanoTime(entry.time).format_as_timer(), BLOG::STR_LEN,
+		BLOG(entry.level).as_string(), entry.message);
+}
+
+static fs::Path s_log_file_path{};
+
+static void touch_file_timestamp() noexcept {
+	(void) fs::last_write_time(s_log_file_path, fs::Time::clock::now());
+}
 
 /*==================================================================*/
 
@@ -25,37 +43,22 @@ static auto monotonicCount() noexcept {
 	return counter.fetch_add(1, std::memory_order::relaxed);
 }
 
-static thread_local fmt::basic_memory_buffer<char, 480> sFormatBuffer;
-
-static void standard_string_formatter_for_LogEntry(const LogEntry& entry) noexcept {
-	sFormatBuffer.clear();
-	fmt::format_to(sFormatBuffer.begin(), "{0}) {1} {3:>{2}} > {4}\n",
-		entry.index, NanoTime(entry.time).format(), BLOG::STR_LEN,
-		BLOG(entry.level).as_string(), entry.message);
-}
-
-/*==================================================================*/
-
-LogEntry::LogEntry(
-	std::uint32_t index,
-	BLOG::LEVEL   level,
-	std::string message
-) noexcept
+LogEntry::LogEntry(BLOG::LEVEL level, std::string message) noexcept
 	: hash    (std::hash<std::thread::id>()(std::this_thread::get_id()))
 	, time    (Millis::raw())
-	, index   (index)
+	, index   (monotonicCount())
 	, level   (level)
 	, message (std::move(message))
 {}
 
 std::string LogEntry::as_string() const noexcept {
 	::standard_string_formatter_for_LogEntry(*this);
-	return std::string(sFormatBuffer.data(), sFormatBuffer.size());
+	return sFormatBuffer;
 }
 
 /*==================================================================*/
 
-class LoggerInstance {
+class BasicLoggerContext {
 	friend class BasicLogger;
 
 	using LogBuffer = BasicLogger::LogBuffer;
@@ -82,29 +85,30 @@ class LoggerInstance {
 		if (!mLogFile) { return; }
 
 		const auto snapshot = mLogBuffer.snapshot(0, mLastFlushPos).fast();
-		if (snapshot.size() == 0) { mLastFlushTime = Millis::now(); return; }
+
+		if (snapshot.size() == 0) {
+			::touch_file_timestamp();
+			mLastFlushTime = Millis::now();
+			return;
+		}
+
 		for (const auto& entry : snapshot) {
-			standard_string_formatter_for_LogEntry(entry);
+			::standard_string_formatter_for_LogEntry(entry);
 			mLogFile.write(sFormatBuffer.data(), sFormatBuffer.size());
 		}
 
 		mLogFile.flush();
+		::touch_file_timestamp();
+
 		mLastFlushPos += snapshot.size();
 		mLastFlushTime = Millis::now();
 	}
 
-	void createLog(const std::string& filename, const std::string& directory) noexcept {
-		#ifdef __APPLE__
-			blog.newEntry<BLOG::INF>(
-				"Logging started on {:%Y-%m-%d %H:%M:%S} ({})",
-				std::chrono::system_clock::now(),
-				"timezone not corrected on macOS");
-		#else
-			blog.newEntry<BLOG::INF>(
-				"Logging started on {:%Y-%m-%d %H:%M:%S}",
-				std::chrono::current_zone()->to_local(
-					std::chrono::system_clock::now()));
-		#endif
+	void create_log(const std::string& filename, const std::string& directory) noexcept {
+		auto current_time = NanoTime(Millis::initial_wall());
+
+		blog.newEntry<BLOG::INF>("Logging started on {}",
+			current_time.format_as_datetime("{:%Y-%m-%d %H:%M:%S}"));
 
 		if (filename.empty() || directory.empty()) {
 			blog.newEntry<BLOG::ERR>(
@@ -112,18 +116,28 @@ class LoggerInstance {
 			return;
 		}
 
-		const auto newPath = std::filesystem::path(directory) / filename;
+		if (!fs::create_directories(directory)) {
+			blog.newEntry<BLOG::ERR>(
+				"Failed to create subfolder structure for Log file: \"{}\"", directory);
+			return;
+		}
 
-		mLogFile.open(newPath, std::ios::trunc);
+		s_log_file_path = fs::Path(directory) / (current_time \
+			.format_as_datetime("{:%Y-%m-%d_%H-%M-%S}_") + filename + ".log");
+
+		mLogFile.open(s_log_file_path, std::ios::trunc);
 		if (!mLogFile) {
 			blog.newEntry<BLOG::ERR>(
 				"Unable to create new Log file: \"{}\"",
-				newPath.string());
+				s_log_file_path.string());
 		}
+
+		// XXX - scan for exiting log files, clear any whose write
+		// heartbeats are stale (older than 2x the flush interval)
 	}
 
 public:
-	LoggerInstance() noexcept {
+	BasicLoggerContext() noexcept {
 		mFlusherThread = Thread([this](StopToken token) noexcept {
 			thread_affinity::set_affinity(0b11ull);
 
@@ -136,7 +150,7 @@ public:
 		});
 	}
 
-	~LoggerInstance() noexcept {
+	~BasicLoggerContext() noexcept {
 		if (mFlusherThread.joinable()) {
 			mFlusherThread.request_stop();
 			mFlusherThread.join();
@@ -152,22 +166,26 @@ public:
 	#pragma region BasicLogger Singleton Class
 
 BasicLogger::BasicLogger() noexcept
-	: mMainLog(std::make_unique<LoggerInstance>())
+	: m_context(std::make_unique<BasicLoggerContext>())
 {}
 
-BasicLogger::~BasicLogger() noexcept {}
+BasicLogger::~BasicLogger() noexcept = default;
 
-auto BasicLogger::buffer() const noexcept -> const LogBuffer& {
-	return mMainLog->buffer();
+void BasicLogger::shutdown() noexcept {
+	if (m_context) { m_context.reset(); }
 }
 
-void BasicLogger::createLog(const std::string& filename, const std::string& directory) noexcept {
-	mMainLog->createLog(filename, directory);
+auto BasicLogger::buffer() const noexcept -> const LogBuffer* {
+	return m_context ? &m_context->buffer() : nullptr;
+}
+
+void BasicLogger::create_log(const std::string& filename, const std::string& directory) noexcept {
+	if (m_context) { m_context->create_log(filename, directory); }
 }
 
 template <BLOG::LEVEL LOG_LEVEL>
 void BasicLogger::newEntry_(std::string&& message) noexcept {
-	mMainLog->buffer().push(LogEntry(monotonicCount(), LOG_LEVEL, message));
+	if (m_context) { m_context->buffer().push(LogEntry(LOG_LEVEL, message)); }
 }
 
 template void BasicLogger::newEntry_<BLOG::DBG>(std::string&&) noexcept;
