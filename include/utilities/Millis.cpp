@@ -14,23 +14,47 @@
 static const auto sInitialApplicationTimestamp
 	= std::chrono::steady_clock::now();
 
+static const auto sInitialApplicationTimestampWall
+	= std::chrono::system_clock::now();
+
 /*==================================================================*/
 
 long long Millis::initial() noexcept {
-	return sInitialApplicationTimestamp.time_since_epoch().count();;
+	return std::chrono::duration_cast<std::chrono::nanoseconds> \
+		(sInitialApplicationTimestamp.time_since_epoch()).count();
+}
+
+long long Millis::initial_wall() noexcept {
+	return std::chrono::duration_cast<std::chrono::nanoseconds> \
+		(sInitialApplicationTimestampWall.time_since_epoch()).count();
 }
 
 long long Millis::now() noexcept {
-	return std::chrono::duration_cast<std::chrono::milliseconds>
+	return std::chrono::duration_cast<std::chrono::milliseconds> \
 		(std::chrono::steady_clock::now() - sInitialApplicationTimestamp).count();
 }
 
 long long Millis::raw() noexcept {
-	return (std::chrono::steady_clock::now() - sInitialApplicationTimestamp).count();
+	return std::chrono::duration_cast<std::chrono::nanoseconds> \
+		(std::chrono::steady_clock::now() - sInitialApplicationTimestamp).count();
+}
+
+long long Millis::now_wall() noexcept {
+	return std::chrono::duration_cast<std::chrono::milliseconds> \
+		(std::chrono::system_clock::now() - sInitialApplicationTimestampWall).count();
+}
+
+long long Millis::raw_wall() noexcept {
+	return std::chrono::duration_cast<std::chrono::nanoseconds> \
+		(std::chrono::system_clock::now() - sInitialApplicationTimestampWall).count();
 }
 
 long long Millis::since(long long past_millis) noexcept {
 	return now() - past_millis;
+}
+
+long long Millis::since_wall(long long past_millis) noexcept {
+	return now_wall() - past_millis;
 }
 
 void Millis::sleep_for(unsigned long long millis) noexcept {
@@ -40,7 +64,7 @@ void Millis::sleep_for(unsigned long long millis) noexcept {
 void Millis::sleeplock_for(double millis) noexcept {
 	using namespace std::chrono;
 
-	const auto target = steady_clock::now() + duration_cast
+	const auto target = steady_clock::now() + duration_cast \
 		<nanoseconds>(duration<double, std::milli>(millis));
 
 	while (true) {
@@ -57,11 +81,29 @@ void Millis::sleeplock_for(double millis) noexcept {
 /*==================================================================*/
 
 #include <fmt/format.h>
+#include <fmt/chrono.h>
 
-std::string NanoTime::format() const noexcept {
+std::string NanoTime::format_as_timer() const noexcept {
 	const auto total_secs = nano / 1'000'000'000ll;
 
 	return fmt::format("{}:{:02}:{:02}.{:03}",
 		total_secs / 3600ll, (total_secs / 60ll) % 60ll,
 		total_secs % 60ll, (nano / 1000000ll) % 1000ll);
+}
+
+std::string NanoTime::format_as_datetime(const char* fmt_string) const noexcept {
+	using namespace std::chrono;
+	using system_duration = system_clock::duration;
+
+	std::tm local_tm;
+	auto timestamp = system_clock::to_time_t(system_clock::time_point(
+		duration_cast<system_clock::duration>(seconds(nano / 1'000'000'000))));
+
+#if defined(_WIN32) && !defined(__CYGWIN__)
+	::localtime_s(&local_tm, &timestamp);
+#else
+	::localtime_r(&timestamp, &local_tm);
+#endif
+
+	return fmt::vformat(fmt_string, fmt::make_format_args(local_tm));
 }

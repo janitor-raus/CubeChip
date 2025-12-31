@@ -16,6 +16,12 @@ namespace Millis {
 	long long initial() noexcept;
 
 	/**
+	 * @brief Returns the initial wall timestamp in nanoseconds since epoch.
+	 */
+	[[nodiscard]]
+	long long initial_wall() noexcept;
+
+	/**
 	 * @brief Returns the current time in milliseconds since application start.
 	 */
 	[[nodiscard]]
@@ -24,10 +30,24 @@ namespace Millis {
 	long long raw() noexcept;
 
 	/**
+	 * @brief Returns the current wall time in milliseconds since application start.
+	 */
+	[[nodiscard]]
+	long long now_wall() noexcept;
+	[[nodiscard]]
+	long long raw_wall() noexcept;
+
+	/**
 	 * @brief Returns the difference between now() and past_millis in milliseconds.
 	 */
 	[[nodiscard]]
 	long long since(long long past_millis) noexcept;
+
+	/**
+	 * @brief Returns the difference between now_wall() and past_millis in milliseconds.
+	 */
+	[[nodiscard]]
+	long long since_wall(long long past_millis) noexcept;
 
 	/**
 	 * @brief Naively sleeps the current thread for X milliseconds.
@@ -50,5 +70,6 @@ struct NanoTime {
 
 	constexpr operator long long() const noexcept { return nano; }
 
-	std::string format() const noexcept;
+	std::string format_as_timer() const noexcept;
+	std::string format_as_datetime(const char* fmt_string) const noexcept;
 };

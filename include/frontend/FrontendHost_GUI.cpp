@@ -201,7 +201,7 @@ void FrontendHost::initializeInterface() noexcept {
 
 					ImGui::TableSetColumnIndex(1);
 					ImGui::TextUnformatted(
-						NanoTime(entry.time).format().c_str());
+						NanoTime(entry.time).format_as_timer().c_str());
 
 					ImGui::TableSetColumnIndex(2);
 					ImGui::TextColored(RGBA_to_ImVec4(
