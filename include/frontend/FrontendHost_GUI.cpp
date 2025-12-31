@@ -105,6 +105,10 @@ void FrontendHost::initializeInterface() noexcept {
 		if (ImGui::BeginMenu("About...")) {
 			ImGui::PushFont(nullptr, 21.0f);
 			ImGui::TextUnformatted(AppName);
+		#if !defined(NDEBUG) || defined(DEBUG)
+			ImGui::SameLine();
+			ImGui::TextUnformatted(" [DEBUG]");
+		#endif
 			ImGui::PopFont();
 
 			ImGui::Spacing(); ImGui::Spacing();

@@ -74,11 +74,7 @@ struct ProjectVersion {
 
 constexpr static inline ProjectVersion AppVer{};
 
-#if !defined(NDEBUG) || defined(DEBUG)
-	constexpr auto* AppName = PROJECT_NAME " [DEBUG]";
-#else
 	constexpr auto* AppName = PROJECT_NAME;
-#endif
 	constexpr auto* OrgName = "";
 
 /*==================================================================*/
