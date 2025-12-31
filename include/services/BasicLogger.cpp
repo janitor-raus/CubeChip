@@ -66,6 +66,8 @@ class BasicLoggerContext {
 	std::ofstream mLogFile;
 	Thread mFlusherThread;
 
+	static constexpr std::size_t s_flush_interval_ms = 10000;
+
 	std::size_t mLastFlushPos{};
 	std::size_t mLastFlushTime{};
 
@@ -78,7 +80,7 @@ class BasicLoggerContext {
 	}
 
 	bool testFlushTime() const noexcept {
-		return Millis::now() - mLastFlushTime >= 10000;
+		return Millis::now() - mLastFlushTime >= s_flush_interval_ms;
 	}
 
 	void flushLogBuffer() noexcept{
@@ -132,8 +134,22 @@ class BasicLoggerContext {
 				s_log_file_path.string());
 		}
 
-		// XXX - scan for exiting log files, clear any whose write
-		// heartbeats are stale (older than 2x the flush interval)
+		const auto cutoff_time = fs::Time::clock::now() - std::chrono::days(7);
+
+		fs::for_each_dir_entry(directory, [&](auto& entry, auto& ec) noexcept -> bool {
+			if (ec) { return false; }
+
+			auto regular_file = entry.is_regular_file(ec);
+			if (ec || !regular_file) { return false; }
+
+			if (entry.path().extension() != ".log") { return false; }
+
+			auto last_write = entry.last_write_time(ec);
+			if (ec || last_write > cutoff_time) { return false; }
+
+			(void) fs::remove(entry.path());
+			return false;
+		});
 	}
 
 public:
