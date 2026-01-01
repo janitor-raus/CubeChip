@@ -65,7 +65,7 @@ void SystemInterface::stop_workers() noexcept {
 }
 
 SystemInterface::SystemInterface() noexcept
-	: m_statistics_data(std::make_shared<Str>())
+	: m_statistics_data(std::make_shared<std::string>())
 {
 	static thread_local auto sRNG   = std::make_unique<Well512>();
 	static thread_local auto sInput = std::make_unique<BasicKeyboard>();
@@ -108,11 +108,11 @@ void SystemInterface::create_statistics_data() noexcept {
 	if (!has_system_state(EmuState::STATS)) { return; }
 	append_statistics_data();
 
-	m_statistics_data.store(std::make_shared<Str> \
+	m_statistics_data.store(std::make_shared<std::string> \
 		(std::move(m_statistics_work_buffer)), mo::release);
 	m_statistics_work_buffer.clear();
 }
 
-Str SystemInterface::copy_statistics_string() const noexcept {
+std::string SystemInterface::copy_statistics_string() const noexcept {
 	return *m_statistics_data.load(mo::acquire);
 }

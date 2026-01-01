@@ -6,12 +6,8 @@
 
 #pragma once
 
-#include <string>
 #include <cstdint>
 #include <cstddef>
-
-#include <filesystem>
-#include <string_view>
 
 /*==================================================================*/
 
@@ -30,13 +26,6 @@ using s64 = std::int64_t;
 using s32 = std::int32_t;
 using s16 = std::int16_t;
 using s8  = std::int8_t;
-
-using Str  = std::string;
-using StrV = std::string_view;
-using Path = std::filesystem::path;
-
-using namespace std::string_literals;
-using namespace std::string_view_literals;
 
 inline constexpr auto KiB(unsigned long long v) noexcept { return 1024ull * v; }
 inline constexpr auto MiB(unsigned long long v) noexcept { return 1024ull * KiB(v); }

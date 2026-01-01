@@ -16,8 +16,9 @@
 BytePusher_CoreInterface::BytePusher_CoreInterface(DisplayDevice display_device) noexcept
 	: mDisplayDevice(std::move(display_device))
 {
-	if (auto* path = HDM->add_user_directory("savestate", "BYTEPUSHER"))
-		{ sSavestatePath = *path / HDM->get_loaded_file_sha1(); }
+	if (auto* path = HDM->add_user_directory("savestate", "BYTEPUSHER")) {
+		sSavestatePath = (*path / HDM->get_loaded_file_sha1()).string();
+	}
 
 	mDisplayDevice.set_osd_callable([&]() {
 		if (!has_system_state(EmuState::STATS)) { return; }

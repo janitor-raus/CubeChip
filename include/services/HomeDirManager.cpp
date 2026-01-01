@@ -6,6 +6,7 @@
 
 #include "HomeDirManager.hpp"
 
+#include "Typedefs.hpp"
 #include "SHA1.hpp"
 #include "SimpleFileIO.hpp"
 #include "BasicLogger.hpp"
@@ -34,7 +35,7 @@ static void trigger_fatal_error(const char* error) noexcept {
 
 static bool is_location_writable(const char* path) noexcept {
 	if (!path) { return false; }
-	const auto file = Path(path) / "__DELETE_ME__";
+	const auto file = fs::Path(path) / "__DELETE_ME__";
 	std::ofstream test(file);
 
 	if (test.is_open()) {
@@ -158,25 +159,24 @@ HomeDirManager* HomeDirManager::initialize(
 	return initError ? nullptr : &self;
 }
 
-const Path* HomeDirManager::add_user_directory(const Path& sub, const Path& sys) noexcept {
+auto HomeDirManager::add_user_directory(const Path& sub, const Path& sys) noexcept -> const Path* {
 	if (sub.empty()) { return nullptr; }
 
-	const auto newDirPath = s_home_path / sys / sub;
+	const auto new_dir_path = s_home_path / sys / sub;
 
 	const auto it = std::find_if(EXEC_POLICY(unseq)
 		m_user_directories.begin(), m_user_directories.end(),
-		[&](const Path& dirEntry) noexcept { return dirEntry == newDirPath; }
+		[&](const Path& dir_entry) noexcept { return dir_entry == new_dir_path; }
 	);
 
-	if (it != m_user_directories.end())
-		{ return &(*it); }
+	if (it != m_user_directories.end()) { return &(*it); }
 
-	if (const auto dirCreated = fs::create_directories(newDirPath)) {
-		m_user_directories.push_back(newDirPath);
+	if (const auto dirCreated = fs::create_directories(new_dir_path)) {
+		m_user_directories.push_back(new_dir_path);
 		return &m_user_directories.back();
 	} else {
 		blog.newEntry<BLOG::ERR>("Unable to create directory: \"{}\" [{}]",
-			newDirPath.string(), dirCreated.error().message());
+			new_dir_path.string(), dirCreated.error().message());
 		return nullptr;
 	}
 }

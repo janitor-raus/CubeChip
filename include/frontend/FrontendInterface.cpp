@@ -4,13 +4,7 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include <cmath>
-#include <algorithm>
-#include <string>
-#include <numeric>
-
 #include "FrontendInterface.hpp"
-#include "HomeDirManager.hpp"
 #include "BasicLogger.hpp"
 
 #include "fonts/RobotoMono.hpp"
@@ -139,8 +133,8 @@ float FrontendInterface::get_ui_scale_factor() noexcept {
 static ImFont* sMainFont{};
 
 void FrontendInterface::init_context(const char* home_dir) {
-	static Str ini_path = home_dir ? Str(home_dir) + "imgui.ini" : Str();
-	static Str log_path = home_dir ? Str(home_dir) + "imgui.log" : Str();
+	static auto ini_path = home_dir ? std::string(home_dir) + "imgui.ini" : std::string();
+	static auto log_path = home_dir ? std::string(home_dir) + "imgui.log" : std::string();
 
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
@@ -154,8 +148,8 @@ void FrontendInterface::init_context(const char* home_dir) {
 
 	s_hooks = std::make_unique<RegistryAggregate>();
 
-	sMainFont = io.Fonts->AddFontFromMemoryCompressedTTF
-		(FontData::Roboto_Mono, std::size(FontData::Roboto_Mono), 16.0f);
+	sMainFont = io.Fonts->AddFontFromMemoryCompressedTTF(
+		FontData::Roboto_Mono, std::size(FontData::Roboto_Mono), 16.0f);
 
 	io.FontDefault = sMainFont;
 }

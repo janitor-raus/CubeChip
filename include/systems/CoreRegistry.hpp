@@ -105,7 +105,7 @@ class CoreRegistry {
 public:
 	static bool validate_game_file(const char* fileData, std::size_t fileSize, const std::string& fileType, const std::string& fileSHA1) noexcept;
 
-	static void load_game_database(const Path& dbPath = {}) noexcept;
+	static void load_game_database(std::string_view db_file_path = {}) noexcept;
 
 	static bool register_new_core(CoreConstructor&& ctor,
 		GameFileTester&& tester, KnownExtensions exts) noexcept;

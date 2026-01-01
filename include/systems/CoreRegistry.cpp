@@ -15,14 +15,14 @@
 Json CoreRegistry::s_game_database{};
 Json CoreRegistry::s_custom_core_cfg{};
 
-static bool loadJsonFromFile(const Path& path, Json& output) noexcept {
-	if (auto jsonData = ::readFileData(path)) {
+static bool loadJsonFromFile(std::string_view json_file_path, Json& output) noexcept {
+	if (auto jsonData = ::readFileData(json_file_path)) {
 		try {
 			output = Json::parse(jsonData->begin(), jsonData->end());
 			return true;
 		} catch (const Json::parse_error& e) {
 			blog.newEntry<BLOG::ERR>("Exception triggered trying to parse JSON file:"
-				" \"{}\" [{}]", path.string(), e.what());
+				" \"{}\" [{}]", json_file_path, e.what());
 		}
 	}
 	return false;
@@ -105,16 +105,16 @@ SystemInterface* CoreRegistry::construct_new_core(std::size_t idx) noexcept {
 	}
 }
 
-void CoreRegistry::load_game_database(const Path& dbPath) noexcept {
-	static const auto defaultPath = ::get_base_path() / Path("programDB.json");
-	const auto& checkPath = dbPath.empty() ? defaultPath : dbPath;
+void CoreRegistry::load_game_database(std::string_view db_file_path) noexcept {
+	static const auto default_db_path = (::get_base_path() / fs::Path("programDB.json")).string();
+	std::string_view normalized_path = db_file_path.empty() ? default_db_path : db_file_path;
 
-	if (!loadJsonFromFile(checkPath, s_game_database)) {
+	if (!loadJsonFromFile(normalized_path, s_game_database)) {
 		s_game_database.clear();
 		blog.newEntry<BLOG::WRN>("Failed to load ProgramDB:"
-			" \"{}\"", checkPath.string());
+			" \"{}\"", normalized_path);
 	} else {
 		blog.newEntry<BLOG::INF>("Successfully loaded ProgramDB:"
-			" \"{}\"", checkPath.string());
+			" \"{}\"", normalized_path);
 	}
 }

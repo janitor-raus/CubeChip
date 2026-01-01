@@ -17,11 +17,13 @@
 Chip8_CoreInterface::Chip8_CoreInterface(DisplayDevice display_device) noexcept
 	: mDisplayDevice(std::move(display_device))
 {
-	if (auto* path = HDM->add_user_directory("savestate", "CHIP8"))
-		{ sSavestatePath = *path / HDM->get_loaded_file_sha1(); }
+	if (auto* path = HDM->add_user_directory("savestate", "CHIP8")) {
+		sSavestatePath = (*path / HDM->get_loaded_file_sha1()).string();
+	}
 
-	if (auto* path = HDM->add_user_directory("permaRegs", "CHIP8"))
-		{ sPermaRegsPath = *path / HDM->get_loaded_file_sha1(); }
+	if (auto* path = HDM->add_user_directory("permaRegs", "CHIP8")) {
+		sPermaRegsPath = (*path / HDM->get_loaded_file_sha1()).string();
+	}
 
 	mDisplayDevice.set_osd_callable([&]() {
 		if (!has_system_state(EmuState::STATS)) { return; }
@@ -257,22 +259,22 @@ void Chip8_CoreInterface::triggerInterrupt(Interrupt type) noexcept {
 
 /*==================================================================*/
 
-bool Chip8_CoreInterface::checkRegularFile(const Path& filePath) const noexcept {
-	const auto fileRegular = fs::is_regular_file(filePath);
+bool Chip8_CoreInterface::checkRegularFile(std::string_view file_path) const noexcept {
+	const auto fileRegular = fs::is_regular_file(file_path);
 	if (!fileRegular) {
 		blog.newEntry<BLOG::DBG>("\"{}\" [{}]",
-			filePath.string(), fileRegular.error().message());
+			file_path, fileRegular.error().message());
 		return false;
 	}
 	return fileRegular.value();
 }
 
-bool Chip8_CoreInterface::newPermaRegsFile(const Path& filePath) const noexcept {
+bool Chip8_CoreInterface::newPermaRegsFile(std::string_view file_path) const noexcept {
 	static constexpr char dataPadding[std::size(sPermRegsV)]{};
-	const auto fileCreated = ::writeFileData(filePath, dataPadding);
+	const auto fileCreated = ::writeFileData(file_path, dataPadding);
 	if (!fileCreated) {
 		blog.newEntry<BLOG::ERR>("\"{}\" [{}]",
-			filePath.string(), fileCreated.error().message());
+			file_path, fileCreated.error().message());
 	}
 	return fileCreated.value();
 }
@@ -281,7 +283,7 @@ void Chip8_CoreInterface::setFilePermaRegs(u32 X) noexcept {
 	auto fileData = ::writeFileData(sPermaRegsPath, mRegisterV, X);
 	if (!fileData) {
 		blog.newEntry<BLOG::ERR>("File IO error: \"{}\" [{}]",
-			sPermaRegsPath.string(), fileData.error().message());
+			sPermaRegsPath, fileData.error().message());
 	}
 }
 
@@ -290,7 +292,7 @@ void Chip8_CoreInterface::getFilePermaRegs(u32 X) noexcept {
 	auto fileData = ::readFileData(sPermaRegsPath, X);
 	if (!fileData) {
 		blog.newEntry<BLOG::ERR>("File IO error: \"{}\" [{}]",
-			sPermaRegsPath.string(), fileData.error().message());
+			sPermaRegsPath, fileData.error().message());
 	} else {
 		std::copy_n(fileData.value().begin(), X, sPermRegsV.begin());
 	}

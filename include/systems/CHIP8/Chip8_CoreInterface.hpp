@@ -22,8 +22,8 @@ protected:
 		BUZZER = ID_3, UNIQUE = ID_0,
 	};
 
-	static inline thread_local Path sPermaRegsPath{};
-	static inline thread_local Path sSavestatePath{};
+	static inline thread_local std::string sPermaRegsPath{};
+	static inline thread_local std::string sSavestatePath{};
 	static constexpr f32 sTonalOffset = 160.0f;
 
 	struct TriBCD final {
@@ -170,8 +170,8 @@ protected:
 	void triggerInterrupt(Interrupt type) noexcept;
 
 private:
-	bool checkRegularFile(const Path& filePath) const noexcept;
-	bool newPermaRegsFile(const Path& filePath) const noexcept;
+	bool checkRegularFile(std::string_view filePath) const noexcept;
+	bool newPermaRegsFile(std::string_view filePath) const noexcept;
 
 	void setFilePermaRegs(u32 X) noexcept;
 	void getFilePermaRegs(u32 X) noexcept;

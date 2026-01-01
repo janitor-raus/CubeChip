@@ -23,7 +23,7 @@
 
 /*==================================================================*/
 
-static std::vector<Str>
+static std::vector<std::string>
 	s_pending_file_drops{};
 
 static void push_back_pending_file_drops(std::string_view filepath) noexcept {
@@ -127,7 +127,7 @@ FrontendHost* FrontendHost::init_application(
 
 
 	blog.create_log(std::to_string(thread_affinity::get_process_id()),
-		(Path(HDM->get_home_path()) / "logs").string());
+		(fs::Path(HDM->get_home_path()) / "logs").string());
 
 	FrontendInterface::init_context(HomeDirManager::get_home_path().c_str());
 

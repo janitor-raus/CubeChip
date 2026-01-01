@@ -8,14 +8,16 @@
 
 #include <span>
 #include <vector>
+#include <filesystem>
 
-#include "Typedefs.hpp"
 #include "SettingWrapper.hpp"
 
 /*==================================================================*/
 	#pragma region HomeDirManager Singleton Class
 
 class HomeDirManager final {
+	using Path = std::filesystem::path;
+
 	HomeDirManager(
 		std::string_view overrideHome, std::string_view configName,
 		bool forcePortable, std::string_view org, std::string_view app,
@@ -89,7 +91,7 @@ public:
 	) noexcept;
 
 	// returns path pointer to added directory, or nullptr on failure
-	const Path* add_user_directory(const Path& sub, const Path& sys = Path{}) noexcept;
+	auto add_user_directory(const Path& sub, const Path& sys = Path{}) noexcept -> const Path*;
 
 	const auto& get_loaded_file_path() const noexcept { return m_file_path; }
 	/***/ auto  get_loaded_file_span() const noexcept { return std::span(m_file_data); }
