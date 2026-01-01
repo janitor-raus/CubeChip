@@ -24,12 +24,12 @@ Chip8_CoreInterface::Chip8_CoreInterface(DisplayDevice display_device) noexcept
 		{ sPermaRegsPath = *path / HDM->get_loaded_file_sha1(); }
 
 	mDisplayDevice.set_osd_callable([&]() {
-		if (!hasSystemState(EmuState::STATS)) { return; }
-		osd::simple_stat_overlay(copyOverlayData());
+		if (!has_system_state(EmuState::STATS)) { return; }
+		osd::simple_stat_overlay(copy_statistics_string());
 	});
 
-	mAudioDevice.addAudioStream(STREAM::MAIN, 48'000);
-	mAudioDevice.resumeStreams();
+	mAudioDevice.add_audio_stream(STREAM::MAIN, 48'000);
+	mAudioDevice.resume_streams();
 
 	loadPresetBinds();
 }
@@ -67,7 +67,7 @@ void Chip8_CoreInterface::loadPresetBinds() noexcept {
 bool Chip8_CoreInterface::keyPressed(u8* keyReg) noexcept {
 	if (!mCustomBinds.size()) { return false; }
 
-	if (mElapsedFrames >= mTickLast + mTickSpan)
+	if (m_elapsed_frames >= mTickLast + mTickSpan)
 		[[unlikely]] { mKeysPrev &= ~mKeysLoop; }
 
 	/**/const auto pressKeys = mKeysCurr & ~mKeysPrev;
@@ -76,7 +76,7 @@ bool Chip8_CoreInterface::keyPressed(u8* keyReg) noexcept {
 		const auto validKeys = pressDiff ? pressDiff : mKeysLoop;
 
 		mKeysLock |= validKeys;
-		mTickLast  = mElapsedFrames;
+		mTickLast  = m_elapsed_frames;
 		mTickSpan  = validKeys != mKeysLoop ? 20 : 5;
 		mKeysLoop  = validKeys & ~(validKeys - 1);
 		::assign_cast(*keyReg, std::countr_zero(mKeysLoop));
@@ -137,12 +137,12 @@ void Chip8_CoreInterface::handleEndFrameInterrupt() noexcept {
 			return;
 
 		case Interrupt::ERROR:
-			addSystemState(EmuState::FATAL);
+			add_system_state(EmuState::FATAL);
 			mTargetCPF = 0;
 			return;
 
 		case Interrupt::FINAL:
-			setSystemState(EmuState::HALTED);
+			add_system_state(EmuState::HALTED);
 			mTargetCPF = 0;
 			return;
 
@@ -180,22 +180,22 @@ void Chip8_CoreInterface::mainSystemLoop() {
 	handleEndFrameInterrupt();
 
 	renderAudioData();
-	makeOverlayData();
+	create_statistics_data();
 	renderVideoData();
 }
 
-void Chip8_CoreInterface::appendOverlayData() noexcept {
-	if (hasSystemState(EmuState::BENCH)) {
+void Chip8_CoreInterface::append_statistics_data() noexcept {
+	if (has_system_state(EmuState::BENCH)) {
 		static thread_local ez::EMA suavemente{};
 
-		suavemente.set_alpha(getRealSystemFramerate());
-		suavemente.add(mCycleCount * getRealSystemFramerate() / 1e6f);
+		suavemente.set_alpha(get_real_system_framerate());
+		suavemente.add(mCycleCount * get_real_system_framerate() / 1e6f);
 
-		formatOverlayData(" ::  MIPS:{:8.2f} (frame: {})\n",
-			suavemente.avg(), mBenchedFrames);
+		format_statistics_data(" ::  MIPS:{:8.2f} (frame: {})\n",
+			suavemente.avg(), m_benched_frames);
 	}
 
-	SystemInterface::appendOverlayData();
+	SystemInterface::append_statistics_data();
 }
 
 /*==================================================================*/
@@ -209,9 +209,9 @@ void Chip8_CoreInterface::startVoice(s32 duration, s32 tone) noexcept {
 void Chip8_CoreInterface::startVoiceAt(u32 voice_index, u32 duration, u32 tone) noexcept {
 	mAudioTimers[voice_index].set(duration);
 	if (auto* stream = mAudioDevice.at(STREAM::MAIN)) {
-		mVoices[voice_index].setStep((sTonalOffset + (tone ? tone : 8 \
+		mVoices[voice_index].set_step((sTonalOffset + (tone ? tone : 8 \
 			* (((mCurrentPC >> 1) + mStackTop + 1) & 0x3E) \
-		)) / stream->getFreq() * getFramerateMultiplier());
+		)) / stream->get_freq() * get_framerate_multiplier());
 	}
 }
 
@@ -219,7 +219,7 @@ void Chip8_CoreInterface::mixAudioData(VoiceGenerators processors) noexcept {
 	if (auto* stream = mAudioDevice.at(STREAM::MAIN)) {
 
 		auto buffer = ::allocate_n<f32>
-			(stream->getNextBufferSize(getRealSystemFramerate()))
+			(stream->get_next_buffer_size(get_real_system_framerate()))
 			.as_value().release_as_container();
 
 		for (auto& bundle : processors)
@@ -228,7 +228,7 @@ void Chip8_CoreInterface::mixAudioData(VoiceGenerators processors) noexcept {
 		for (auto& sample : buffer)
 			{ sample = ez::fast_tanh(sample); }
 
-		stream->pushAudioData(buffer);
+		stream->push_audio_data(buffer);
 	}
 }
 
@@ -237,9 +237,9 @@ void Chip8_CoreInterface::makePulseWave(f32* data, u32 size, Voice* voice, Strea
 	auto* timer = static_cast<AudioTimer*>(voice->userdata);
 
 	for (auto i{ 0u }; i < size; ++i) {
-		if (const auto gain = voice->getLevel(i, *timer)) {
+		if (const auto gain = voice->get_level(i, *timer)) {
 			::assign_cast_add(data[i], \
-				WaveForms::pulse(voice->peekPhase(i)) * gain);
+				WaveForms::pulse(voice->peek_phase(i)) * gain);
 		} else break;
 	}
 	voice->stepPhase(size);
@@ -251,7 +251,7 @@ void Chip8_CoreInterface::instructionError(u32 HI, u32 LO) {
 }
 
 void Chip8_CoreInterface::triggerInterrupt(Interrupt type) noexcept {
-	setStopFrame(true);
+	set_frame_stop_flag(true);
 	mInterrupt = type;
 }
 

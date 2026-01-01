@@ -18,7 +18,7 @@ void MEGACHIP::initializeSystem() noexcept {
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
 	copyFontToMemory(mMemoryBank.data(), 180);
 
-	setBaseSystemFramerate(cRefreshRate);
+	set_base_system_framerate(cRefreshRate);
 
 	mVoices[VOICE::UNIQUE].userdata = &mAudioTimers[VOICE::UNIQUE];
 	mVoices[VOICE::BUZZER].userdata = &mAudioTimers[VOICE::BUZZER];
@@ -441,9 +441,9 @@ void MEGACHIP::startAudioTrack(bool repeat) noexcept {
 		const bool oob = mTrack.data + mTrack.size > &mMemoryBank.back();
 		if (!mTrack.size || oob) { mTrack.reset(); }
 		else {
-			mVoices[VOICE::UNIQUE].setPhase(0.0).setStep(getFramerateMultiplier() * (
+			mVoices[VOICE::UNIQUE].set_phase(0.0).set_step(get_framerate_multiplier() * (
 				(mMemoryBank[mRegisterI + 0] << 8 | mMemoryBank[mRegisterI + 1]) \
-				/ f64(mTrack.size) / stream->getFreq())).userdata = &mTrack;
+				/ f64(mTrack.size) / stream->get_freq())).userdata = &mTrack;
 		}
 	}
 }
@@ -454,7 +454,7 @@ void MEGACHIP::makeByteWave(f32* data, u32 size, Voice* voice, Stream*) noexcept
 		if (!track->isOn()) { return; }
 
 		for (auto i = 0u; i < size; ++i) {
-			const auto head = voice->peekRawPhase(i);
+			const auto head = voice->peek_raw_phase(i);
 			if (!track->loop && head >= 1.0) {
 				track->reset(); return;
 			} else {

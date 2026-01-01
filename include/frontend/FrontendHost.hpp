@@ -7,8 +7,9 @@
 #pragma once
 
 #include <memory>
+#include <string>
+#include <string_view>
 
-#include "Typedefs.hpp"
 #include "SimpleMRU.hpp"
 #include "FileItem.hpp"
 #include "SettingWrapper.hpp"
@@ -74,8 +75,8 @@ struct ProjectVersion {
 
 constexpr static inline ProjectVersion AppVer{};
 
-	constexpr auto* AppName = PROJECT_NAME;
-	constexpr auto* OrgName = "";
+constexpr auto* AppName = PROJECT_NAME;
+constexpr auto* OrgName = "";
 
 /*==================================================================*/
 
@@ -87,22 +88,18 @@ class SystemInterface;
 /*==================================================================*/
 
 class FrontendHost final {
-	FrontendHost(const Path&) noexcept;
+	FrontendHost() noexcept;
 
 	FrontendHost(const FrontendHost&) = delete;
 	FrontendHost& operator=(const FrontendHost&) = delete;
 
-	struct StopSystemThread {
-		void operator()(SystemInterface*) noexcept;
-	};
-	using SystemCore = std::unique_ptr
-		<SystemInterface, StopSystemThread>;
 
-	SystemCore mSystemCore;
+	using OpenFileResult = std::shared_ptr<std::string>;
 
-	/*==================================================================*/
+	[[nodiscard]]
+	static auto get_open_file_dialog_result() noexcept -> OpenFileResult;
+	static void set_open_file_dialog_result(std::string_view file) noexcept;
 
-private:
 	static constexpr std::size_t s_mru_limit = 5;
 	static inline SimpleMRU<FileItem, s_mru_limit> s_file_mru;
 
@@ -119,18 +116,36 @@ private:
 	/*==================================================================*/
 
 private:
-	static inline
-	AtomSharedPtr<std::string>
-		s_open_file_result{};
+	class SystemInstance final {
+		struct StopSystemThread {
+			void operator()(SystemInterface*) noexcept;
+		};
+		using SystemCore = std::unique_ptr
+			<SystemInterface, StopSystemThread>;
 
-	[[nodiscard]]
-	static auto get_open_file_dialog_result() noexcept {
-		return s_open_file_result.exchange(nullptr, mo::relaxed);
+	public:
+		SystemCore core;
+
+		static inline bool delimiters{};
+		static inline bool statistics{};
+
+		operator bool() const noexcept { return bool(core); }
+	};
+
+	using SystemID = std::size_t;
+	using SystemMap = std::unordered_map<SystemID, SystemInstance>;
+
+	SystemMap m_systems{};
+
+	SystemInstance* system_with_id(const SystemID& key) noexcept {
+		auto sys_ptr = m_systems.find(key);
+		return (sys_ptr != m_systems.end()) ?
+			&sys_ptr->second : nullptr;
 	}
 
-	static void set_open_file_dialog_result(std::string_view file) noexcept {
-		s_open_file_result.store(std::make_shared<std::string>(file), mo::relaxed);
-	}
+	void toggle_system_delimiters(SystemInstance& system) noexcept;
+	void toggle_system_statistics(SystemInstance& system) noexcept;
+	void set_system_hidden_status(SystemInstance& system, bool state) noexcept;
 
 	/*==================================================================*/
 
@@ -139,49 +154,39 @@ public:
 	static inline GlobalAudioBase* GAB{};
 	static inline BasicVideoSpec*  BVS{};
 
+public:
 	struct Settings {
 		float ui_scale = 1.5f;
-		std::array<std::string, s_mru_limit>
-			file_mru_cache{};
+
+		std::string file_mru_cache[s_mru_limit];
 
 		SettingsMap map() noexcept;
 	};
 
 private:
-	auto exportSettings() const noexcept -> Settings;
+	auto export_settings() const noexcept -> Settings;
 
 	/*==================================================================*/
 
 private:
-	static inline bool mToggleOSD{};
-	static inline bool mUnlimited{};
+	void load_file_from_disk(std::string_view game_file_path);
+	void handle_main_hotkeys();
+	void setup_gui_callables() noexcept;
 
-	void handleHotkeyActions();
-	void initializeInterface() noexcept;
-
-	void toggleSystemLimiter() noexcept;
-	void toggleSystemOSD()     noexcept;
-	void toggleSystemHidden(bool state) noexcept;
-
-	void discard_active_core();
-	void replace_active_core();
+	void discard_system_core(SystemID id);
+	void replace_system_core(SystemID id);
 
 /*==================================================================*/
 
-
 public:
-	static auto* initialize(const Path& filepath) noexcept {
-		static FrontendHost self(filepath);
-		return &self;
-	}
+	static FrontendHost*
+	init_application(std::string_view home_override, std::string_view config_name,
+		std::string_view game_file_path, bool force_portable) noexcept;
 
-	static bool initApplication(StrV overrideHome, StrV configName, bool forcePortable) noexcept;
+	void quit_application() noexcept;
 
-	void quitApplication() noexcept;
-	void loadGameFile(const Path&);
-
-	s32  processEvents(void* event) noexcept;
-	s32  processFrame();
+	int handle_client_events(void* event) noexcept;
+	int process_client_frame();
 };
 
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/

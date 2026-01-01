@@ -24,7 +24,7 @@ auto GlobalAudioBase::export_settings() const noexcept -> Settings {
 	Settings out;
 
 	out.volume = m_global_gain.load(std::memory_order::relaxed);
-	out.muted = ms_is_muted.load(std::memory_order::relaxed);
+	out.muted = m_is_muted.load(std::memory_order::relaxed);
 
 	return out;
 }
@@ -45,15 +45,15 @@ GlobalAudioBase::~GlobalAudioBase() noexcept {
 /*==================================================================*/
 
 bool GlobalAudioBase::is_muted()           noexcept {
-	return ms_is_muted.load(std::memory_order::relaxed);
+	return m_is_muted.load(std::memory_order::relaxed);
 }
 
 void GlobalAudioBase::is_muted(bool state) noexcept {
-	ms_is_muted.store(state, std::memory_order::relaxed);
+	m_is_muted.store(state, std::memory_order::relaxed);
 }
 
 void GlobalAudioBase::toggle_mute()       noexcept {
-	ms_is_muted.store(is_muted(), std::memory_order::relaxed);
+	m_is_muted.store(is_muted(), std::memory_order::relaxed);
 }
 
 /*==================================================================*/

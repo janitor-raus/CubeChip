@@ -53,15 +53,15 @@ struct CoreDetails {
 	GameFileTester  test_game_file{};
 	KnownExtensions known_extensions{};
 
-	std::string coreName{};
-	std::string coreDesc{};
+	std::string core_name{};
+	std::string core_desc{};
 
 	void clear() noexcept {
 		construct_core = nullptr;
 		test_game_file = nullptr;
 		known_extensions.clear();
-		coreName.clear();
-		coreDesc.clear();
+		core_name.clear();
+		core_desc.clear();
 	}
 };
 
@@ -89,8 +89,8 @@ class CoreRegistry {
 		return s_core_registry;
 	}
 
-	static inline CoreRegList   s_potential_cores{};
-	static inline CoreDetails   s_selected_core{};
+	static inline CoreRegList s_potential_cores{};
+	static inline CoreDetails s_selected_core{};
 
 	static Json s_game_database;
 	static Json s_custom_core_cfg;

@@ -4,9 +4,7 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include <vector>
 #include <algorithm>
-#include <cassert>
 
 #include "AssignCast.hpp"
 #include "GlobalAudioBase.hpp"
@@ -18,18 +16,18 @@
 
 /*==================================================================*/
 
-static float calculateGain(float streamGain) noexcept {
-	return streamGain * (GlobalAudioBase::is_muted()
+static float calculate_gain(float stream_gain) noexcept {
+	return stream_gain * (GlobalAudioBase::is_muted()
 		? 0.0f : GlobalAudioBase::get_global_gain());
 }
 
 /*==================================================================*/
 	#pragma region AudioDevice Class
 
-bool AudioDevice::addAudioStream(
+bool AudioDevice::add_audio_stream(
 	unsigned streamID, unsigned frequency,
-	unsigned channels, unsigned device
-) {
+	unsigned channels, unsigned device)
+{
 	SDL_AudioSpec spec{ SDL_AUDIO_F32, signed(channels), signed(frequency) };
 
 	auto* ptr = SDL_OpenAudioDeviceStream(
@@ -44,24 +42,27 @@ bool AudioDevice::addAudioStream(
 		*slot = Stream(ptr, spec.format, spec.freq, spec.channels);
 		return true;
 	} else {
-		return (audioStreams.try_emplace(streamID, ptr,
+		return (m_audio_streams.try_emplace(streamID, ptr,
 			spec.format, spec.freq, spec.channels)).second;
 	}
 }
 
 /*==================================================================*/
 
-unsigned AudioDevice::getStreamCount() const noexcept
-	{ return unsigned(audioStreams.size()); }
-
-void AudioDevice::pauseStreams() noexcept {
-	for (auto& stream : audioStreams)
-		{ SDL_PauseAudioStreamDevice(stream.second); }
+unsigned AudioDevice::get_stream_count() const noexcept {
+	return unsigned(m_audio_streams.size());
 }
 
-void AudioDevice::resumeStreams() noexcept {
-	for (auto& stream : audioStreams)
-		{ SDL_ResumeAudioStreamDevice(stream.second); }
+void AudioDevice::pause_streams() noexcept {
+	for (auto& stream : m_audio_streams) {
+		SDL_PauseAudioStreamDevice(stream.second);
+	}
+}
+
+void AudioDevice::resume_streams() noexcept {
+	for (auto& stream : m_audio_streams) {
+		SDL_ResumeAudioStreamDevice(stream.second);
+	}
 }
 
 	#pragma endregion
@@ -71,61 +72,66 @@ AudioDevice::Stream::Stream(
 	SDL_AudioStream* ptr,
 	unsigned format, unsigned freq, unsigned channels
 ) noexcept
-	: ptr     (ptr     )
-	, format  (format  )
-	, freq    (freq    )
-	, channels(channels)
+	: m_ptr     (ptr     )
+	, m_format  (format  )
+	, m_freq    (freq    )
+	, m_channels(channels)
 {}
 
-auto AudioDevice::Stream::getSpec() const noexcept -> SDL_AudioSpec {
-	return { SDL_AudioFormat(format), signed(freq), signed(channels) };
+auto AudioDevice::Stream::get_spec() const noexcept -> SDL_AudioSpec {
+	return { SDL_AudioFormat(m_format), signed(m_freq), signed(m_channels) };
 }
 
-bool AudioDevice::Stream::isPaused() const noexcept {
-	const auto deviceID = SDL_GetAudioStreamDevice(ptr);
+bool AudioDevice::Stream::is_paused() const noexcept {
+	const auto deviceID = SDL_GetAudioStreamDevice(m_ptr);
 	return deviceID ? SDL_AudioDevicePaused(deviceID) : true;
 }
 
-bool AudioDevice::Stream::isPlayback() const noexcept {
-	return SDL_IsAudioDevicePlayback(SDL_GetAudioStreamDevice(ptr));
+bool AudioDevice::Stream::is_playback() const noexcept {
+	return SDL_IsAudioDevicePlayback(SDL_GetAudioStreamDevice(m_ptr));
 }
 
-float AudioDevice::Stream::getRawSampleRate(float framerate) const noexcept {
+float AudioDevice::Stream::get_raw_sample_rate(float framerate) const noexcept {
 	if (framerate < 1.0) { return 0.0; }
-	return freq / framerate * channels;
+	return m_freq / framerate * m_channels;
 }
 
-unsigned AudioDevice::Stream::getNextBufferSize(float framerate) noexcept {
+unsigned AudioDevice::Stream::get_next_buffer_size(float framerate) noexcept {
 	if (framerate < 1.0f) { return 0u; }
 
 	static constexpr auto scale_factor = 1ull << 24;
-	::assign_cast_add(accumulator, freq / framerate * scale_factor);
-	const auto sample_amount = accumulator >> 24;
-	::assign_cast_and(accumulator, scale_factor - 1);
+	::assign_cast_add(m_accumulator, m_freq / framerate * scale_factor);
+	const auto sample_amount = m_accumulator >> 24;
+	::assign_cast_and(m_accumulator, scale_factor - 1);
 
-	return unsigned(sample_amount * channels);
+	return unsigned(sample_amount * m_channels);
 }
 
-void AudioDevice::Stream::pause() noexcept
-	{ SDL_PauseAudioStreamDevice(ptr); }
+void AudioDevice::Stream::pause() noexcept {
+	SDL_PauseAudioStreamDevice(m_ptr);
+}
 
-void AudioDevice::Stream::resume() noexcept
-	{ SDL_ResumeAudioStreamDevice(ptr); }
+void AudioDevice::Stream::resume() noexcept {
+	SDL_ResumeAudioStreamDevice(m_ptr);
+}
 
-float AudioDevice::Stream::getGain() const noexcept
-	{ return SDL_GetAudioStreamGain(ptr); }
+float AudioDevice::Stream::get_gain() const noexcept {
+	return SDL_GetAudioStreamGain(m_ptr);
+}
 
-void AudioDevice::Stream::setGain(float new_gain) noexcept
-	{ SDL_SetAudioStreamGain(ptr, new_gain); }
+void AudioDevice::Stream::set_gain(float new_gain) noexcept {
+	SDL_SetAudioStreamGain(m_ptr, std::clamp(new_gain, 0.0f, 2.0f));
+}
 
-void AudioDevice::Stream::addGain(float add_gain) noexcept
-	{ setGain(getGain() + add_gain); }
+void AudioDevice::Stream::add_gain(float add_gain) noexcept {
+	set_gain(get_gain() + add_gain);
+}
 
-void AudioDevice::Stream::pushRawAudio(void* sampleData,
-	std::size_t bufferSize, std::size_t sampleSize
-) const {
-	if (isPaused() || bufferSize == 0u) { return; }
+void AudioDevice::Stream::push_raw_audio_data(void* sample_data,
+	std::size_t buffer_size, std::size_t sample_size) const
+{
+	if (is_paused() || buffer_size == 0u) { return; }
 
-	SDL_SetAudioDeviceGain(SDL_GetAudioStreamDevice(ptr), calculateGain(getGain()));
-	SDL_PutAudioStreamData(ptr, sampleData, signed(bufferSize * sampleSize));
+	SDL_SetAudioDeviceGain(SDL_GetAudioStreamDevice(m_ptr), ::calculate_gain(get_gain()));
+	SDL_PutAudioStreamData(m_ptr, sample_data, signed(buffer_size * sample_size));
 }

@@ -9,34 +9,34 @@
 /*==================================================================*/
 
 auto SimpleTimer::start() noexcept -> self& {
-	mPausedTime = duration::zero();
-	mTimerStart = clock::now();
-	mTimerStop  = {};
-	mIsPaused = false;
-	mIsActive = true;
+	m_paused_for = duration::zero();
+	m_time_start = clock::now();
+	m_time_stop  = time_point();
+	m_is_paused  = false;
+	m_is_active  = true;
 	return *this;
 }
 
 auto SimpleTimer::resume() noexcept -> self& {
 	if (is_paused()) {
-		mPausedTime += clock::now() - mTimerStop;
-		mIsPaused    = false;
+		m_paused_for += clock::now() - m_time_stop;
+		m_is_active   = false;
 	}
 	return *this;
 }
 
 auto SimpleTimer::pause() noexcept -> self& {
 	if (!is_paused()) {
-		mTimerStop = clock::now();
-		mIsPaused  = true;
+		m_time_stop = clock::now();
+		m_is_active = true;
 	}
 	return *this;
 }
 
 auto SimpleTimer::reset() noexcept -> self& {
-	mPausedTime = duration::zero();
-	mTimerStart = mTimerStop = {};
-	mIsActive   = mIsPaused  = false;
+	m_paused_for = duration::zero();
+	m_time_start = m_time_stop = time_point();
+	m_is_active  = m_is_paused = false;
 	return *this;
 }
 
@@ -48,56 +48,63 @@ auto SimpleTimer::mark_lap() noexcept {
 	duration diff = duration::zero();
 	if (is_active()) {
 		if (is_paused()) {
-			diff = mTimerStop - mTimerStart - mPausedTime;
+			diff = m_time_stop - m_time_start - m_paused_for;
 		} else {
-			diff = current_time - mTimerStart - mPausedTime;
+			diff = current_time - m_time_start - m_paused_for;
 		}
 	}
 
-	mTimerStart = current_time;
-	mPausedTime = duration::zero();
-	mTimerStop  = {};
-	mIsPaused   = false;
-	mIsActive   = true;
+	m_time_start = current_time;
+	m_paused_for = duration::zero();
+	m_time_stop  = time_point();
+	m_is_paused  = false;
+	m_is_active  = true;
 
 	return diff;
 }
 
-float SimpleTimer::lap_millis() noexcept
-	{ return std::chrono::duration<float, std::milli>(mark_lap()).count(); }
+float SimpleTimer::lap_millis() noexcept {
+	return std::chrono::duration<float, std::milli>(mark_lap()).count();
+}
 
-float SimpleTimer::lap_micros() noexcept
-	{ return std::chrono::duration<float, std::micro>(mark_lap()).count(); }
+float SimpleTimer::lap_micros() noexcept {
+	return std::chrono::duration<float, std::micro>(mark_lap()).count();
+}
 
 /*==================================================================*/
 
 auto SimpleTimer::get_elapsed() const noexcept {
-	if (!is_active()) [[unlikely]]
-		{ return duration::zero(); }
+	if (!is_active()) [[unlikely]] {
+		return duration::zero();
+	}
 
 	if (!is_paused()) {
-		return clock::now() - mTimerStart - mPausedTime;
+		return clock::now() - m_time_start - m_paused_for;
 	} else {
-		return mTimerStop - mTimerStart - mPausedTime;
+		return m_time_stop - m_time_start - m_paused_for;
 	}
 }
 
-bool SimpleTimer::has_millis_elapsed(float time) const noexcept
-	{ return get_elapsed_millis() >= time; }
+bool SimpleTimer::has_millis_elapsed(float time) const noexcept {
+	return get_elapsed_millis() >= time;
+}
 
-bool SimpleTimer::has_micros_elapsed(float time) const noexcept
-	{ return get_elapsed_micros() >= time; }
+bool SimpleTimer::has_micros_elapsed(float time) const noexcept {
+	return get_elapsed_micros() >= time;
+}
 
-float SimpleTimer::get_elapsed_millis() const noexcept
-	{ return std::chrono::duration<float, std::milli>(get_elapsed()).count(); }
+float SimpleTimer::get_elapsed_millis() const noexcept {
+	return std::chrono::duration<float, std::milli>(get_elapsed()).count();
+}
 
-float SimpleTimer::get_elapsed_micros() const noexcept
-	{ return std::chrono::duration<float, std::micro>(get_elapsed()).count(); }
+float SimpleTimer::get_elapsed_micros() const noexcept {
+	return std::chrono::duration<float, std::micro>(get_elapsed()).count();
+}
 
-float SimpleTimer::get_current_millis() noexcept
-	{ return std::chrono::duration<float, std::milli>(clock::now().time_since_epoch()).count(); }
+float SimpleTimer::get_current_millis() noexcept {
+	return std::chrono::duration<float, std::milli>(clock::now().time_since_epoch()).count();
+}
 
-float SimpleTimer::get_current_micros() noexcept
-	{ return std::chrono::duration<float, std::micro>(clock::now().time_since_epoch()).count(); }
-
-
+float SimpleTimer::get_current_micros() noexcept {
+	return std::chrono::duration<float, std::micro>(clock::now().time_since_epoch()).count();
+}

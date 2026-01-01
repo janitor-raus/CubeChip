@@ -20,7 +20,7 @@ void CHIP8E::initializeSystem() noexcept {
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
 	copyFontToMemory(mMemoryBank.data(), 80);
 
-	setBaseSystemFramerate(cRefreshRate);
+	set_base_system_framerate(cRefreshRate);
 
 	mVoices[VOICE::ID_0].userdata = &mAudioTimers[VOICE::ID_0];
 	mVoices[VOICE::ID_1].userdata = &mAudioTimers[VOICE::ID_1];

@@ -198,10 +198,10 @@ protected:
 	virtual void renderVideoData() = 0;
 
 #define LOOP_DISPATCH(LOOP_FUNCTION)					\
-	if (hasSystemState(EmuState::BENCH)) [[likely]] {	\
-		setStopFrame(hasInterrupt());					\
+	if (has_system_state(EmuState::BENCH)) [[likely]] {	\
+		set_frame_stop_flag(hasInterrupt());			\
 		LOOP_FUNCTION([&]() noexcept					\
-			{ return !getStopFrame(); });				\
+			{ return !get_frame_stop_flag(); });		\
 	} else {											\
 		LOOP_FUNCTION([&]() noexcept					\
 			{ return !hasInterrupt() && mCycleCount < mTargetCPF; }); \
@@ -213,7 +213,7 @@ protected:
 public:
 	void mainSystemLoop() override final;
 
-	void appendOverlayData() noexcept override final;
+	void append_statistics_data() noexcept override final;
 
 /*==================================================================*/
 

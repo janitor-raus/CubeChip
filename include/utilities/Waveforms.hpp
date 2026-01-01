@@ -18,15 +18,15 @@ struct Phase {
 	using Float_T = ez::f64;
 
 private:
-	Float_T mPhase{};
+	Float_T m_phase{};
 
 public:
 	template <std::integral Any_Int>
-	constexpr Phase(Any_Int value) noexcept : mPhase(Byte_T(value) * (1.0 / 255.0)) {}
-	constexpr Phase(Float_T value) noexcept : mPhase(value - int(value)) {}
+	constexpr Phase(Any_Int phase) noexcept : m_phase(Byte_T(phase) * (1.0 / 255.0)) {}
+	constexpr Phase(Float_T phase) noexcept : m_phase(phase - int(phase)) {}
 	constexpr Phase() noexcept = default;
 
-	constexpr operator Float_T() const noexcept { return mPhase; }
+	constexpr operator Float_T() const noexcept { return m_phase; }
 };
 
 class WaveForms {
@@ -34,25 +34,28 @@ class WaveForms {
 	using Byte_T  = Phase::Byte_T;
 	using Float_T = Phase::Float_T;
 
-	static constexpr Float_T calc_period(Millis p, Millis t) noexcept
-		{ return p ? Float_T(t % p) / p : 0.0; }
+	static constexpr Float_T calc_period(Millis p, Millis t) noexcept {
+		return p ? Float_T(t % p) / p : 0.0;
+	}
 
 public:
 	class Bipolar {
-		Float_T mPhase{};
+		Float_T m_phase{};
 
 	public:
-		constexpr Bipolar(Float_T value) noexcept : mPhase{ value } {}
+		constexpr Bipolar(Float_T phase) noexcept : m_phase(phase) {}
 
 		// cast phase value to a 0..255 value and return
-		constexpr Byte_T as_byte() const noexcept
-			{ return Byte_T(mPhase * 127.5 + 128.0); }
+		constexpr Byte_T as_byte() const noexcept {
+			return Byte_T(m_phase * 127.5 + 128.0);
+		}
 
 		// cast phase value to a 0..1 range and return
-		constexpr Float_T as_unipolar() const noexcept
-			{ return 0.5 * (mPhase + 1.0); }
+		constexpr Float_T as_unipolar() const noexcept {
+			return 0.5 * (m_phase + 1.0);
+		}
 
-		constexpr operator Float_T() const noexcept { return mPhase; }
+		constexpr operator Float_T() const noexcept { return m_phase; }
 	};
 
 	/*==================================================================*/

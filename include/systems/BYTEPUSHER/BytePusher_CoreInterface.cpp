@@ -20,8 +20,8 @@ BytePusher_CoreInterface::BytePusher_CoreInterface(DisplayDevice display_device)
 		{ sSavestatePath = *path / HDM->get_loaded_file_sha1(); }
 
 	mDisplayDevice.set_osd_callable([&]() {
-		if (!hasSystemState(EmuState::STATS)) { return; }
-		osd::simple_stat_overlay(copyOverlayData());
+		if (!has_system_state(EmuState::STATS)) { return; }
+		osd::simple_stat_overlay(copy_statistics_string());
 	});
 
 	loadPresetBinds();
@@ -32,7 +32,7 @@ BytePusher_CoreInterface::BytePusher_CoreInterface(DisplayDevice display_device)
 void BytePusher_CoreInterface::mainSystemLoop() {
 	instructionLoop();
 	renderAudioData();
-	makeOverlayData();
+	create_statistics_data();
 	renderVideoData();
 }
 

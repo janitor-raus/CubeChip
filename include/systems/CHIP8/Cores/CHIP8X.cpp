@@ -20,7 +20,7 @@ void CHIP8X::initializeSystem() noexcept {
 	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
 	copyFontToMemory(mMemoryBank.data(), 80);
 
-	setBaseSystemFramerate(cRefreshRate);
+	set_base_system_framerate(cRefreshRate);
 
 	mVoices[VOICE::UNIQUE].userdata = &mAudioTimers[VOICE::UNIQUE];
 	mVoices[VOICE::BUZZER].userdata = &mAudioTimers[VOICE::BUZZER];
@@ -269,9 +269,9 @@ void CHIP8X::renderVideoData() {
 
 void CHIP8X::setBuzzerPitch(s32 pitch) noexcept {
 	if (auto* stream = mAudioDevice.at(STREAM::MAIN)) {
-		mVoices[VOICE::UNIQUE].setStep((sTonalOffset + (
+		mVoices[VOICE::UNIQUE].set_step((sTonalOffset + (
 			(0xFF - (pitch ? pitch : 0x80)) >> 3 << 4)
-		) / stream->getFreq() * getFramerateMultiplier());
+		) / stream->get_freq() * get_framerate_multiplier());
 	}
 }
 

@@ -21,7 +21,7 @@ void XOCHIP::initializeSystem() noexcept {
 	copyColorsToCore(mBitColors.data());
 
 	mDisplay.set(cScreenSizeX, cScreenSizeY);
-	setBaseSystemFramerate(cRefreshRate);
+	set_base_system_framerate(cRefreshRate);
 
 	setPatternPitch(64);
 
@@ -307,8 +307,8 @@ void XOCHIP::setColorBit332(s32 bit, s32 index) noexcept {
 
 void XOCHIP::setPatternPitch(s32 pitch) noexcept {
 	if (auto* stream = mAudioDevice.at(STREAM::MAIN)) {
-		mVoices[VOICE::UNIQUE].setStep(std::bit_cast<f32>
-			(sPitchFreqLUT[pitch]) / stream->getFreq() * getFramerateMultiplier());
+		mVoices[VOICE::UNIQUE].set_step(std::bit_cast<f32>
+			(sPitchFreqLUT[pitch]) / stream->get_freq() * get_framerate_multiplier());
 	}
 }
 
@@ -317,8 +317,8 @@ void XOCHIP::makePatternWave(f32* data, u32 size, Voice* voice, Stream*) noexcep
 	auto* timer = static_cast<AudioTimer*>(voice->userdata);
 
 	for (auto i = 0u; i < size; ++i) {
-		if (const auto gain = voice->getLevel(i, *timer)) {
-			const auto bitStep = s32(voice->peekPhase(i) * 128.0f);
+		if (const auto gain = voice->get_level(i, *timer)) {
+			const auto bitStep = s32(voice->peek_phase(i) * 128.0f);
 			const auto bitMask = 1 << (0x7 ^ (bitStep & 0x7));
 			::assign_cast_add(data[i], \
 				(mPattern[bitStep >> 3] & bitMask) ? gain : -gain);

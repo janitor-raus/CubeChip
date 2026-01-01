@@ -13,7 +13,8 @@
 Well512::Well512() noexcept {
 	using chrono = std::chrono::steady_clock;
 	const auto seed = chrono::now().time_since_epoch().count();
+
 	for (auto i = 0; i < 16; ++i) {
-		mState[i] = static_cast<result_type>(seed >> i * 2);
+		m_state[i] = result_type(seed >> i * 2);
 	}
 }

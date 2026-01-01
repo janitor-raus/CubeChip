@@ -154,7 +154,7 @@ class BasicLoggerContext {
 
 public:
 	BasicLoggerContext() noexcept {
-		mFlusherThread = Thread([this](StopToken token) noexcept {
+		mFlusherThread = Thread([&](StopToken token) noexcept {
 			thread_affinity::set_affinity(0b11ull);
 
 			do {

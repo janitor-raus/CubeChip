@@ -66,39 +66,38 @@ class GlobalAudioBase;
 
 class alignas(HDIS) SystemInterface {
 
-	Thread mSystemThread;
-	Thread mTimingThread;
+	Thread m_system_thread;
+	Thread m_timing_thread;
 
-	std::atomic<u8> mGlobalState = EmuState::NORMAL;
+	std::atomic<u8> m_system_state = EmuState::NORMAL;
 
-	std::atomic<bool> mNextFrame{};
-	std::atomic<bool> mStopFrame{};
+	std::atomic<bool> m_next_frame_flag{};
+	std::atomic<bool> m_stop_frame_flag{};
 
 protected:
-	SimpleTimer mTimer{};
+	SimpleTimer m_timer{};
 
 private:
-	Str mOverlayDataBuffer{};
-	AtomSharedPtr<Str>
-		mOverlayData{};
+	std::string m_statistics_work_buffer{};
+	AtomSharedPtr<std::string>
+		m_statistics_data{};
 
 protected:
 	static inline HomeDirManager* HDM{};
-	static inline BasicVideoSpec* BVS{};
 
 	Well512*       RNG{};
 	BasicKeyboard* Input{};
 
 public:
-	void startWorker() noexcept;
-	void stopWorker() noexcept;
+	void start_workers() noexcept;
+	void stop_workers() noexcept;
 
 protected:
-	std::atomic<f32> mBaseSystemFramerate{};
-	std::atomic<f32> mFramerateMultiplier = 1.0f;
+	std::atomic<f32> m_base_system_framerate{};
+	std::atomic<f32> m_framerate_multiplier = 1.0f;
 
-	u32 mBenchedFrames{};
-	u32 mElapsedFrames{};
+	u32 m_benched_frames{};
+	u32 m_elapsed_frames{};
 
 protected:
 	SystemInterface() noexcept;
@@ -107,58 +106,51 @@ public:
 	virtual ~SystemInterface() noexcept = default;
 
 public:
-	static void assignComponents(
-		HomeDirManager* const pHDM,
-		BasicVideoSpec* const pBVS
-	) noexcept {
-		HDM = pHDM;
-		BVS = pBVS;
-	}
+	static void hdm_passthrough(HomeDirManager* const pHDM) noexcept { HDM = pHDM; }
 
 	// Adds a State to the System, returns previous value of State.
-	auto addSystemState(EmuState state) noexcept { return mGlobalState.fetch_or ( state, mo::acq_rel) & state; }
+	auto add_system_state(EmuState state) noexcept { return m_system_state.fetch_or ( state, mo::acq_rel) & state; }
 	// Removes a State from the System, returns previous value of State.
-	auto subSystemState(EmuState state) noexcept { return mGlobalState.fetch_and(~state, mo::acq_rel) & state; }
+	auto sub_system_state(EmuState state) noexcept { return m_system_state.fetch_and(~state, mo::acq_rel) & state; }
 	// Toggles a State in the System, returns previous value of State.
-	auto xorSystemState(EmuState state) noexcept { return mGlobalState.fetch_xor( state, mo::acq_rel) & state; }
+	auto xor_system_state(EmuState state) noexcept { return m_system_state.fetch_xor( state, mo::acq_rel) & state; }
 	// Sets the total System State, return previous value of State.
-	auto setSystemState(EmuState state) noexcept { return mGlobalState.exchange(state, mo::acq_rel) & state; }
+	auto set_system_state(EmuState state) noexcept { return m_system_state.exchange(state, mo::acq_rel) & state; }
 	// Fetches the current total System State.
-	auto getSystemState()         const noexcept { return mGlobalState.load(mo::acquire);  }
+	auto get_system_state()         const noexcept { return m_system_state.load(mo::acquire);  }
 
 	// Tests if the given State is present in the System.
-	bool hasSystemState(EmuState state) const noexcept { return !!(getSystemState() & state); }
+	bool has_system_state(EmuState state) const noexcept { return !!(get_system_state() & state); }
 	// Tests if the System is allowed to run (temporarily or not).
-	bool canSystemWork()               const noexcept { return !(getSystemState() & EmuState::NOT_RUNNING); }
+	bool can_system_work()               const noexcept { return !(get_system_state() & EmuState::NOT_RUNNING); }
 	// Tests if the System is allowed to (un)pause on demand.
-	bool canSystemPause()              const noexcept { return !(getSystemState() & EmuState::CANNOT_PAUSE); }
+	bool can_system_pause()              const noexcept { return !(get_system_state() & EmuState::CANNOT_PAUSE); }
 
 	// Attempts to (un)pause the System if possible, returns paused State value.
-	std::optional<bool> tryPauseSystem() noexcept {
-		if (!canSystemPause()) { return std::nullopt; }
-		return !xorSystemState(EmuState::PAUSED);
+	std::optional<bool> try_pause_system() noexcept {
+		if (!can_system_pause()) { return std::nullopt; }
+		return !xor_system_state(EmuState::PAUSED);
 	}
 
-protected: void setBaseSystemFramerate(f32 value) noexcept;
-public:    void setFramerateMultiplier(f32 value) noexcept;
+protected: void set_base_system_framerate(f32 value) noexcept;
+public:    void set_framerate_multiplier(f32 value) noexcept;
 
-public:    f32  getBaseSystemFramerate() const noexcept;
-public:    f32  getFramerateMultiplier() const noexcept;
-public:    f32  getRealSystemFramerate() const noexcept;
-
+public:    f32  get_base_system_framerate() const noexcept;
+public:    f32  get_framerate_multiplier() const noexcept;
+public:    f32  get_real_system_framerate() const noexcept;
 
 protected:
-	void setStopFrame(bool state) noexcept { mStopFrame.store(state, mo::release); }
-	auto getStopFrame()     const noexcept { return mStopFrame.load(mo::acquire);  }
+	void set_frame_stop_flag(bool state) noexcept { m_stop_frame_flag.store(state, mo::release); }
+	auto get_frame_stop_flag()     const noexcept { return m_stop_frame_flag.load(mo::acquire);  }
 
 private:
-	void declareNextFrame(bool state) noexcept {
-		mNextFrame.store(state, mo::release);
-		mNextFrame.notify_one();
+	void notify_next_frame(bool state) noexcept {
+		m_next_frame_flag.store(state, mo::release);
+		m_next_frame_flag.notify_one();
 	}
-	void standbyNextFrame(bool state) noexcept {
-		mNextFrame.wait(state, mo::acquire);
-		mNextFrame.store(state, mo::release);
+	void await_next_frame(bool state) noexcept {
+		m_next_frame_flag.wait(state, mo::acquire);
+		m_next_frame_flag.store(state, mo::release);
 	}
 
 protected:
@@ -167,25 +159,25 @@ protected:
 
 protected:
 	template <typename... Args>
-	void formatOverlayData(std::string&& message, Args&&... args) noexcept {
+	void format_statistics_data(std::string&& message, Args&&... args) noexcept {
 		try {
-			fmt::vformat_to(std::back_inserter(mOverlayDataBuffer),
+			fmt::vformat_to(std::back_inserter(m_statistics_work_buffer),
 				message, fmt::make_format_args(args...));
 		} catch (...) { /* ignore */ }
 	}
 
 	template <typename... Args>
-	void formatOverlayData(const std::string& message, Args&&... args) noexcept {
+	void format_statistics_data(const std::string& message, Args&&... args) noexcept {
 		try {
-			fmt::vformat_to(std::back_inserter(mOverlayDataBuffer),
+			fmt::vformat_to(std::back_inserter(m_statistics_work_buffer),
 				message, fmt::make_format_args(args...));
 		} catch (...) { /* ignore */ }
 	}
 
 protected:
-	virtual void appendOverlayData() noexcept;
-	/*****/ void makeOverlayData() noexcept;
-	/*****/ Str  copyOverlayData() const noexcept;
+	virtual void append_statistics_data() noexcept;
+	/*****/ void create_statistics_data() noexcept;
+	std::string  copy_statistics_string() const noexcept;
 };
 
 

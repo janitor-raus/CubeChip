@@ -6,28 +6,24 @@
 
 #pragma once
 
-#include "AtomSharedPtr.hpp"
-#include "TripleBuffer.hpp"
 #include "LifetimeWrapperSDL.hpp"
 #include "SettingWrapper.hpp"
 #include "EzMaths.hpp"
-
-#include <functional>
 
 /*==================================================================*/
 	#pragma region BasicVideoSpec Singleton Class
 
 class BasicVideoSpec final {
 
-	SDL_Unique<SDL_Window>   mMainWindow{};
-	SDL_Unique<SDL_Renderer> mMainRenderer{};
+	SDL_Unique<SDL_Window>   m_main_window{};
+	SDL_Unique<SDL_Renderer> m_main_renderer{};
 
 /*==================================================================*/
 
 public:
 	struct Settings {
 		static constexpr ez::Rect
-			defaults{ 0, 0, 640, 480 };
+			defaults = { 0, 0, 640, 480 };
 
 		ez::Rect window = defaults;
 		bool first_run = true;
@@ -36,7 +32,7 @@ public:
 	};
 
 	[[nodiscard]]
-	auto exportSettings() const noexcept -> Settings;
+	auto export_settings() const noexcept -> Settings;
 
 private:
 	BasicVideoSpec(const Settings& settings, bool& success) noexcept;
@@ -56,30 +52,27 @@ public:
 /*==================================================================*/
 
 public:
-	float getDisplayRefreshRate(SDL_DisplayID display) noexcept;
-	void  normalizeRectToDisplay(ez::Rect& rect, ez::Rect& deco, bool first_run) noexcept;
+	float get_display_refresh_rate(SDL_DisplayID display) noexcept;
+	void  normalize_rect_to_display(ez::Rect& rect, ez::Rect& deco, bool first_run) noexcept;
 
 /*==================================================================*/
 
-	SDL_Window* getMainWindow() const noexcept
-		{ return mMainWindow; }
-
-	SDL_Renderer* getMainRenderer() const noexcept
-		{ return mMainRenderer; }
+	SDL_Window*   get_main_window()   const noexcept { return m_main_window; }
+	SDL_Renderer* get_main_renderer() const noexcept { return m_main_renderer; }
 
 /*==================================================================*/
 
 public:
-	static SDL_Texture* makeDisplayTexture(SDL_Renderer* renderer, int w, int h) noexcept;
-	static void renderStreamTexture(SDL_Renderer* renderer,
+	static SDL_Texture* create_stream_texture(SDL_Renderer* renderer, int w, int h) noexcept;
+	static void write_stream_texture(SDL_Renderer* renderer,
 		SDL_Texture* texture, const std::byte* src_buffer) noexcept;
 
 public:
-	void setMainWindowTitle(const std::string& title) noexcept;
-	bool isMainWindowID(unsigned id) const noexcept;
-	void raiseMainWindow() noexcept;
+	void set_window_title(const std::string& title, SDL_Window* window = nullptr) noexcept;
+	bool is_main_window_id(unsigned id) const noexcept;
+	void raise_window(SDL_Window* window = nullptr) noexcept;
 
-	bool renderPresent() noexcept;
+	bool render_present() noexcept;
 };
 
 	#pragma endregion

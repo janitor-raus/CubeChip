@@ -12,107 +12,107 @@
 
 /*==================================================================*/
 
-void SystemInterface::startWorker() noexcept {
-	if (!mSystemThread.joinable()) {
+void SystemInterface::start_workers() noexcept {
+	if (!m_system_thread.joinable()) {
 		initializeSystem();
-		mSystemThread = Thread([this](StopToken token) noexcept {
+		m_system_thread = Thread([&](StopToken token) noexcept {
 			SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 			thread_affinity::set_affinity(~0b11ull);
 
 			do {
-				standbyNextFrame(false);
+				await_next_frame(false);
 
-				mTimer.start();
+				m_timer.start();
 				mainSystemLoop();
 
-				mElapsedFrames += 1;
-				mBenchedFrames = hasSystemState(EmuState::BENCH)
-					? mBenchedFrames + 1 : 0;
+				m_elapsed_frames += 1;
+				m_benched_frames = has_system_state(EmuState::BENCH)
+					? m_benched_frames + 1 : 0;
 			} while (!token.stop_requested());
 		});
 	}
-	if (!mTimingThread.joinable()) {
-		mTimingThread = Thread([this](StopToken token) noexcept {
+	if (!m_timing_thread.joinable()) {
+		m_timing_thread = Thread([&](StopToken token) noexcept {
 			SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 			thread_affinity::set_affinity(0b11ull);
 
-			FrameLimiter Pacer(getRealSystemFramerate());
+			FrameLimiter Pacer(get_real_system_framerate());
 
 			do {
-				if (Pacer.isFrameReady(!hasSystemState(EmuState::BENCH))) {
-					Pacer.setLimiterProperties(getRealSystemFramerate());
+				if (Pacer.isFrameReady(!has_system_state(EmuState::BENCH))) {
+					Pacer.setLimiterProperties(get_real_system_framerate());
 
-					if (!canSystemWork()) [[unlikely]] { return; }
+					if (!can_system_work()) [[unlikely]] { return; }
 
-					setStopFrame(true);
-					declareNextFrame(true);
+					set_frame_stop_flag(true);
+					notify_next_frame(true);
 				}
 			} while (!token.stop_requested());
 		});
 	}
 }
 
-void SystemInterface::stopWorker() noexcept {
-	if (mSystemThread.joinable()) {
-		mSystemThread.request_stop();
-		declareNextFrame(true);
-		mSystemThread.join();
+void SystemInterface::stop_workers() noexcept {
+	if (m_system_thread.joinable()) {
+		m_system_thread.request_stop();
+		notify_next_frame(true);
+		m_system_thread.join();
 	}
-	if (mTimingThread.joinable()) {
-		mTimingThread.request_stop();
-		mTimingThread.join();
+	if (m_timing_thread.joinable()) {
+		m_timing_thread.request_stop();
+		m_timing_thread.join();
 	}
 }
 
 SystemInterface::SystemInterface() noexcept
-	: mOverlayData(std::make_shared<Str>())
+	: m_statistics_data(std::make_shared<Str>())
 {
 	static thread_local auto sRNG   = std::make_unique<Well512>();
 	static thread_local auto sInput = std::make_unique<BasicKeyboard>();
 	RNG   = sRNG.get();
 	Input = sInput.get();
 
-	mOverlayDataBuffer.reserve(1_KiB);
+	m_statistics_work_buffer.reserve(1_KiB);
 }
 
 /*==================================================================*/
 
-f32 SystemInterface::getBaseSystemFramerate() const noexcept
-	{ return mBaseSystemFramerate.load(mo::relaxed); }
+f32 SystemInterface::get_base_system_framerate() const noexcept
+	{ return m_base_system_framerate.load(mo::relaxed); }
 
-f32 SystemInterface::getFramerateMultiplier() const noexcept
-	{ return mFramerateMultiplier.load(mo::relaxed); }
+f32 SystemInterface::get_framerate_multiplier() const noexcept
+	{ return m_framerate_multiplier.load(mo::relaxed); }
 
-f32 SystemInterface::getRealSystemFramerate() const noexcept
-	{ return getBaseSystemFramerate() * getFramerateMultiplier(); }
+f32 SystemInterface::get_real_system_framerate() const noexcept
+	{ return get_base_system_framerate() * get_framerate_multiplier(); }
 
-void SystemInterface::setBaseSystemFramerate(f32 value) noexcept
-	{ mBaseSystemFramerate.store(std::clamp(value, 24.0f, 100.0f), mo::relaxed); }
+void SystemInterface::set_base_system_framerate(f32 value) noexcept
+	{ m_base_system_framerate.store(std::clamp(value, 24.0f, 100.0f), mo::relaxed); }
 
-void SystemInterface::setFramerateMultiplier(f32 value) noexcept
-	{ mFramerateMultiplier.store(std::clamp(value, 0.10f, 10.00f), mo::relaxed); }
+void SystemInterface::set_framerate_multiplier(f32 value) noexcept
+	{ m_framerate_multiplier.store(std::clamp(value, 0.10f, 10.00f), mo::relaxed); }
 
-void SystemInterface::appendOverlayData() noexcept {
-	const auto framerate{ getRealSystemFramerate() };
-	const auto frametime{ mTimer.get_elapsed_millis() };
-	const auto framespan{ 1000.0f / framerate };
+void SystemInterface::append_statistics_data() noexcept {
+	const auto framerate = get_real_system_framerate();
+	const auto frametime = m_timer.get_elapsed_millis();
+	const auto framespan = 1000.0f / framerate;
 
-	formatOverlayData(
+	format_statistics_data(
 		"Framerate:{:9.3f} fps |{:9.3f}ms\n"
 		"Frametime:{:9.3f} ms ({:>6.2f}%)\n",
 		framerate, framespan, frametime,
 		frametime / framespan * 100.0f);
 }
 
-void SystemInterface::makeOverlayData() noexcept {
-	if (!hasSystemState(EmuState::STATS)) { return; }
-	appendOverlayData();
+void SystemInterface::create_statistics_data() noexcept {
+	if (!has_system_state(EmuState::STATS)) { return; }
+	append_statistics_data();
 
-	mOverlayData.store(std::make_shared<Str> \
-		(std::move(mOverlayDataBuffer)), mo::release);
-	mOverlayDataBuffer.clear();
+	m_statistics_data.store(std::make_shared<Str> \
+		(std::move(m_statistics_work_buffer)), mo::release);
+	m_statistics_work_buffer.clear();
 }
 
-Str SystemInterface::copyOverlayData() const noexcept {
-	return *mOverlayData.load(mo::acquire);
+Str SystemInterface::copy_statistics_string() const noexcept {
+	return *m_statistics_data.load(mo::acquire);
 }

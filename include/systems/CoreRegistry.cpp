@@ -106,7 +106,7 @@ SystemInterface* CoreRegistry::construct_new_core(std::size_t idx) noexcept {
 }
 
 void CoreRegistry::load_game_database(const Path& dbPath) noexcept {
-	static const auto defaultPath = ::getBasePath() / Path("programDB.json");
+	static const auto defaultPath = ::get_base_path() / Path("programDB.json");
 	const auto& checkPath = dbPath.empty() ? defaultPath : dbPath;
 
 	if (!loadJsonFromFile(checkPath, s_game_database)) {

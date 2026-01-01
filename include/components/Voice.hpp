@@ -14,11 +14,13 @@
 
 /*==================================================================*/
 
-constexpr inline float transientGain(unsigned iter, float step = 0.01f) noexcept
-	{ return std::min(0.0f + step * (iter + 1), 1.0f); }
+constexpr inline float transient_gain(unsigned iter, float step = 0.01f) noexcept {
+	return std::min(0.0f + step * (iter + 1), 1.0f);
+}
 
-constexpr inline float transientFall(unsigned iter, float step = 0.01f) noexcept
-	{ return std::max(1.0f - step * (iter + 1), 0.0f); }
+constexpr inline float transient_fall(unsigned iter, float step = 0.01f) noexcept {
+	return std::max(1.0f - step * (iter + 1), 0.0f);
+}
 
 /*==================================================================*/
 
@@ -37,8 +39,8 @@ struct TransienceGain {
 	{}
 
 	constexpr auto calculate(unsigned sample_idx, float step = 0.01f) const noexcept {
-		return  intro ? ::transientGain(sample_idx, step) :
-				outro ? ::transientFall(sample_idx, step) : fallback;
+		return  intro ? ::transient_gain(sample_idx, step) :
+				outro ? ::transient_fall(sample_idx, step) : fallback;
 	}
 };
 
@@ -50,24 +52,25 @@ struct TransienceGain {
 * gain calculations, though they're not useful for data-driven voices.
 */
 class AudioTimer {
-	unsigned timer_old{};
-	unsigned timer_new{};
+	unsigned m_timer_old{};
+	unsigned m_timer_new{};
 
 public:
-	constexpr unsigned get()        const noexcept { return timer_new; }
-	constexpr void     set(unsigned time) noexcept { timer_old = std::exchange(timer_new, time); }
-	constexpr void     dec()              noexcept { set(timer_new ? timer_new - 1 : 0); }
+	constexpr unsigned get()        const noexcept { return m_timer_new; }
+	constexpr void     set(unsigned time) noexcept { m_timer_old = std::exchange(m_timer_new, time); }
+	constexpr void     dec()              noexcept { set(m_timer_new ? m_timer_new - 1 : 0); }
 
 	// Check if the timer is currently rising (intro)
-	constexpr bool intro() const noexcept { return timer_new && !timer_old; }
+	constexpr bool intro() const noexcept { return m_timer_new && !m_timer_old; }
 
 	// Check if the timer is currently falling (outro)
-	constexpr bool outro() const noexcept { return !timer_new && timer_old; }
+	constexpr bool outro() const noexcept { return !m_timer_new && m_timer_old; }
 
-	constexpr operator unsigned() const noexcept { return timer_new; }
+	constexpr operator unsigned() const noexcept { return m_timer_new; }
 
-	constexpr operator TransienceGain() const noexcept
-		{ return TransienceGain{ intro(), outro(), !!timer_new }; }
+	constexpr operator TransienceGain() const noexcept {
+		return TransienceGain{ intro(), outro(), !!m_timer_new };
+	}
 };
 
 /*==================================================================*/
@@ -81,50 +84,54 @@ class Voice {
 	using self = Voice;
 
 protected:
-	double mPhase{}; // [0..1) range.
-	double mStep{};  // [0..1) range.
-	float  mVolumeGain{}; // System-facing volume control, to be controlled by a system.
-	float  mMasterGain{}; // Mastering volume control to manually balance against other voices.
+	double m_phase{}; // [0..1) range.
+	double m_step{};  // [0..1) range.
+	float  m_volume_gain{}; // System-facing volume control, to be controlled by a system.
+	float  m_master_gain{}; // Mastering volume control to manually balance against other voices.
 
 public:
 	// Pass along additional data to a voice processor, if needed.
 	void* userdata{};
 
-	Voice(float master_gain = 0.2f) noexcept
-		: mVolumeGain(1.0f)
-	{ setMasterGain(master_gain); }
+	Voice(float master_gain = 0.2f) noexcept : m_volume_gain(1.0f) {
+		set_master_gain(master_gain);
+	}
 
 	// Get the volume of the voice, in range of: [0..1]
-	constexpr float getVolume()     const noexcept { return mVolumeGain; }
+	constexpr float get_volume()     const noexcept { return m_volume_gain; }
 	// Set the volume of the voice, clamped to: [0..1]
-	constexpr self& setVolume(float gain) noexcept { mVolumeGain = std::clamp(gain, 0.0f, 1.0f); return *this; }
+	constexpr self& set_volume(float gain) noexcept { m_volume_gain = std::clamp(gain, 0.0f, 1.0f); return *this; }
 
 	// Get the mastering volume of the voice, in range of: [0..1]
-	constexpr float getMasterGain()     const noexcept { return mMasterGain; }
+	constexpr float get_master_gain()     const noexcept { return m_master_gain; }
 	// Set the mastering volume of the voice, clamped to: [0..1]
-	constexpr self& setMasterGain(float gain) noexcept { mMasterGain = std::clamp(gain, 0.0f, 1.0f); return *this; }
+	constexpr self& set_master_gain(float gain) noexcept { m_master_gain = std::clamp(gain, 0.0f, 1.0f); return *this; }
 
-	constexpr Phase getStep()     const noexcept { return mStep; }
-	constexpr self& setStep(Phase step) noexcept { mStep = step; return *this; }
+	constexpr Phase get_step()     const noexcept { return m_step; }
+	constexpr self& set_step(Phase step) noexcept { m_step = step; return *this; }
 
-	constexpr Phase getPhase()      const noexcept { return mPhase; }
-	constexpr self& setPhase(Phase phase) noexcept { mPhase = phase; return *this; }
+	constexpr Phase get_phase()      const noexcept { return m_phase; }
+	constexpr self& set_phase(Phase phase) noexcept { m_phase = phase; return *this; }
 
 	// Peek the next raw phase without wrapping it, default is 1 step ahead.
-	constexpr double peekRawPhase(double steps = 1.0) const noexcept
-		{ return mPhase + mStep * steps; }
+	constexpr double peek_raw_phase(double steps = 1.0) const noexcept {
+		return m_phase + m_step * steps;
+	}
 
 	// Peek the next phase without modifying it, default is 1 step ahead.
-	constexpr Phase peekPhase(double steps = 1.0) const noexcept
-		{ return peekRawPhase(steps); }
+	constexpr Phase peek_phase(double steps = 1.0) const noexcept {
+		return peek_raw_phase(steps);
+	}
 
 	// Advance the phase by a number of steps, default is 1 step ahead.
-	constexpr self& stepPhase(double steps = 1.0) noexcept
-		{ mPhase = peekPhase(steps); return *this; }
+	constexpr self& stepPhase(double steps = 1.0) noexcept {
+		m_phase = peek_phase(steps); return *this;
+	}
 
 	// Get the current level of the voice sample, optionally with transience gain calculation.
-	constexpr float getLevel(unsigned sample_idx, TransienceGain transience = {}) const noexcept
-		{ return transience.calculate(sample_idx) * getVolume() * getMasterGain(); }
+	constexpr float get_level(unsigned sample_idx, TransienceGain transience = {}) const noexcept {
+		return transience.calculate(sample_idx) * get_volume() * get_master_gain();
+	}
 };
 
 /*==================================================================*/

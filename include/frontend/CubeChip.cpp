@@ -5,7 +5,6 @@
 */
 
 #include "BasicLogger.hpp"
-#include "ThreadAffinity.hpp"
 #include "AttachConsole.hpp"
 
 #include <cxxopts.hpp>
@@ -55,15 +54,15 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 	{
 		options.add_options("Runtime")
 			("program",  "Forces the application to load a program on startup.",
-				cxxopts::value<Str>())
+				cxxopts::value<std::string>())
 			("headless", "Forces the application to run without a graphical user interface.",
 				cxxopts::value<bool>()->default_value("false"));
 
 		options.add_options("Configuration")
 			("homedir",  "Forces application to use a different home directory to read/write files.",
-				cxxopts::value<Str>())
+				cxxopts::value<std::string>())
 			("config",   "Forces application to use a different config file to load/save settings, relative to the home directory.",
-				cxxopts::value<Str>())
+				cxxopts::value<std::string>())
 			("portable", "Force application to operate in portable mode, setting the home directory to the executable's location. Overriden by --home.",
 				cxxopts::value<bool>()->default_value("false"));
 
@@ -92,18 +91,14 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 		return SDL_APP_SUCCESS;
 	}
 
-	if (!FrontendHost::initApplication(
-		result.count("homedir")  ? result["homedir"].as<Str>() : ""s,
-		result.count("config")   ? result["config"] .as<Str>() : ""s,
+	*Host = FrontendHost::init_application(
+		result["homedir"].as_optional<std::string>().value_or(""),
+		result["config" ].as_optional<std::string>().value_or(""),
+		result["program"].as_optional<std::string>().value_or(""),
 		result.count("portable") ? true : false
-	)) { return SDL_APP_FAILURE; }
+	);
 
-	*Host = FrontendHost::initialize(
-		result.count("program") ? result["program"].as<Str>() : ""s);
-
-	thread_affinity::set_affinity(0b11ull);
-
-	return SDL_APP_CONTINUE;
+	return *Host ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
 }
 
 /*==================================================================*/
@@ -111,7 +106,7 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 SDL_AppResult SDL_AppIterate(void *pHost) {
 	auto* Host = static_cast<FrontendHost*>(pHost);
 
-	return SDL_AppResult(Host->processFrame());
+	return SDL_AppResult(Host->process_client_frame());
 }
 
 /*==================================================================*/
@@ -119,7 +114,7 @@ SDL_AppResult SDL_AppIterate(void *pHost) {
 SDL_AppResult SDL_AppEvent(void *pHost, SDL_Event *event) {
 	auto* Host = static_cast<FrontendHost*>(pHost);
 
-	return SDL_AppResult(Host->processEvents(event));
+	return SDL_AppResult(Host->handle_client_events(event));
 }
 
 /*==================================================================*/
@@ -127,6 +122,6 @@ SDL_AppResult SDL_AppEvent(void *pHost, SDL_Event *event) {
 void SDL_AppQuit(void* pHost, SDL_AppResult) {
 	auto* Host = static_cast<FrontendHost*>(pHost);
 
-	Host->quitApplication();
+	Host->quit_application();
 	blog.shutdown();
 }

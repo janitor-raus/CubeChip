@@ -8,9 +8,9 @@
 
 /*==================================================================*/
 
-const char* getHomePath(
+const char* get_home_path(
 	const char* org = nullptr,
 	const char* app = nullptr
 ) noexcept;
 
-const char* getBasePath() noexcept;
+const char* get_base_path() noexcept;

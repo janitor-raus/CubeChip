@@ -17,16 +17,16 @@ class SimpleTimer {
 
 	using self = SimpleTimer;
 
-	duration   mPausedTime{};
-	time_point mTimerStart{};
-	time_point mTimerStop{};
+	duration   m_paused_for{};
+	time_point m_time_start{};
+	time_point m_time_stop{};
 
-	bool       mIsActive{};
-	bool       mIsPaused{};
+	bool       m_is_active{};
+	bool       m_is_paused{};
 
 public:
-	constexpr bool is_active() const noexcept { return mIsActive; }
-	constexpr bool is_paused() const noexcept { return mIsPaused; }
+	constexpr bool is_active() const noexcept { return m_is_active; }
+	constexpr bool is_paused() const noexcept { return m_is_paused; }
 
 public:
 	auto start()  noexcept -> self&;

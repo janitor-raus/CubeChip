@@ -17,10 +17,10 @@ REGISTER_CORE(BYTEPUSHER_STANDARD, ".BytePusher")
 void BYTEPUSHER_STANDARD::initializeSystem() noexcept {
 	copyGameToMemory(mMemoryBank.data());
 
-	setBaseSystemFramerate(cRefreshRate);
+	set_base_system_framerate(cRefreshRate);
 
-	mAudioDevice.addAudioStream(STREAM::MAIN, u32(getRealSystemFramerate() * cAudioLength));
-	mAudioDevice.resumeStreams();
+	mAudioDevice.add_audio_stream(STREAM::MAIN, u32(get_real_system_framerate() * cAudioLength));
+	mAudioDevice.resume_streams();
 
 	mDisplayDevice.metadata_staging
 		.set_viewport(cDisplayW, cDisplayH)
@@ -48,7 +48,7 @@ void BYTEPUSHER_STANDARD::instructionLoop() noexcept {
 void BYTEPUSHER_STANDARD::renderAudioData() {
 	if (auto* stream = mAudioDevice.at(STREAM::MAIN)) {
 		const auto samplesOffset = mMemoryBank.data() + (readData<2>(6) << 8);
-		auto buffer = ::allocate_n<f32>(stream->getNextBufferSize(getRealSystemFramerate()))
+		auto buffer = ::allocate_n<f32>(stream->get_next_buffer_size(get_real_system_framerate()))
 			.as_value().release_as_container();
 
 		static constexpr auto master_gain = 0.22f;
@@ -58,7 +58,7 @@ void BYTEPUSHER_STANDARD::renderAudioData() {
 			[](const auto sample) noexcept { return s8(sample) * (master_gain / 127.0f); }
 		);
 
-		mAudioDevice[STREAM::MAIN].pushAudioData(buffer);
+		mAudioDevice[STREAM::MAIN].push_audio_data(buffer);
 	}
 }
 

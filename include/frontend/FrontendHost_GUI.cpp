@@ -23,22 +23,13 @@
 
 /*==================================================================*/
 
-static constexpr auto RGBA_to_ImVec4(RGBA color) noexcept {
-	return ImVec4(
-		color.R / 255.0f, color.G / 255.0f,
-		color.B / 255.0f, color.A / 255.0f
-	);
-}
-
-/*==================================================================*/
-
-void FrontendHost::initializeInterface() noexcept {
+void FrontendHost::setup_gui_callables() noexcept {
 	static auto sMenu_File_Open = FrontendInterface::register_menu("",
 	{ 0, "File" }, [&]() noexcept {
 		if (ImGui::MenuItem("Open File...")) {
 			SDL_ShowOpenFileDialog([](void*, const char* const* file_list, int) noexcept {
 				if (file_list && file_list[0]) { set_open_file_dialog_result(file_list[0]); }
-			}, nullptr, BVS->getMainWindow(), nullptr, 0, nullptr, false);
+			}, nullptr, BVS->get_main_window(), nullptr, 0, nullptr, false);
 		}
 	});
 
@@ -78,7 +69,7 @@ void FrontendHost::initializeInterface() noexcept {
 			if (ImGui::MenuItem(entry->filename().string().c_str(),
 				nullptr, nullptr, clicked ? entry.exists() : entry))
 			{
-				loadGameFile(entry);
+				load_file_from_disk(entry->string());
 			}
 		}
 	});

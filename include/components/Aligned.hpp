@@ -42,20 +42,20 @@ class AlignedTypeArrayDeleter {
 	static_assert(!std::is_trivially_destructible_v<T>,
 		"Deleter expects non-trivially-destructible types.");
 
-	std::size_t mSize{};
+	std::size_t m_size{};
 
 public:
 	constexpr AlignedTypeArrayDeleter() noexcept = default;
-	constexpr AlignedTypeArrayDeleter(std::size_t size) noexcept : mSize(size) {}
+	constexpr AlignedTypeArrayDeleter(std::size_t size) noexcept : m_size(size) {}
 
 	void operator()(T* ptr) const noexcept(std::is_nothrow_destructible_v<T>)
 	{
-		if (ptr) { std::destroy_n(EXEC_POLICY(unseq) ptr, mSize); }
+		if (ptr) { std::destroy_n(EXEC_POLICY(unseq) ptr, m_size); }
 		::operator delete[](ptr, std::align_val_t(A));
 	}
 
 	friend constexpr void swap(AlignedTypeArrayDeleter& lhs, AlignedTypeArrayDeleter& rhs) noexcept
-		{ std::swap(lhs.mSize, rhs.mSize); }
+		{ std::swap(lhs.m_size, rhs.m_size); }
 };
 
 /**
@@ -128,25 +128,25 @@ public:
 	using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
 private:
-	/* */ memory_type pData;
-	const size_type   mSize;
+	/* */ memory_type m_data;
+	const size_type   m_size;
 
 public:
-	constexpr size_type size()       const noexcept { return mSize; }
+	constexpr size_type size()       const noexcept { return m_size; }
 	constexpr size_type size_bytes() const noexcept { return size() * sizeof(T); }
 	constexpr bool      empty()      const noexcept { return size() == 0; }
 	constexpr auto      span()       const noexcept { return std::span(data(), size()); }
 
-	constexpr pointer   data()  { return pData.get(); }
+	constexpr pointer   data()  { return m_data.get(); }
 	constexpr reference front() { return data()[0]; }
 	constexpr reference back()  { return data()[size() - 1]; }
 
-	constexpr const_pointer   data()  const { return pData.get(); }
+	constexpr const_pointer   data()  const { return m_data.get(); }
 	constexpr const_reference front() const { return data()[0]; }
 	constexpr const_reference back()  const { return data()[size() - 1]; }
 
 	explicit AlignedContainer(memory_type&& memory_block, size_type size) noexcept
-		: pData(std::move(memory_block)), mSize(size) {}
+		: m_data(std::move(memory_block)), m_size(size) {}
 
 public:
 	constexpr reference at(size_type idx) {
@@ -201,15 +201,15 @@ class AlignedMemoryBlock {
 	using self = AlignedMemoryBlock;
 	using size_type = std::size_t;
 
-	memory_type mAllocated;
-	size_type mSize{};
-	size_type mOffset{};
+	memory_type m_allocated;
+	size_type m_size{};
+	size_type m_offset{};
 
 private:
 	friend self allocate_n<T, A>(std::size_t) noexcept;
 
 	AlignedMemoryBlock(T* ptr, size_type size) noexcept
-		: mAllocated(ptr, size), mSize(size)
+		: m_allocated(ptr, size), m_size(size)
 	{}
 
 	constexpr size_type clamp_element_construction_count(size_type count) const noexcept
@@ -222,32 +222,32 @@ public:
 	self& operator=(self&&)      = default;
 
 public:
-	constexpr size_type element_count()   const noexcept { return mSize; }
-	constexpr size_type construct_count() const noexcept { return mOffset; }
+	constexpr size_type element_count()   const noexcept { return m_size; }
+	constexpr size_type construct_count() const noexcept { return m_offset; }
 	constexpr size_type remaining_count() const noexcept { return element_count() - construct_count(); }
 
 public:
 	constexpr bool is_constructed() const noexcept { return construct_count() >= element_count(); }
-	constexpr bool has_valid_ptr()  const noexcept { return mAllocated.get() != nullptr; }
+	constexpr bool has_valid_ptr()  const noexcept { return m_allocated.get() != nullptr; }
 
 	[[nodiscard]]
 	memory_type release() noexcept
-		{ return has_valid_ptr() ? std::move(mAllocated) : memory_type{}; }
+		{ return has_valid_ptr() ? std::move(m_allocated) : memory_type{}; }
 
 	[[nodiscard]]
 	memory_type release_if_constructed() noexcept
-		{ return is_constructed() ? std::move(mAllocated) : memory_type{}; }
+		{ return is_constructed() ? std::move(m_allocated) : memory_type{}; }
 
 	[[nodiscard]]
 	AlignedContainer<T, A> release_as_container() noexcept {
 		return AlignedContainer<T, A>(has_valid_ptr() \
-			? std::move(mAllocated) : memory_type{}, element_count());
+			? std::move(m_allocated) : memory_type{}, element_count());
 	}
 
 	[[nodiscard]]
 	AlignedContainer<T, A> release_as_container_if_constructed() noexcept {
 		return AlignedContainer<T, A>(is_constructed() \
-			? std::move(mAllocated) : memory_type{}, element_count());
+			? std::move(m_allocated) : memory_type{}, element_count());
 	}
 
 	/*==================================================================*/
@@ -260,8 +260,8 @@ public:
 		if (has_valid_ptr() && !is_constructed()) {
 			const auto safe_count = clamp_element_construction_count(count);
 			std::uninitialized_value_construct_n(EXEC_POLICY(unseq)
-				mAllocated.get() + construct_count(), safe_count);
-			mOffset += safe_count;
+				m_allocated.get() + construct_count(), safe_count);
+			m_offset += safe_count;
 		}
 		return *this;
 	}
@@ -280,8 +280,8 @@ public:
 		if (has_valid_ptr() && !is_constructed()) {
 			const auto safe_count = clamp_element_construction_count(count);
 			std::uninitialized_default_construct_n(EXEC_POLICY(unseq)
-				mAllocated.get() + construct_count(), safe_count);
-			mOffset += safe_count;
+				m_allocated.get() + construct_count(), safe_count);
+			m_offset += safe_count;
 		}
 		return *this;
 	}
@@ -301,8 +301,8 @@ public:
 		if (has_valid_ptr() && !is_constructed()) {
 			const auto safe_count = clamp_element_construction_count(count);
 			std::uninitialized_fill_n(EXEC_POLICY(unseq)
-				mAllocated.get() + construct_count(), safe_count, std::forward<V>(value));
-			mOffset += safe_count;
+				m_allocated.get() + construct_count(), safe_count, std::forward<V>(value));
+			m_offset += safe_count;
 		}
 		return *this;
 	}
@@ -324,12 +324,12 @@ public:
 		if (has_valid_ptr() && !is_constructed()) {
 			const auto safe_count = clamp_element_construction_count(count);
 			if constexpr (std::is_same_v<T, V> && std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T>) {
-				std::memcpy(mAllocated.get() + construct_count(), from, safe_count * sizeof(T));
+				std::memcpy(m_allocated.get() + construct_count(), from, safe_count * sizeof(T));
 			} else {
 				std::uninitialized_copy_n(EXEC_POLICY(unseq)
-					from, safe_count, mAllocated.get() + construct_count());
+					from, safe_count, m_allocated.get() + construct_count());
 			}
-			mOffset += safe_count;
+			m_offset += safe_count;
 		}
 		return *this;
 	}
@@ -351,12 +351,12 @@ public:
 		if (has_valid_ptr() && !is_constructed()) {
 			const auto safe_count = clamp_element_construction_count(count);
 			if constexpr (std::is_same_v<T, V> && std::is_trivially_move_constructible_v<T> && std::is_trivially_destructible_v<T>) {
-				std::memmove(mAllocated.get() + construct_count(), from, safe_count * sizeof(T));
+				std::memmove(m_allocated.get() + construct_count(), from, safe_count * sizeof(T));
 			} else {
 				std::uninitialized_move_n(EXEC_POLICY(unseq)
-					from, safe_count, mAllocated.get() + construct_count());
+					from, safe_count, m_allocated.get() + construct_count());
 			}
-			mOffset += safe_count;
+			m_offset += safe_count;
 		}
 		return *this;
 	}

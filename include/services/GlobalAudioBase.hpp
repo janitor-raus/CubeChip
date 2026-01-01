@@ -14,7 +14,7 @@
 
 class GlobalAudioBase final {
 	static inline std::atomic<float> m_global_gain{};
-	static inline std::atomic<bool>  ms_is_muted{};
+	static inline std::atomic<bool>  m_is_muted{};
 
 	static inline bool m_has_audio_output{};
 

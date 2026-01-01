@@ -27,7 +27,7 @@ struct BLOG {
 	};
 
 private:
-	LEVEL value{};
+	LEVEL m_value{};
 
 public:
 	static constexpr LEVEL DBG = LEVEL::DBG;
@@ -39,11 +39,11 @@ public:
 	static constexpr auto STR_LEN = 7u; // hardcoded for now
 
 	constexpr BLOG() noexcept = default;
-	constexpr BLOG(LEVEL level) noexcept : value(level) {}
+	constexpr BLOG(LEVEL level) noexcept : m_value(level) {}
 
 	// Severity string representations
 	constexpr const char* as_string() const noexcept {
-		switch (value) {
+		switch (m_value) {
 			case DBG: return "DEBUG";
 			case INF: return "INFO";
 			case WRN: return "WARNING";
@@ -53,8 +53,8 @@ public:
 		}
 	}
 	// Severity color codes in RGBA format
-	constexpr std::uint32_t as_color() const noexcept {
-		switch (value) {
+	constexpr unsigned as_color() const noexcept {
+		switch (m_value) {
 			case DBG: return 0x77DDDDFF;
 			case INF: return 0x44BB00FF;
 			case WRN: return 0xFFCC00FF;

@@ -33,7 +33,7 @@ struct DisplayDevice::DisplayContext {
 		, m_osd_callable(nullptr)
 		, m_render_hook(FrontendInterface::register_window(
 			[&]() noexcept { render_display_window(); }))
-		, m_sdl_texture(BasicVideoSpec::makeDisplayTexture(
+		, m_sdl_texture(BasicVideoSpec::create_stream_texture(
 			FrontendInterface::get_current_renderer(),
 			static_cast<int>(W), static_cast<int>(H)))
 		, m_swapchain(bpp, static_cast<int>(W), static_cast<int>(H))
@@ -44,7 +44,7 @@ private:
 		m_swapchain.present([&](auto frame) noexcept {
 			const auto& metadata = frame.buffer.metadata;
 
-			BasicVideoSpec::renderStreamTexture(
+			BasicVideoSpec::write_stream_texture(
 				FrontendInterface::get_current_renderer(),
 				m_sdl_texture, frame.buffer.data());
 
@@ -192,5 +192,5 @@ void DisplayDevice::set_osd_callable(Callable callable) noexcept {
 /*==================================================================*/
 
 void osd::simple_stat_overlay(const std::string& overlay_data) noexcept {
-	ImGui::writeShadowedText(overlay_data, RGBA::White, { 0.0f, 1.0f });
+	ImGui::writeShadowedText(overlay_data.c_str(), RGBA::White, { 0.0f, 1.0f });
 }

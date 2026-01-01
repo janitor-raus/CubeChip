@@ -26,24 +26,36 @@
 static std::vector<Str>
 	s_pending_file_drops{};
 
-static void push_back_pending_file_drops(const Str& filepath) noexcept {
-	if (!filepath.empty()) { s_pending_file_drops.push_back(filepath); }
+static void push_back_pending_file_drops(std::string_view filepath) noexcept {
+	if (!filepath.empty()) { s_pending_file_drops.push_back(filepath.data()); }
+}
+
+static AtomSharedPtr<std::string>
+	s_open_file_result{};
+
+auto FrontendHost::get_open_file_dialog_result() noexcept -> OpenFileResult {
+	return s_open_file_result.exchange(nullptr, mo::relaxed);
+}
+
+void FrontendHost::set_open_file_dialog_result(std::string_view file) noexcept {
+	s_open_file_result.store(std::make_shared<std::string>(file), mo::relaxed);
 }
 
 /*==================================================================*/
 
-FrontendHost::FrontendHost(const Path& filepath) noexcept {
-	SystemInterface::assignComponents(HDM, BVS);
-	BVS->setMainWindowTitle(AppName);
+FrontendHost::FrontendHost() noexcept {
+	SystemInterface::hdm_passthrough(HDM);
+	BVS->set_window_title(AppName);
 	HDM->set_validator_callable(CoreRegistry::validate_game_file);
 	CoreRegistry::load_game_database();
 
-	::push_back_pending_file_drops(filepath.string());
+	setup_gui_callables();
+
 }
 
-void FrontendHost::StopSystemThread::operator()(SystemInterface* ptr) noexcept {
+void FrontendHost::SystemInstance::StopSystemThread::operator()(SystemInterface* ptr) noexcept {
 	if (ptr) {
-		ptr->stopWorker();
+		ptr->stop_workers();
 		ptr->~SystemInterface();
 		::operator delete(ptr, std::align_val_t(HDIS));
 	}
@@ -52,55 +64,66 @@ void FrontendHost::StopSystemThread::operator()(SystemInterface* ptr) noexcept {
 SettingsMap FrontendHost::Settings::map() noexcept {
 	return {
 		::make_setting_link("Frontend.Interface.Scale", &ui_scale),
-		::make_setting_link("Frontend.Interface.FileMRU", file_mru_cache.data(), s_mru_limit),
+		::make_setting_link("Frontend.Interface.FileMRU", file_mru_cache, s_mru_limit),
 	};
 }
 
-auto FrontendHost::exportSettings() const noexcept -> Settings {
+auto FrontendHost::export_settings() const noexcept -> Settings {
 	Settings out;
 
 	out.ui_scale = FrontendInterface::get_ui_scale_factor();
-	FrontendHost::export_mru(out.file_mru_cache.data());
+	FrontendHost::export_mru(out.file_mru_cache);
 
 	return out;
 }
 
 /*==================================================================*/
 
-void FrontendHost::discard_active_core() {
-	mSystemCore.reset();
-	CoreRegistry::clear_eligible_cores();
+void FrontendHost::discard_system_core(SystemID id) {
+	if (auto* system = system_with_id(id)) {
+		system->core.reset();
+		CoreRegistry::clear_eligible_cores();
+	}
 	HDM->clear_cached_file_data();
 }
 
-void FrontendHost::replace_active_core() {
-	mSystemCore.reset(); // ensures previous thread quits first!
-	mSystemCore.reset(CoreRegistry::construct_new_core()); // need a gui here to list and select cores!
+void FrontendHost::replace_system_core(SystemID id) {
+	if (auto* system = system_with_id(id)) {
+		system->core.reset(); // ensures previous thread quits first!
+		system->core.reset(CoreRegistry::construct_new_core()); // need a gui here to list and select cores!
 
-	if (mSystemCore) {
-		BVS->raiseMainWindow(); // bring to front when we get a core!
-		toggleSystemLimiter(); toggleSystemOSD();
-		mSystemCore->startWorker();
+		if (system) {
+			BVS->raise_window(); // bring to front when we get a core!
+			toggle_system_delimiters(*system);
+			toggle_system_statistics(*system);
+			system->core->start_workers();
+		}
 	}
 }
 
 /*==================================================================*/
 
-void FrontendHost::loadGameFile(const Path& gameFile) {
-	blog.newEntry<BLOG::INF>("Attempting to load: \"{}\"", gameFile.string());
+void FrontendHost::load_file_from_disk(std::string_view gameFile) {
+	blog.newEntry<BLOG::INF>("Attempting to load: \"{}\"", gameFile);
 	if (HDM->load_and_validate_file(gameFile)) {
 		blog.newEntry<BLOG::INF>("File has been accepted!");
 		s_file_mru.insert(gameFile);
-		replace_active_core();
+		replace_system_core(0 /* XXX */);
 	} else {
 		blog.newEntry<BLOG::INF>("Path has been rejected!");
 	}
 }
 
-bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forcePortable) noexcept {
+FrontendHost* FrontendHost::init_application(
+	std::string_view home_override, std::string_view config_name,
+	std::string_view game_file_path, bool force_portable) noexcept
+{
+	static FrontendHost* self = nullptr;
+	if (self) { return self; }
+
 	HDM = HomeDirManager::initialize(
-		overrideHome, configName, forcePortable, OrgName, AppName);
-	if (!HDM) { return false; }
+		home_override, config_name, force_portable, OrgName, AppName);
+	if (!HDM) { return nullptr; }
 
 
 	blog.create_log(std::to_string(thread_affinity::get_process_id()),
@@ -124,32 +147,36 @@ bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forc
 	}
 
 	BVS = BasicVideoSpec::initialize(BVS_settings);
-	if (!BVS) { return false; }
+	if (!BVS) { return nullptr; }
 
 	FrontendInterface::set_ui_scale_factor(FEH_settings.ui_scale);
-	FrontendHost::import_mru(FEH_settings.file_mru_cache.data());
+	FrontendHost::import_mru(FEH_settings.file_mru_cache);
 
-	return true;
+	::push_back_pending_file_drops(game_file_path);
+	thread_affinity::set_affinity(0b11ull);
+
+	static FrontendHost instance;
+	return self = &instance;
 }
 
-void FrontendHost::quitApplication() noexcept {
-	mSystemCore.reset();
+void FrontendHost::quit_application() noexcept {
+	for (auto& [id, system] : m_systems) { system.core.reset(); }
 
 	HDM->write_app_config_file(
 		GAB->export_settings().map(),
-		BVS->exportSettings().map(),
-		this->exportSettings().map()
+		BVS->export_settings().map(),
+		/***/export_settings().map()
 	);
 }
 
 /*==================================================================*/
 
-s32  FrontendHost::processEvents(void* event) noexcept {
+int FrontendHost::handle_client_events(void* event) noexcept {
 	FrontendInterface::process_event(event);
 
 	auto sdl_event = reinterpret_cast<SDL_Event*>(event);
 
-	if (BVS->isMainWindowID(sdl_event->window.windowID)) {
+	if (BVS->is_main_window_id(sdl_event->window.windowID)) {
 		switch (sdl_event->type) {
 			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
 				return SDL_APP_SUCCESS;
@@ -159,11 +186,13 @@ s32  FrontendHost::processEvents(void* event) noexcept {
 				break;
 
 			case SDL_EVENT_WINDOW_MINIMIZED:
-				toggleSystemHidden(true);
+				for (auto& [id, system] : m_systems) {
+					set_system_hidden_status(system, true); }
 				break;
 
 			case SDL_EVENT_WINDOW_RESTORED:
-				toggleSystemHidden(false);
+				for (auto& [id, system] : m_systems) {
+					set_system_hidden_status(system, false); }
 				break;
 
 			case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
@@ -183,76 +212,86 @@ s32  FrontendHost::processEvents(void* event) noexcept {
 
 /*==================================================================*/
 
-s32  FrontendHost::processFrame() {
-	initializeInterface();
-	handleHotkeyActions();
+int FrontendHost::process_client_frame() {
+	handle_main_hotkeys();
 
 	const auto dialogResult = get_open_file_dialog_result();
-	if (dialogResult) { loadGameFile(*dialogResult); }
+	if (dialogResult) { load_file_from_disk(*dialogResult); }
 
 	else if (s_pending_file_drops.size() > 0) {
 		// we only allow a single file load a time (for now?)
-		loadGameFile(s_pending_file_drops[0]);
+		load_file_from_disk(s_pending_file_drops[0]);
 		s_pending_file_drops.clear();
 	}
 
-	return BVS->renderPresent() ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
+	return BVS->render_present() ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
 }
 
-void FrontendHost::handleHotkeyActions() {
+void FrontendHost::handle_main_hotkeys() {
 	static BasicKeyboard Input;
 	Input.updateStates();
 
-	if (Input.isPressed(KEY(F9)))
-		{ CoreRegistry::load_game_database(); }
+	if (Input.isPressed(KEY(F9))) {
+		CoreRegistry::load_game_database();
+	}
 
-	if (mSystemCore) {
+	if (m_systems[0]) {
 		if (Input.isPressed(KEY(ESCAPE))) {
-			discard_active_core();
+			discard_system_core(0 /* XXX */);
 			blog.newEntry<BLOG::INF>(
 				"Emulator core exited successfully.");
 			return;
 		}
 		if (Input.isPressed(KEY(BACKSPACE))) {
-			replace_active_core();
+			replace_system_core(0 /* XXX */);
 			blog.newEntry<BLOG::INF>(
 				"Emulator core restarted successfully.");
 			return;
 		}
 		if (Input.isPressed(KEY(F9))) {
-			if (auto paused = mSystemCore->tryPauseSystem()) {
-				blog.newEntry<BLOG::INF>("System has been {} by hotkey!",
-					*paused ? "paused" : "unpaused");
+			if (auto* system = system_with_id(0 /* XXX */)) {
+				if (auto paused = system->core->try_pause_system()) {
+					blog.newEntry<BLOG::INF>("System has been {} by hotkey!",
+						*paused ? "paused" : "unpaused");
+				}
 			}
 		}
-		if (Input.isPressed(KEY(F11)))
-			{ mToggleOSD = !mToggleOSD; toggleSystemOSD(); }
-		if (Input.isPressed(KEY(F10)))
-			{ mUnlimited = !mUnlimited; toggleSystemLimiter(); }
+		if (Input.isPressed(KEY(F11))) {
+			if (auto* system = system_with_id(0 /* XXX */)) {
+				system->statistics = !system->statistics;
+				toggle_system_statistics(*system);
+			}
+		}
+		if (Input.isPressed(KEY(F10))) {
+			if (auto* system = system_with_id(0 /* XXX */)) {
+				system->delimiters = !system->delimiters;
+				toggle_system_delimiters(*system);
+			}
+		}
 	}
 }
 
-void FrontendHost::toggleSystemLimiter() noexcept {
-	if (mUnlimited) {
-		if (mSystemCore) { mSystemCore->addSystemState(EmuState::BENCH); }
+void FrontendHost::toggle_system_delimiters(SystemInstance& system) noexcept {
+	if (system.delimiters) {
+		if (system.core) { system.core->add_system_state(EmuState::BENCH); }
 	} else {
-		if (mSystemCore) { mSystemCore->subSystemState(EmuState::BENCH); }
+		if (system.core) { system.core->sub_system_state(EmuState::BENCH); }
 	}
 }
 
-void FrontendHost::toggleSystemOSD() noexcept {
-	if (mToggleOSD) {
-		if (mSystemCore) { mSystemCore->addSystemState(EmuState::STATS); }
+void FrontendHost::toggle_system_statistics(SystemInstance& system) noexcept {
+	if (system.statistics) {
+		if (system.core) { system.core->add_system_state(EmuState::STATS); }
 	} else {
-		if (mSystemCore) { mSystemCore->subSystemState(EmuState::STATS); }
+		if (system.core) { system.core->sub_system_state(EmuState::STATS); }
 	}
 }
 
-void FrontendHost::toggleSystemHidden(bool state) noexcept {
+void FrontendHost::set_system_hidden_status(SystemInstance& system, bool state) noexcept {
 	if (state) {
-		if (mSystemCore) { mSystemCore->addSystemState(EmuState::HIDDEN); }
+		if (system.core) { system.core->add_system_state(EmuState::HIDDEN); }
 	} else {
-		if (mSystemCore) { mSystemCore->subSystemState(EmuState::HIDDEN); }
+		if (system.core) { system.core->sub_system_state(EmuState::HIDDEN); }
 	}
 }
 

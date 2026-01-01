@@ -77,9 +77,9 @@ bool HomeDirManager::set_home_path(
 	}
 
 	if (forcePortable) {
-		if (::is_location_writable(::getBasePath())) {
+		if (::is_location_writable(::get_base_path())) {
 			blog.newEntry<BLOG::INF>("Forced portable mode successful!");
-			s_home_path = ::getBasePath();
+			s_home_path = ::get_base_path();
 			return true;
 		} else {
 			::trigger_fatal_error("Forced portable mode failure: cannot write to location!");
@@ -87,11 +87,11 @@ bool HomeDirManager::set_home_path(
 		}
 	}
 
-	if (::getBasePath()) {
-		const auto fileExists = fs::exists(Path(::getBasePath()) / "portable.txt");
+	if (::get_base_path()) {
+		const auto fileExists = fs::exists(Path(::get_base_path()) / "portable.txt");
 		if (fileExists && fileExists.value()) {
-			if (::is_location_writable(::getBasePath())) {
-				s_home_path = ::getBasePath();
+			if (::is_location_writable(::get_base_path())) {
+				s_home_path = ::get_base_path();
 				return true;
 			} else {
 				blog.newEntry<BLOG::ERR>(
@@ -100,11 +100,11 @@ bool HomeDirManager::set_home_path(
 		}
 	}
 
-	if (::is_location_writable(::getHomePath(
+	if (::is_location_writable(::get_home_path(
 		org.empty() ? nullptr : org.data(),
 		app.empty() ? nullptr : app.data()
 	))) {
-		s_home_path = ::getHomePath();
+		s_home_path = ::get_home_path();
 		return true;
 	} else {
 		::trigger_fatal_error("Failed to determine Home path: cannot write to location!");

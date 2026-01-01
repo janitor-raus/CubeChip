@@ -19,7 +19,7 @@ void SCHIP_MODERN::initializeSystem() noexcept {
 	copyFontToMemory(mMemoryBank.data(), 240);
 
 	mDisplay.set(cScreenSizeX, cScreenSizeY);
-	setBaseSystemFramerate(cRefreshRate);
+	set_base_system_framerate(cRefreshRate);
 
 	mVoices[VOICE::ID_0].userdata = &mAudioTimers[VOICE::ID_0];
 	mVoices[VOICE::ID_1].userdata = &mAudioTimers[VOICE::ID_1];

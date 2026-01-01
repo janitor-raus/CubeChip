@@ -10,7 +10,7 @@
 
 /*==================================================================*/
 
-const char* getHomePath(
+const char* get_home_path(
 	const char* org,
 	const char* app
 ) noexcept {
@@ -18,7 +18,7 @@ const char* getHomePath(
 	return homePath;
 }
 
-const char* getBasePath() noexcept {
+const char* get_base_path() noexcept {
 	static auto* basePath = SDL_GetBasePath();
 	return basePath;
 }

@@ -7,7 +7,6 @@
 #include "FrontendInterface.hpp"
 #include "BasicVideoSpec.hpp"
 #include "BasicLogger.hpp"
-#include "ColorOps.hpp"
 
 #include <vector>
 #include <exception>
@@ -57,8 +56,8 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 			throwFatalError(__LINE__, __func__);
 		}
 
-		mMainWindow = SDL_CreateWindow(nullptr, 0, 0, SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE); \
-		if (!mMainWindow) { throwFatalError(__LINE__, __func__); }
+		m_main_window = SDL_CreateWindow(nullptr, 0, 0, SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE); \
+		if (!m_main_window) { throwFatalError(__LINE__, __func__); }
 		#ifdef _WIN32
 			#ifdef OLD_WINDOWS_SDK
 				static constexpr auto NTDDI_MAJOR{ ((NTDDI_VERSION >> 24) & 0x00FF) };
@@ -69,7 +68,7 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 			#else
 				else {
 					const auto windowHandle = SDL_GetPointerProperty(
-						SDL_GetWindowProperties(mMainWindow),
+						SDL_GetWindowProperties(m_main_window),
 						SDL_PROP_WINDOW_WIN32_HWND_POINTER,
 						nullptr
 					);
@@ -97,23 +96,23 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 			#endif
 			SDL_ShowWindow(dummy);
 			SDL_SyncWindow(dummy);
-			SDL_RenderPresent(mMainRenderer);
+			SDL_RenderPresent(m_main_renderer);
 			SDL_GetWindowBordersSize(dummy, &deco.x, &deco.y, &deco.w, &deco.h);
 		}
 
 		auto window = settings.window;
-		normalizeRectToDisplay(window, deco, settings.first_run);
+		normalize_rect_to_display(window, deco, settings.first_run);
 
-		SDL_SetWindowPosition(mMainWindow, window.x, window.y);
-		SDL_SetWindowSize(mMainWindow, window.w, window.h);
-		SDL_SetWindowMinimumSize(mMainWindow, 800, 600);
+		SDL_SetWindowPosition(m_main_window, window.x, window.y);
+		SDL_SetWindowSize(m_main_window, window.w, window.h);
+		SDL_SetWindowMinimumSize(m_main_window, 800, 600);
 
-		mMainRenderer = SDL_CreateRenderer(mMainWindow, nullptr); \
-		if (!mMainRenderer) { throwFatalError(__LINE__, __func__); }
+		m_main_renderer = SDL_CreateRenderer(m_main_window, nullptr); \
+		if (!m_main_renderer) { throwFatalError(__LINE__, __func__); }
 
-		FrontendInterface::init_video(mMainWindow, mMainRenderer);
+		FrontendInterface::init_video(m_main_window, m_main_renderer);
 
-		SDL_ShowWindow(mMainWindow);
+		SDL_ShowWindow(m_main_window);
 	}
 	catch (const FatalError&) {
 		success = false; return;
@@ -142,30 +141,30 @@ SettingsMap BasicVideoSpec::Settings::map() noexcept {
 	};
 }
 
-auto BasicVideoSpec::exportSettings() const noexcept -> Settings {
+auto BasicVideoSpec::export_settings() const noexcept -> Settings {
 	Settings out;
 
-	if (SDL_GetWindowFlags(mMainWindow) & SDL_WINDOW_MAXIMIZED) {
-		SDL_RestoreWindow(mMainWindow);
-		SDL_SyncWindow(mMainWindow);
+	if (SDL_GetWindowFlags(m_main_window) & SDL_WINDOW_MAXIMIZED) {
+		SDL_RestoreWindow(m_main_window);
+		SDL_SyncWindow(m_main_window);
 	}
 
-	SDL_GetWindowPosition(mMainWindow, &out.window.x, &out.window.y);
-	SDL_GetWindowSize(mMainWindow, &out.window.w, &out.window.h);
+	SDL_GetWindowPosition(m_main_window, &out.window.x, &out.window.y);
+	SDL_GetWindowSize(m_main_window, &out.window.w, &out.window.h);
 	out.first_run = false;
 
 	return out;
 }
 
-void BasicVideoSpec::setMainWindowTitle(const std::string& title) noexcept {
-	SDL_SetWindowTitle(mMainWindow, title.c_str());
+void BasicVideoSpec::set_window_title(const std::string& title, SDL_Window* window) noexcept {
+	SDL_SetWindowTitle(window ? window : m_main_window.get(), title.c_str());
 }
 
-bool BasicVideoSpec::isMainWindowID(unsigned id) const noexcept {
-	return id > 0u && id == SDL_GetWindowID(mMainWindow);
+bool BasicVideoSpec::is_main_window_id(unsigned id) const noexcept {
+	return id && id == SDL_GetWindowID(m_main_window);
 }
 
-float BasicVideoSpec::getDisplayRefreshRate(SDL_DisplayID display) noexcept {
+float BasicVideoSpec::get_display_refresh_rate(SDL_DisplayID display) noexcept {
 	if (const auto* mode = SDL_GetCurrentDisplayMode(display)) {
 		if (mode->refresh_rate_denominator > 0) {
 			return float(mode->refresh_rate_numerator) /
@@ -178,7 +177,7 @@ float BasicVideoSpec::getDisplayRefreshRate(SDL_DisplayID display) noexcept {
 	return 60.0f;
 }
 
-void BasicVideoSpec::normalizeRectToDisplay(ez::Rect& rect, ez::Rect& deco, bool first_run) noexcept {
+void BasicVideoSpec::normalize_rect_to_display(ez::Rect& rect, ez::Rect& deco, bool first_run) noexcept {
 	auto numDisplays =  0; // count of displays SDL found
 	auto bestDisplay = -1; // index of display our window will use
 	bool rectIntersectsDisplay{};
@@ -248,11 +247,11 @@ void BasicVideoSpec::normalizeRectToDisplay(ez::Rect& rect, ez::Rect& deco, bool
 	}
 }
 
-void BasicVideoSpec::raiseMainWindow() noexcept {
-	SDL_RaiseWindow(mMainWindow);
+void BasicVideoSpec::raise_window(SDL_Window* window) noexcept {
+	SDL_RaiseWindow(window ? window : m_main_window.get());
 }
 
-SDL_Texture* BasicVideoSpec::makeDisplayTexture(SDL_Renderer* renderer, int w, int h) noexcept {
+SDL_Texture* BasicVideoSpec::create_stream_texture(SDL_Renderer* renderer, int w, int h) noexcept {
 	if (!renderer) { return nullptr; }
 	try {
 		auto* texture = SDL_CreateTexture(renderer, \
@@ -270,7 +269,7 @@ SDL_Texture* BasicVideoSpec::makeDisplayTexture(SDL_Renderer* renderer, int w, i
 	}
 }
 
-void BasicVideoSpec::renderStreamTexture(
+void BasicVideoSpec::write_stream_texture(
 	SDL_Renderer* renderer, SDL_Texture* texture, const std::byte* src_buffer
 ) noexcept {
 	if (!renderer || !texture) { return; }
@@ -300,12 +299,12 @@ void BasicVideoSpec::renderStreamTexture(
 
 /*==================================================================*/
 
-bool BasicVideoSpec::renderPresent() noexcept {
+bool BasicVideoSpec::render_present() noexcept {
 	try {
 		FrontendInterface::begin_new_frame();
-		FrontendInterface::render_frame(mMainRenderer);
+		FrontendInterface::render_frame(m_main_renderer);
 
-		if (!SDL_RenderPresent(mMainRenderer)) { \
+		if (!SDL_RenderPresent(m_main_renderer)) { \
 			throwFatalError(__LINE__, __func__);
 		}
 
