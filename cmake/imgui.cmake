@@ -1,5 +1,6 @@
 
 set(VENDOR_DIR "${PROJECT_VENDOR_DIR}/imgui")
+set(IMCONFIG_PATH "${PROJECT_INCLUDE_DIR}/vendor/imgui/personal")
 
 fetch_and_vendor(
 	"https://github.com/ocornut/imgui.git"
@@ -10,6 +11,7 @@ fetch_and_vendor(
 if (NOT TARGET imgui)
 	add_library(imgui
 		STATIC EXCLUDE_FROM_ALL
+		"${IMCONFIG_PATH}.cpp"
 		"${VENDOR_DIR}/imgui.cpp"
 		"${VENDOR_DIR}/imgui_demo.cpp"
 		"${VENDOR_DIR}/imgui_draw.cpp"
@@ -21,6 +23,10 @@ if (NOT TARGET imgui)
 	)
 endif()
 
+target_sources(imgui PUBLIC
+	"${IMCONFIG_PATH}.hpp"
+)
+
 target_include_directories(imgui
 	PUBLIC
 	"${VENDOR_DIR}"
@@ -30,7 +36,10 @@ target_include_directories(imgui
 	"${SDL3_INCLUDE_DIRS}"
 )
 
-target_link_libraries(
-	imgui PUBLIC
+target_compile_definitions(imgui PUBLIC
+	IMGUI_USER_CONFIG="${IMCONFIG_PATH}.hpp"
+)
+
+target_link_libraries(imgui PUBLIC
 	SDL3::SDL3
 )

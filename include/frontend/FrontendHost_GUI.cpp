@@ -18,7 +18,6 @@
 #include "ColorOps.hpp"
 #include "Thread.hpp"
 
-#define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 #include <ranges>
 
@@ -204,13 +203,12 @@ void FrontendHost::initializeInterface() noexcept {
 					ImGui::Text("%u", entry.index);
 
 					ImGui::TableSetColumnIndex(1);
-					ImGui::TextUnformatted(
-						NanoTime(entry.time).format_as_timer().c_str());
+					ImGui::TextUnformatted(NanoTime(entry.time)
+						.format_as_timer().c_str());
 
 					ImGui::TableSetColumnIndex(2);
-					ImGui::TextColored(RGBA_to_ImVec4(
-						BLOG(entry.level).as_color()), "%s",
-						BLOG(entry.level).as_string());
+					ImGui::TextUnformatted(BLOG(entry.level).as_string(),
+						RGBA(BLOG(entry.level).as_color()).XBGR());
 
 					ImGui::TableSetColumnIndex(3);
 					ImGui::TextUnformatted(entry.message.c_str());

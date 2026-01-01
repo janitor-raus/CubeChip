@@ -386,7 +386,3 @@ generate.stamp*
 **/ZERO_CHECK/
 **/*.tlog/
 **/*.obj
-
-/include/vendor/*
-!/include/vendor/jthread/
-!/include/vendor/jthread/**
