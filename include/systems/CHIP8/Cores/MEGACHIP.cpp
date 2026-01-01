@@ -462,7 +462,7 @@ void MEGACHIP::makeByteWave(f32* data, u32 size, Voice* voice, Stream*) noexcept
 					track->pos(head));
 			}
 		}
-		voice->stepPhase(size);
+		voice->step_phase(size);
 	}
 }
 

@@ -242,7 +242,7 @@ void Chip8_CoreInterface::makePulseWave(f32* data, u32 size, Voice* voice, Strea
 				WaveForms::pulse(voice->peek_phase(i)) * gain);
 		} else break;
 	}
-	voice->stepPhase(size);
+	voice->step_phase(size);
 }
 
 void Chip8_CoreInterface::instructionError(u32 HI, u32 LO) {

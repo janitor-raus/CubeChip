@@ -124,7 +124,7 @@ public:
 	}
 
 	// Advance the phase by a number of steps, default is 1 step ahead.
-	constexpr self& stepPhase(double steps = 1.0) noexcept {
+	constexpr self& step_phase(double steps = 1.0) noexcept {
 		m_phase = peek_phase(steps); return *this;
 	}
 
