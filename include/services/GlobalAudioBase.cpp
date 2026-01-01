@@ -7,24 +7,9 @@
 #include <algorithm>
 
 #include "GlobalAudioBase.hpp"
-#include "SettingWrapper.hpp"
 #include "LifetimeWrapperSDL.hpp"
 
 #include <SDL3/SDL_init.h>
-#include <SDL3/SDL_messagebox.h>
-
-/*==================================================================*/
-
-GlobalAudioBase::GlobalAudioBase(const Settings& settings) noexcept {
-	mStatus = SDL_InitSubSystem(SDL_INIT_AUDIO)
-		? mStatus : STATUS::NO_AUDIO;
-
-	setGlobalGain(settings.volume);
-	isMuted(settings.muted);
-}
-
-GlobalAudioBase::~GlobalAudioBase() noexcept
-	{ SDL_QuitSubSystem(SDL_INIT_AUDIO); }
 
 /*==================================================================*/
 
@@ -35,51 +20,70 @@ SettingsMap GlobalAudioBase::Settings::map() noexcept {
 	};
 }
 
-auto GlobalAudioBase::exportSettings() const noexcept -> Settings {
+auto GlobalAudioBase::export_settings() const noexcept -> Settings {
 	Settings out;
 
-	out.volume = mGlobalGain.load(std::memory_order_relaxed);
-	out.muted = mIsMuted.load(std::memory_order_relaxed);
+	out.volume = m_global_gain.load(std::memory_order::relaxed);
+	out.muted = ms_is_muted.load(std::memory_order::relaxed);
 
 	return out;
 }
 
 /*==================================================================*/
 
-bool GlobalAudioBase::isMuted()           noexcept
-	{ return mIsMuted.load(std::memory_order_relaxed); }
+GlobalAudioBase::GlobalAudioBase(const Settings& settings) noexcept {
+	m_has_audio_output = SDL_InitSubSystem(SDL_INIT_AUDIO);
 
-void GlobalAudioBase::isMuted(bool state) noexcept
-	{ mIsMuted.store(state, std::memory_order_relaxed); }
+	set_glogal_gain(settings.volume);
+	is_muted(settings.muted);
+}
 
-void GlobalAudioBase::toggleMuted()       noexcept
-	{ mIsMuted.store(isMuted(), std::memory_order_relaxed); }
+GlobalAudioBase::~GlobalAudioBase() noexcept {
+	SDL_QuitSubSystem(SDL_INIT_AUDIO);
+}
 
 /*==================================================================*/
 
-float GlobalAudioBase::getGlobalGain() noexcept
-	{ return mGlobalGain.load(std::memory_order_relaxed); }
+bool GlobalAudioBase::is_muted()           noexcept {
+	return ms_is_muted.load(std::memory_order::relaxed);
+}
 
-void GlobalAudioBase::setGlobalGain(float gain) noexcept
-	{ mGlobalGain.store(std::clamp(gain, 0.0f, 1.0f), std::memory_order_relaxed); }
+void GlobalAudioBase::is_muted(bool state) noexcept {
+	ms_is_muted.store(state, std::memory_order::relaxed);
+}
 
-void GlobalAudioBase::addGlobalGain(float gain) noexcept
-	{ setGlobalGain(getGlobalGain() + gain); }
+void GlobalAudioBase::toggle_mute()       noexcept {
+	ms_is_muted.store(is_muted(), std::memory_order::relaxed);
+}
 
-int GlobalAudioBase::getPlaybackDeviceCount() noexcept {
-	auto deviceCount{ 0 };
-	if (mStatus == STATUS::NORMAL) {
-		SDL_Unique<SDL_AudioDeviceID> devices
-			{ SDL_GetAudioPlaybackDevices(&deviceCount) };
+/*==================================================================*/
+
+float GlobalAudioBase::get_global_gain() noexcept {
+	return m_global_gain.load(std::memory_order::relaxed);
+}
+
+void GlobalAudioBase::set_glogal_gain(float gain) noexcept {
+	m_global_gain.store(std::clamp(gain, 0.0f, 1.0f), std::memory_order::relaxed);
+}
+
+void GlobalAudioBase::add_global_gain(float gain) noexcept {
+	set_glogal_gain(get_global_gain() + gain);
+}
+
+int GlobalAudioBase::get_playback_device_count() noexcept {
+	auto deviceCount = 0;
+	if (has_audio_output()) {
+		SDL_Unique<SDL_AudioDeviceID> devices =
+			SDL_GetAudioPlaybackDevices(&deviceCount);
 	}
 	return deviceCount;
 }
 
-int GlobalAudioBase::getRecordingDeviceCount() noexcept {
-	auto deviceCount{ 0 };
-	if (mStatus == STATUS::NORMAL) {
-		SDL_Unique<SDL_AudioDeviceID> devices
-			{ SDL_GetAudioRecordingDevices(&deviceCount) };
+int GlobalAudioBase::get_recording_device_count() noexcept {
+	auto deviceCount = 0;
+	if (has_audio_output()) {
+		SDL_Unique<SDL_AudioDeviceID> devices =
+			SDL_GetAudioRecordingDevices(&deviceCount);
 	}
 	return deviceCount;
 }

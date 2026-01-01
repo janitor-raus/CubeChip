@@ -119,8 +119,9 @@ bool FrontendHost::initApplication(StrV overrideHome, StrV configName, bool forc
 	);
 
 	GAB = GlobalAudioBase::initialize(GAB_settings);
-	if (GAB->getStatus() == GlobalAudioBase::STATUS::NO_AUDIO)
-		{ blog.newEntry<BLOG::WRN>("Audio Subsystem is not available!"); }
+	if (!GAB->has_audio_output()) {
+		blog.newEntry<BLOG::WRN>("Audio Subsystem is not available!");
+	}
 
 	BVS = BasicVideoSpec::initialize(BVS_settings);
 	if (!BVS) { return false; }
@@ -135,7 +136,7 @@ void FrontendHost::quitApplication() noexcept {
 	mSystemCore.reset();
 
 	HDM->write_app_config_file(
-		GAB->exportSettings().map(),
+		GAB->export_settings().map(),
 		BVS->exportSettings().map(),
 		this->exportSettings().map()
 	);

@@ -146,9 +146,9 @@ void FrontendHost::initializeInterface() noexcept {
 
 	static auto sMenu_Settings_MasterVol = FrontendInterface::register_menu("",
 	{ 20, "Settings" }, [&]() noexcept {
-		auto global_gain = int(GAB->getGlobalGain() * 100);
+		auto global_gain = int(GAB->get_global_gain() * 100);
 		if (ImGui::SliderInt(" Master Volume", &global_gain, 0, 100, "%d%%"))
-			{ GAB->setGlobalGain(global_gain * 0.01f); }
+			{ GAB->set_glogal_gain(global_gain * 0.01f); }
 	});
 
 	static auto sWindow_Demo = FrontendInterface::register_window(

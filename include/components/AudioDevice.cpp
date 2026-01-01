@@ -19,8 +19,8 @@
 /*==================================================================*/
 
 static float calculateGain(float streamGain) noexcept {
-	return streamGain * (GlobalAudioBase::isMuted()
-		? 0.0f : GlobalAudioBase::getGlobalGain());
+	return streamGain * (GlobalAudioBase::is_muted()
+		? 0.0f : GlobalAudioBase::get_global_gain());
 }
 
 /*==================================================================*/
