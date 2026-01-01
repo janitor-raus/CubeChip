@@ -21,55 +21,58 @@ using mo = std::memory_order;
 	#include <mutex>
 	#include <shared_mutex>
 
-	/*
-		Semi-functional mutex-based stub for unfortunate situations where
-		std::atomic<std::shared_ptr<T>> is not yet officially supported
-		despite alleged C++20 compliance. Looking at you, MacOS.
-	*/
+	/**
+	 * @brief Mutex-backed stand-in for std::atomic<std::shared_ptr<T>>.
+	 *
+	 * Semi-functional stopgap for platforms where atomic<shared_ptr> is
+	 * unsupported (looking at you, MacOS). Pretends to be an atomic, but
+	 * uses a shared_mutex internally, so it's truly "lock-free".
+	 */
 	template <typename T>
 	class AtomSharedPtr {
-		mutable std::shared_mutex mLock;
-		std::shared_ptr<T> mSharedPtr;
+		mutable std::shared_mutex m_lock;
+		std::shared_ptr<T> m_ptr;
 
 	public:
-		AtomSharedPtr()
-			: mSharedPtr(nullptr)
+		AtomSharedPtr() noexcept = default;
+
+		explicit AtomSharedPtr(const std::shared_ptr<T>& ptr) noexcept
+			: m_ptr(ptr)
 		{}
 
-		explicit AtomSharedPtr(const std::shared_ptr<T>& new_ptr)
-			: mSharedPtr(new_ptr)
+		explicit AtomSharedPtr(std::shared_ptr<T>&& ptr) noexcept
+			: m_ptr(std::move(ptr))
 		{}
 
-		explicit AtomSharedPtr(std::shared_ptr<T>&& new_ptr)
-			: mSharedPtr(std::move(new_ptr))
-		{}
+		AtomSharedPtr(const AtomSharedPtr&) = delete;
+		AtomSharedPtr& operator=(const AtomSharedPtr&) = delete;
 
-		inline void store(const std::shared_ptr<T>& new_ptr, std::memory_order = std::memory_order_seq_cst) {
-			std::unique_lock lock(mLock);
-			mSharedPtr = new_ptr;
+		void store(const std::shared_ptr<T>& ptr, std::memory_order = std::memory_order::seq_cst) noexcept {
+			std::unique_lock lock(m_lock);
+			m_ptr = ptr;
 		}
 
-		inline void store(std::shared_ptr<T>&& new_ptr, std::memory_order = std::memory_order_seq_cst) {
-			std::unique_lock lock(mLock);
-			mSharedPtr = std::move(new_ptr);
+		void store(std::shared_ptr<T>&& ptr, std::memory_order = std::memory_order::seq_cst) noexcept {
+			std::unique_lock lock(m_lock);
+			m_ptr = std::move(ptr);
 		}
 
-		auto load(std::memory_order = std::memory_order_seq_cst) const {
-			std::shared_lock lock(mLock);
-			return mSharedPtr;
+		auto load(std::memory_order = std::memory_order::seq_cst) const noexcept {
+			std::shared_lock lock(m_lock);
+			return m_ptr;
 		}
 
-		auto exchange(const std::shared_ptr<T>& new_ptr, std::memory_order = std::memory_order_seq_cst) {
-			std::unique_lock lock(mLock);
-			auto old = mSharedPtr;
-			mSharedPtr = new_ptr;
+		auto exchange(const std::shared_ptr<T>& ptr, std::memory_order = std::memory_order::seq_cst) noexcept {
+			std::unique_lock lock(m_lock);
+			auto old = std::move(m_ptr);
+			m_ptr = ptr;
 			return old;
 		}
 
-		auto exchange(std::shared_ptr<T>&& new_ptr, std::memory_order = std::memory_order_seq_cst) {
-			std::unique_lock lock(mLock);
-			auto old = std::move(mSharedPtr);
-			mSharedPtr = std::move(new_ptr);
+		auto exchange(std::shared_ptr<T>&& ptr, std::memory_order = std::memory_order::seq_cst) noexcept {
+			std::unique_lock lock(m_lock);
+			auto old = std::move(m_ptr);
+			m_ptr = std::move(ptr);
 			return old;
 		}
 	};
