@@ -148,7 +148,7 @@ namespace fs {
  * @param[in] dataReadOffset :: Absolute read position offset.
  */
 [[maybe_unused]]
-inline auto readFileData(
+inline auto read_file_data(
 	const fs::Path& filePath, std::size_t dataReadSize = 0,
 	std::streamoff dataReadOffset = 0
 ) noexcept -> Expected<std::vector<char>, std::error_code> {
@@ -192,7 +192,7 @@ inline auto readFileData(
 
 template <typename T>
 [[maybe_unused]]
-inline auto writeFileData(
+inline auto write_file_data(
 	const fs::Path& filePath, const T* fileData, std::size_t dataWriteSize,
 	std::streamoff dataWriteOffset = 0
 ) noexcept -> Expected<bool, std::error_code> {
@@ -213,11 +213,11 @@ inline auto writeFileData(
 
 template <IsContiguousContainer T>
 [[maybe_unused]]
-inline auto writeFileData(
+inline auto write_file_data(
 	const fs::Path& filePath, const T& fileData, std::size_t dataWriteSize = 0,
 	std::streamoff dataWriteOffset = 0
 ) noexcept {
-	return writeFileData(
+	return write_file_data(
 		filePath, std::data(fileData), dataWriteSize
 		? dataWriteSize : std::size(fileData),
 		dataWriteOffset
@@ -226,9 +226,9 @@ inline auto writeFileData(
 
 template <typename T, std::size_t N>
 [[maybe_unused]]
-inline auto writeFileData(
+inline auto write_file_data(
 	const fs::Path& filePath, const T(&fileData)[N],
 	std::streamoff dataWriteOffset = 0
 ) noexcept {
-	return writeFileData(filePath, fileData, N, dataWriteOffset);
+	return write_file_data(filePath, fileData, N, dataWriteOffset);
 }

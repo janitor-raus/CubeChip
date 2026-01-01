@@ -9,7 +9,7 @@
 
 /*==================================================================*/
 
-auto TomlConfig::writeToFile(
+auto TomlConfig::write_into_file(
 	const toml::table& table,
 	const char* filename
 ) noexcept -> Expected<bool, std::error_code> {
@@ -20,23 +20,23 @@ auto TomlConfig::writeToFile(
 	catch (...) { return ::make_unexpected(std::make_error_code(std::errc::io_error)); }
 }
 
-auto TomlConfig::parseFromFile(
+auto TomlConfig::parse_from_file(
 	const char* filename
 ) noexcept -> toml::parse_result {
-	const auto rawData = ::readFileData(filename ? filename : "");
-	const std::string_view tableData = !rawData ? "" :
-		std::string_view(rawData.value().data(), rawData.value().size());
+	const auto raw_file_data = ::read_file_data(filename ? filename : "");
+	const std::string_view table_data_view = !raw_file_data ? "" :
+		std::string_view(raw_file_data.value().data(), raw_file_data.value().size());
 
-	return toml::parse(tableData);
+	return toml::parse(table_data_view);
 }
 
 /*==================================================================*/
 
-void TomlConfig::safeTableUpdate(toml::table& dst, const toml::table& src) {
+void TomlConfig::update_existing_table_contents(toml::table& dst, const toml::table& src) {
 	for (auto&& [key, dst_val] : dst) {
 		if (const auto* src_val = src.get(key)) {
 			if (dst_val.is_table() && src_val->is_table()) {
-				safeTableUpdate(*dst_val.as_table(), *src_val->as_table());
+				update_existing_table_contents(*dst_val.as_table(), *src_val->as_table());
 			}
 			else if (dst_val.is_array() && src_val->is_array()) {
 				dst.insert_or_assign(key, *src_val);
@@ -50,7 +50,7 @@ void TomlConfig::safeTableUpdate(toml::table& dst, const toml::table& src) {
 	}
 }
 
-void TomlConfig::safeTableInsert(toml::table& dst, const toml::table& src) {
+void TomlConfig::insert_missing_table_entries(toml::table& dst, const toml::table& src) {
 	for (auto&& [key, src_val] : src) {
 		if (auto it = dst.find(key); it == dst.end()) {
 			if (src_val.is_table()) {
@@ -61,7 +61,7 @@ void TomlConfig::safeTableInsert(toml::table& dst, const toml::table& src) {
 		}
 		else {
 			if (src_val.is_table() && it->second.is_table()) {
-				safeTableInsert(*it->second.as_table(), *src_val.as_table());
+				insert_missing_table_entries(*it->second.as_table(), *src_val.as_table());
 			}
 		}
 	}

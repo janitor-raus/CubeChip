@@ -271,7 +271,7 @@ bool Chip8_CoreInterface::checkRegularFile(std::string_view file_path) const noe
 
 bool Chip8_CoreInterface::newPermaRegsFile(std::string_view file_path) const noexcept {
 	static constexpr char dataPadding[std::size(sPermRegsV)]{};
-	const auto fileCreated = ::writeFileData(file_path, dataPadding);
+	const auto fileCreated = ::write_file_data(file_path, dataPadding);
 	if (!fileCreated) {
 		blog.newEntry<BLOG::ERR>("\"{}\" [{}]",
 			file_path, fileCreated.error().message());
@@ -280,7 +280,7 @@ bool Chip8_CoreInterface::newPermaRegsFile(std::string_view file_path) const noe
 }
 
 void Chip8_CoreInterface::setFilePermaRegs(u32 X) noexcept {
-	auto fileData = ::writeFileData(sPermaRegsPath, mRegisterV, X);
+	auto fileData = ::write_file_data(sPermaRegsPath, mRegisterV, X);
 	if (!fileData) {
 		blog.newEntry<BLOG::ERR>("File IO error: \"{}\" [{}]",
 			sPermaRegsPath, fileData.error().message());
@@ -289,7 +289,7 @@ void Chip8_CoreInterface::setFilePermaRegs(u32 X) noexcept {
 
 void Chip8_CoreInterface::getFilePermaRegs(u32 X) noexcept {
 	::assign_cast_min(X, sPermRegsV.size());
-	auto fileData = ::readFileData(sPermaRegsPath, X);
+	auto fileData = ::read_file_data(sPermaRegsPath, X);
 	if (!fileData) {
 		blog.newEntry<BLOG::ERR>("File IO error: \"{}\" [{}]",
 			sPermaRegsPath, fileData.error().message());

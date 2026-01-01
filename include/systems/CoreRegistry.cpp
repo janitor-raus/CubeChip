@@ -16,7 +16,7 @@ Json CoreRegistry::s_game_database{};
 Json CoreRegistry::s_custom_core_cfg{};
 
 static bool loadJsonFromFile(std::string_view json_file_path, Json& output) noexcept {
-	if (auto jsonData = ::readFileData(json_file_path)) {
+	if (auto jsonData = ::read_file_data(json_file_path)) {
 		try {
 			output = Json::parse(jsonData->begin(), jsonData->end());
 			return true;

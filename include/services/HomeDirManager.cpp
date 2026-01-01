@@ -114,8 +114,8 @@ bool HomeDirManager::set_home_path(
 }
 
 void HomeDirManager::parse_app_config_file() const noexcept {
-	if (const auto result = TomlConfig::parseFromFile(s_config_at.c_str())) {
-		TomlConfig::safeTableUpdate(s_config_model, result.table());
+	if (const auto result = TomlConfig::parse_from_file(s_config_at.c_str())) {
+		TomlConfig::update_existing_table_contents(s_config_model, result.table());
 		blog.newEntry<BLOG::INF>(
 			"[TOML] App Config found, previous settings loaded!");
 	} else {
@@ -125,7 +125,7 @@ void HomeDirManager::parse_app_config_file() const noexcept {
 }
 
 void HomeDirManager::write_app_config_file() const noexcept {
-	if (const auto result = TomlConfig::writeToFile(s_config_model, s_config_at.c_str())) {
+	if (const auto result = TomlConfig::write_into_file(s_config_model, s_config_at.c_str())) {
 		blog.newEntry<BLOG::INF>(
 			"[TOML] App Config written to file successfully!");
 	} else {
@@ -215,7 +215,7 @@ bool HomeDirManager::load_and_validate_file(const Path& gamePath) noexcept {
 		return false;
 	}
 
-	auto fileData = ::readFileData(gamePath);
+	auto fileData = ::read_file_data(gamePath);
 	if (!fileData) {
 		blog.newEntry<BLOG::WRN>("Path is ineligible: \"{}\" [{}]",
 			gamePath.string(), fileData.error().message());
