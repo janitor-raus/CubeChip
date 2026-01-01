@@ -57,8 +57,6 @@ HomeDirManager::HomeDirManager(
 	if (!set_home_path(overrideHome, forcePortable, org, app))
 		{ initError = true; return; }
 
-	blog.createLog("program.log", s_home_path);
-
 	if (configName.empty()) { configName = "settings.toml"; }
 	s_config_at = (Path(s_home_path) / configName).string();
 }
