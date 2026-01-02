@@ -30,7 +30,7 @@ static void standard_string_formatter_for_LogEntry(const LogEntry& entry) noexce
 		BLOG(entry.level).as_string(), entry.message);
 }
 
-static fs::Path s_log_file_path{};
+static std::string s_log_file_path{};
 
 static void touch_file_timestamp() noexcept {
 	(void) fs::last_write_time(s_log_file_path, fs::Time::clock::now());
@@ -124,14 +124,14 @@ class BasicLoggerContext {
 			return;
 		}
 
-		s_log_file_path = fs::Path(directory) / (current_time \
-			.format_as_datetime("{:%Y-%m-%d_%H-%M-%S}_") + filename + ".log");
+		s_log_file_path = (std::filesystem::path(directory) / (current_time \
+			.format_as_datetime("{:%Y-%m-%d_%H-%M-%S}_") + filename + ".log")).string();
 
 		mLogFile.open(s_log_file_path, std::ios::trunc);
 		if (!mLogFile) {
 			blog.newEntry<BLOG::ERR>(
 				"Unable to create new Log file: \"{}\"",
-				s_log_file_path.string());
+				std::exchange(s_log_file_path, {}));
 		}
 
 		const auto cutoff_time = fs::Time::clock::now() - std::chrono::days(7);
@@ -197,6 +197,10 @@ auto BasicLogger::buffer() const noexcept -> const LogBuffer* {
 
 void BasicLogger::create_log(const std::string& filename, const std::string& directory) noexcept {
 	if (m_context) { m_context->create_log(filename, directory); }
+}
+
+auto BasicLogger::get_log_path() const noexcept -> std::string {
+	return s_log_file_path;
 }
 
 template <BLOG::LEVEL LOG_LEVEL>

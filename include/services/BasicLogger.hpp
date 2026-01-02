@@ -108,6 +108,7 @@ public:
 	auto operator->() const noexcept -> const LogBuffer* { return buffer(); }
 
 	void create_log(const std::string& filename, const std::string& directory) noexcept;
+	auto get_log_path() const noexcept -> std::string;
 
 private:
 	template <BLOG::LEVEL LOG_LEVEL>

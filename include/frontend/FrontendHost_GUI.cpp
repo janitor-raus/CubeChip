@@ -155,6 +155,8 @@ void FrontendHost::setup_gui_callables() noexcept {
 		static bool autoScroll = true;
 		static bool scrollToBottom{};
 
+		static std::atomic<bool> s_opening_log{};
+
 		if (ImGui::Begin("Application Log##Logger", &sShowLogWindow,
 			ImGuiWindowFlags_NoCollapse
 		)) {
@@ -162,6 +164,22 @@ void FrontendHost::setup_gui_callables() noexcept {
 
 			ImGui::SameLine();
 			ImGui::Checkbox("Auto-scroll", &autoScroll);
+			ImGui::SameLine();
+
+			const auto current_log_path = blog.get_log_path();
+			ImGui::BeginDisabled(s_opening_log.load(mo::acquire) || current_log_path.empty());
+			if (ImGui::Button("View Log File")) {
+				s_opening_log.store(true, mo::release);
+
+				Thread([=]() noexcept {
+					if (!SDL_OpenURL(("file:///" + current_log_path).c_str())) {
+						blog.newEntry<BLOG::ERR>("Failed to open Log file! [{}]", SDL_GetError());
+					}
+					s_opening_log.store(false, mo::release);
+				}).detach();
+			}
+			ImGui::EndDisabled();
+
 			ImGui::Separator();
 
 			ImGui::BeginChild("LogTableRegion", { 0.0f, 0.0f });
