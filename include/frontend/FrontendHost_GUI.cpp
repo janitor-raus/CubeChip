@@ -171,8 +171,8 @@ void FrontendHost::setup_gui_callables() noexcept {
 			if (ImGui::Button("View Log File")) {
 				s_opening_log.store(true, mo::release);
 
-				Thread([=]() noexcept {
-					if (!SDL_OpenURL(("file:///" + current_log_path).c_str())) {
+				Thread([log_path_copy = std::move(current_log_path)]() noexcept {
+					if (!SDL_OpenURL(("file:///" + log_path_copy).c_str())) {
 						blog.newEntry<BLOG::ERR>("Failed to open Log file! [{}]", SDL_GetError());
 					}
 					s_opening_log.store(false, mo::release);
