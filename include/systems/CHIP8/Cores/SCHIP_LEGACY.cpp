@@ -546,7 +546,7 @@ void SCHIP_LEGACY::scrollDisplayRT() {
 				const auto offsetY = originY + rowN * 2;
 
 				collisions += drawDoubleBytes(originX, offsetY, 0x20,
-					ez::bitDup8(mMemoryBank[mRegisterI + rowN]) << offsetX);
+					ez::bit_dup8(mMemoryBank[mRegisterI + rowN]) << offsetX);
 
 				if (offsetY == (cDisplayH - 2)) { break; }
 			}

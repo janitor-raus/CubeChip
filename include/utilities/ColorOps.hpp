@@ -93,10 +93,10 @@ public:
 
 	static constexpr RGBA lerp(RGBA x, RGBA y, Weight w) noexcept {
 		return RGBA(
-			ez::fixedLerp8(x.R, y.R, w),
-			ez::fixedLerp8(x.G, y.G, w),
-			ez::fixedLerp8(x.B, y.B, w),
-			ez::fixedLerp8(x.A, y.A, w));
+			ez::fixed_lerp8(x.R, y.R, w),
+			ez::fixed_lerp8(x.G, y.G, w),
+			ez::fixed_lerp8(x.B, y.B, w),
+			ez::fixed_lerp8(x.A, y.A, w));
 	}
 
 	class Blend {
@@ -121,7 +121,7 @@ public:
 
 		[[nodiscard]] static constexpr
 		u8 Screen(u8 src, u8 dst) noexcept
-			{ return x8(ez::fixedMul8(x8(src), x8(dst))); }
+			{ return x8(ez::fixed_mul8(x8(src), x8(dst))); }
 
 		[[nodiscard]] static constexpr
 		u8 ColorDodge(u8 src, u8 dst) noexcept
@@ -139,7 +139,7 @@ public:
 
 		[[nodiscard]] static constexpr
 		u8 Multiply(u8 src, u8 dst) noexcept
-			{ return ez::fixedMul8(src, dst); }
+			{ return ez::fixed_mul8(src, dst); }
 
 		[[nodiscard]] static constexpr
 		u8 ColorBurn(u8 src, u8 dst) noexcept
@@ -166,13 +166,13 @@ public:
 		[[nodiscard]] static constexpr
 		u8 Overlay(u8 src, u8 dst) noexcept {
 			return src < 128
-				? u8(ez::fixedMul8(   src,     dst)  * 2)
-				: x8(ez::fixedMul8(x8(src), x8(dst)) * 2);
+				? u8(ez::fixed_mul8(   src,     dst)  * 2)
+				: x8(ez::fixed_mul8(x8(src), x8(dst)) * 2);
 		}
 
 		[[nodiscard]] static constexpr
 		u8 Glow(u8 src, u8 dst) noexcept
-			{ return u8(dst == MAX ? MAX : std::min((ez::fixedMul8(src, dst) * MAX) / x8(dst), MAX)); }
+			{ return u8(dst == MAX ? MAX : std::min((ez::fixed_mul8(src, dst) * MAX) / x8(dst), MAX)); }
 
 		[[nodiscard]] static constexpr
 		u8 Reflect(u8 src, u8 dst) noexcept
@@ -189,7 +189,7 @@ public:
 	 * @param[in] func :: Function to blend each channel, but not alpha.
 	 */
 	[[nodiscard]] static constexpr
-	RGBA channelBlend(RGBA src, RGBA dst, BlendFunc func) noexcept {
+	RGBA channel_blend(RGBA src, RGBA dst, BlendFunc func) noexcept {
 		return RGBA(
 			func(src.R, dst.R),
 			func(src.G, dst.G),
@@ -203,7 +203,7 @@ public:
 	 * @param[in] dst :: Destination color.
 	 */
 	[[nodiscard]] static constexpr
-	RGBA blendAlpha(RGBA src, RGBA dst) noexcept {
+	RGBA alpha_blend(RGBA src, RGBA dst) noexcept {
 		switch (src.A) {
 			case Opaque_A:      return src;
 			case Transparent_A: return dst;
@@ -212,13 +212,13 @@ public:
 	}
 
 	/**
-	 * @brief Alpha blends two RGBA colors together with custom weight.
+	 * @brief Alpha blends two RGBA colors together with custom source weight.
 	 * @param[in] src :: Source color.
 	 * @param[in] dst :: Destination color.
-	 * @param[in] weight :: Custom weight bias.
+	 * @param[in] weight :: Custom source weight bias.
 	 */
 	[[nodiscard]] static constexpr
-	RGBA blendWeightedAlpha(RGBA src, RGBA dst, Weight weight) noexcept {
+	RGBA weighted_alpha_blend(RGBA src, RGBA dst, Weight weight) noexcept {
 		switch (weight) {
 			case Opaque_A:      return src;
 			case Transparent_A: return dst;
@@ -227,16 +227,17 @@ public:
 	}
 
 	/**
-	 * @brief Blends two RGBA colors together using the provided BlendFunc(), then applies alphaBlend().
+	 * @brief Blends two RGBA colors together using the provided BlendFunc(), then applies alpha_blend().
 	 * @param[in] src :: Source color.
 	 * @param[in] dst :: Destination color.
 	 * @param[in] func :: Function to blend each channel, but not alpha.
-	 * @param[in] weight :: Custom weight bias. If 0, default to source alpha.
+	 * @param[in] weight :: Custom source weight bias. If 0, default to source alpha.
 	 */
 	[[nodiscard]] static constexpr
-	RGBA compositeBlend(RGBA src, RGBA dst, BlendFunc func, Weight weight = Opaque_A) noexcept {
-		if (auto alpha = ez::fixedMul8(src.A, weight)) [[likely]]
-			{ return blendWeightedAlpha(channelBlend(src, dst, func), dst, alpha); }
+	RGBA composite_blend(RGBA src, RGBA dst, BlendFunc func, Weight weight = Opaque_A) noexcept {
+		if (auto alpha = ez::fixed_mul8(src.A, weight)) [[likely]] {
+			return weighted_alpha_blend(channel_blend(src, dst, func), dst, alpha);
+		}
 		return dst;
 	}
 
@@ -248,9 +249,9 @@ public:
 	[[nodiscard]] static constexpr
 	RGBA premul(RGBA src, Weight weight) noexcept {
 		return RGBA(
-			ez::fixedMul8(src.R, weight),
-			ez::fixedMul8(src.G, weight),
-			ez::fixedMul8(src.B, weight),
+			ez::fixed_mul8(src.R, weight),
+			ez::fixed_mul8(src.G, weight),
+			ez::fixed_mul8(src.B, weight),
 			weight
 		);
 	}
@@ -262,9 +263,9 @@ public:
 	[[nodiscard]] static constexpr
 	RGBA premul(RGBA src) noexcept {
 		return RGBA(
-			ez::fixedMul8(src.R, src.A),
-			ez::fixedMul8(src.G, src.A),
-			ez::fixedMul8(src.B, src.A),
+			ez::fixed_mul8(src.R, src.A),
+			ez::fixed_mul8(src.G, src.A),
+			ez::fixed_mul8(src.B, src.A),
 			src.A
 		);
 	}
@@ -305,9 +306,9 @@ struct alignas(4) HSV {
 
 	static constexpr HSV lerp(HSV x, HSV y, Weight w) noexcept {
 		return HSV(
-			ez::fixedLerpN(x.H, y.H, w, full_hue, half_hue),
-			ez::fixedLerp8(x.S, y.S, w),
-			ez::fixedLerp8(x.V, y.V, w));
+			ez::fixed_lerpN(x.H, y.H, w, full_hue, half_hue),
+			ez::fixed_lerp8(x.S, y.S, w),
+			ez::fixed_lerp8(x.V, y.V, w));
 	}
 };
 

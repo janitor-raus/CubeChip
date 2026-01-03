@@ -13,19 +13,31 @@
 
 /*==================================================================*/
 
-template <typename SrcT, typename Ufn>
-using unary_transform_result_t = std::conditional_t<
-	std::is_invocable_v<Ufn&, SrcT&>,
-	std::invoke_result_t<Ufn&, SrcT&>,
-	std::invoke_result_t<Ufn&, const SrcT&>
->;
+template <typename F, typename T>
+using UnaryReturnT = std::invoke_result_t<F&, T&>;
 
-template <typename SrcT, typename Bfn>
-using binary_transform_result_t = std::conditional_t<
-	std::is_invocable_v<Bfn&, SrcT&, SrcT&>,
-	std::invoke_result_t<Bfn&, SrcT&, SrcT&>,
-	std::invoke_result_t<Bfn&, const SrcT&, const SrcT&>
->;
+/**
+ * @brief Concept for a unary transform callable, which must be nothrow invocable
+ * with one parameter of type T and return a nothrow copyable type.
+ */
+template <typename F, typename T>
+concept UnaryTransformFn = std::invocable<F&, T&>
+	&& std::is_nothrow_invocable_v<F&, T&>
+	&& IsNothrowCopyable<UnaryReturnT<F, T>>;
+
+/*==================================================================*/
+
+template <typename F, typename T>
+using BinaryReturnT = std::invoke_result_t<F&, T&, T&>;
+
+/**
+ * @brief Concept for a binary transform callable, which must be nothrow invocable
+ * with two parameters of type T and return a nothrow copyable type.
+ */
+template <typename F, typename T>
+concept BinaryTransformFn = std::invocable<F&, T&, T&>
+	&& std::is_nothrow_invocable_v<F&, T&, T&>
+	&& IsNothrowCopyable<BinaryReturnT<F, T>>;
 
 /*==================================================================*/
 
@@ -168,8 +180,10 @@ struct FramePacket {
 	};
 
 private:
+	static constexpr auto MAX_ALIGN = ::HDIS;
+
 	AlignedUniqueArray
-		<value_type> m_buffer;
+		<value_type, MAX_ALIGN> m_buffer;
 
 public:
 	Metadata metadata;
@@ -186,105 +200,92 @@ private:
 
 public:
 	FramePacket(std::size_t SIZE, std::size_t W, std::size_t H) noexcept
-		: m_buffer(::allocate_n<value_type>(W * H * SIZE).as_value().release())
+		: m_buffer(::allocate_n<value_type, MAX_ALIGN>(W * H * SIZE).as_value().release())
 		, metadata(static_cast<int>(W), static_cast<int>(H))
 	{}
 
 public:
-	template <typename SourceT>
-	void copy_from(const SourceT* src, std::size_t count = 0) noexcept {
-		static_assert(alignof(SourceT) <= HDIS);
-		static_assert(std::is_trivially_copyable_v<SourceT>,
-			"SourceT must be trivially copyable.");
+	template <IsNothrowCopyable Src>
+	void copy_from(const Src* src, std::size_t count = 0) noexcept {
+		static_assert(alignof(Src) <= MAX_ALIGN,
+			"Source type alignment exceeds buffer alignment!");
 
-		auto dst_rc = reinterpret_cast<SourceT*>(data());
+		auto dst_rc = reinterpret_cast<Src*>(data());
 		std::copy_n(EXEC_POLICY(unseq)
 			src, clamp_count(count), dst_rc);
 	}
 
-	template <IsContiguousContainer T>
-	void copy_from(const T& src) noexcept {
+	template <IsContiguousContainer Src> requires (IsNothrowCopyable<ValueType<Src>>)
+	void copy_from(const Src& src) noexcept {
 		copy_from(src.data(), src.size());
 	}
 
-	template <typename SourceT, typename Ufn>
-	void copy_from(const SourceT* src, std::size_t count, Ufn&& fn) noexcept {
-		using OutputT = unary_transform_result_t<SourceT, Ufn>;
-		static_assert(alignof(OutputT) <= HDIS);
-		static_assert(std::is_trivially_copyable_v<SourceT>,
-			"SourceT must be trivially copyable.");
-		static_assert(std::is_trivially_copyable_v<OutputT>,
-			"Buffer data type must be trivially copyable.");
+	template <IsNothrowCopyable Src, UnaryTransformFn<Src> Ufn>
+	void copy_from(const Src* src, std::size_t count, Ufn&& fn) noexcept {
+		using Out = UnaryReturnT<Ufn, Src>;
+		static_assert(alignof(Out) <= MAX_ALIGN,
+			"Output type alignment exceeds buffer alignment!");
 
-		auto dst_rc = reinterpret_cast<OutputT*>(data());
+		auto dst_rc = reinterpret_cast<Out*>(data());
 		std::transform(EXEC_POLICY(unseq)
 			src, src + clamp_count(count),
 			dst_rc, std::forward<Ufn>(fn));
 	}
 
-	template <IsContiguousContainer T, typename Ufn>
-	void copy_from(const T& src, Ufn&& fn) noexcept {
+	template <IsContiguousContainer Src, UnaryTransformFn<ValueType<Src>> Ufn> requires (IsNothrowCopyable<ValueType<Src>>)
+	void copy_from(const Src& src, Ufn&& fn) noexcept {
 		copy_from(src.data(), src.size(), std::forward<Ufn>(fn));
 	}
 
-	template <typename SourceT, typename Bfn>
-	void copy_from(const SourceT* src1, std::size_t count1, const SourceT* src2, std::size_t count2, Bfn&& fn) noexcept {
-		using OutputT = binary_transform_result_t<SourceT, Bfn>;
-		static_assert(alignof(OutputT) <= HDIS);
-		static_assert(std::is_trivially_copyable_v<SourceT>,
-			"SourceT must be trivially copyable.");
-		static_assert(std::is_trivially_copyable_v<OutputT>,
-			"Buffer data type must be trivially copyable.");
+	template <IsNothrowCopyable Src, BinaryTransformFn<Src> Bfn>
+	void copy_from(const Src* src1, std::size_t count1, const Src* src2, std::size_t count2, Bfn&& binary_function) noexcept {
+		using Out = BinaryReturnT<Bfn, Src>;
+		static_assert(alignof(Out) <= MAX_ALIGN,
+			"Output type alignment exceeds buffer alignment!");
 
-		auto dst_rc = reinterpret_cast<OutputT*>(data());
+		auto dst_rc = reinterpret_cast<Out*>(data());
 		std::transform(EXEC_POLICY(unseq)
 			src1, src1 + clamp_count(std::min(count1, count2)),
-			src2, dst_rc, std::forward<Bfn>(fn));
+			src2, dst_rc, std::forward<Bfn>(binary_function));
 	}
 
-	template <IsContiguousContainer T, typename Bfn>
-	void copy_from(const T& src1, const T& src2, Bfn&& fn) noexcept {
-		copy_from(src1.data(), src1.size(), src2.data(), src2.size(), std::forward<Bfn>(fn));
+	template <IsContiguousContainer Src, BinaryTransformFn<ValueType<Src>> Bfn> requires (IsNothrowCopyable<ValueType<Src>>)
+	void copy_from(const Src& src1, const Src& src2, Bfn&& binary_function) noexcept {
+		copy_from(src1.data(), src1.size(), src2.data(), src2.size(), std::forward<Bfn>(binary_function));
 	}
 
 	/*==================================================================*/
 
-	template <typename OutputT>
-	void copy_into(OutputT* dst, std::size_t count = 0) const noexcept {
-		static_assert(std::is_trivially_copyable_v<OutputT>,
-			"OutputT must be trivially copyable.");
+	template <IsNothrowCopyable Dst>
+	void copy_into(Dst* dst, std::size_t count = 0) const noexcept {
 
-		auto src_rc = reinterpret_cast<const OutputT*>(data());
+		auto src_rc = reinterpret_cast<const Dst*>(data());
 		std::copy_n(EXEC_POLICY(unseq)
 			src_rc, clamp_count(count), dst);
 	}
 
-	template <IsContiguousContainer T>
-	void copy_into(T& dst) const noexcept {
+	template <IsContiguousContainer Dst> requires (IsNothrowCopyable<ValueType<Dst>>)
+	void copy_into(Dst& dst) const noexcept {
 		copy_into(dst.data(), dst.size());
 	}
 
-	template <typename OutputT, typename Ufn>
-	void copy_into(OutputT* dst, std::size_t count, Ufn&& fn) const noexcept {
-		static_assert(alignof(OutputT) <= HDIS);
-		static_assert(std::is_trivially_copyable_v<OutputT>,
-			"OutputT must be trivially copyable.");
+	template <IsNothrowCopyable Dst, UnaryTransformFn<Dst> Ufn> requires (IsNothrowConvertible<UnaryReturnT<Ufn, Dst>, Dst>)
+	void copy_into(Dst* dst, std::size_t count, Ufn&& fn) const noexcept {
+		using Out = UnaryReturnT<Ufn, Dst>;
+		static_assert(alignof(Out) <= MAX_ALIGN,
+			"Output type alignment exceeds buffer alignment!");
 
-		using RetT = unary_transform_result_t<OutputT, Ufn>;
-		static_assert(std::is_convertible_v<RetT, OutputT>,
-			"Ufn return type must be convertible to OutputT.");
-
-		auto src_rc = reinterpret_cast<const OutputT*>(data());
+		auto src_rc = reinterpret_cast<const Dst*>(data());
 		std::transform(EXEC_POLICY(unseq)
 			src_rc, src_rc + clamp_count(count),
 			dst, std::forward<Ufn>(fn));
 	}
 
-	template <IsContiguousContainer T, typename Ufn>
-	void copy_into(T& dst, Ufn&& fn) const noexcept {
+	template <IsContiguousContainer Dst, UnaryTransformFn<ValueType<Dst>> Ufn> requires (IsNothrowCopyable<ValueType<Dst>>)
+	void copy_into(Dst& dst, Ufn&& fn) const noexcept {
 		copy_into(dst.data(), dst.size(), std::forward<Ufn>(fn));
 	}
 };
 
-static_assert(std::is_move_constructible_v<FramePacket>, "FramePacket must be move-constructible.");
-static_assert(std::is_move_assignable_v   <FramePacket>, "FramePacket must be move-assignable.");
+static_assert(IsNothrowMovable<FramePacket>,
+	"FramePacket must be nothrow move-constructible/assignable.");

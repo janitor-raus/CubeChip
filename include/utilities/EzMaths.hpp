@@ -80,19 +80,19 @@ namespace EzMaths {
 	// Lightweight, unprotected Weight class with 8-bit integer precision.
 	// Expected constructor ranges: [0..255] for integers, [0..1] for floats.
 	class Weight {
-		u8 mWeight{};
+		u8 m_weight{};
 
 	public:
 		template <std::integral Int>
-		constexpr Weight(Int value) noexcept : mWeight(u8(value)) {}
-		constexpr Weight(f64 value) noexcept : mWeight(u8(value * 255.0)) {}
+		constexpr Weight(Int value) noexcept : m_weight(u8(value)) {}
+		constexpr Weight(f64 value) noexcept : m_weight(u8(value * 255.0)) {}
 
 		// Cast weight to floating-point [0..1] value
 		constexpr auto as_fp() const noexcept {
-			return (1.0 / 255.0) * mWeight;
+			return (1.0 / 255.0) * m_weight;
 		}
 
-		constexpr operator u8() const noexcept { return mWeight; }
+		constexpr operator u8() const noexcept { return m_weight; }
 	};
 }
 
@@ -145,7 +145,7 @@ namespace EzMaths {
 		{ return x * (T(27) + x * x) / (T(27) + T(9) * x * x); }
 
 	// Simple mirror folding function with repeating peaks
-	template<typename T>
+	template <typename T>
 		requires (std::is_unsigned_v<T>)
 	inline constexpr T peak_mirror_fold(T value, u64 max) noexcept {
 		auto wrapped = value % (max * 2);
@@ -156,20 +156,20 @@ namespace EzMaths {
 /*==================================================================*/
 
 namespace EzMaths {
-	inline constexpr u8 fixedMul8(u8 x, u8 y) noexcept {
+	inline constexpr u8 fixed_mul8(u8 x, u8 y) noexcept {
 		return u8(((x * (y | y << 8)) + 0x8080u) >> 16);
 	}
 
-	inline constexpr u8 fixedScale8(u8 x, u16 y) noexcept {
+	inline constexpr u8 fixed_scale8(u8 x, u16 y) noexcept {
 		return u8(std::min((x * y * 257u + 0x8080u) >> 16, 255u));
 	}
 
-	inline constexpr u8 fixedLerp8(u8 x, u8 y, Weight w) noexcept {
-		return u8(fixedMul8(x, u8(255 - w)) + fixedMul8(y, w));
+	inline constexpr u8 fixed_lerp8(u8 x, u8 y, Weight w) noexcept {
+		return u8(fixed_mul8(x, u8(255 - w)) + fixed_mul8(y, w));
 	}
 
 	template <std::integral T>
-	inline constexpr T fixedLerpN(T x, T y, Weight w, T full_hue, T half_hue) noexcept {
+	inline constexpr T fixed_lerpN(T x, T y, Weight w, T full_hue, T half_hue) noexcept {
 		const auto shortest = (y - x + half_hue) % full_hue - half_hue;
 		return T((x + T(shortest * w.as_fp()) + full_hue) % full_hue);
 	}
@@ -178,14 +178,14 @@ namespace EzMaths {
 /*==================================================================*/
 
 namespace EzMaths {
-	inline constexpr u32 bitDup8(u32 data) noexcept {
+	inline constexpr u32 bit_dup8(u32 data) noexcept {
 		data = (data << 4 | data) & 0x0F0Fu;
 		data = (data << 2 | data) & 0x3333u;
 		data = (data << 1 | data) & 0x5555u;
 		return (data << 1 | data) & 0xFFFFu;
 	}
 
-	inline constexpr u32 bitDup16(u32 data) noexcept {
+	inline constexpr u32 bit_dup16(u32 data) noexcept {
 		data = (data << 8 | data) & 0x00FF00FFu;
 		data = (data << 4 | data) & 0x0F0F0F0Fu;
 		data = (data << 2 | data) & 0x33333333u;
@@ -193,7 +193,7 @@ namespace EzMaths {
 		return  data << 1 | data;
 	}
 
-	inline constexpr u64 bitDup32(u64 data) noexcept {
+	inline constexpr u64 bit_dup32(u64 data) noexcept {
 		data = (data << 16 | data) & 0x0000FFFF0000FFFFu;
 		data = (data <<  8 | data) & 0x00FF00FF00FF00FFu;
 		data = (data <<  4 | data) & 0x0F0F0F0F0F0F0F0Fu;

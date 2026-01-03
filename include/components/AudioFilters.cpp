@@ -9,51 +9,53 @@
 
 /*==================================================================*/
 
-LowPassFilter::LowPassFilter(float sampleRate, float cutoffFreq) noexcept
-	{ setCoefficient(sampleRate, cutoffFreq); }
+LowPassFilter::LowPassFilter(float sampleRate, float cutoffFreq) noexcept {
+	set_coefficient(sampleRate, cutoffFreq);
+}
 
-void LowPassFilter::setCoefficient(float sampleRate, float cutoffFreq) noexcept {
+void LowPassFilter::set_coefficient(float sampleRate, float cutoffFreq) noexcept {
 	if (sampleRate <= 1.0f) {
-		mCoefficient = 0.0f;
+		m_coefficient = 0.0f;
 	} else {
 		const auto dt = 1.0f / sampleRate;
 		const auto rc = 1.0f / (2.0f * float(std::numbers::pi) \
 			* (cutoffFreq ? cutoffFreq : sampleRate * 0.01f));
-		mCoefficient = dt / (rc + dt);
+		m_coefficient = dt / (rc + dt);
 	}
 }
 
-float LowPassFilter::filterSample(float sample) noexcept {
-	if (mCoefficient <= 0.0f) { return sample; }
+float LowPassFilter::filter_sample(float sample) noexcept {
+	if (m_coefficient <= 0.0f) { return sample; }
 	else [[likely]] {
-		mLastSampleI = mCoefficient * sample \
-			+ (1.0f - mCoefficient) * mLastSampleI;
-		return mLastSampleI;
+		m_last_sample_in = m_coefficient * sample \
+			+ (1.0f - m_coefficient) * m_last_sample_in;
+		return m_last_sample_in;
 	}
 }
 
 /*==================================================================*/
 
-HighPassFilter::HighPassFilter(float sampleRate, float cutoffFreq) noexcept
-	{ setCoefficient(sampleRate, cutoffFreq); }
+HighPassFilter::HighPassFilter(float sampleRate, float cutoffFreq) noexcept {
+	set_coefficient(sampleRate, cutoffFreq);
+}
 
-void HighPassFilter::setCoefficient(float sampleRate, float cutoffFreq) noexcept {
-	if (sampleRate <= 1.0f)
-		{ mCoefficient = 0.0f; }
-	else {
+void HighPassFilter::set_coefficient(float sampleRate, float cutoffFreq) noexcept {
+	if (sampleRate <= 1.0f) {
+		m_coefficient = 0.0f;
+	} else {
 		const auto dt = 1.0f / sampleRate;
 		const auto rc = 1.0f / (2.0f * float(std::numbers::pi) \
 			* (cutoffFreq ? cutoffFreq : sampleRate * 0.01f));
-		mCoefficient = rc / (rc + dt);
+		m_coefficient = rc / (rc + dt);
 	}
 }
 
-float HighPassFilter::filterSample(float sample) noexcept {
-	if (mCoefficient <= 0.0f) { return sample; }
+float HighPassFilter::filter_sample(float sample) noexcept {
+	if (m_coefficient <= 0.0f) { return sample; }
 	else [[likely]] {
-		const auto output = mCoefficient * (mLastSampleO + sample - mLastSampleI);
-		mLastSampleI = sample;
-		mLastSampleO = output;
+		const auto output = m_coefficient * (m_last_sample_out + sample - m_last_sample_in);
+		m_last_sample_in  = sample;
+		m_last_sample_out = output;
 		return output;
 	}
 }
