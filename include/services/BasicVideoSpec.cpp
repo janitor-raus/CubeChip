@@ -11,6 +11,7 @@
 #include <vector>
 #include <exception>
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_render.h>
 
 #ifdef _WIN32
 	#include <sdkddkver.h>
@@ -313,6 +314,17 @@ bool BasicVideoSpec::is_main_window_id(unsigned id) const noexcept {
 
 bool BasicVideoSpec::raise_window(SDL_Window* window) noexcept {
 	return SDL_RaiseWindow(window ? window : m_main_window.get());
+}
+
+bool BasicVideoSpec::update_renderer_logical_presentation(SDL_Renderer* renderer) noexcept {
+	auto current_renderer = renderer ? renderer : m_main_renderer.get();
+	int  window_w, window_h;
+
+	SDL_GetWindowSize(SDL_GetRenderWindow(current_renderer),
+		&window_w, &window_h);
+
+	return SDL_SetRenderLogicalPresentation(current_renderer,
+		window_w, window_h, SDL_LOGICAL_PRESENTATION_STRETCH);
 }
 
 /*==================================================================*/

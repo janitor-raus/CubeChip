@@ -197,6 +197,13 @@ int FrontendHost::handle_client_events(void* event) noexcept {
 				for (auto& [id, system] : m_systems) {
 					set_system_hidden_status(system, false); }
 				break;
+
+			case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+			case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+			case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
+			case SDL_EVENT_WINDOW_RESIZED:
+				BVS->update_renderer_logical_presentation();
+				break;
 		}
 	} else {
 		switch (sdl_event->type) {

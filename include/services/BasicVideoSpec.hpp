@@ -73,6 +73,7 @@ public:
 	bool  set_window_title(const std::string& title, SDL_Window* window = nullptr) noexcept;
 	bool  is_main_window_id(unsigned id) const noexcept;
 	bool  raise_window(SDL_Window* window = nullptr) noexcept;
+	bool  update_renderer_logical_presentation(SDL_Renderer* renderer = nullptr) noexcept;
 
 	bool render_present() noexcept;
 };
