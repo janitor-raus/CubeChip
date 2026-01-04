@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <concepts>
 #include <algorithm>
+#include <limits>
 
 #include "Macros.hpp"
 

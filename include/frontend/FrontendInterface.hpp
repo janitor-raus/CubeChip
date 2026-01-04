@@ -12,6 +12,7 @@
 #include <vector>
 #include <utility>
 #include <string>
+#include <memory>
 #include <functional>
 
 /*==================================================================*/

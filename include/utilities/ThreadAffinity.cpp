@@ -22,6 +22,7 @@
 	#include <thread>
 	#include <algorithm>
 	#include <pthread.h>
+	#include <unistd.h>
 	#include <sys/sysctl.h>
 	#include <mach/mach.h>
 	#include <mach/thread_policy.h>
