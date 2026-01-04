@@ -12,6 +12,7 @@
 #include <atomic>
 #include <utility>
 #include <fstream>
+#include <unordered_map>
 
 #include "BasicLogger.hpp"
 #include "SimpleFileIO.hpp"
@@ -21,12 +22,12 @@
 
 /*==================================================================*/
 
-static thread_local std::string sFormatBuffer(512, '\0');
+static thread_local auto s_format_buffer = std::string(512, '\0');
 
 static void standard_string_formatter_for_LogEntry(const LogEntry& entry) noexcept {
-	sFormatBuffer.clear();
-	fmt::format_to(std::back_inserter(sFormatBuffer), "{0}) {1} {3:>{2}} > {4}\n",
-		entry.index, NanoTime(entry.time).format_as_timer(), BLOG::STR_LEN,
+	s_format_buffer.clear();
+	fmt::format_to(std::back_inserter(s_format_buffer), "{0})\t{1}\t{2}\t{3}\n",
+		entry.index, NanoTime(entry.time).format_as_timer(),
 		BLOG(entry.level).as_string(), entry.message);
 }
 
@@ -36,6 +37,11 @@ static void touch_file_timestamp() noexcept {
 	(void) fs::last_write_time(s_log_file_path, fs::Time::clock::now());
 }
 
+static std::atomic<unsigned> s_next_tid{ 1u };
+
+static thread_local unsigned s_this_tid = s_next_tid \
+	.fetch_add(1u, std::memory_order::relaxed);
+
 /*==================================================================*/
 
 static auto monotonicCount() noexcept {
@@ -44,16 +50,17 @@ static auto monotonicCount() noexcept {
 }
 
 LogEntry::LogEntry(BLOG::LEVEL level, std::string message) noexcept
-	: hash    (std::hash<std::thread::id>()(std::this_thread::get_id()))
-	, time    (Millis::raw())
-	, index   (monotonicCount())
-	, level   (level)
-	, message (std::move(message))
+	: thread (s_this_tid)
+	, index  (monotonicCount())
+	, source (0) // XXX
+	, level  (level)
+	, time   (Millis::raw())
+	, message(std::move(message))
 {}
 
 std::string LogEntry::as_string() const noexcept {
 	::standard_string_formatter_for_LogEntry(*this);
-	return sFormatBuffer;
+	return s_format_buffer;
 }
 
 /*==================================================================*/
@@ -63,54 +70,57 @@ class BasicLoggerContext {
 
 	using LogBuffer = BasicLogger::LogBuffer;
 
-	std::ofstream mLogFile;
-	Thread mFlusherThread;
+	std::ofstream m_log_file_handle;
+	Thread m_log_flusher_thread;
 
 	static constexpr std::size_t s_flush_interval_ms = 10000;
 
-	std::size_t mLastFlushPos{};
-	std::size_t mLastFlushTime{};
+	std::size_t m_last_flush_pos{};
+	std::size_t m_last_flush_time{};
 
-	LogBuffer mLogBuffer;
+	std::unordered_map<std::string, std::size_t>
+		m_logger_sources_map{};
 
-	bool testFlushSize() const noexcept {
-		const auto head = mLogBuffer.head();
-		return head >= mLastFlushPos && \
-			head - mLastFlushPos >= (mLogBuffer.size() / 2);
+	LogBuffer m_log_backtrace_buffer;
+
+	bool test_flush_size() const noexcept {
+		const auto head = m_log_backtrace_buffer.head();
+		return head >= m_last_flush_pos && \
+			head - m_last_flush_pos >= (m_log_backtrace_buffer.size() / 2);
 	}
 
-	bool testFlushTime() const noexcept {
-		return Millis::now() - mLastFlushTime >= s_flush_interval_ms;
+	bool test_flush_time() const noexcept {
+		return Millis::now() - m_last_flush_time >= s_flush_interval_ms;
 	}
 
-	void flushLogBuffer() noexcept{
-		if (!mLogFile) { return; }
+	void flush_log_backtrace_buffer() noexcept{
+		if (!m_log_file_handle) { return; }
 
-		const auto snapshot = mLogBuffer.snapshot(0, mLastFlushPos).fast();
+		const auto snapshot = m_log_backtrace_buffer.snapshot(0, m_last_flush_pos).fast();
 
 		if (snapshot.size() == 0) {
 			::touch_file_timestamp();
-			mLastFlushTime = Millis::now();
+			m_last_flush_time = Millis::now();
 			return;
 		}
 
 		for (const auto& entry : snapshot) {
 			::standard_string_formatter_for_LogEntry(entry);
-			mLogFile.write(sFormatBuffer.data(), sFormatBuffer.size());
+			m_log_file_handle.write(s_format_buffer.data(), s_format_buffer.size());
 		}
 
-		mLogFile.flush();
+		m_log_file_handle.flush();
 		::touch_file_timestamp();
 
-		mLastFlushPos += snapshot.size();
-		mLastFlushTime = Millis::now();
+		m_last_flush_pos += snapshot.size();
+		m_last_flush_time = Millis::now();
 	}
 
 	void create_log(const std::string& filename, const std::string& directory) noexcept {
 		auto current_time = NanoTime(Millis::initial_wall());
 
 		blog.newEntry<BLOG::INF>("Logging started on {}",
-			current_time.format_as_datetime("{:%Y-%m-%d %H:%M:%S}"));
+			current_time.format_as_datetime("{:%Y-%m-%d, at %H:%M:%S}"));
 
 		if (filename.empty() || directory.empty()) {
 			blog.newEntry<BLOG::ERR>(
@@ -125,10 +135,10 @@ class BasicLoggerContext {
 		}
 
 		s_log_file_path = (std::filesystem::path(directory) / (current_time \
-			.format_as_datetime("{:%Y-%m-%d_%H-%M-%S}_") + filename + ".log")).string();
+			.format_as_datetime("{:%Y-%m-%d__%H-%M-%S}__pid-") + filename + ".log")).string();
 
-		mLogFile.open(s_log_file_path, std::ios::trunc);
-		if (!mLogFile) {
+		m_log_file_handle.open(s_log_file_path, std::ios::trunc);
+		if (!m_log_file_handle) {
 			blog.newEntry<BLOG::ERR>(
 				"Unable to create new Log file: \"{}\"",
 				std::exchange(s_log_file_path, {}));
@@ -154,12 +164,12 @@ class BasicLoggerContext {
 
 public:
 	BasicLoggerContext() noexcept {
-		mFlusherThread = Thread([&](StopToken token) noexcept {
+		m_log_flusher_thread = Thread([&](StopToken token) noexcept {
 			thread_affinity::set_affinity(0b11ull);
 
 			do {
-				if (testFlushSize() || testFlushTime())
-					[[unlikely]] { flushLogBuffer(); }
+				if (test_flush_size() || test_flush_time())
+					[[unlikely]] { flush_log_backtrace_buffer(); }
 				Millis::sleep_for(1);
 			}
 			while (!token.stop_requested());
@@ -167,15 +177,15 @@ public:
 	}
 
 	~BasicLoggerContext() noexcept {
-		if (mFlusherThread.joinable()) {
-			mFlusherThread.request_stop();
-			mFlusherThread.join();
+		if (m_log_flusher_thread.joinable()) {
+			m_log_flusher_thread.request_stop();
+			m_log_flusher_thread.join();
 		}
-		flushLogBuffer();
+		flush_log_backtrace_buffer();
 	}
 
-	auto buffer() const noexcept -> const auto& { return mLogBuffer; }
-	auto buffer()       noexcept ->       auto& { return mLogBuffer; }
+	auto buffer() const noexcept -> const auto& { return m_log_backtrace_buffer; }
+	auto buffer()       noexcept ->       auto& { return m_log_backtrace_buffer; }
 };
 
 /*==================================================================*/

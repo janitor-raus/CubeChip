@@ -67,11 +67,12 @@ public:
 /*==================================================================*/
 
 struct LogEntry {
-	const std::uint64_t hash{};  // thread hash, to be filled in automatically
-	const std::int64_t  time{};  // timestamp, expected to be ns
-	const std::uint32_t index{}; // entry index, expected to be monotonic
-	const BLOG::LEVEL   level{}; // severity level, has additional methods
-	const std::string message{};  // self-explanatory
+	const std::uint32_t thread{}; // thread id, expected to be monotonic
+	const std::uint32_t index{};  // entry index, expected to be monotonic
+	const std::uint32_t source{}; // component source id, key for filtering
+	const BLOG::LEVEL   level{};  // severity level, offers additional methods
+	const std::int64_t  time{};   // timestamp, expected to be ns precision
+	const std::string message{};  // the actual string message
 
 	constexpr LogEntry() noexcept = default;
 	LogEntry(BLOG::LEVEL level, std::string message) noexcept;
