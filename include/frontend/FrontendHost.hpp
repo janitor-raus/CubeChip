@@ -156,7 +156,8 @@ public:
 
 public:
 	struct Settings {
-		float ui_scale = 1.5f;
+		float ui_zoom_scale = 1.1f;
+		float ui_text_scale = 1.1f;
 
 		std::string file_mru_cache[s_mru_limit];
 

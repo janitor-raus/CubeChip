@@ -55,8 +55,10 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 			throw_fatal_error(__LINE__, __func__);
 		}
 
-		m_main_window = SDL_CreateWindow(nullptr, 0, 0, SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE); \
+		m_main_window = SDL_CreateWindow(nullptr, 0, 0, \
+			SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY); \
 		if (!m_main_window) { throw_fatal_error(__LINE__, __func__); }
+
 		#if defined(_WIN32) && defined(WINDOWS_NO_ROUNDED_CORNERS)
 			#ifdef OLD_WINDOWS_SDK
 				static constexpr auto NTDDI_MAJOR{ ((NTDDI_VERSION >> 24) & 0x00FF) };
@@ -110,6 +112,7 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 		if (!m_main_renderer) { throw_fatal_error(__LINE__, __func__); }
 
 		FrontendInterface::init_video(m_main_window, m_main_renderer);
+		FrontendInterface::set_display_scaling(get_display_pixel_density());
 
 		SDL_ShowWindow(m_main_window);
 	}
@@ -291,6 +294,10 @@ void BasicVideoSpec::write_stream_texture(
 }
 
 /*==================================================================*/
+
+float BasicVideoSpec::get_display_pixel_density(SDL_DisplayID display_id) noexcept {
+	return SDL_GetDisplayContentScale(display_id ? display_id : SDL_GetPrimaryDisplay());
+}
 
 float BasicVideoSpec::get_window_pixel_density(SDL_Window* window) noexcept {
 	return SDL_GetWindowPixelDensity(window ? window : m_main_window.get());

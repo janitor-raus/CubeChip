@@ -63,7 +63,8 @@ void FrontendHost::SystemInstance::StopSystemThread::operator()(SystemInterface*
 
 SettingsMap FrontendHost::Settings::map() noexcept {
 	return {
-		::make_setting_link("Frontend.Interface.Scale", &ui_scale),
+		::make_setting_link("Frontend.Interface.Scale.Zoom", &ui_zoom_scale),
+		::make_setting_link("Frontend.Interface.Scale.Text", &ui_text_scale),
 		::make_setting_link("Frontend.Interface.FileMRU", file_mru_cache, s_mru_limit),
 	};
 }
@@ -71,7 +72,8 @@ SettingsMap FrontendHost::Settings::map() noexcept {
 auto FrontendHost::export_settings() const noexcept -> Settings {
 	Settings out;
 
-	out.ui_scale = FrontendInterface::get_ui_scale_factor();
+	out.ui_zoom_scale = FrontendInterface::get_ui_zoom_scaling();
+	out.ui_text_scale = FrontendInterface::get_ui_text_scaling();
 	FrontendHost::export_mru(out.file_mru_cache);
 
 	return out;
@@ -149,7 +151,8 @@ FrontendHost* FrontendHost::init_application(
 	BVS = BasicVideoSpec::initialize(BVS_settings);
 	if (!BVS) { return nullptr; }
 
-	FrontendInterface::set_ui_scale_factor(FEH_settings.ui_scale);
+	FrontendInterface::set_ui_zoom_scaling(FEH_settings.ui_zoom_scale);
+	FrontendInterface::set_ui_text_scaling(FEH_settings.ui_text_scale);
 	FrontendHost::import_mru(FEH_settings.file_mru_cache);
 
 	::push_back_pending_file_drops(game_file_path);
@@ -193,12 +196,6 @@ int FrontendHost::handle_client_events(void* event) noexcept {
 			case SDL_EVENT_WINDOW_RESTORED:
 				for (auto& [id, system] : m_systems) {
 					set_system_hidden_status(system, false); }
-				break;
-
-			case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
-			case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-				FrontendInterface::scale_by_pixel_density(
-					BVS->get_window_pixel_density());
 				break;
 		}
 	} else {

@@ -19,10 +19,18 @@ static ImFont*    s_main_font{};
 static ImGuiID    s_main_dock_id{};
 
 static ImGuiStyle s_default_style;
-static float      s_default_scale = 1.0f;
-static float      s_pixel_density = 1.0f;
 
-static bool       s_pending_theme_changes = false;
+static float      s_zoom_scaling = 1.0f;
+static float      s_text_scaling = 1.0f;
+
+static float      s_display_scaling = 1.0f;
+
+static bool       s_pending_style_changes = false;
+
+template <typename T> requires std::is_arithmetic_v<T>
+static constexpr void exchange_if_not_equal(T& target, T value) noexcept {
+	if (target != value) { target = value; }
+}
 
 /*==================================================================*/
 
@@ -128,19 +136,29 @@ void FrontendInterface::invoke_registered_menus(const PlainKey& tag) noexcept {
 
 /*==================================================================*/
 
-void FrontendInterface::scale_by_pixel_density(float density) noexcept {
-	s_pixel_density = density;
-	set_ui_scale_factor(get_ui_scale_factor());
+void FrontendInterface::set_display_scaling(float scale) noexcept {
+	s_display_scaling = scale;
+	set_ui_zoom_scaling(get_ui_zoom_scaling());
 }
 
-void FrontendInterface::set_ui_scale_factor(float scale) noexcept {
-	s_default_scale = std::clamp(scale, 1.0f, 4.0f) / s_pixel_density;
-	s_pending_theme_changes = true;
+void FrontendInterface::set_ui_zoom_scaling(float scale) noexcept {
+	s_zoom_scaling = std::clamp(scale, 1.0f, 4.0f);
+	s_pending_style_changes = true;
 }
 
-float FrontendInterface::get_ui_scale_factor() noexcept {
-	return s_default_scale;
+float FrontendInterface::get_ui_zoom_scaling() noexcept {
+	return s_zoom_scaling;
 }
+
+void FrontendInterface::set_ui_text_scaling(float scale) noexcept {
+	s_text_scaling = std::clamp(scale, 0.5f, 2.0f);
+	s_pending_style_changes = true;
+}
+
+float FrontendInterface::get_ui_text_scaling() noexcept {
+	return s_text_scaling;
+}
+
 
 /*==================================================================*/
 
@@ -158,9 +176,15 @@ void FrontendInterface::init_context(const char* home_dir) {
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
+	io.ConfigDpiScaleFonts = true;
+	io.ConfigDpiScaleViewports = true;
+
 	s_hooks = std::make_unique<RegistryAggregate>();
 
 	s_default_style = ImGui::GetStyle();
+
+	::exchange_if_not_equal(s_text_scaling, s_default_style.FontScaleMain);
+	::exchange_if_not_equal(s_display_scaling, s_default_style.FontScaleDpi);
 
 	// XXX this is where we should apply theme customizations later
 
@@ -195,13 +219,14 @@ void FrontendInterface::process_event(void* event) {
 }
 
 void FrontendInterface::begin_new_frame() {
-	if (s_pending_theme_changes) {
+	if (s_pending_style_changes) {
 		ImGui::GetStyle() = s_default_style;
 
-		ImGui::GetStyle().FontScaleMain = s_default_scale;
-		ImGui::GetStyle().ScaleAllSizes(s_default_scale);
+		ImGui::GetStyle().FontScaleDpi = s_display_scaling;
+		ImGui::GetStyle().FontScaleMain = s_zoom_scaling * s_text_scaling;
+		ImGui::GetStyle().ScaleAllSizes(s_display_scaling * s_zoom_scaling);
 
-		s_pending_theme_changes = false;
+		s_pending_style_changes = false;
 	}
 
 	ImGui_ImplSDLRenderer3_NewFrame();

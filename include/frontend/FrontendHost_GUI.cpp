@@ -126,12 +126,26 @@ void FrontendHost::setup_gui_callables() noexcept {
 		static int  scale_factor{};
 		static bool click_active{};
 
-		if (!click_active) { scale_factor = int(FrontendInterface::get_ui_scale_factor() * 100); }
-		ImGui::SliderInt(" UI Scale", &scale_factor, 100, 300, "%d%%");
+		if (!click_active) { scale_factor = int(FrontendInterface::get_ui_zoom_scaling() * 100); }
+		ImGui::SliderInt(" UI Zoom Scale", &scale_factor, 100, 300, "%d%%");
 
 		click_active = ImGui::IsItemActive();
 		if (ImGui::IsItemDeactivatedAfterEdit()) {
-			FrontendInterface::set_ui_scale_factor(scale_factor * 0.01f);
+			FrontendInterface::set_ui_zoom_scaling(scale_factor * 0.01f);
+		}
+	});
+
+	static auto sMenu_Settings_ScaleText = FrontendInterface::register_menu("",
+	{ 20, "Settings" }, [&]() noexcept {
+		static int  scale_factor{};
+		static bool click_active{};
+
+		if (!click_active) { scale_factor = int(FrontendInterface::get_ui_text_scaling() * 100); }
+		ImGui::SliderInt(" UI Text Scale", &scale_factor, 50, 200, "%d%%");
+
+		click_active = ImGui::IsItemActive();
+		if (ImGui::IsItemDeactivatedAfterEdit()) {
+			FrontendInterface::set_ui_text_scaling(scale_factor * 0.01f);
 		}
 	});
 
@@ -166,7 +180,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 			ImGui::Checkbox("Auto-scroll", &autoScroll);
 			ImGui::SameLine();
 
-			const auto current_log_path = blog.get_log_path();
+			auto current_log_path = blog.get_log_path();
 			ImGui::BeginDisabled(s_opening_log.load(mo::acquire) || current_log_path.empty());
 			if (ImGui::Button("View Log File")) {
 				s_opening_log.store(true, mo::release);

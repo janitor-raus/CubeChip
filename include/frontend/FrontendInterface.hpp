@@ -124,7 +124,7 @@ private:
 	static void invoke_registered_menus(const PlainKey& tag) noexcept;
 
 public:
-	static void init_context(const char*);
+	static void init_context(const char* home_dir);
 	static void quit_context();
 
 	static void init_video(SDL_Window*, SDL_Renderer*);
@@ -136,9 +136,11 @@ public:
 	static auto* get_current_renderer() noexcept { return s_current_renderer; }
 
 public:
-	static void  scale_by_pixel_density(float density) noexcept;
-	static void  set_ui_scale_factor(float scale) noexcept;
-	static float get_ui_scale_factor() noexcept;
+	static void  set_display_scaling(float density) noexcept;
+	static void  set_ui_zoom_scaling(float scale) noexcept;
+	static float get_ui_zoom_scaling() noexcept;
+	static void  set_ui_text_scaling(float scale) noexcept;
+	static float get_ui_text_scaling() noexcept;
 
 public:
 	static void process_event(void* event);
