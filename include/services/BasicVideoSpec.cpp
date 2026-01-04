@@ -137,11 +137,11 @@ BasicVideoSpec::~BasicVideoSpec() noexcept {
 
 SettingsMap BasicVideoSpec::Settings::map() noexcept {
 	return {
-		::make_setting_link("Window.X", &window.x),
-		::make_setting_link("Window.Y", &window.y),
-		::make_setting_link("Window.W", &window.w),
-		::make_setting_link("Window.H", &window.h),
-		::make_setting_link("Window.FirstRun", &first_run),
+		::make_setting_link("Window.Main.Pos.X", &window.x),
+		::make_setting_link("Window.Main.Pos.Y", &window.y),
+		::make_setting_link("Window.Main.Size.W", &window.w),
+		::make_setting_link("Window.Main.Size.H", &window.h),
+		::make_setting_link("Window.Main.FirstRun", &first_run),
 	};
 }
 
