@@ -22,7 +22,7 @@ struct SDL_Texture;
 struct SDL_Window;
 
 template <typename Fn>
-concept VoidInvocable = std::is_invocable_r_v<void, Fn>;
+concept VoidInvocable = std::is_nothrow_invocable_r_v<void, Fn>;
 
 /*==================================================================*/
 
@@ -136,6 +136,7 @@ public:
 	static auto* get_current_renderer() noexcept { return s_current_renderer; }
 
 public:
+	static void  scale_by_pixel_density(float density) noexcept;
 	static void  set_ui_scale_factor(float scale) noexcept;
 	static float get_ui_scale_factor() noexcept;
 

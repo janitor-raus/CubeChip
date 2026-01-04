@@ -195,9 +195,10 @@ int FrontendHost::handle_client_events(void* event) noexcept {
 					set_system_hidden_status(system, false); }
 				break;
 
-			case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
 			case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
-				// Check if ImGui updates DPI scaling automatically
+			case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+				FrontendInterface::scale_by_pixel_density(
+					BVS->get_window_pixel_density());
 				break;
 		}
 	} else {

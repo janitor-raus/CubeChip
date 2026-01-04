@@ -68,9 +68,10 @@ public:
 		SDL_Texture* texture, const std::byte* src_buffer) noexcept;
 
 public:
-	void set_window_title(const std::string& title, SDL_Window* window = nullptr) noexcept;
-	bool is_main_window_id(unsigned id) const noexcept;
-	void raise_window(SDL_Window* window = nullptr) noexcept;
+	float get_window_pixel_density(SDL_Window* window = nullptr) noexcept;
+	bool  set_window_title(const std::string& title, SDL_Window* window = nullptr) noexcept;
+	bool  is_main_window_id(unsigned id) const noexcept;
+	bool  raise_window(SDL_Window* window = nullptr) noexcept;
 
 	bool render_present() noexcept;
 };

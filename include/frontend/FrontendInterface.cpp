@@ -15,7 +15,14 @@
 
 /*==================================================================*/
 
-static ImGuiID sMainDockID{};
+static ImFont*    s_main_font{};
+static ImGuiID    s_main_dock_id{};
+
+static ImGuiStyle s_default_style;
+static float      s_default_scale = 1.0f;
+static float      s_pixel_density = 1.0f;
+
+static bool       s_pending_theme_changes = false;
 
 /*==================================================================*/
 
@@ -121,16 +128,21 @@ void FrontendInterface::invoke_registered_menus(const PlainKey& tag) noexcept {
 
 /*==================================================================*/
 
-void FrontendInterface::set_ui_scale_factor(float scale) noexcept {
-	ImGui::GetStyle().FontScaleMain = scale;
+void FrontendInterface::scale_by_pixel_density(float density) noexcept {
+	s_pixel_density = density;
+	set_ui_scale_factor(get_ui_scale_factor());
 }
+
+void FrontendInterface::set_ui_scale_factor(float scale) noexcept {
+	s_default_scale = std::clamp(scale, 1.0f, 4.0f) / s_pixel_density;
+	s_pending_theme_changes = true;
+}
+
 float FrontendInterface::get_ui_scale_factor() noexcept {
-	return ImGui::GetStyle().FontScaleMain;
+	return s_default_scale;
 }
 
 /*==================================================================*/
-
-static ImFont* sMainFont{};
 
 void FrontendInterface::init_context(const char* home_dir) {
 	static auto ini_path = home_dir ? std::string(home_dir) + "imgui.ini" : std::string();
@@ -148,10 +160,14 @@ void FrontendInterface::init_context(const char* home_dir) {
 
 	s_hooks = std::make_unique<RegistryAggregate>();
 
-	sMainFont = io.Fonts->AddFontFromMemoryCompressedTTF(
+	s_default_style = ImGui::GetStyle();
+
+	// XXX this is where we should apply theme customizations later
+
+	s_main_font = io.Fonts->AddFontFromMemoryCompressedTTF(
 		FontData::Roboto_Mono, std::size(FontData::Roboto_Mono), 16.0f);
 
-	io.FontDefault = sMainFont;
+	io.FontDefault = s_main_font;
 }
 
 void FrontendInterface::quit_context() {
@@ -179,6 +195,15 @@ void FrontendInterface::process_event(void* event) {
 }
 
 void FrontendInterface::begin_new_frame() {
+	if (s_pending_theme_changes) {
+		ImGui::GetStyle() = s_default_style;
+
+		ImGui::GetStyle().FontScaleMain = s_default_scale;
+		ImGui::GetStyle().ScaleAllSizes(s_default_scale);
+
+		s_pending_theme_changes = false;
+	}
+
 	ImGui_ImplSDLRenderer3_NewFrame();
 	ImGui_ImplSDL3_NewFrame();
 
@@ -198,8 +223,8 @@ void FrontendInterface::begin_new_frame() {
 		| ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs
 		| ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
 
-	sMainDockID = ImGui::GetID("MainDockspace");
-	ImGui::DockSpace(sMainDockID);
+	s_main_dock_id = ImGui::GetID("MainDockspace");
+	ImGui::DockSpace(s_main_dock_id);
 	ImGui::End();
 
 	invoke_registered_windows();
@@ -211,6 +236,6 @@ void FrontendInterface::render_frame(SDL_Renderer* renderer) {
 }
 
 void FrontendInterface::dock_next_window_to(unsigned id, bool first_time) noexcept {
-	ImGui::SetNextWindowDockID(id ? id : sMainDockID,
+	ImGui::SetNextWindowDockID(id ? id : s_main_dock_id,
 		first_time ? ImGuiCond_FirstUseEver : ImGuiCond_Always);
 }

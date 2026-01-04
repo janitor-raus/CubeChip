@@ -37,7 +37,7 @@ struct FatalError : public std::runtime_error {
 };
 
 [[noreturn]] static
-void throwFatalError(unsigned line, const char* function) noexcept(false) {
+void throw_fatal_error(unsigned line, const char* function) noexcept(false) {
 	blog.newEntry<BLOG::FTL>("L{} : {}(): {}",
 		line, function, SDL_GetError());
 
@@ -48,17 +48,16 @@ void throwFatalError(unsigned line, const char* function) noexcept(false) {
 }
 
 /*==================================================================*/
-	#pragma region BasicVideoSpec Singleton Class
 
 BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept {
 	try {
 		if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) { \
-			throwFatalError(__LINE__, __func__);
+			throw_fatal_error(__LINE__, __func__);
 		}
 
 		m_main_window = SDL_CreateWindow(nullptr, 0, 0, SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE); \
-		if (!m_main_window) { throwFatalError(__LINE__, __func__); }
-		#ifdef _WIN32
+		if (!m_main_window) { throw_fatal_error(__LINE__, __func__); }
+		#if defined(_WIN32) && defined(WINDOWS_NO_ROUNDED_CORNERS)
 			#ifdef OLD_WINDOWS_SDK
 				static constexpr auto NTDDI_MAJOR{ ((NTDDI_VERSION >> 24) & 0x00FF) };
 				static constexpr auto NTDDI_MINOR{ ((NTDDI_VERSION >> 16) & 0x00FF) };
@@ -108,7 +107,7 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 		SDL_SetWindowMinimumSize(m_main_window, 800, 600);
 
 		m_main_renderer = SDL_CreateRenderer(m_main_window, nullptr); \
-		if (!m_main_renderer) { throwFatalError(__LINE__, __func__); }
+		if (!m_main_renderer) { throw_fatal_error(__LINE__, __func__); }
 
 		FrontendInterface::init_video(m_main_window, m_main_renderer);
 
@@ -130,6 +129,8 @@ BasicVideoSpec::~BasicVideoSpec() noexcept {
 
 	SDL_QuitSubSystem(SDL_INIT_VIDEO);
 }
+
+/*==================================================================*/
 
 SettingsMap BasicVideoSpec::Settings::map() noexcept {
 	return {
@@ -156,13 +157,7 @@ auto BasicVideoSpec::export_settings() const noexcept -> Settings {
 	return out;
 }
 
-void BasicVideoSpec::set_window_title(const std::string& title, SDL_Window* window) noexcept {
-	SDL_SetWindowTitle(window ? window : m_main_window.get(), title.c_str());
-}
-
-bool BasicVideoSpec::is_main_window_id(unsigned id) const noexcept {
-	return id && id == SDL_GetWindowID(m_main_window);
-}
+/*==================================================================*/
 
 float BasicVideoSpec::get_display_refresh_rate(SDL_DisplayID display) noexcept {
 	if (const auto* mode = SDL_GetCurrentDisplayMode(display)) {
@@ -247,16 +242,14 @@ void BasicVideoSpec::normalize_rect_to_display(ez::Rect& rect, ez::Rect& deco, b
 	}
 }
 
-void BasicVideoSpec::raise_window(SDL_Window* window) noexcept {
-	SDL_RaiseWindow(window ? window : m_main_window.get());
-}
+/*==================================================================*/
 
 SDL_Texture* BasicVideoSpec::create_stream_texture(SDL_Renderer* renderer, int w, int h) noexcept {
 	if (!renderer) { return nullptr; }
 	try {
 		auto* texture = SDL_CreateTexture(renderer, \
 			SDL_PIXELFORMAT_RGBX8888, SDL_TEXTUREACCESS_STREAMING, w, h); \
-		if (!texture) { throwFatalError(__LINE__, __func__); }
+		if (!texture) { throw_fatal_error(__LINE__, __func__); }
 		return texture;
 	}
 	catch (const FatalError&) {
@@ -277,7 +270,7 @@ void BasicVideoSpec::write_stream_texture(
 	void* pixels_ptr; int pitch;
 
 	if (!SDL_LockTexture(texture, nullptr, &pixels_ptr, &pitch)) { \
-		throwFatalError(__LINE__, __func__);
+		throw_fatal_error(__LINE__, __func__);
 	} else {
 		const auto total_rows = texture->h;
 		const auto row_length = texture->w * SDL_BYTESPERPIXEL(texture->format);
@@ -299,13 +292,31 @@ void BasicVideoSpec::write_stream_texture(
 
 /*==================================================================*/
 
+float BasicVideoSpec::get_window_pixel_density(SDL_Window* window) noexcept {
+	return SDL_GetWindowPixelDensity(window ? window : m_main_window.get());
+}
+
+bool BasicVideoSpec::set_window_title(const std::string& title, SDL_Window* window) noexcept {
+	return SDL_SetWindowTitle(window ? window : m_main_window.get(), title.c_str());
+}
+
+bool BasicVideoSpec::is_main_window_id(unsigned id) const noexcept {
+	return id && id == SDL_GetWindowID(m_main_window);
+}
+
+bool BasicVideoSpec::raise_window(SDL_Window* window) noexcept {
+	return SDL_RaiseWindow(window ? window : m_main_window.get());
+}
+
+/*==================================================================*/
+
 bool BasicVideoSpec::render_present() noexcept {
 	try {
 		FrontendInterface::begin_new_frame();
 		FrontendInterface::render_frame(m_main_renderer);
 
 		if (!SDL_RenderPresent(m_main_renderer)) { \
-			throwFatalError(__LINE__, __func__);
+			throw_fatal_error(__LINE__, __func__);
 		}
 
 		return true;
@@ -319,6 +330,3 @@ bool BasicVideoSpec::render_present() noexcept {
 		return false;
 	}
 }
-
-	#pragma endregion
-/*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
