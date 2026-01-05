@@ -23,7 +23,7 @@ static ImGuiStyle s_default_style;
 static float      s_zoom_scaling = 1.0f;
 static float      s_text_scaling = 1.0f;
 
-static float      s_display_scaling = 1.0f;
+static float      s_display_density = 1.0f;
 
 static bool       s_pending_style_changes = false;
 
@@ -137,7 +137,7 @@ void FrontendInterface::invoke_registered_menus(const PlainKey& tag) noexcept {
 /*==================================================================*/
 
 void FrontendInterface::set_display_scaling(float scale) noexcept {
-	s_display_scaling = scale;
+	s_display_density = std::clamp(scale, 1.0f, 4.0f);
 	set_ui_zoom_scaling(get_ui_zoom_scaling());
 }
 
@@ -184,7 +184,7 @@ void FrontendInterface::init_context(const char* home_dir) {
 	s_default_style = ImGui::GetStyle();
 
 	::exchange_if_not_equal(s_text_scaling, s_default_style.FontScaleMain);
-	::exchange_if_not_equal(s_display_scaling, s_default_style.FontScaleDpi);
+	::exchange_if_not_equal(s_display_density, s_default_style.FontScaleDpi);
 
 	// XXX this is where we should apply theme customizations later
 
@@ -222,9 +222,9 @@ void FrontendInterface::begin_new_frame() {
 	if (s_pending_style_changes) {
 		ImGui::GetStyle() = s_default_style;
 
-		ImGui::GetStyle().FontScaleDpi = s_display_scaling;
+		//ImGui::GetStyle().FontScaleDpi = s_display_density;
 		ImGui::GetStyle().FontScaleMain = s_zoom_scaling * s_text_scaling;
-		ImGui::GetStyle().ScaleAllSizes(s_display_scaling * s_zoom_scaling);
+		ImGui::GetStyle().ScaleAllSizes(s_zoom_scaling);
 
 		s_pending_style_changes = false;
 	}
@@ -240,8 +240,8 @@ void FrontendInterface::begin_new_frame() {
 	}
 
 	const auto& viewport = *ImGui::GetMainViewport();
-	ImGui::SetNextWindowPos(ImVec2(viewport.Pos.x, viewport.Pos.y + ImGui::GetFrameHeight()));
-	ImGui::SetNextWindowSize(ImVec2(viewport.Size.x, viewport.Size.y - ImGui::GetFrameHeight()));
+	ImGui::SetNextWindowPos(viewport.WorkPos);
+	ImGui::SetNextWindowSize(viewport.WorkSize);
 	ImGui::SetNextWindowViewport(viewport.ID);
 
 	ImGui::Begin("MainDockspace", nullptr, ImGuiWindowFlags_NoSavedSettings

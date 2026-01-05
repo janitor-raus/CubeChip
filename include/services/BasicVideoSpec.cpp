@@ -113,7 +113,7 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 		if (!m_main_renderer) { throw_fatal_error(__LINE__, __func__); }
 
 		FrontendInterface::init_video(m_main_window, m_main_renderer);
-		FrontendInterface::set_display_scaling(get_display_pixel_density());
+		//FrontendInterface::set_display_scaling(get_display_pixel_density());
 
 		SDL_ShowWindow(m_main_window);
 	}
