@@ -15,22 +15,15 @@
 
 /*==================================================================*/
 
-static ImFont*    s_main_font{};
-static ImGuiID    s_main_dock_id{};
+static ImFont* s_main_font{};
+static ImGuiID s_main_dock_id{};
 
 static ImGuiStyle s_default_style;
 
-static float      s_zoom_scaling = 1.0f;
-static float      s_text_scaling = 1.0f;
+static float s_zoom_scaling = 1.0f;
+static float s_text_scaling = 1.0f;
 
-static float      s_display_density = 1.0f;
-
-static bool       s_pending_style_changes = false;
-
-template <typename T> requires std::is_arithmetic_v<T>
-static constexpr void exchange_if_not_equal(T& target, T value) noexcept {
-	if (target != value) { target = value; }
-}
+static bool  s_pending_style_changes = false;
 
 /*==================================================================*/
 
@@ -136,11 +129,6 @@ void FrontendInterface::invoke_registered_menus(const PlainKey& tag) noexcept {
 
 /*==================================================================*/
 
-void FrontendInterface::set_dpi_scaling(float scale) noexcept {
-	s_display_density = std::clamp(scale, 1.0f, 4.0f);
-	set_ui_zoom_scaling(get_ui_zoom_scaling());
-}
-
 void FrontendInterface::set_ui_zoom_scaling(float scale) noexcept {
 	s_zoom_scaling = std::clamp(scale, 1.0f, 4.0f);
 	s_pending_style_changes = true;
@@ -184,10 +172,6 @@ void FrontendInterface::init_context(const char* home_dir) {
 	s_default_style = ImGui::GetStyle();
 
 	ImGui::StyleColorsDark();
-	//ImGui::StyleColorsLight();
-
-	::exchange_if_not_equal(s_text_scaling, s_default_style.FontScaleMain);
-	::exchange_if_not_equal(s_display_density, s_default_style.FontScaleDpi);
 
 	// XXX this is where we should apply theme customizations later
 
@@ -222,11 +206,14 @@ void FrontendInterface::process_event(void* event) {
 
 void FrontendInterface::begin_new_frame() {
 	if (s_pending_style_changes) {
-		ImGui::GetStyle() = s_default_style;
+		auto& current_style = ImGui::GetStyle();
 
-		ImGui::GetStyle().ScaleAllSizes(s_zoom_scaling);
-		ImGui::GetStyle().FontScaleMain = s_zoom_scaling * s_text_scaling;
-		ImGui::GetStyle().FontScaleDpi = s_zoom_scaling * s_text_scaling;
+		auto monitor_dpi = current_style.FontScaleDpi;
+		current_style = s_default_style;
+
+		current_style.ScaleAllSizes(s_zoom_scaling);
+		current_style.FontScaleMain = s_zoom_scaling * s_text_scaling;
+		current_style.FontScaleDpi = monitor_dpi;
 
 		s_pending_style_changes = false;
 	}

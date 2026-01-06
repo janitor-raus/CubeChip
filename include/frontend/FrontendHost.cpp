@@ -151,11 +151,10 @@ FrontendHost* FrontendHost::init_application(
 	BVS = BasicVideoSpec::initialize(BVS_settings);
 	if (!BVS) { return nullptr; }
 
-	FrontendInterface::set_dpi_scaling(BVS->get_display_pixel_density());
 	FrontendInterface::init_video(BVS->get_main_window(), BVS->get_main_renderer());
-
 	FrontendInterface::set_ui_zoom_scaling(FEH_settings.ui_zoom_scale);
 	FrontendInterface::set_ui_text_scaling(FEH_settings.ui_text_scale);
+
 	FrontendHost::import_mru(FEH_settings.file_mru_cache);
 
 	::push_back_pending_file_drops(game_file_path);

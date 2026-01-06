@@ -136,7 +136,6 @@ public:
 	static auto* get_current_renderer() noexcept { return s_current_renderer; }
 
 public:
-	static void  set_dpi_scaling(float density) noexcept;
 	static void  set_ui_zoom_scaling(float scale) noexcept;
 	static float get_ui_zoom_scaling() noexcept;
 	static void  set_ui_text_scaling(float scale) noexcept;

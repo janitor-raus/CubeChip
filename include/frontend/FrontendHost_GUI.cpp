@@ -182,7 +182,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 
 			auto current_log_path = blog.get_log_path();
 			ImGui::BeginDisabled(s_opening_log.load(mo::acquire) || current_log_path.empty());
-			if (ImGui::Button("View Log File")) {
+			if (ImGui::Button("Open Log File")) {
 				s_opening_log.store(true, mo::release);
 
 				Thread([log_path_copy = std::move(current_log_path)]() noexcept {
