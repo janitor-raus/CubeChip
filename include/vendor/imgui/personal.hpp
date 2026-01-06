@@ -43,6 +43,10 @@ namespace ImGui {
 
 	void TextUnformatted(const char* text, unsigned color, const char* text_end = 0) noexcept;
 
+	void AddCursorPos(const ImVec2& delta) noexcept;
+	void AddCursorPosX(float delta) noexcept;
+	void AddCursorPosY(float delta) noexcept;
+
 	void writeText(
 		const char* textString,
 		unsigned textColor   = 0xFFFFFFFF,

@@ -24,7 +24,7 @@
 /*==================================================================*/
 
 void FrontendHost::setup_gui_callables() noexcept {
-	static auto sMenu_File_Open = FrontendInterface::register_menu("",
+	static auto s_menu_file__open_file = FrontendInterface::register_menu("",
 	{ 0, "File" }, [&]() noexcept {
 		if (ImGui::MenuItem("Open File...")) {
 			SDL_ShowOpenFileDialog([](void*, const char* const* file_list, int) noexcept {
@@ -33,7 +33,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 		}
 	});
 
-	static auto sMenu_File_Data = FrontendInterface::register_menu("",
+	static auto s_menu_file__data_folder = FrontendInterface::register_menu("",
 	{ 0, "File" }, [&]() noexcept {
 		static std::atomic<bool> s_opening_url{};
 		static auto s_home_url = "file:///" + HomeDirManager::get_home_path();
@@ -50,7 +50,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 		}
 	});
 
-	static auto sMenu_Recent_Files = FrontendInterface::register_menu("",
+	static auto s_menu_file__recent_files = FrontendInterface::register_menu("",
 	{ 0, "File" }, [&]() noexcept {
 		if (!s_file_mru.size()) { return; }
 		ImGui::Spacing();
@@ -74,23 +74,23 @@ void FrontendHost::setup_gui_callables() noexcept {
 		}
 	});
 
-	static bool sShowDemoWindow{};
-	static auto sMenu_Debug_Demo = FrontendInterface::register_menu("",
+	static bool s_show_window_demo{};
+	static auto s_menu_debug__imgui_demo = FrontendInterface::register_menu("",
 	{ 10, "Debug" }, [&]() noexcept {
-		if (ImGui::MenuItem("ImGUI Demo...", nullptr, sShowDemoWindow)) {
-			sShowDemoWindow = !sShowDemoWindow;
+		if (ImGui::MenuItem("ImGUI Demo...", nullptr, s_show_window_demo)) {
+			s_show_window_demo = !s_show_window_demo;
 		}
 	});
 
-	static bool sShowLogWindow{};
-	static auto sMenu_Debug_Log = FrontendInterface::register_menu("",
+	static bool s_show_window_logger{};
+	static auto s_menu_debug__show_logs = FrontendInterface::register_menu("",
 	{ 10, "Debug" }, [&]() noexcept {
-		if (ImGui::MenuItem("Show Logs...", nullptr, sShowLogWindow)) {
-			sShowLogWindow = !sShowLogWindow;
+		if (ImGui::MenuItem("Show Logs...", nullptr, s_show_window_logger)) {
+			s_show_window_logger = !s_show_window_logger;
 		}
 	});
 
-	static auto sMenu_AboutApp = FrontendInterface::register_menu("",
+	static auto s_menu_debug__about_app = FrontendInterface::register_menu("",
 	{ 10, "Debug" }, [&]() noexcept {
 		if (ImGui::BeginMenu("About...")) {
 			ImGui::PushFont(nullptr, 21.0f);
@@ -121,68 +121,74 @@ void FrontendHost::setup_gui_callables() noexcept {
 		}
 	});
 
-	static auto sMenu_Settings_ZoomScale = FrontendInterface::register_menu("",
+	static auto s_menu_settings__zoom_scale = FrontendInterface::register_menu("",
 	{ 20, "Settings" }, [&]() noexcept {
-		static int  scale_factor{};
-		static bool click_active{};
+		static int  s_scale_factor{};
+		static bool s_click_active{};
 
-		if (!click_active) { scale_factor = int(FrontendInterface::get_ui_zoom_scaling() * 100); }
-		ImGui::SliderInt(" UI Zoom Scale", &scale_factor, 100, 200, "%d%%");
+		if (!s_click_active) { s_scale_factor = int(FrontendInterface::get_ui_zoom_scaling() * 100); }
+		ImGui::SliderInt(" UI Zoom Scale", &s_scale_factor, 100, 200, "%d%%");
 
-		click_active = ImGui::IsItemActive();
+		s_click_active = ImGui::IsItemActive();
 		if (ImGui::IsItemDeactivatedAfterEdit()) {
-			FrontendInterface::set_ui_zoom_scaling(scale_factor * 0.01f);
+			FrontendInterface::set_ui_zoom_scaling(s_scale_factor * 0.01f);
 		}
 	});
 
-	static auto sMenu_Settings_TextScale = FrontendInterface::register_menu("",
+	static auto s_menu_settings__text_scale = FrontendInterface::register_menu("",
 	{ 20, "Settings" }, [&]() noexcept {
-		static int  scale_factor{};
-		static bool click_active{};
+		static int  s_scale_factor{};
+		static bool s_click_active{};
 
-		if (!click_active) { scale_factor = int(FrontendInterface::get_ui_text_scaling() * 100); }
-		ImGui::SliderInt(" UI Text Scale", &scale_factor, 50, 150, "%d%%");
+		if (!s_click_active) { s_scale_factor = int(FrontendInterface::get_ui_text_scaling() * 100); }
+		ImGui::SliderInt(" UI Text Scale", &s_scale_factor, 50, 150, "%d%%");
 
-		click_active = ImGui::IsItemActive();
+		s_click_active = ImGui::IsItemActive();
 		if (ImGui::IsItemDeactivatedAfterEdit()) {
-			FrontendInterface::set_ui_text_scaling(scale_factor * 0.01f);
+			FrontendInterface::set_ui_text_scaling(s_scale_factor * 0.01f);
 		}
 	});
 
-	static auto sMenu_Settings_MasterVol = FrontendInterface::register_menu("",
+	static auto s_menu_settings__master_vol = FrontendInterface::register_menu("",
 	{ 20, "Settings" }, [&]() noexcept {
 		auto global_gain = int(GAB->get_global_gain() * 100);
 		if (ImGui::SliderInt(" Master Volume", &global_gain, 0, 100, "%d%%"))
 			{ GAB->set_glogal_gain(global_gain * 0.01f); }
 	});
 
-	static auto sWindow_Demo = FrontendInterface::register_window(
+	static auto s_window_none__imgui_demo = FrontendInterface::register_window(
 	[&]() noexcept {
-		if (!sShowDemoWindow) { return; }
-		ImGui::ShowDemoWindow(&sShowDemoWindow);
+		if (!s_show_window_demo) { return; }
+		ImGui::ShowDemoWindow(&s_show_window_demo);
 	});
 
-	static auto sWindow_Log = FrontendInterface::register_window(
+	static auto s_window_none__log_viewer = FrontendInterface::register_window(
 	[&]() noexcept {
-		if (!sShowLogWindow) { return; }
+		if (!s_show_window_logger) { return; }
 
-		static bool autoScroll = true;
-		static bool scrollToBottom{};
+		static bool s_auto_scroll = true;
+		static bool s_goto_bottom = false;
 
 		static std::atomic<bool> s_opening_log{};
 
-		if (ImGui::Begin("Application Log##Logger", &sShowLogWindow,
+		if (ImGui::Begin("Application Log##Logger", &s_show_window_logger,
 			ImGuiWindowFlags_NoCollapse
 		)) {
-			if (ImGui::Button("Scroll to Bottom")) { scrollToBottom = true; }
+			if (ImGui::Button("Scroll to Bottom")) { s_goto_bottom = true; }
 
 			ImGui::SameLine();
-			ImGui::Checkbox("Auto-scroll", &autoScroll);
+			ImGui::Checkbox("Auto-scroll", &s_auto_scroll);
 			ImGui::SameLine();
+
+			constexpr static const char* s_open_log_file_label = "Open Log File";
+			const float right_width = ImGui::CalcTextSize(s_open_log_file_label).x
+				+ ImGui::GetStyle().FramePadding.x * 2;
+
+			ImGui::AddCursorPosX(ImGui::GetContentRegionAvail().x - right_width);
 
 			auto current_log_path = blog.get_log_path();
 			ImGui::BeginDisabled(s_opening_log.load(mo::acquire) || current_log_path.empty());
-			if (ImGui::Button("Open Log File")) {
+			if (ImGui::Button(s_open_log_file_label)) {
 				s_opening_log.store(true, mo::release);
 
 				Thread([log_path_copy = std::move(current_log_path)]() noexcept {
@@ -196,12 +202,9 @@ void FrontendHost::setup_gui_callables() noexcept {
 
 			ImGui::Separator();
 
-			ImGui::BeginChild("LogTableRegion", { 0.0f, 0.0f });
-
-			if (ImGui::BeginTable("LogTable", 4,
-				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Sortable |
-				ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_RowBg)
-			) {
+			if (ImGui::BeginTable("LogTable", 4, ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_RowBg
+				| ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY
+			)) {
 				ImGui::TableSetupScrollFreeze(0, 1);
 				ImGui::TableSetupColumn("#",        ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_PreferSortAscending);
 				ImGui::TableSetupColumn("Time",     ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort);
@@ -210,11 +213,11 @@ void FrontendHost::setup_gui_callables() noexcept {
 				ImGui::TableHeadersRow();
 
 				const auto snapshot = blog->snapshot(0).fast();
-				static bool sortDescending{};
+				static bool s_sort_descending{};
 
 				if (auto* sort = ImGui::TableGetSortSpecs()) {
 					if (sort->SpecsCount > 0 && sort->SpecsDirty) {
-						sortDescending = sort->Specs[0].SortDirection
+						s_sort_descending = sort->Specs[0].SortDirection
 							== ImGuiSortDirection_Descending;
 					}
 				}
@@ -237,22 +240,20 @@ void FrontendHost::setup_gui_callables() noexcept {
 					ImGui::TextUnformatted(entry.message.c_str());
 				};
 
-				if (sortDescending) {
+				if (s_sort_descending) {
 					namespace rv = std::ranges::views;
 					for (auto& entry : rv::reverse(snapshot)) { renderTable(entry); }
 				} else {
 					for (auto& entry : snapshot) { renderTable(entry); }
 				}
 
-				if (scrollToBottom || (autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY())) {
+				if (s_goto_bottom || (s_auto_scroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY())) {
 					ImGui::SetScrollHereY(1.0f);
-					scrollToBottom = false;
+					s_goto_bottom = false;
 				}
 
 				ImGui::EndTable();
 			}
-
-			ImGui::EndChild();
 		}
 		ImGui::End();
 	});

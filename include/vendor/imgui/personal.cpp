@@ -1,3 +1,6 @@
+#include "personal.hpp"
+#include "personal.hpp"
+#include "personal.hpp"
 /*
 	This Source Code Form is subject to the terms of the Mozilla Public
 	License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -62,6 +65,18 @@ namespace ImGui {
 		PushStyleColor(ImGuiCol_Text, color);
 		TextUnformatted(text, text_end);
 		PopStyleColor();
+	}
+
+	void AddCursorPos(const ImVec2& delta) noexcept {
+		ImGui::SetCursorPos(ImGui::GetCursorPos() + delta);
+	}
+
+	void AddCursorPosX(float delta) noexcept {
+		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + delta);
+	}
+
+	void AddCursorPosY(float delta) noexcept {
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + delta);
 	}
 
 	void writeText(
