@@ -121,13 +121,13 @@ void FrontendHost::setup_gui_callables() noexcept {
 		}
 	});
 
-	static auto sMenu_Settings_ScaleUI = FrontendInterface::register_menu("",
+	static auto sMenu_Settings_ZoomScale = FrontendInterface::register_menu("",
 	{ 20, "Settings" }, [&]() noexcept {
 		static int  scale_factor{};
 		static bool click_active{};
 
 		if (!click_active) { scale_factor = int(FrontendInterface::get_ui_zoom_scaling() * 100); }
-		ImGui::SliderInt(" UI Zoom Scale", &scale_factor, 100, 300, "%d%%");
+		ImGui::SliderInt(" UI Zoom Scale", &scale_factor, 100, 200, "%d%%");
 
 		click_active = ImGui::IsItemActive();
 		if (ImGui::IsItemDeactivatedAfterEdit()) {
@@ -135,13 +135,13 @@ void FrontendHost::setup_gui_callables() noexcept {
 		}
 	});
 
-	static auto sMenu_Settings_ScaleText = FrontendInterface::register_menu("",
+	static auto sMenu_Settings_TextScale = FrontendInterface::register_menu("",
 	{ 20, "Settings" }, [&]() noexcept {
 		static int  scale_factor{};
 		static bool click_active{};
 
 		if (!click_active) { scale_factor = int(FrontendInterface::get_ui_text_scaling() * 100); }
-		ImGui::SliderInt(" UI Text Scale", &scale_factor, 50, 200, "%d%%");
+		ImGui::SliderInt(" UI Text Scale", &scale_factor, 50, 150, "%d%%");
 
 		click_active = ImGui::IsItemActive();
 		if (ImGui::IsItemDeactivatedAfterEdit()) {

@@ -136,7 +136,7 @@ void FrontendInterface::invoke_registered_menus(const PlainKey& tag) noexcept {
 
 /*==================================================================*/
 
-void FrontendInterface::set_display_scaling(float scale) noexcept {
+void FrontendInterface::set_dpi_scaling(float scale) noexcept {
 	s_display_density = std::clamp(scale, 1.0f, 4.0f);
 	set_ui_zoom_scaling(get_ui_zoom_scaling());
 }
@@ -183,6 +183,9 @@ void FrontendInterface::init_context(const char* home_dir) {
 
 	s_default_style = ImGui::GetStyle();
 
+	ImGui::StyleColorsDark();
+	//ImGui::StyleColorsLight();
+
 	::exchange_if_not_equal(s_text_scaling, s_default_style.FontScaleMain);
 	::exchange_if_not_equal(s_display_density, s_default_style.FontScaleDpi);
 
@@ -199,8 +202,7 @@ void FrontendInterface::quit_context() {
 }
 
 void FrontendInterface::init_video(SDL_Window* window, SDL_Renderer* renderer) {
-	ImGui::StyleColorsDark();
-	//ImGui::StyleColorsLight();
+
 
 	ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
 	ImGui_ImplSDLRenderer3_Init(renderer);
@@ -222,9 +224,9 @@ void FrontendInterface::begin_new_frame() {
 	if (s_pending_style_changes) {
 		ImGui::GetStyle() = s_default_style;
 
-		//ImGui::GetStyle().FontScaleDpi = s_display_density;
-		ImGui::GetStyle().FontScaleMain = s_zoom_scaling * s_text_scaling;
 		ImGui::GetStyle().ScaleAllSizes(s_zoom_scaling);
+		ImGui::GetStyle().FontScaleMain = s_zoom_scaling * s_text_scaling;
+		ImGui::GetStyle().FontScaleDpi = s_zoom_scaling * s_text_scaling;
 
 		s_pending_style_changes = false;
 	}
@@ -257,7 +259,8 @@ void FrontendInterface::begin_new_frame() {
 
 void FrontendInterface::render_frame(SDL_Renderer* renderer) {
 	ImGui::Render();
-	ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
+	ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(),
+		renderer ? renderer : s_current_renderer);
 }
 
 void FrontendInterface::dock_next_window_to(unsigned id, bool first_time) noexcept {

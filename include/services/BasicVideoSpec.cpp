@@ -4,16 +4,17 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "FrontendInterface.hpp"
 #include "BasicVideoSpec.hpp"
 #include "BasicLogger.hpp"
 
 #include <vector>
 #include <exception>
-#include <SDL3/SDL.h>
+
+#include <SDL3/SDL_messagebox.h>
+#include <SDL3/SDL_init.h>
 #include <SDL3/SDL_render.h>
 
-#ifdef _WIN32
+#if defined(_WIN32) && defined(WINDOWS_NO_ROUNDED_CORNERS)
 	#include <sdkddkver.h>
 
 	#if (NTDDI_VERSION < NTDDI_WIN10_CO)
@@ -112,9 +113,6 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 		m_main_renderer = SDL_CreateRenderer(m_main_window, nullptr); \
 		if (!m_main_renderer) { throw_fatal_error(__LINE__, __func__); }
 
-		FrontendInterface::init_video(m_main_window, m_main_renderer);
-		//FrontendInterface::set_display_scaling(get_display_pixel_density());
-
 		SDL_ShowWindow(m_main_window);
 	}
 	catch (const FatalError&) {
@@ -128,9 +126,6 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 }
 
 BasicVideoSpec::~BasicVideoSpec() noexcept {
-	FrontendInterface::quit_video();
-	FrontendInterface::quit_context();
-
 	SDL_QuitSubSystem(SDL_INIT_VIDEO);
 }
 
@@ -316,23 +311,14 @@ bool BasicVideoSpec::raise_window(SDL_Window* window) noexcept {
 	return SDL_RaiseWindow(window ? window : m_main_window.get());
 }
 
-bool BasicVideoSpec::update_renderer_logical_presentation(SDL_Renderer* renderer) noexcept {
-	auto current_renderer = renderer ? renderer : m_main_renderer.get();
-	int  window_w, window_h;
-
-	SDL_GetWindowSize(SDL_GetRenderWindow(current_renderer),
-		&window_w, &window_h);
-
-	return SDL_SetRenderLogicalPresentation(current_renderer,
-		window_w, window_h, SDL_LOGICAL_PRESENTATION_STRETCH);
-}
-
 /*==================================================================*/
 
-bool BasicVideoSpec::render_present() noexcept {
+bool BasicVideoSpec::render_present(std::function<void()> render_callable) noexcept {
+	const auto scale = SDL_GetWindowPixelDensity(m_main_window);
+	SDL_SetRenderScale(m_main_renderer, scale, scale);
+
 	try {
-		FrontendInterface::begin_new_frame();
-		FrontendInterface::render_frame(m_main_renderer);
+		if (render_callable) { render_callable(); }
 
 		if (!SDL_RenderPresent(m_main_renderer)) { \
 			throw_fatal_error(__LINE__, __func__);

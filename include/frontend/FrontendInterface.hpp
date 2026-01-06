@@ -136,7 +136,7 @@ public:
 	static auto* get_current_renderer() noexcept { return s_current_renderer; }
 
 public:
-	static void  set_display_scaling(float density) noexcept;
+	static void  set_dpi_scaling(float density) noexcept;
 	static void  set_ui_zoom_scaling(float scale) noexcept;
 	static float get_ui_zoom_scaling() noexcept;
 	static void  set_ui_text_scaling(float scale) noexcept;
@@ -145,7 +145,7 @@ public:
 public:
 	static void process_event(void* event);
 	static void begin_new_frame();
-	static void render_frame(SDL_Renderer*);
+	static void render_frame(SDL_Renderer* = nullptr);
 
 	static void dock_next_window_to(unsigned id, bool first_time) noexcept;
 };

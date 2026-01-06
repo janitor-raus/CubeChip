@@ -151,6 +151,9 @@ FrontendHost* FrontendHost::init_application(
 	BVS = BasicVideoSpec::initialize(BVS_settings);
 	if (!BVS) { return nullptr; }
 
+	FrontendInterface::set_dpi_scaling(BVS->get_display_pixel_density());
+	FrontendInterface::init_video(BVS->get_main_window(), BVS->get_main_renderer());
+
 	FrontendInterface::set_ui_zoom_scaling(FEH_settings.ui_zoom_scale);
 	FrontendInterface::set_ui_text_scaling(FEH_settings.ui_text_scale);
 	FrontendHost::import_mru(FEH_settings.file_mru_cache);
@@ -163,6 +166,9 @@ FrontendHost* FrontendHost::init_application(
 }
 
 void FrontendHost::quit_application() noexcept {
+	FrontendInterface::quit_video();
+	FrontendInterface::quit_context();
+
 	for (auto& [id, system] : m_systems) { system.core.reset(); }
 
 	HDM->write_app_config_file(
@@ -229,7 +235,10 @@ int FrontendHost::process_client_frame() {
 		s_pending_file_drops.clear();
 	}
 
-	return BVS->render_present() ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
+	return BVS->render_present([&]() {
+		FrontendInterface::begin_new_frame();
+		FrontendInterface::render_frame();
+	}) ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
 }
 
 void FrontendHost::handle_main_hotkeys() {
