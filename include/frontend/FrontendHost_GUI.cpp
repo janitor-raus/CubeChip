@@ -168,19 +168,22 @@ void FrontendHost::setup_gui_callables() noexcept {
 
 		static bool s_auto_scroll = true;
 		static bool s_goto_bottom = false;
+		static bool s_is_bottomed = true;
 
 		static std::atomic<bool> s_opening_log{};
 
-		if (ImGui::Begin("Application Log##Logger", &s_show_window_logger,
+		if (ImGui::Begin("Log Viewer##log_viewer", &s_show_window_logger,
 			ImGuiWindowFlags_NoCollapse
 		)) {
-			if (ImGui::Button("Scroll to Bottom")) { s_goto_bottom = true; }
+			ImGui::BeginDisabled(s_is_bottomed);
+			if (ImGui::Button("Scroll to bottom")) { s_goto_bottom = true; }
+			ImGui::EndDisabled();
 
 			ImGui::SameLine();
 			ImGui::Checkbox("Auto-scroll", &s_auto_scroll);
 			ImGui::SameLine();
 
-			constexpr static const char* s_open_log_file_label = "Open Log File";
+			constexpr static const char* s_open_log_file_label = "Open log file...";
 			const float right_width = ImGui::CalcTextSize(s_open_log_file_label).x
 				+ ImGui::GetStyle().FramePadding.x * 2;
 
@@ -200,12 +203,12 @@ void FrontendHost::setup_gui_callables() noexcept {
 			}
 			ImGui::EndDisabled();
 
-			ImGui::Separator();
+			ImGui::Spacing();
 
 			if (ImGui::BeginTable("LogTable", 4, ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_RowBg
 				| ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY
 			)) {
-				ImGui::TableSetupScrollFreeze(0, 1);
+				ImGui::TableSetupScrollFreeze(1, 1);
 				ImGui::TableSetupColumn("#",        ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_PreferSortAscending);
 				ImGui::TableSetupColumn("Time",     ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort);
 				ImGui::TableSetupColumn("Severity", ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort);
@@ -247,9 +250,11 @@ void FrontendHost::setup_gui_callables() noexcept {
 					for (auto& entry : snapshot) { renderTable(entry); }
 				}
 
-				if (s_goto_bottom || (s_auto_scroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY())) {
+				s_is_bottomed = ImGui::GetScrollY() >= ImGui::GetScrollMaxY();
+
+				if (s_goto_bottom || s_auto_scroll && s_is_bottomed) {
+					s_is_bottomed = true; s_goto_bottom = false;
 					ImGui::SetScrollHereY(1.0f);
-					s_goto_bottom = false;
 				}
 
 				ImGui::EndTable();

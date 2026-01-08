@@ -244,7 +244,7 @@ void FrontendHost::handle_main_hotkeys() {
 	static BasicKeyboard Input;
 	Input.updateStates();
 
-	if (Input.isPressed(KEY(F9))) {
+	if (Input.isPressed(KEY(F8))) {
 		CoreRegistry::load_game_database();
 	}
 

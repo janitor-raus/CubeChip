@@ -42,7 +42,7 @@ void SystemInterface::start_workers() noexcept {
 				if (Pacer.isFrameReady(!has_system_state(EmuState::BENCH))) {
 					Pacer.setLimiterProperties(get_real_system_framerate());
 
-					if (!can_system_work()) [[unlikely]] { return; }
+					if (!can_system_work()) [[unlikely]] { continue; }
 
 					set_frame_stop_flag(true);
 					notify_next_frame(true);

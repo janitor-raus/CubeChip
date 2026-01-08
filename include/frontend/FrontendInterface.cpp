@@ -233,9 +233,12 @@ void FrontendInterface::begin_new_frame() {
 	ImGui::SetNextWindowSize(viewport.WorkSize);
 	ImGui::SetNextWindowViewport(viewport.ID);
 
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2());
 	ImGui::Begin("MainDockspace", nullptr, ImGuiWindowFlags_NoSavedSettings
 		| ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs
 		| ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
+	ImGui::PopStyleVar(2);
 
 	s_main_dock_id = ImGui::GetID("MainDockspace");
 	ImGui::DockSpace(s_main_dock_id);
