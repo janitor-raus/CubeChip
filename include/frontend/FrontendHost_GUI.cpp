@@ -38,6 +38,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 		static std::atomic<bool> s_opening_url{};
 		static auto s_home_url = "file:///" + HomeDirManager::get_home_path();
 
+		ImGui::BeginDisabled(s_opening_url.load(mo::acquire));
 		if (ImGui::MenuItem("Open Data Folder...", nullptr, nullptr, !s_opening_url.load(mo::acquire))) {
 			s_opening_url.store(true, mo::release);
 
@@ -48,6 +49,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 				s_opening_url.store(false, mo::release);
 			}).detach();
 		}
+		ImGui::EndDisabled();
 	});
 
 	static auto s_menu_file__recent_files = FrontendInterface::register_menu("",
