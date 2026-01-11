@@ -33,7 +33,6 @@ inline CONSTEXPR_MATH RGBA  to_RGBA (OKLCH in) noexcept;
 struct alignas(4) RGBA {
 	using u8     = ez::u8;
 	using Packed = ez::u32;
-	using Weight = ez::Weight;
 
 	static constexpr u8 Opaque_A = 0xFF;
 	static constexpr u8 Transparent_A = 0x0;
@@ -61,6 +60,11 @@ private:
 	}
 
 public:
+	constexpr RGBA& set_R(u8 r) noexcept { R = r; return *this; }
+	constexpr RGBA& set_G(u8 g) noexcept { G = g; return *this; }
+	constexpr RGBA& set_B(u8 b) noexcept { B = b; return *this; }
+	constexpr RGBA& set_A(u8 a) noexcept { A = a; return *this; }
+
 	constexpr Packed raw()      const noexcept { return std::bit_cast<Packed>(*this); }
 	constexpr operator Packed() const noexcept { return raw(); }
 
@@ -91,7 +95,7 @@ public:
 	constexpr Packed BRGA()     const noexcept { return pack(B, R, G, A); }
 	constexpr Packed BGRA()     const noexcept { return pack(B, G, R, A); }
 
-	static constexpr RGBA lerp(RGBA x, RGBA y, Weight w) noexcept {
+	static constexpr RGBA lerp(RGBA x, RGBA y, ez::Weight w) noexcept {
 		return RGBA(
 			ez::fixed_lerp8(x.R, y.R, w),
 			ez::fixed_lerp8(x.G, y.G, w),
@@ -218,7 +222,7 @@ public:
 	 * @param[in] weight :: Custom source weight bias.
 	 */
 	[[nodiscard]] static constexpr
-	RGBA weighted_alpha_blend(RGBA src, RGBA dst, Weight weight) noexcept {
+	RGBA weighted_alpha_blend(RGBA src, RGBA dst, ez::Weight weight) noexcept {
 		switch (weight) {
 			case Opaque_A:      return src;
 			case Transparent_A: return dst;
@@ -234,7 +238,7 @@ public:
 	 * @param[in] weight :: Custom source weight bias. If 0, default to source alpha.
 	 */
 	[[nodiscard]] static constexpr
-	RGBA composite_blend(RGBA src, RGBA dst, BlendFunc func, Weight weight = Opaque_A) noexcept {
+	RGBA composite_blend(RGBA src, RGBA dst, BlendFunc func, ez::Weight weight = Opaque_A) noexcept {
 		if (auto alpha = ez::fixed_mul8(src.A, weight)) [[likely]] {
 			return weighted_alpha_blend(channel_blend(src, dst, func), dst, alpha);
 		}
@@ -244,10 +248,10 @@ public:
 	/**
 	 * @brief Pre-multiplies an RGBA color by a given weight.
 	 * @param[in] src :: Source color (alpha is ignored).
-	 * @param[in] weight :: Weight to pre-multiply by.
+	 * @param[in] weight :: ez::Weight to pre-multiply by.
 	 */
 	[[nodiscard]] static constexpr
-	RGBA premul(RGBA src, Weight weight) noexcept {
+	RGBA premul(RGBA src, ez::Weight weight) noexcept {
 		return RGBA(
 			ez::fixed_mul8(src.R, weight),
 			ez::fixed_mul8(src.G, weight),
@@ -283,7 +287,6 @@ struct alignas(4) HSV {
 	using Type_S = ez::u8;
 	using Type_V = Type_S;
 	using Packed = ez::u32;
-	using Weight = ez::Weight;
 
 	static constexpr auto full_hue = Type_H(0x600u);
 	static constexpr auto half_hue = Type_H(full_hue >> 1);
@@ -304,7 +307,7 @@ struct alignas(4) HSV {
 
 	constexpr operator Packed() const noexcept { return Packed(H) << 16 | S << 8 | V; }
 
-	static constexpr HSV lerp(HSV x, HSV y, Weight w) noexcept {
+	static constexpr HSV lerp(HSV x, HSV y, ez::Weight w) noexcept {
 		return HSV(
 			ez::fixed_lerpN(x.H, y.H, w, full_hue, half_hue),
 			ez::fixed_lerp8(x.S, y.S, w),
@@ -315,8 +318,7 @@ struct alignas(4) HSV {
 /*==================================================================*/
 
 struct OKLAB {
-	using Type_F = ez::f64;
-	using Weight = ez::Weight;
+	using Type_F = ez::f32;
 
 	Type_F L{}, A{}, B{};
 
@@ -326,29 +328,28 @@ struct OKLAB {
 	{}
 
 	static CONSTEXPR_MATH Type_F gamma_def(Type_F x) noexcept {
-		return x <= 0.0404500 ? x / 12.92 : std::pow((x + 0.055) / 1.055, 2.4);
+		return x <= 0.0404500f ? x / 12.92f : std::pow((x + 0.055f) / 1.055f, 2.4f);
 		//return std::pow(x, 2.2); // quick path
 	}
 	static CONSTEXPR_MATH Type_F gamma_inv(Type_F x) noexcept {
-		return x <= 0.0031308 ? x * 12.92 : 1.055 * std::pow(x, 1.0 / 2.4) - 0.055;
-		//return std::pow(x, 1.0 / 2.2); // quick path
+		return x <= 0.0031308f ? x * 12.92f : 1.055f * std::pow(x, 1.0f / 2.4f) - 0.055f;
+		//return std::pow(x, 1.0f / 2.2f); // quick path
 	}
 
-	static constexpr OKLAB lerp(OKLAB x, OKLAB y, Weight w) noexcept {
+	static constexpr OKLAB lerp(OKLAB x, OKLAB y, ez::Weight w) noexcept {
 		return OKLAB(
 			std::lerp(x.L, y.L, w.as_fp()),
 			std::lerp(x.A, y.A, w.as_fp()),
 			std::lerp(x.B, y.B, w.as_fp()));
 	}
 
-	static CONSTEXPR_MATH RGBA lerp(RGBA x, RGBA y, Weight w) noexcept {
+	static CONSTEXPR_MATH RGBA lerp(RGBA x, RGBA y, ez::Weight w) noexcept {
 		return ::to_RGBA(lerp(::to_OKLAB(x), ::to_OKLAB(y), w));
 	}
 };
 
 struct OKLCH {
 	using Type_F = OKLAB::Type_F;
-	using Weight = OKLAB::Weight;
 
 	Type_F L{}, C{}, H{};
 
@@ -357,20 +358,20 @@ struct OKLCH {
 		: L(L), C(C), H(H)
 	{}
 
-	static constexpr OKLCH lerp(OKLCH x, OKLCH y, Weight w) noexcept {
-		const auto delta = ez::fmod(y.H - x.H + \
-			std::numbers::pi * 3, std::numbers::pi * 2) - std::numbers::pi;
+	static constexpr OKLCH lerp(OKLCH x, OKLCH y, ez::Weight w) noexcept {
+		const auto delta = ez::fmod(y.H - x.H + ez::f32(std::numbers::pi * 3),
+			ez::f32(std::numbers::pi * 2)) - ez::f32(std::numbers::pi);
 		return OKLCH(
 			std::lerp(x.L, y.L, w.as_fp()),
 			std::lerp(x.C, y.C, w.as_fp()),
 			y.H + delta * w);
 	}
 
-	static CONSTEXPR_MATH OKLAB lerp(OKLAB x, OKLAB y, Weight w) noexcept {
+	static CONSTEXPR_MATH OKLAB lerp(OKLAB x, OKLAB y, ez::Weight w) noexcept {
 		return ::to_OKLAB(lerp(::to_OKLCH(x), ::to_OKLCH(y), w));
 	}
 
-	static CONSTEXPR_MATH RGBA lerp(RGBA x, RGBA y, Weight w) noexcept {
+	static CONSTEXPR_MATH RGBA lerp(RGBA x, RGBA y, ez::Weight w) noexcept {
 		return ::to_RGBA(lerp(::to_OKLCH(x), ::to_OKLCH(y), w));
 	}
 };
@@ -424,14 +425,14 @@ inline CONSTEXPR_MATH OKLAB to_OKLAB(RGBA in) noexcept {
 	const auto G = OKLAB::gamma_def(in.G / 255.0f);
 	const auto B = OKLAB::gamma_def(in.B / 255.0f);
 
-	const auto L = std::cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B);
-	const auto M = std::cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B);
-	const auto S = std::cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
+	const auto L = std::cbrt(0.4122214708f * R + 0.5363325363f * G + 0.0514459929f * B);
+	const auto M = std::cbrt(0.2119034982f * R + 0.6806995451f * G + 0.1073969566f * B);
+	const auto S = std::cbrt(0.0883024619f * R + 0.2817188376f * G + 0.6299787005f * B);
 
 	return OKLAB(
-		0.2104542553 * L + 0.7936177850 * M - 0.0040720468 * S,
-		1.9779984951 * L - 2.4285922050 * M + 0.4505937099 * S,
-		0.0259040371 * L + 0.7827717662 * M - 0.8086757660 * S
+		0.2104542553f * L + 0.7936177850f * M - 0.0040720468f * S,
+		1.9779984951f * L - 2.4285922050f * M + 0.4505937099f * S,
+		0.0259040371f * L + 0.7827717662f * M - 0.8086757660f * S
 	);
 }
 
@@ -448,18 +449,18 @@ inline CONSTEXPR_MATH OKLCH to_OKLCH(RGBA in) noexcept {
 }
 
 inline CONSTEXPR_MATH RGBA to_RGBA(OKLAB in) noexcept {
-	const auto L = std::pow(in.L + in.A * 0.39633778 + in.B * 0.21580376, 3.0);
-	const auto M = std::pow(in.L - in.A * 0.10556113 - in.B * 0.06385417, 3.0);
-	const auto S = std::pow(in.L - in.A * 0.08948418 - in.B * 1.29148554, 3.0);
+	const auto L = std::pow(in.L + in.A * 0.39633778f + in.B * 0.21580376f, 3.0f);
+	const auto M = std::pow(in.L - in.A * 0.10556113f - in.B * 0.06385417f, 3.0f);
+	const auto S = std::pow(in.L - in.A * 0.08948418f - in.B * 1.29148554f, 3.0f);
 
-	const auto R = +4.07674 * L - 3.30771 * M + 0.23097 * S;
-	const auto G = -1.26844 * L + 2.60976 * M - 0.34132 * S;
-	const auto B = -0.00439 * L - 0.70342 * M + 1.70758 * S;
+	const auto R = +4.07674f * L - 3.30771f * M + 0.23097f * S;
+	const auto G = -1.26844f * L + 2.60976f * M - 0.34132f * S;
+	const auto B = -0.00439f * L - 0.70342f * M + 1.70758f * S;
 
 	return RGBA(
-		RGBA::u8(ez::round(255.0 * OKLAB::gamma_inv(R))),
-		RGBA::u8(ez::round(255.0 * OKLAB::gamma_inv(G))),
-		RGBA::u8(ez::round(255.0 * OKLAB::gamma_inv(B)))
+		RGBA::u8(ez::round(255.0f * OKLAB::gamma_inv(R))),
+		RGBA::u8(ez::round(255.0f * OKLAB::gamma_inv(G))),
+		RGBA::u8(ez::round(255.0f * OKLAB::gamma_inv(B)))
 	);
 }
 

@@ -90,7 +90,7 @@ namespace EzMaths {
 
 		// Cast weight to floating-point [0..1] value
 		constexpr auto as_fp() const noexcept {
-			return (1.0 / 255.0) * m_weight;
+			return (1.0f / 255.0f) * m_weight;
 		}
 
 		constexpr operator u8() const noexcept { return m_weight; }
