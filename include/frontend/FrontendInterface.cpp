@@ -23,7 +23,7 @@ static ImGuiStyle s_default_style;
 static float s_zoom_scaling = 1.0f;
 static float s_text_scaling = 1.0f;
 
-static bool  s_pending_style_changes = false;
+static bool  s_pending_style_changes = true;
 
 /*==================================================================*/
 
@@ -169,9 +169,7 @@ void FrontendInterface::init_context(const char* home_dir) {
 
 	s_hooks = std::make_unique<RegistryAggregate>();
 
-	s_default_style = ImGui::GetStyle();
-
-	ImGui::StyleColorsDark();
+	ImGui::StyleColorsDark(&s_default_style);
 
 	// XXX this is where we should apply theme customizations later
 
@@ -206,14 +204,10 @@ void FrontendInterface::process_event(void* event) {
 
 void FrontendInterface::begin_new_frame() {
 	if (s_pending_style_changes) {
-		auto& current_style = ImGui::GetStyle();
+		ImGui::GetStyle() = s_default_style;
 
-		auto monitor_dpi = current_style.FontScaleDpi;
-		current_style = s_default_style;
-
-		current_style.ScaleAllSizes(s_zoom_scaling);
-		current_style.FontScaleMain = s_zoom_scaling * s_text_scaling;
-		current_style.FontScaleDpi = monitor_dpi;
+		ImGui::GetStyle().ScaleAllSizes(s_zoom_scaling);
+		ImGui::GetStyle().FontScaleMain = s_zoom_scaling * s_text_scaling;
 
 		s_pending_style_changes = false;
 	}
@@ -256,4 +250,28 @@ void FrontendInterface::render_frame(SDL_Renderer* renderer) {
 void FrontendInterface::dock_next_window_to(unsigned id, bool first_time) noexcept {
 	ImGui::SetNextWindowDockID(id ? id : s_main_dock_id,
 		first_time ? ImGuiCond_FirstUseEver : ImGuiCond_Always);
+}
+
+void FrontendInterface::call_menubar(const char* window_name) noexcept {
+	if (ImGui::BeginMenuBar()) {
+		invoke_registered_menus(window_name);
+		ImGui::EndMenuBar();
+	}
+}
+
+void FrontendInterface::call_autohide_menubar(const char* window_name, int key, bool& hidden) noexcept {
+	if (ImGui::IsKeyPressed(ImGuiKey(key))) { hidden = !hidden; }
+
+	if (hidden) { return; }
+	bool menus_hovered = false;
+
+	if (ImGui::BeginMenuBar()) {
+		menus_hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
+
+		invoke_registered_menus(window_name);
+		ImGui::EndMenuBar();
+	}
+
+	if (!ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) { hidden = true; }
+	if (!menus_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) { hidden = true; }
 }

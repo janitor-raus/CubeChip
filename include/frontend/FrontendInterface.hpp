@@ -147,4 +147,7 @@ public:
 	static void render_frame(SDL_Renderer* = nullptr);
 
 	static void dock_next_window_to(unsigned id, bool first_time) noexcept;
+
+	static void call_menubar(const char* window_name) noexcept;
+	static void call_autohide_menubar(const char* window_name, int key, bool& hidden) noexcept;
 };
