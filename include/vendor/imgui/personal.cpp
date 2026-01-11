@@ -78,6 +78,17 @@ namespace ImGui {
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + delta);
 	}
 
+	ImVec2 GetWindowDecoSize() noexcept {
+		const auto& style = ImGui::GetStyle();
+
+		return ImVec2(style.WindowPadding.x * 2.0f, style.WindowPadding.y * 2.0f
+			+ ImGui::GetFontSize() + style.FramePadding.y * 2.0f);
+	}
+
+	void SetNextWindowMinClientSize(const ImVec2& min) noexcept {
+		ImGui::SetNextWindowSizeConstraints(min + ImGui::GetWindowDecoSize(), ImVec2(FLT_MAX, FLT_MAX));
+	}
+
 	void writeText(
 		const char* textString, unsigned textColor,
 		Vec2 textAlign, Vec2 textPadding

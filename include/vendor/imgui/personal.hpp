@@ -47,6 +47,10 @@ namespace ImGui {
 	void AddCursorPosX(float delta) noexcept;
 	void AddCursorPosY(float delta) noexcept;
 
+	ImVec2 GetWindowDecoSize() noexcept;
+
+	void SetNextWindowMinClientSize(const ImVec2& min) noexcept;
+
 	void writeText(
 		const char* textString,
 		unsigned textColor   = 0xFFFFFFFF,
