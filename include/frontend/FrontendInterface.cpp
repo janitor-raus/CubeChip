@@ -15,6 +15,8 @@
 
 /*==================================================================*/
 
+static SDL_Renderer* s_current_renderer{};
+
 static ImFont* s_main_font{};
 static ImGuiID s_main_dock_id{};
 
@@ -65,20 +67,19 @@ void FrontendInterface::invoke_registered_windows() noexcept {
 	windows.offset = 0;
 }
 
-bool FrontendInterface::merge_overflowing_menus(const PlainKey& tag) noexcept {
+bool FrontendInterface::merge_overflowing_menus(const LabelKey& window_key) noexcept {
 	std::unique_lock lock(s_hooks->menus.overflow_lock);
 
-	auto& src_window = s_hooks->menus.overflow[tag];
-	if (src_window.empty()) {
-		 return false; }
+	auto& src_window = s_hooks->menus.overflow[window_key.get_id_or_label()];
+	if (src_window.empty()) { return false; }
 
 	unsigned migration_count = 0;
-	for (auto& [menu_title, src_hooks] : src_window) {
+	for (auto& [menu_key, src_hooks] : src_window) {
 		if (src_hooks.buffer.empty()) { continue; }
-		auto& dst_hooks = s_hooks->menus.registry[tag][menu_title];
+		auto& dst_hooks = s_hooks->menus.registry[window_key.get_id_or_label()][menu_key];
 
 		blog.newEntry<BLOG::DBG>("{} overflow hooks for menu \"{}\" found.",
-			src_hooks.buffer.size(), menu_title.second.c_str());
+			src_hooks.buffer.size(), menu_key.second.c_str());
 
 		dst_hooks.buffer.insert(dst_hooks.buffer.end(),
 			std::make_move_iterator(src_hooks.buffer.begin()),
@@ -91,17 +92,18 @@ bool FrontendInterface::merge_overflowing_menus(const PlainKey& tag) noexcept {
 	return !!migration_count;
 }
 
-void FrontendInterface::invoke_registered_menus(const PlainKey& tag) noexcept {
+void FrontendInterface::invoke_registered_menus(const LabelKey& window_key) noexcept {
 	std::unique_lock lock(s_hooks->menus.registry_lock);
 
-	auto window = s_hooks->menus.registry.find(tag);
+	merge_overflowing_menus(window_key); // unconditional first merge
+	auto window = s_hooks->menus.registry.find(window_key.get_id_or_label());
 	if (window == s_hooks->menus.registry.end()) { return; }
 
 	do {
-		for (auto& [menu_title, hooks] : window->second) {
+		for (auto& [menu_key, hooks] : window->second) {
 			if (hooks.buffer.empty()) { continue; }
 
-			if (ImGui::BeginMenu(menu_title.second.c_str())) {
+			if (ImGui::BeginMenu(menu_key.second.c_str())) {
 				hooks.first_hit = !std::exchange(hooks.has_focus, true);
 				s_active_menu = &hooks;
 
@@ -121,13 +123,16 @@ void FrontendInterface::invoke_registered_menus(const PlainKey& tag) noexcept {
 				continue;
 			}
 		}
-	} while (merge_overflowing_menus(tag));
+	} while (merge_overflowing_menus(window_key));
 
 	for (auto& [_, hooks] : window->second)
 		{ hooks.offset = 0; } // reset for next frame
 }
 
 /*==================================================================*/
+
+SDL_Renderer* FrontendInterface::get_current_renderer()  noexcept { return s_current_renderer; }
+unsigned      FrontendInterface::get_main_dockspace_id() noexcept { return s_main_dock_id; }
 
 void FrontendInterface::set_ui_zoom_scaling(float scale) noexcept {
 	s_zoom_scaling = std::clamp(scale, 1.0f, 4.0f);
@@ -259,19 +264,27 @@ void FrontendInterface::call_menubar(const char* window_name) noexcept {
 	}
 }
 
-void FrontendInterface::call_autohide_menubar(const char* window_name, int key, bool& hidden) noexcept {
-	if (ImGui::IsKeyPressed(ImGuiKey(key))) { hidden = !hidden; }
+void FrontendInterface::call_autohide_menubar(const char* window_name, bool& hidden) noexcept {
 
-	if (hidden) { return; }
-	bool menus_hovered = false;
+	if (hidden) {
+		if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && (
+			ImGui::IsKeyPressed(ImGuiKey_LeftAlt) || ImGui::IsKeyPressed(ImGuiKey_RightAlt)
+		)) { hidden = false; return; }
+	} else {
+		if (ImGui::IsKeyPressed(ImGuiKey_LeftAlt) ||
+			ImGui::IsKeyPressed(ImGuiKey_RightAlt)) { hidden = true; }
+	}
+
+	bool menu_or_popup_hovered = false;
 
 	if (ImGui::BeginMenuBar()) {
-		menus_hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
+		menu_or_popup_hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)
+			&& (ImGui::IsAnyItemHovered() || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId));
 
 		invoke_registered_menus(window_name);
 		ImGui::EndMenuBar();
 	}
 
-	if (!ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) { hidden = true; }
-	if (!menus_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) { hidden = true; }
+	if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+		!menu_or_popup_hovered) { hidden = true; }
 }

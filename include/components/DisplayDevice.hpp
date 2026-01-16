@@ -53,12 +53,39 @@ public:
 	DisplayDevice& operator=(DisplayDevice&&) noexcept;
 
 public:
+	int  get_screen_rotation() const noexcept;
 	void set_screen_rotation(int rotation) noexcept;
-	void set_integer_scaling(bool enable)  noexcept;
-	void set_utilize_shaders(bool enable)  noexcept;
 
+	bool get_integer_scaling() const noexcept;
+	void set_integer_scaling(bool enable) noexcept;
+
+	bool get_utilize_shaders() const noexcept;
+	void set_utilize_shaders(bool enable) noexcept;
+
+	auto get_display_name() const noexcept -> std::string;
 	void set_display_name(std::string_view name) noexcept;
-	void set_osd_callable(Callable callable)   noexcept;
+
+	void set_osd_callable(Callable callable) noexcept;
+
+	#if !defined(NDEBUG) || defined(DEBUG)
+private:
+	void bind_debug_menu_hooks() noexcept;
+	void free_debug_menu_hooks() noexcept;
+
+	FrontendInterface::Hook m_debug_border_width;
+	FrontendInterface::Hook m_debug_inner_margin;
+
+	FrontendInterface::Hook m_debug_border_color;
+	FrontendInterface::Hook m_debug_texture_tint;
+
+	FrontendInterface::Hook m_debug_texture_zoom;
+	FrontendInterface::Hook m_debug_pixel_ratio;
+
+	FrontendInterface::Hook m_debug_linear_scaling;
+	FrontendInterface::Hook m_debug_screen_enabled;
+
+	FrontendInterface::Hook m_reserved[4]{};
+	#endif
 };
 
 /*==================================================================*/

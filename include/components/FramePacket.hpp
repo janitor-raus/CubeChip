@@ -9,6 +9,7 @@
 #include "EzMaths.hpp"
 #include "ColorOps.hpp"
 #include "Aligned.hpp"
+#include "Parameter.hpp"
 #include "Concepts.hpp"
 
 /*==================================================================*/
@@ -78,35 +79,38 @@ struct FramePacket {
 			) : viewport_rect;
 		}
 
-		// RGB color applied as background when texture padding is used.
-		// The alpha channel is used to fade the texture to black.
+	private:
 		RGBA texture_tint = RGBA::White;
+
+	public:
+		constexpr auto  get_texture_tint() const noexcept { return texture_tint; }
+		constexpr auto& rmw_texture_tint() noexcept { return texture_tint; }
+		// The color components (RGB_) are used as the background color.
+		// The alpha component (___A) is used to fade out the texture instead.
 		constexpr self& set_texture_tint(ez::u32 color) noexcept {
 			texture_tint = color;
 			return *this;
 		}
 
 	private:
-		ez::u8 upscale_mult = 1;
+		ez::u8 texture_zoom = 1;
 
 	public:
-		constexpr auto  get_scaling() const noexcept { return upscale_mult; }
-		// Scales minimum texture display size from 1x to 16x
-		constexpr self& set_scaling(ez::s32 scale) noexcept {
-			upscale_mult = ez::u8(std::clamp(scale, 1, 16));
+		constexpr auto  get_texture_zoom() const noexcept { return texture_zoom; }
+		// Forces a mininum zoom level for the textre (1-16x)
+		constexpr self& set_texture_zoom(ez::s32 scale) noexcept {
+			texture_zoom = ez::u8(std::clamp(scale, 1, 16));
 			return *this;
 		}
 
 	private:
-		ez::u8 texture_pad = 0;
+		ez::u8 inner_margin = 0;
 
 	public:
-		constexpr auto  get_padding() const noexcept {
-			return texture_pad;
-		}
-		// Adds virtual padding pixels around the texture display (max: 15)
-		constexpr self& set_padding(ez::s32 width) noexcept {
-			texture_pad = ez::u8(std::clamp(width, 0, 32));
+		constexpr auto  get_inner_margin() const noexcept { return inner_margin; }
+		// Adds inner margin between the texture and border (max: 32px)
+		constexpr self& set_inner_margin(ez::s32 width) noexcept {
+			inner_margin = ez::u8(std::clamp(width, 0, 32));
 			return *this;
 		}
 
@@ -116,9 +120,27 @@ struct FramePacket {
 		bool interlaced{}; // signal is interlaced, framerate is halved
 		bool enabled{};    // enables the display (for systems that need it off)
 
+	private:
+		ez::u8 border_width = 4;
+
+	public:
+		constexpr auto  get_border_width() const noexcept { return border_width; }
+		constexpr self& set_border_width(ez::s32 width) noexcept {
+			border_width = ez::u8(std::clamp(width, 0, 32));
+			return *this;
+		}
+
+	private:
 		static constexpr RGBA default_border_color = RGBA(0x303030FF);
 		RGBA border_color = default_border_color;
-		ez::f32 border_width = 4.0f;
+
+	public:
+		constexpr auto  get_border_color() const noexcept { return border_color; }
+		constexpr auto& rmw_border_color() noexcept { return border_color; }
+		constexpr self& set_border_color(RGBA color) noexcept {
+			border_color = color;
+			return *this;
+		}
 
 		constexpr self& set_border_color_if(bool cond, RGBA color) noexcept {
 			border_color = cond ? color : default_border_color;
@@ -130,8 +152,19 @@ struct FramePacket {
 			return *this;
 		}
 
+	private:
+		ez::f32 pixel_ratio = 1.0f; // width/height ratio of a single pixel
+
+	public:
+		constexpr auto  get_pixel_ratio() const noexcept { return pixel_ratio; }
+		// Sets the texture's pixel aspect ratio (0.1..4.0)
+		constexpr self& set_pixel_ratio(ez::f32 ratio) noexcept {
+			pixel_ratio = std::clamp(ratio, 0.1f, 4.0f);
+			return *this;
+		}
+
 		ez::f32 refresh_rate = 60.0f; // display refresh rate in Hz
-		ez::f32 pixel_ratio  =  1.0f; // width/height ratio of a single pixel
+
 
 		ez::u64 frame_count{}; // number of frames rendered
 
@@ -153,8 +186,8 @@ struct FramePacket {
 				);
 
 				texture_tint = other.texture_tint;
-				upscale_mult = other.upscale_mult;
-				texture_pad  = other.texture_pad;
+				texture_zoom = other.texture_zoom;
+				inner_margin = other.inner_margin;
 				interlaced   = other.interlaced;
 				enabled      = other.enabled;
 				border_color = other.border_color;
@@ -164,6 +197,14 @@ struct FramePacket {
 				frame_count  = other.frame_count;
 			}
 			return *this;
+		}
+
+		/**
+		 * @brief Simple helper to increment frame_count by one. Primarily intended
+		 *        when copying from another source which was used to stage changes.
+		 */
+		Metadata& operator++() noexcept {
+			++frame_count; return *this;
 		}
 
 		// Calculates Screen Aspect Ratio (as: viewport.W / viewport.H)

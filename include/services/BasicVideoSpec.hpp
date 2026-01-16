@@ -65,9 +65,19 @@ public:
 /*==================================================================*/
 
 public:
-	static SDL_Texture* create_stream_texture(SDL_Renderer* renderer, int w, int h) noexcept;
+	static SDL_Texture* create_stream_texture(SDL_Renderer* renderer,
+		int w, int h, bool linear_scaling = false) noexcept;
+
+	static SDL_Texture* create_target_texture(SDL_Renderer* renderer,
+		int w, int h, bool linear_scaling = false) noexcept;
+
+	// Writes pixel data from src_buffer into a given Stream texture.
 	static void write_stream_texture(SDL_Renderer* renderer,
 		SDL_Texture* texture, const std::byte* src_buffer) noexcept;
+
+	// Renders Stream src_texture onto a given Target dst_texture.
+	static void write_stream_texture(SDL_Renderer* renderer,
+		SDL_Texture* dst_texture, SDL_Texture* src_texture) noexcept;
 
 public:
 	float get_display_pixel_density(SDL_DisplayID display_id = 0) noexcept;

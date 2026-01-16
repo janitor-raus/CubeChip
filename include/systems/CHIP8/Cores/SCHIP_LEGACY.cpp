@@ -33,7 +33,7 @@ void SCHIP_LEGACY::initializeSystem() noexcept {
 
 	mDisplayDevice.metadata_staging
 		.set_viewport(cDisplayW, cDisplayH)
-		.set_scaling(4).set_padding(4)
+		.set_texture_zoom(4).set_inner_margin(4)
 		.set_texture_tint(sBitColors[0])
 		.enabled = true;
 }
@@ -232,7 +232,7 @@ void SCHIP_LEGACY::renderAudioData() {
 
 void SCHIP_LEGACY::renderVideoData() {
 	mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = mDisplayDevice.metadata_staging;
+		frame.metadata = ++mDisplayDevice.metadata_staging;
 		frame.copy_from(mDisplayBuffer, isUsingPixelTrails()
 			? [](u32 pixel) noexcept { return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
 			: [](u32 pixel) noexcept { return sBitColors[pixel >> 3]; }

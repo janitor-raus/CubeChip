@@ -33,7 +33,7 @@ void CHIP8X::initializeSystem() noexcept {
 
 	mDisplayDevice.metadata_staging
 		.set_viewport(cDisplayW, cDisplayH)
-		.set_scaling(8).set_padding(4)
+		.set_texture_zoom(8).set_inner_margin(4)
 		.set_texture_tint(cBackColor[mBackgroundColor])
 		.enabled = true;
 }
@@ -233,7 +233,7 @@ void CHIP8X::renderAudioData() {
 void CHIP8X::renderVideoData() {
 	if (isUsingPixelTrails()) {
 		mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-			frame.metadata = mDisplayDevice.metadata_staging;
+			frame.metadata = ++mDisplayDevice.metadata_staging;
 			frame.copy_from(mDisplayBuffer, [&](auto& pixel) noexcept {
 				if (pixel == 0) {
 					return cBackColor[mBackgroundColor];
@@ -252,7 +252,7 @@ void CHIP8X::renderVideoData() {
 		);
 	} else {
 		mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-			frame.metadata = mDisplayDevice.metadata_staging;
+			frame.metadata = ++mDisplayDevice.metadata_staging;
 			frame.copy_from(mDisplayBuffer, [&](auto& pixel) noexcept {
 				if (pixel == 0) {
 					return cBackColor[mBackgroundColor];
@@ -302,8 +302,8 @@ void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 		mCurrentPC = mStackBank[--mStackTop & 0xF];
 	}
 	void CHIP8X::instruction_02A0() noexcept {
-		mDisplayDevice.metadata_staging.texture_tint =
-			cBackColor[++mBackgroundColor &= 0x3];
+		mDisplayDevice.metadata_staging.set_texture_tint(
+			cBackColor[++mBackgroundColor &= 0x3]);
 	}
 
 	#pragma endregion

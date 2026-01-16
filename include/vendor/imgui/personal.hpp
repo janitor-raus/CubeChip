@@ -51,6 +51,8 @@ namespace ImGui {
 
 	void SetNextWindowMinClientSize(const ImVec2& min) noexcept;
 
+	void DockNextWindowTo(unsigned id, bool first_use = false) noexcept;
+
 	void writeText(
 		const char* textString,
 		unsigned textColor   = 0xFFFFFFFF,

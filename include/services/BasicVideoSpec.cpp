@@ -243,12 +243,17 @@ void BasicVideoSpec::normalize_rect_to_display(ez::Rect& rect, ez::Rect& deco, b
 
 /*==================================================================*/
 
-SDL_Texture* BasicVideoSpec::create_stream_texture(SDL_Renderer* renderer, int w, int h) noexcept {
+static SDL_Texture* create_texture(
+	SDL_Renderer* renderer, int w, int h, SDL_PixelFormat format,
+	SDL_TextureAccess access, SDL_ScaleMode scale_mode
+) noexcept {
 	if (!renderer) { return nullptr; }
 	try {
-		auto* texture = SDL_CreateTexture(renderer, \
-			SDL_PIXELFORMAT_RGBX8888, SDL_TEXTUREACCESS_STREAMING, w, h); \
+		auto* texture = SDL_CreateTexture(renderer, format, access, w, h); \
 		if (!texture) { throw_fatal_error(__LINE__, __func__); }
+
+		SDL_SetTextureScaleMode(texture, scale_mode);
+		SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
 		return texture;
 	}
 	catch (const FatalError&) {
@@ -259,6 +264,20 @@ SDL_Texture* BasicVideoSpec::create_stream_texture(SDL_Renderer* renderer, int w
 			__func__, e.what());
 		return nullptr;
 	}
+}
+
+SDL_Texture* BasicVideoSpec::create_stream_texture(
+	SDL_Renderer* renderer, int w, int h, bool linear_scalemode
+) noexcept {
+	return ::create_texture(renderer, w, h, SDL_PIXELFORMAT_RGBX8888,
+		SDL_TEXTUREACCESS_STREAMING, SDL_ScaleMode(linear_scalemode));
+}
+
+SDL_Texture* BasicVideoSpec::create_target_texture(
+	SDL_Renderer* renderer, int w, int h, bool linear_scalemode
+) noexcept {
+	return ::create_texture(renderer, w, h, SDL_PIXELFORMAT_RGBX8888,
+		SDL_TEXTUREACCESS_TARGET, SDL_ScaleMode(linear_scalemode));
 }
 
 void BasicVideoSpec::write_stream_texture(
@@ -287,6 +306,19 @@ void BasicVideoSpec::write_stream_texture(
 
 	SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
 	SDL_RenderTexture(renderer, texture, nullptr, &dest_frect);
+}
+
+void BasicVideoSpec::write_stream_texture(
+	SDL_Renderer* renderer, SDL_Texture* dst_texture, SDL_Texture* src_texture
+) noexcept {
+	if (!renderer || !dst_texture || !src_texture) { return; }
+
+	const SDL_FRect dest_frect = { 0.0f, 0.0f,
+		float(dst_texture->w), float(dst_texture->h) };
+
+	SDL_SetRenderTarget(renderer, dst_texture);
+	SDL_RenderTexture(renderer, src_texture, nullptr, &dest_frect);
+	SDL_SetRenderTarget(renderer, nullptr);
 }
 
 /*==================================================================*/

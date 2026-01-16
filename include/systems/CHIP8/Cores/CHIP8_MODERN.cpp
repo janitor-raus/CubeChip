@@ -29,7 +29,7 @@ void CHIP8_MODERN::initializeSystem() noexcept {
 
 	mDisplayDevice.metadata_staging
 		.set_viewport(cDisplayW, cDisplayH)
-		.set_scaling(8).set_padding(4)
+		.set_texture_zoom(8).set_inner_margin(4)
 		.set_texture_tint(sBitColors[0])
 		.enabled = true;
 }
@@ -201,7 +201,7 @@ void CHIP8_MODERN::renderAudioData() {
 
 void CHIP8_MODERN::renderVideoData() {
 	mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = mDisplayDevice.metadata_staging;
+		frame.metadata = ++mDisplayDevice.metadata_staging;
 		frame.copy_from(mDisplayBuffer, isUsingPixelTrails()
 			? [](u32 pixel) noexcept { return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
 			: [](u32 pixel) noexcept { return sBitColors[pixel >> 3]; }

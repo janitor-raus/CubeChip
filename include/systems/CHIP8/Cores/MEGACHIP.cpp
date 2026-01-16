@@ -28,7 +28,7 @@ void MEGACHIP::initializeSystem() noexcept {
 	prepDisplayArea(Resolution::LO);
 
 	mDisplayDevice.metadata_staging
-		.set_scaling(2).set_padding(4)
+		.set_texture_zoom(2).set_inner_margin(4)
 		.enabled = true;
 }
 
@@ -327,7 +327,7 @@ void MEGACHIP::renderVideoData() {
 		}
 
 		mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-			frame.metadata = mDisplayDevice.metadata_staging;
+			frame.metadata = ++mDisplayDevice.metadata_staging;
 			frame.copy_from(mBackgroundBuffer);
 		});
 	}
@@ -413,7 +413,7 @@ void MEGACHIP::scrapAllVideoBuffers() {
 
 void MEGACHIP::flushAllVideoBuffers() {
 	mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = mDisplayDevice.metadata_staging;
+		frame.metadata = ++mDisplayDevice.metadata_staging;
 		frame.copy_from(mBackgroundBuffer);
 	});
 
@@ -424,7 +424,7 @@ void MEGACHIP::flushAllVideoBuffers() {
 
 void MEGACHIP::blendAndFlushBuffers() {
 	mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = mDisplayDevice.metadata_staging;
+		frame.metadata = ++mDisplayDevice.metadata_staging;
 		frame.copy_from(mLastRenderBuffer, mBackgroundBuffer, RGBA::alpha_blend);
 	});
 }
@@ -574,7 +574,7 @@ void MEGACHIP::scrollBuffersRT() {
 		mTexture.H = NN ? NN : 256;
 	}
 	void MEGACHIP::instruction_05NN(s32 NN) noexcept {
-		::assign_cast(mDisplayDevice.metadata_staging.texture_tint.A, NN);
+		mDisplayDevice.metadata_staging.rmw_texture_tint().set_A(NN & 0xFF);
 	}
 	void MEGACHIP::instruction_060N(s32 N) noexcept {
 		startAudioTrack(N == 0);
@@ -934,7 +934,7 @@ void MEGACHIP::scrollBuffersRT() {
 		mInputReg = &mRegisterV[X];
 		if (isManualRefresh()) [[unlikely]] {
 			mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-				frame.metadata = mDisplayDevice.metadata_staging;
+				frame.metadata = ++mDisplayDevice.metadata_staging;
 				frame.copy_from(mBackgroundBuffer);
 			});
 		}

@@ -278,7 +278,7 @@ void XOCHIP::renderVideoData() {
 	);
 
 	mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = mDisplayDevice.metadata_staging;
+		frame.metadata = ++mDisplayDevice.metadata_staging;
 		frame.copy_from(tempBuffer, [&](auto pixel) noexcept { return mBitColors[pixel]; });
 	});
 }
@@ -290,8 +290,8 @@ void XOCHIP::prepDisplayArea(const Resolution mode) {
 	const auto H = isLargerDisplay() ? cDisplayH : cDisplayH / 2;
 
 	mDisplayDevice.metadata_staging.set_viewport(W, H)
-		.set_padding(4)
-		.set_scaling(isLargerDisplay() ? 4 : 8);
+		.set_inner_margin(4)
+		.set_texture_zoom(isLargerDisplay() ? 4 : 8);
 
 	mDisplay.set(W, H);
 

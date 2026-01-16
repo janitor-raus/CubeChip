@@ -13,7 +13,6 @@
 
 /*==================================================================*/
 
-
 namespace ImGui {
 	ImVec2 clamp(const ImVec2& value, const ImVec2& min, const ImVec2& max) noexcept {
 		return { std::clamp(value.x, min.x, max.x), std::clamp(value.y, min.y, max.y) };
@@ -87,6 +86,11 @@ namespace ImGui {
 
 	void SetNextWindowMinClientSize(const ImVec2& min) noexcept {
 		ImGui::SetNextWindowSizeConstraints(min + ImGui::GetWindowDecoSize(), ImVec2(FLT_MAX, FLT_MAX));
+	}
+
+	void DockNextWindowTo(unsigned dock_id, bool first_use) noexcept {
+		ImGui::SetNextWindowDockID(dock_id, first_use
+			? ImGuiCond_FirstUseEver : ImGuiCond_Always);
 	}
 
 	void writeText(

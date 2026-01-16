@@ -17,6 +17,96 @@
 
 /*==================================================================*/
 
+/**
+ * @brief Utility class for handling ImGui labels with optional tags.
+ *
+ * ImGui uses '##' as a separator between the visible label and an internal
+ * identifier tag. This class encapsulates that functionality, allowing easy
+ * manipulation of both the label and tag components.
+ */
+struct ImLabel {
+	static constexpr const char* separator = "##";
+
+	std::string value;
+
+	ImLabel() noexcept = default;
+	ImLabel(std::string v) noexcept : value(std::move(v)) {}
+	ImLabel(const char* v) noexcept : value(v) {}
+
+	/*==================================================================*/
+
+	operator std::string_view() const noexcept { return value; }
+	operator const char*() const noexcept { return value.c_str(); }
+
+	/***/ std::string* operator->()       noexcept { return &value; }
+	const std::string* operator->() const noexcept { return &value; }
+
+	bool operator==(const ImLabel& other) const noexcept {
+		return value == other.value;
+	}
+
+	/*==================================================================*/
+
+	bool has_id() const noexcept {
+		return value.find(separator) != std::string::npos;
+	}
+
+	std::string get_name() const noexcept {
+		const auto pos = value.find(separator);
+		return (pos == std::string::npos) ? value
+			: std::string(value.data(), pos);
+	}
+
+	std::string get_id() const noexcept {
+		const auto pos = value.find(separator);
+		return (pos == std::string::npos) ? std::string()
+			: std::string(value.data() + pos);
+	}
+
+	std::string get_id_or_label() const noexcept {
+		const auto pos = value.find(separator);
+		return (pos == std::string::npos) ? value
+			: std::string(value.data() + pos);
+	}
+
+	/*==================================================================*/
+
+	void set_name(std::string_view new_name) noexcept {
+		if (has_id()) {
+			value = std::string(new_name) + separator + get_id();
+		} else {
+			value = std::string(new_name);
+		}
+	}
+
+	void set_id(std::string_view new_id) noexcept {
+		if (new_id.empty()) {
+			value = get_name();
+		} else {
+			value = get_name() + separator + std::string(new_id);
+		}
+	}
+
+	void set_label(std::string_view new_name, std::string_view new_id) noexcept {
+		if (new_id.empty()) {
+			value = std::string(new_name);
+		} else {
+			value = std::string(new_name) + separator + std::string(new_id);
+		}
+	}
+};
+
+namespace std {
+	template<>
+	struct hash<ImLabel> {
+		std::size_t operator()(const ImLabel& label) const noexcept {
+			return std::hash<std::string>{}(label.value);
+		}
+	};
+}
+
+/*==================================================================*/
+
 struct SDL_Renderer;
 struct SDL_Texture;
 struct SDL_Window;
@@ -30,7 +120,7 @@ class FrontendInterface {
 public:
 	using Func = std::function<void()>;
 	using Hook = std::shared_ptr<Func>;
-	using PlainKey = std::string;
+	using LabelKey = ImLabel;
 	using OrderKey = std::pair<std::size_t, std::string>;
 
 private:
@@ -48,7 +138,7 @@ private:
 	};
 
 	using HookRegistryMapped = std::unordered_map
-		<PlainKey, std::map<OrderKey, HookRegistry>>;
+		<LabelKey, std::map<OrderKey, HookRegistry>>;
 
 	template <typename T>
 	struct RegistryBox {
@@ -95,15 +185,17 @@ public:
 	 * When the Hook is destroyed, the function is unregistered automatically.
 	 */
 	template <VoidInvocable Fn> [[nodiscard]]
-	static Hook register_menu(const PlainKey& window_tag, const OrderKey& menu_title, Fn&& fn) noexcept {
+	static Hook register_menu(const LabelKey& window_tag, const OrderKey& menu_title, Fn&& fn) noexcept {
 		auto shared_ptr = std::make_shared<Func>(std::forward<Fn>(fn));
 
 		if (s_hooks->menus.registry_lock.try_lock()) { // may fail spuriously (fine)
-			s_hooks->menus.registry[window_tag][menu_title].buffer.push_back(shared_ptr);
+			s_hooks->menus.registry[window_tag.get_id_or_label()] \
+				[menu_title].buffer.push_back(shared_ptr);
 			s_hooks->menus.registry_lock.unlock();
 		} else {
 			std::unique_lock lock(s_hooks->menus.overflow_lock); // must wait to acquire
-			s_hooks->menus.overflow[window_tag][menu_title].buffer.push_back(shared_ptr);
+			s_hooks->menus.overflow[window_tag.get_id_or_label()] \
+				[menu_title].buffer.push_back(shared_ptr);
 		}
 
 		return shared_ptr;
@@ -120,8 +212,8 @@ private:
 	static bool merge_overflowing_windows() noexcept;
 	static void invoke_registered_windows() noexcept;
 
-	static bool merge_overflowing_menus(const PlainKey& tag) noexcept;
-	static void invoke_registered_menus(const PlainKey& tag) noexcept;
+	static bool merge_overflowing_menus(const LabelKey& tag) noexcept;
+	static void invoke_registered_menus(const LabelKey& tag) noexcept;
 
 public:
 	static void init_context(const char* home_dir);
@@ -130,10 +222,9 @@ public:
 	static void init_video(SDL_Window*, SDL_Renderer*);
 	static void quit_video();
 
-private:
-	static inline SDL_Renderer* s_current_renderer{};
 public:
-	static auto* get_current_renderer() noexcept { return s_current_renderer; }
+	static SDL_Renderer* get_current_renderer()  noexcept;
+	static unsigned      get_main_dockspace_id() noexcept;
 
 public:
 	static void  set_ui_zoom_scaling(float scale) noexcept;
@@ -146,8 +237,8 @@ public:
 	static void begin_new_frame();
 	static void render_frame(SDL_Renderer* = nullptr);
 
-	static void dock_next_window_to(unsigned id, bool first_time) noexcept;
+	static void dock_next_window_to(unsigned id, bool first_time = false) noexcept;
 
 	static void call_menubar(const char* window_name) noexcept;
-	static void call_autohide_menubar(const char* window_name, int key, bool& hidden) noexcept;
+	static void call_autohide_menubar(const char* window_name, bool& hidden) noexcept;
 };
