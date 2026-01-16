@@ -81,10 +81,13 @@ private:
 	FrontendInterface::Hook m_debug_texture_zoom;
 	FrontendInterface::Hook m_debug_pixel_ratio;
 
+	FrontendInterface::Hook m_debug_screen_rotation;
+	FrontendInterface::Hook m_debug_shaders_enabled;
+
 	FrontendInterface::Hook m_debug_linear_scaling;
 	FrontendInterface::Hook m_debug_screen_enabled;
 
-	FrontendInterface::Hook m_reserved[4]{};
+	FrontendInterface::Hook m_reserved[2]{};
 	#endif
 };
 

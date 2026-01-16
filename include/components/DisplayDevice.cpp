@@ -61,8 +61,12 @@ private:
 			const auto margin   = float(metadata.get_inner_margin());
 			const auto min_zoom = float(metadata.get_texture_zoom());
 
-			const auto cur_viewport = metadata.get_flipped_viewport_if(rotation & 1);
-			/***/ auto dar_viewport = cur_viewport; dar_viewport.w = int(dar_viewport.w * px_ratio);
+			const auto cur_viewport = metadata.get_viewport();
+			const auto dar_viewport = (rotation & 1)
+				? ez::Rect(cur_viewport.y, cur_viewport.x,
+					int(cur_viewport.h * px_ratio), cur_viewport.w)
+				: ez::Rect(cur_viewport.x, cur_viewport.y,
+					int(cur_viewport.w * px_ratio), cur_viewport.h);
 
 			const auto border_width = metadata.get_border_width() / 2 * 2;
 			const auto borders_vec2 = ImVec2(float(border_width), float(border_width));
@@ -321,8 +325,8 @@ void DisplayDevice::bind_debug_menu_hooks() noexcept {
 
 	m_debug_border_color = FrontendInterface::register_menu(window_label,
 	{ 0, "Debug" }, [&]() noexcept {
-		const auto temp = metadata_staging.get_border_color();
-		float color[3] = { (temp.R / 255.0f), (temp.G / 255.0f), (temp.B / 255.0f) };
+		const auto value = metadata_staging.get_border_color();
+		float color[3] = { (value.R / 255.0f), (value.G / 255.0f), (value.B / 255.0f) };
 		if (ImGui::ColorEdit3(" Border Color", color)) {
 			metadata_staging.set_border_color(RGBA(
 				ez::u8(color[0] * 255.0f), ez::u8(color[1] * 255.0f),
@@ -333,8 +337,8 @@ void DisplayDevice::bind_debug_menu_hooks() noexcept {
 
 	m_debug_texture_tint = FrontendInterface::register_menu(window_label,
 	{ 0, "Debug" }, [&]() noexcept {
-		const auto temp = metadata_staging.get_texture_tint();
-		float color[4] = { (temp.R / 255.0f), (temp.G / 255.0f), (temp.B / 255.0f), (temp.A / 255.0f) };
+		const auto value = metadata_staging.get_texture_tint();
+		float color[4] = { (value.R / 255.0f), (value.G / 255.0f), (value.B / 255.0f), (value.A / 255.0f) };
 		if (ImGui::ColorEdit4(" Texture Tint", color)) {
 			metadata_staging.set_texture_tint(RGBA(
 				ez::u8(color[0] * 255.0f), ez::u8(color[1] * 255.0f),
@@ -359,19 +363,36 @@ void DisplayDevice::bind_debug_menu_hooks() noexcept {
 		}
 	});
 
+	m_debug_screen_rotation = FrontendInterface::register_menu(window_label,
+	{ 0, "Debug" }, [&]() noexcept {
+		int value = get_screen_rotation();
+		static const char* labels[] = { "0 degrees", "90 degrees", "180 degrees", "270 degrees" };
+		if (ImGui::Combo(" Screen Rotation", &value, labels, IM_ARRAYSIZE(labels))) {
+			set_screen_rotation(value);
+		}
+	});
+
+	m_debug_shaders_enabled = FrontendInterface::register_menu(window_label,
+	{ 0, "Debug" }, [&]() noexcept {
+		int value = get_utilize_shaders();
+		if (ImGui::SliderInt(" Shaders Enabled?", &value, 0, 1, "", ImGuiSliderFlags_NoInput)) {
+			set_utilize_shaders(value == 0);
+		}
+	});
+
 	m_debug_linear_scaling = FrontendInterface::register_menu(window_label,
 	{ 0, "Debug" }, [&]() noexcept {
-		int a = !get_integer_scaling();
-		if (ImGui::SliderInt(" Linear Scaling?", &a, 0, 1, "", ImGuiSliderFlags_NoInput)) {
-			set_integer_scaling(a == 0);
+		int value = !get_integer_scaling();
+		if (ImGui::SliderInt(" Linear Scaling?", &value, 0, 1, "", ImGuiSliderFlags_NoInput)) {
+			set_integer_scaling(value == 0);
 		}
 	});
 
 	m_debug_screen_enabled = FrontendInterface::register_menu(window_label,
 	{ 0, "Debug" }, [&]() noexcept {
-		int a = metadata_staging.enabled ? 1 : 0;
-		if (ImGui::SliderInt(" Screen Enabled?", &a, 0, 1, "", ImGuiSliderFlags_NoInput)) {
-			metadata_staging.enabled = (a != 0);
+		int value = metadata_staging.enabled ? 1 : 0;
+		if (ImGui::SliderInt(" Screen Enabled?", &value, 0, 1, "", ImGuiSliderFlags_NoInput)) {
+			metadata_staging.enabled = (value != 0);
 		}
 	});
 }
@@ -383,6 +404,8 @@ void DisplayDevice::free_debug_menu_hooks() noexcept {
 	m_debug_texture_tint.reset();
 	m_debug_texture_zoom.reset();
 	m_debug_pixel_ratio.reset();
+	m_debug_screen_rotation.reset();
+	m_debug_shaders_enabled.reset();
 	m_debug_linear_scaling.reset();
 	m_debug_screen_enabled.reset();
 }

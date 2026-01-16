@@ -72,13 +72,6 @@ struct FramePacket {
 			return *this;
 		}
 
-		constexpr auto get_flipped_viewport_if(bool cond) const noexcept {
-			return cond ? ez::Rect(
-				viewport_rect.y, viewport_rect.x,
-				viewport_rect.h, viewport_rect.w
-			) : viewport_rect;
-		}
-
 	private:
 		RGBA texture_tint = RGBA::White;
 

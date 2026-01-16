@@ -133,7 +133,7 @@ namespace ImGui {
 		const ImVec2 BL = { TL.x,          TL.y + dims.y };
 
 		static constexpr int rotLUT[4][4] = {
-			{ 0, 1, 3, 2 }, //   0 deg : TL TR BR BL
+			{ 0, 1, 2, 3 }, //   0 deg : TL TR BR BL
 			{ 3, 0, 1, 2 }, //  90 deg
 			{ 2, 3, 0, 1 }, // 180 deg
 			{ 1, 2, 3, 0 }, // 270 deg
@@ -142,8 +142,8 @@ namespace ImGui {
 		const ImVec2 uvs[] = {
 			{ uv0.x, uv0.y }, // TL
 			{ uv1.x, uv0.y }, // TR
-			{ uv0.x, uv1.y }, // BL
 			{ uv1.x, uv1.y }, // BR
+			{ uv0.x, uv1.y }, // BL
 		};
 		const auto& m = rotLUT[rotation & 3];
 

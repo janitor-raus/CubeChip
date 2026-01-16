@@ -286,5 +286,5 @@ void FrontendInterface::call_autohide_menubar(const char* window_name, bool& hid
 	}
 
 	if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
-		!menu_or_popup_hovered) { hidden = true; }
+		!menu_or_popup_hovered && !ImGui::GetIO().WantCaptureMouse) { hidden = true; }
 }
