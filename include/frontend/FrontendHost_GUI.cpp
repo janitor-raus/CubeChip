@@ -129,7 +129,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 		static bool s_click_active{};
 
 		if (!s_click_active) { s_scale_factor = int(FrontendInterface::get_ui_zoom_scaling() * 100); }
-		ImGui::SliderInt(" UI Zoom Scale", &s_scale_factor, 100, 200, "%d%%");
+		ImGui::SliderInt("UI Zoom Scale", &s_scale_factor, 100, 200, "%d%%");
 
 		s_click_active = ImGui::IsItemActive();
 		if (ImGui::IsItemDeactivatedAfterEdit()) {
@@ -143,7 +143,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 		static bool s_click_active{};
 
 		if (!s_click_active) { s_scale_factor = int(FrontendInterface::get_ui_text_scaling() * 100); }
-		ImGui::SliderInt(" UI Text Scale", &s_scale_factor, 50, 150, "%d%%");
+		ImGui::SliderInt("UI Text Scale", &s_scale_factor, 50, 150, "%d%%");
 
 		s_click_active = ImGui::IsItemActive();
 		if (ImGui::IsItemDeactivatedAfterEdit()) {
@@ -154,7 +154,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 	static auto s_menu_settings__master_vol = FrontendInterface::register_menu("",
 	{ 20, "Settings" }, [&]() noexcept {
 		auto global_gain = int(GAB->get_global_gain() * 100);
-		if (ImGui::SliderInt(" Master Volume", &global_gain, 0, 100, "%d%%"))
+		if (ImGui::SliderInt("Master Volume", &global_gain, 0, 100, "%d%%"))
 			{ GAB->set_glogal_gain(global_gain * 0.01f); }
 	});
 

@@ -139,8 +139,8 @@ private:
 
 	SystemInstance* system_with_id(const SystemID& key) noexcept {
 		auto sys_ptr = m_systems.find(key);
-		return (sys_ptr != m_systems.end()) ?
-			&sys_ptr->second : nullptr;
+		return (sys_ptr != m_systems.end())
+			? &sys_ptr->second : nullptr;
 	}
 
 	void toggle_system_delimiters(SystemInstance& system) noexcept;

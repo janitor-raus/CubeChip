@@ -152,7 +152,6 @@ float FrontendInterface::get_ui_text_scaling() noexcept {
 	return s_text_scaling;
 }
 
-
 /*==================================================================*/
 
 void FrontendInterface::init_context(const char* home_dir) {
@@ -189,8 +188,6 @@ void FrontendInterface::quit_context() {
 }
 
 void FrontendInterface::init_video(SDL_Window* window, SDL_Renderer* renderer) {
-
-
 	ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
 	ImGui_ImplSDLRenderer3_Init(renderer);
 	s_current_renderer = renderer;

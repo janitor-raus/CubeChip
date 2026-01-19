@@ -29,6 +29,7 @@ Chip8_CoreInterface::Chip8_CoreInterface(DisplayDevice display_device) noexcept
 		if (!has_system_state(EmuState::STATS)) { return; }
 		osd::simple_stat_overlay(copy_statistics_string());
 	});
+	mDisplayDevice.set_shutdown_signal(&m_is_system_alive);
 
 	mAudioDevice.add_audio_stream(STREAM::MAIN, 48'000);
 	mAudioDevice.resume_streams();

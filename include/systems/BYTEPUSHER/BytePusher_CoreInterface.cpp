@@ -24,6 +24,7 @@ BytePusher_CoreInterface::BytePusher_CoreInterface(DisplayDevice display_device)
 		if (!has_system_state(EmuState::STATS)) { return; }
 		osd::simple_stat_overlay(copy_statistics_string());
 	});
+	mDisplayDevice.set_shutdown_signal(&m_is_system_alive);
 
 	loadPresetBinds();
 }

@@ -86,7 +86,6 @@ void FrontendHost::discard_system_core(SystemID id) {
 		system->core.reset();
 		CoreRegistry::clear_eligible_cores();
 	}
-	HDM->clear_cached_file_data();
 }
 
 void FrontendHost::replace_system_core(SystemID id) {
@@ -225,6 +224,13 @@ int FrontendHost::handle_client_events(void* event) noexcept {
 int FrontendHost::process_client_frame() {
 	handle_main_hotkeys();
 
+	for (auto& [id, system] : m_systems) {
+		if (!system.core) { continue; }
+		if (system.core->get_window_shutdown_signal()) {
+			discard_system_core(id);
+		}
+	}
+
 	const auto dialogResult = get_open_file_dialog_result();
 	if (dialogResult) { load_file_from_disk(*dialogResult); }
 
@@ -249,16 +255,18 @@ void FrontendHost::handle_main_hotkeys() {
 	}
 
 	if (m_systems[0]) {
-		if (Input.isPressed(KEY(ESCAPE))) {
+		if (Input.areAnyHeld(KEY(LSHIFT), KEY(RSHIFT))
+			&& Input.isPressed(KEY(ESCAPE))
+		) {
 			discard_system_core(0 /* XXX */);
 			blog.newEntry<BLOG::INF>(
-				"Emulator core exited successfully.");
+				"Emulator core exited manually.");
 			return;
 		}
 		if (Input.isPressed(KEY(BACKSPACE))) {
 			replace_system_core(0 /* XXX */);
 			blog.newEntry<BLOG::INF>(
-				"Emulator core restarted successfully.");
+				"Emulator core restarted manually.");
 			return;
 		}
 		if (Input.isPressed(KEY(F9))) {

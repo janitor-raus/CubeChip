@@ -75,6 +75,10 @@ class alignas(HDIS) SystemInterface {
 	std::atomic<bool> m_stop_frame_flag{};
 
 protected:
+	bool m_shutdown_signal = true;
+	bool m_is_system_alive = true;
+
+protected:
 	SimpleTimer m_timer{};
 
 private:
@@ -132,12 +136,17 @@ public:
 		return !xor_system_state(EmuState::PAUSED);
 	}
 
-protected: void set_base_system_framerate(f32 value) noexcept;
-public:    void set_framerate_multiplier(f32 value) noexcept;
+	bool get_window_shutdown_signal() const noexcept { return !m_is_system_alive; }
 
-public:    f32  get_base_system_framerate() const noexcept;
-public:    f32  get_framerate_multiplier() const noexcept;
-public:    f32  get_real_system_framerate() const noexcept;
+protected:
+	void set_base_system_framerate(f32 value) noexcept;
+public:
+	void set_framerate_multiplier(f32 value) noexcept;
+
+public:
+	f32  get_base_system_framerate() const noexcept;
+	f32  get_framerate_multiplier() const noexcept;
+	f32  get_real_system_framerate() const noexcept;
 
 protected:
 	void set_frame_stop_flag(bool state) noexcept { m_stop_frame_flag.store(state, mo::release); }

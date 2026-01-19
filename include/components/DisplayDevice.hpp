@@ -62,9 +62,10 @@ public:
 	bool get_utilize_shaders() const noexcept;
 	void set_utilize_shaders(bool enable) noexcept;
 
-	auto get_display_name() const noexcept -> std::string;
-	void set_display_name(std::string_view name) noexcept;
+	auto get_window_label() const noexcept -> std::string;
+	void set_window_label(std::string_view name) noexcept;
 
+	void set_shutdown_signal(bool* signal) noexcept;
 	void set_osd_callable(Callable callable) noexcept;
 
 	#if !defined(NDEBUG) || defined(DEBUG)
@@ -81,10 +82,10 @@ private:
 	FrontendInterface::Hook m_debug_texture_zoom;
 	FrontendInterface::Hook m_debug_pixel_ratio;
 
-	FrontendInterface::Hook m_debug_screen_rotation;
-	FrontendInterface::Hook m_debug_shaders_enabled;
-
 	FrontendInterface::Hook m_debug_linear_scaling;
+	FrontendInterface::Hook m_debug_screen_rotation;
+
+	FrontendInterface::Hook m_debug_shaders_enabled;
 	FrontendInterface::Hook m_debug_screen_enabled;
 
 	FrontendInterface::Hook m_reserved[2]{};

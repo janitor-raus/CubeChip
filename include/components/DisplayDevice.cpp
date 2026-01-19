@@ -31,8 +31,8 @@ struct DisplayDevice::DisplayContext {
 	std::atomic<bool> m_integer_scaling{};
 	std::atomic<bool> m_utilize_shaders{};
 
-	bool m_menubar_hidden = true;
-	bool m_display_debug = false;
+	bool  m_disable_menubar = true;
+	bool* m_is_window_alive = nullptr;
 
 	ez::Frame m_old_target_size{};
 
@@ -77,12 +77,12 @@ private:
 				* min_zoom + padding_vec2 + borders_vec2);
 
 			const auto window_name = m_display_name.load(mo::relaxed);
-			if (ImGui::Begin(window_name->c_str(), nullptr, ImGuiWindowFlags_NoCollapse
+			if (ImGui::Begin(window_name->c_str(), m_is_window_alive, ImGuiWindowFlags_NoCollapse
 				| ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
-				| (m_menubar_hidden ? ImGuiWindowFlags_None : ImGuiWindowFlags_MenuBar)
+				| (m_disable_menubar ? ImGuiWindowFlags_None : ImGuiWindowFlags_MenuBar)
 			)) {
 				FrontendInterface::call_autohide_menubar(
-					window_name->c_str(), m_menubar_hidden);
+					window_name->c_str(), m_disable_menubar);
 
 			// calc padding/borders spacing in advance
 				const auto origin_point = ImGui::GetCursorPos();
@@ -157,53 +157,53 @@ private:
 				auto osd_callable = m_osd_callable.load(mo::relaxed);
 				if (osd_callable) { (*osd_callable)(); }
 
-				if (m_display_debug) {
-					ImGui::SetCursorPos(origin_point);
+				#ifdef DISPLAYDEVICEDEBUG
+				ImGui::SetCursorPos(origin_point);
 
-					if (ImGui::BeginTable("##debug_table", 2,
-						ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoBordersInBody
-					)) {
-						static auto row = [](const char* label, auto fmt, auto... args) {
-							ImGui::TableNextRow();
-							ImGui::TableSetColumnIndex(0);
-							ImGui::TextUnformatted(label);
-							ImGui::TableSetColumnIndex(1);
-							ImGui::Text(fmt, args...);
-						};
-						static auto row_separate = []() {
-							ImGui::TableNextRow();
-							ImGui::TableSetColumnIndex(0);
-							ImGui::Dummy(ImVec2(0.0f, ImGui::GetTextLineHeight() * 0.3f));
-						};
+				if (ImGui::BeginTable("##debug_table", 2,
+					ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoBordersInBody
+				)) {
+					static auto row = [](const char* label, auto fmt, auto... args) {
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::TextUnformatted(label);
+						ImGui::TableSetColumnIndex(1);
+						ImGui::Text(fmt, args...);
+					};
+					static auto row_separate = []() {
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Dummy(ImVec2(0.0f, ImGui::GetTextLineHeight() * 0.3f));
+					};
 
-						const auto window_size = ImGui::GetWindowSize();
-						const auto usable_size = display_zone;
+					const auto window_size = ImGui::GetWindowSize();
+					const auto usable_size = display_zone;
 
-						const auto deco_margin = ImGui::GetWindowDecoSize();
-						const auto constraints =
-							ImVec2(float(dar_viewport.w), float(dar_viewport.h)) *
-								min_zoom + padding_vec2 + borders_vec2 + deco_margin;
+					const auto deco_margin = ImGui::GetWindowDecoSize();
+					const auto constraints =
+						ImVec2(float(dar_viewport.w), float(dar_viewport.h)) *
+							min_zoom + padding_vec2 + borders_vec2 + deco_margin;
 
 
-						row("Window size:", "%.0f x %.0f", window_size.x, window_size.y);
-						row("Deco size:",   "%.0f x %.0f", deco_margin.x, deco_margin.y);
-						row("Constrained:", "%.0f x %.0f", constraints.x, constraints.y);
-						row("Usable size",  "%.0f x %.0f", usable_size.x, usable_size.y);
-						row_separate();
-						row("Viewport (w,h):", "%d x %d", dar_viewport.w, dar_viewport.h);
-						row("Viewport (x,y):", "%d , %d", dar_viewport.x, dar_viewport.y);
-						row_separate();
-						row("Base AR:",   "%.3f", base_AR);
-						row("Target AR:", "%.3f", target_AR);
-						row_separate();
-						row("Texture area size:", "%.0f x %.0f", texture_area.x, texture_area.y);
-						row("Borders area size:", "%.0f x %.0f", borders_area.x, borders_area.y);
-						row_separate();
-						row("Texture scaled as:", "%d x %d", new_target_size.w, new_target_size.h);
+					row("Window size:", "%.0f x %.0f", window_size.x, window_size.y);
+					row("Deco size:",   "%.0f x %.0f", deco_margin.x, deco_margin.y);
+					row("Constrained:", "%.0f x %.0f", constraints.x, constraints.y);
+					row("Usable size",  "%.0f x %.0f", usable_size.x, usable_size.y);
+					row_separate();
+					row("Viewport (w,h):", "%d x %d", dar_viewport.w, dar_viewport.h);
+					row("Viewport (x,y):", "%d , %d", dar_viewport.x, dar_viewport.y);
+					row_separate();
+					row("Base AR:",   "%.3f", base_AR);
+					row("Target AR:", "%.3f", target_AR);
+					row_separate();
+					row("Texture area size:", "%.0f x %.0f", texture_area.x, texture_area.y);
+					row("Borders area size:", "%.0f x %.0f", borders_area.x, borders_area.y);
+					row_separate();
+					row("Texture scaled as:", "%d x %d", new_target_size.w, new_target_size.h);
 
-						ImGui::EndTable();
-					}
+					ImGui::EndTable();
 				}
+				#endif DISPLAYDEVICEDEBUG
 			}
 			ImGui::End();
 		});
@@ -291,12 +291,16 @@ void DisplayDevice::set_utilize_shaders(bool enable) noexcept {
 	m_context->m_utilize_shaders.store(enable, mo::relaxed);
 }
 
-auto DisplayDevice::get_display_name() const noexcept -> std::string {
+auto DisplayDevice::get_window_label() const noexcept -> std::string {
 	return *m_context->m_display_name.load(mo::relaxed);
 }
 
-void DisplayDevice::set_display_name(std::string_view name) noexcept {
+void DisplayDevice::set_window_label(std::string_view name) noexcept {
 	m_context->m_display_name.store(std::make_shared<std::string>(name), mo::relaxed);
+}
+
+void DisplayDevice::set_shutdown_signal(bool* signal) noexcept {
+	m_context->m_is_window_alive = signal;
 }
 
 void DisplayDevice::set_osd_callable(Callable callable) noexcept {
@@ -305,12 +309,12 @@ void DisplayDevice::set_osd_callable(Callable callable) noexcept {
 
 #if !defined(NDEBUG) || defined(DEBUG)
 void DisplayDevice::bind_debug_menu_hooks() noexcept {
-	const auto window_label = ImLabel(get_display_name());
+	const auto window_label = ImLabel(get_window_label());
 
 	m_debug_border_width = FrontendInterface::register_menu(window_label,
 	{ 0, "Debug" }, [&]() noexcept {
 		int value = metadata_staging.get_border_width();
-		if (ImGui::SliderInt(" Border Width", &value, 0, 32, "%d", ImGuiSliderFlags_AlwaysClamp)) {
+		if (ImGui::SliderInt("Border Width", &value, 0, 32, "%d", ImGuiSliderFlags_AlwaysClamp)) {
 			metadata_staging.set_border_width(value);
 		}
 	});
@@ -318,7 +322,7 @@ void DisplayDevice::bind_debug_menu_hooks() noexcept {
 	m_debug_inner_margin = FrontendInterface::register_menu(window_label,
 	{ 0, "Debug" }, [&]() noexcept {
 		int value = metadata_staging.get_inner_margin();
-		if (ImGui::SliderInt(" Inner Margin", &value, 0, 32, "%d", ImGuiSliderFlags_AlwaysClamp)) {
+		if (ImGui::SliderInt("Inner Margin", &value, 0, 32, "%d", ImGuiSliderFlags_AlwaysClamp)) {
 			metadata_staging.set_inner_margin(value);
 		}
 	});
@@ -327,7 +331,7 @@ void DisplayDevice::bind_debug_menu_hooks() noexcept {
 	{ 0, "Debug" }, [&]() noexcept {
 		const auto value = metadata_staging.get_border_color();
 		float color[3] = { (value.R / 255.0f), (value.G / 255.0f), (value.B / 255.0f) };
-		if (ImGui::ColorEdit3(" Border Color", color)) {
+		if (ImGui::ColorEdit3("Border Color", color)) {
 			metadata_staging.set_border_color(RGBA(
 				ez::u8(color[0] * 255.0f), ez::u8(color[1] * 255.0f),
 				ez::u8(color[2] * 255.0f), 255
@@ -339,7 +343,7 @@ void DisplayDevice::bind_debug_menu_hooks() noexcept {
 	{ 0, "Debug" }, [&]() noexcept {
 		const auto value = metadata_staging.get_texture_tint();
 		float color[4] = { (value.R / 255.0f), (value.G / 255.0f), (value.B / 255.0f), (value.A / 255.0f) };
-		if (ImGui::ColorEdit4(" Texture Tint", color)) {
+		if (ImGui::ColorEdit4("Texture Tint", color)) {
 			metadata_staging.set_texture_tint(RGBA(
 				ez::u8(color[0] * 255.0f), ez::u8(color[1] * 255.0f),
 				ez::u8(color[2] * 255.0f), ez::u8(color[3] * 255.0f)
@@ -350,7 +354,7 @@ void DisplayDevice::bind_debug_menu_hooks() noexcept {
 	m_debug_texture_zoom = FrontendInterface::register_menu(window_label,
 	{ 0, "Debug" }, [&]() noexcept {
 		int value = metadata_staging.get_texture_zoom();
-		if (ImGui::SliderInt(" Texture Zoom", &value, 1, 32, "%d", ImGuiSliderFlags_AlwaysClamp)) {
+		if (ImGui::SliderInt("Texture Zoom", &value, 1, 32, "%d", ImGuiSliderFlags_AlwaysClamp)) {
 			metadata_staging.set_texture_zoom(value);
 		}
 	});
@@ -358,8 +362,17 @@ void DisplayDevice::bind_debug_menu_hooks() noexcept {
 	m_debug_pixel_ratio = FrontendInterface::register_menu(window_label,
 	{ 0, "Debug" }, [&]() noexcept {
 		float value = metadata_staging.get_pixel_ratio();
-		if (ImGui::SliderFloat(" Pixel Ratio", &value, 0.1f, 4.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
+		if (ImGui::SliderFloat("Pixel Ratio", &value, 0.1f, 4.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
 			metadata_staging.set_pixel_ratio(value);
+		}
+	});
+
+	m_debug_linear_scaling = FrontendInterface::register_menu(window_label,
+	{ 0, "Debug" }, [&]() noexcept {
+		int value = get_integer_scaling();
+		static const char* labels[] = { "Fractional", "Integer" };
+		if (ImGui::Combo("Screen Scaling", &value, labels, IM_ARRAYSIZE(labels))) {
+			set_integer_scaling(value != 0);
 		}
 	});
 
@@ -367,7 +380,7 @@ void DisplayDevice::bind_debug_menu_hooks() noexcept {
 	{ 0, "Debug" }, [&]() noexcept {
 		int value = get_screen_rotation();
 		static const char* labels[] = { "0 degrees", "90 degrees", "180 degrees", "270 degrees" };
-		if (ImGui::Combo(" Screen Rotation", &value, labels, IM_ARRAYSIZE(labels))) {
+		if (ImGui::Combo("Screen Rotation", &value, labels, IM_ARRAYSIZE(labels))) {
 			set_screen_rotation(value);
 		}
 	});
@@ -375,23 +388,15 @@ void DisplayDevice::bind_debug_menu_hooks() noexcept {
 	m_debug_shaders_enabled = FrontendInterface::register_menu(window_label,
 	{ 0, "Debug" }, [&]() noexcept {
 		int value = get_utilize_shaders();
-		if (ImGui::SliderInt(" Shaders Enabled?", &value, 0, 1, "", ImGuiSliderFlags_NoInput)) {
-			set_utilize_shaders(value == 0);
-		}
-	});
-
-	m_debug_linear_scaling = FrontendInterface::register_menu(window_label,
-	{ 0, "Debug" }, [&]() noexcept {
-		int value = !get_integer_scaling();
-		if (ImGui::SliderInt(" Linear Scaling?", &value, 0, 1, "", ImGuiSliderFlags_NoInput)) {
-			set_integer_scaling(value == 0);
+		if (ImGui::SliderInt("Shaders Enabled?", &value, 0, 1, "", ImGuiSliderFlags_NoInput)) {
+			set_utilize_shaders(value != 0);
 		}
 	});
 
 	m_debug_screen_enabled = FrontendInterface::register_menu(window_label,
 	{ 0, "Debug" }, [&]() noexcept {
 		int value = metadata_staging.enabled ? 1 : 0;
-		if (ImGui::SliderInt(" Screen Enabled?", &value, 0, 1, "", ImGuiSliderFlags_NoInput)) {
+		if (ImGui::SliderInt("Screen Enabled?", &value, 0, 1, "", ImGuiSliderFlags_NoInput)) {
 			metadata_staging.enabled = (value != 0);
 		}
 	});
@@ -404,9 +409,9 @@ void DisplayDevice::free_debug_menu_hooks() noexcept {
 	m_debug_texture_tint.reset();
 	m_debug_texture_zoom.reset();
 	m_debug_pixel_ratio.reset();
+	m_debug_linear_scaling.reset();
 	m_debug_screen_rotation.reset();
 	m_debug_shaders_enabled.reset();
-	m_debug_linear_scaling.reset();
 	m_debug_screen_enabled.reset();
 }
 #endif
@@ -426,7 +431,7 @@ void osd::simple_stat_overlay(const std::string& overlay_data) noexcept {
 	)) {
 		ImGui::TextUnformatted(overlay_data.c_str());
 		ImGui::Dummy(ImGui::GetStyle().WindowPadding);
-		ImGui::EndChild();
 	}
+	ImGui::EndChild();
 	ImGui::PopStyleColor();
 }
