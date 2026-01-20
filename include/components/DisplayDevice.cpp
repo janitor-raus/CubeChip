@@ -343,7 +343,7 @@ void DisplayDevice::bind_debug_menu_hooks() noexcept {
 	{ 0, "Debug" }, [&]() noexcept {
 		const auto value = metadata_staging.get_texture_tint();
 		float color[4] = { (value.R / 255.0f), (value.G / 255.0f), (value.B / 255.0f), (value.A / 255.0f) };
-		if (ImGui::ColorEdit4("Texture Tint", color)) {
+		if (ImGui::ColorEdit4("Texture Tint", color, ImGuiColorEditFlags_AlphaPreviewHalf)) {
 			metadata_staging.set_texture_tint(RGBA(
 				ez::u8(color[0] * 255.0f), ez::u8(color[1] * 255.0f),
 				ez::u8(color[2] * 255.0f), ez::u8(color[3] * 255.0f)
@@ -354,7 +354,7 @@ void DisplayDevice::bind_debug_menu_hooks() noexcept {
 	m_debug_texture_zoom = FrontendInterface::register_menu(window_label,
 	{ 0, "Debug" }, [&]() noexcept {
 		int value = metadata_staging.get_texture_zoom();
-		if (ImGui::SliderInt("Texture Zoom", &value, 1, 32, "%d", ImGuiSliderFlags_AlwaysClamp)) {
+		if (ImGui::SliderInt("Texture Zoom", &value, 1, 16, "%d", ImGuiSliderFlags_AlwaysClamp)) {
 			metadata_staging.set_texture_zoom(value);
 		}
 	});
