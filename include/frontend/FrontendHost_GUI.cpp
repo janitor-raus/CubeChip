@@ -252,7 +252,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 
 				s_is_bottomed = ImGui::GetScrollY() >= ImGui::GetScrollMaxY();
 
-				if (s_goto_bottom || s_auto_scroll && s_is_bottomed) {
+				if (s_goto_bottom || (s_auto_scroll && s_is_bottomed)) {
 					s_is_bottomed = true; s_goto_bottom = false;
 					ImGui::SetScrollHereY(1.0f);
 				}

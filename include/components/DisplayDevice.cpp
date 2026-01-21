@@ -203,7 +203,7 @@ private:
 
 					ImGui::EndTable();
 				}
-				#endif DISPLAYDEVICEDEBUG
+				#endif
 			}
 			ImGui::End();
 		});
