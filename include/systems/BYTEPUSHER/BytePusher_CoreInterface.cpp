@@ -22,7 +22,7 @@ BytePusher_CoreInterface::BytePusher_CoreInterface(DisplayDevice display_device)
 
 	mDisplayDevice.set_osd_callable([&]() {
 		if (!has_system_state(EmuState::STATS)) { return; }
-		osd::simple_stat_overlay(copy_statistics_string());
+		osd::simple_text_overlay(copy_statistics_string());
 	});
 	mDisplayDevice.set_shutdown_signal(&m_is_system_alive);
 

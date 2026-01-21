@@ -100,7 +100,7 @@ class FrontendHost final {
 	static auto get_open_file_dialog_result() noexcept -> OpenFileResult;
 	static void set_open_file_dialog_result(std::string_view file) noexcept;
 
-	static constexpr std::size_t s_mru_limit = 5;
+	static constexpr std::size_t s_mru_limit = 10;
 	static inline SimpleMRU<FileItem, s_mru_limit> s_file_mru;
 
 	static void import_mru(std::string* src) noexcept {
@@ -156,8 +156,8 @@ public:
 
 public:
 	struct Settings {
-		float ui_zoom_scale = 1.1f;
-		float ui_text_scale = 1.1f;
+		float ui_zoom_scale = 1.0f;
+		float ui_text_scale = 1.0f;
 
 		std::string file_mru_cache[s_mru_limit];
 

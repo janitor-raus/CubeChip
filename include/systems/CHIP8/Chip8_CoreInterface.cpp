@@ -26,8 +26,12 @@ Chip8_CoreInterface::Chip8_CoreInterface(DisplayDevice display_device) noexcept
 	}
 
 	mDisplayDevice.set_osd_callable([&]() {
-		if (!has_system_state(EmuState::STATS)) { return; }
-		osd::simple_stat_overlay(copy_statistics_string());
+		if (mInterrupt == Interrupt::INPUT) {
+			osd::key_press_indicator(WaveForms::pulse_t(500, Millis::now()).as_unipolar());
+		}
+		if (has_system_state(EmuState::STATS)) {
+			osd::simple_text_overlay(copy_statistics_string());
+		}
 	});
 	mDisplayDevice.set_shutdown_signal(&m_is_system_alive);
 

@@ -95,5 +95,6 @@ private:
 /*==================================================================*/
 
 namespace osd {
-	void simple_stat_overlay(const std::string& overlay_data) noexcept;
+	void simple_text_overlay(const std::string& overlay_data) noexcept;
+	void key_press_indicator(float phase) noexcept;
 }

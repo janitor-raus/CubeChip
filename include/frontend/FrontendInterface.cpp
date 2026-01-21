@@ -227,7 +227,7 @@ void FrontendInterface::init_context(const char* home_dir) {
 	colors[ImGuiCol_Text]                   = ImVec4(0.95f, 0.95f, 0.95f, 1.00f);
 	colors[ImGuiCol_TextDisabled]           = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);
 	colors[ImGuiCol_WindowBg]               = ImVec4(0.10f, 0.10f, 0.13f, 1.00f);
-	colors[ImGuiCol_ChildBg]                = ImVec4(0.00f, 0.00f, 0.00f, 0.13f);
+	colors[ImGuiCol_ChildBg]                = ImVec4(0.08f, 0.08f, 0.09f, 0.50f);
 	colors[ImGuiCol_PopupBg]                = ImVec4(0.10f, 0.10f, 0.13f, 1.00f);
 	colors[ImGuiCol_Border]                 = ImVec4(0.21f, 0.21f, 0.25f, 1.00f);
 	colors[ImGuiCol_BorderShadow]           = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);

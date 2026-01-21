@@ -84,6 +84,25 @@ namespace ImGui {
 			+ ImGui::GetFontSize() + style.FramePadding.y * 2.0f);
 	}
 
+	void Dummy(float mult_w, float mult_h) noexcept {
+		const auto mult_vec2 = ImVec2(mult_w, mult_h);
+		ImGui::Dummy(ImGui::GetStyle().WindowPadding * mult_vec2);
+	}
+
+	void DummyX(float mult) noexcept {
+		ImGui::Dummy(ImVec2(mult * ImGui::GetStyle().WindowPadding.x, 0.0f));
+	}
+
+	void DummyY(float mult) noexcept {
+		ImGui::Dummy(ImVec2(0.0f, mult * ImGui::GetStyle().WindowPadding.y));
+	}
+
+	void Separator(float mult) noexcept {
+		ImGui::DummyY(mult * 0.5f);
+		ImGui::Separator();
+		ImGui::DummyY(mult * 0.5f);
+	}
+
 	void SetNextWindowMinClientSize(const ImVec2& min) noexcept {
 		ImGui::SetNextWindowSizeConstraints(min + ImGui::GetWindowDecoSize(), ImVec2(FLT_MAX, FLT_MAX));
 	}

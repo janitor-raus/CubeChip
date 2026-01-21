@@ -418,20 +418,64 @@ void DisplayDevice::free_debug_menu_hooks() noexcept {
 
 /*==================================================================*/
 
-void osd::simple_stat_overlay(const std::string& overlay_data) noexcept {
-	const ImVec2 text_zone = ImGui::CalcTextSize(overlay_data.c_str())
+void osd::simple_text_overlay(const std::string& overlay_data) noexcept {
+	const auto text_zone = ImGui::CalcTextSize(overlay_data.c_str())
 		+ ImGui::GetStyle().WindowPadding * 2.0f;
 
 	ImGui::SetCursorPos(ImGui::GetCursorPos()
 		+ (ImGui::GetContentRegionAvail() - text_zone) * ImVec2(0.0f, 1.0f));
 
-	ImGui::PushStyleColor(ImGuiCol_ChildBg, RGBA(20, 20, 20, 80).ABGR());
-	if (ImGui::BeginChild("##osd_overlay", text_zone, ImGuiChildFlags_Borders | ImGuiChildFlags_NavFlattened,
+	if (ImGui::BeginChild("##text_overlay", text_zone, ImGuiChildFlags_Borders | ImGuiChildFlags_NavFlattened,
 		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoNav
 	)) {
 		ImGui::TextUnformatted(overlay_data.c_str());
-		ImGui::Dummy(ImGui::GetStyle().WindowPadding);
 	}
 	ImGui::EndChild();
-	ImGui::PopStyleColor();
+}
+
+void osd::key_press_indicator(float phase) noexcept {
+	const auto text_height = ImGui::GetTextLineHeight();
+	const auto size = ImVec2(text_height * 0.8f, text_height);
+	const auto widget_zone = size + ImGui::GetStyle().WindowPadding * 2.0f;
+
+	ImGui::SetCursorPos(ImGui::GetCursorPos()
+		+ (ImGui::GetContentRegionAvail() - widget_zone) * ImVec2(0.0f, 0.0f));
+
+	if (ImGui::BeginChild("##key_indicator", widget_zone, ImGuiChildFlags_Borders | ImGuiChildFlags_NavFlattened,
+		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoNav
+	)) {
+		const auto origin = ImGui::GetCursorScreenPos();
+		const auto& style = ImGui::GetStyle();
+
+		{
+			const auto pos1 = origin + ImVec2(0.0f, size.y * 0.75f);
+			const auto pos2 = pos1 + ImVec2(size.x, size.y * 0.25f);
+
+			ImGui::GetWindowDrawList()->AddRectFilled(pos1, pos2,
+				ImGui::GetColorU32(ImGuiCol_Text), 0.0f, ImDrawFlags_None);
+
+			if (style.FrameBorderSize >= 1.0f) {
+				ImGui::GetWindowDrawList()->AddRect(pos1, pos2,
+					ImGui::GetColorU32(ImGuiCol_Border), 0.0f,
+					ImDrawFlags_None, style.FrameBorderSize);
+			}
+		}
+
+		{
+			const auto pos1 = origin + ImVec2(0.0f, size.y * 0.20f * phase);
+			const auto pos2 = pos1 + ImVec2(size.x, 0.0f);
+			const auto pos3 = pos2 + ImVec2(size.x * -0.5f, size.y * 0.45f);
+
+			ImGui::GetWindowDrawList()->AddTriangleFilled(pos1, pos2, pos3,
+				ImGui::GetColorU32(ImGuiCol_Text));
+
+			if (style.FrameBorderSize >= 1.0f) {
+				ImGui::GetWindowDrawList()->AddTriangle(pos1, pos2, pos3,
+					ImGui::GetColorU32(ImGuiCol_Border), style.FrameBorderSize);
+			}
+		}
+
+		ImGui::Dummy(widget_zone);
+	}
+	ImGui::EndChild();
 }

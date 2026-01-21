@@ -49,6 +49,16 @@ namespace ImGui {
 
 	ImVec2 GetWindowDecoSize() noexcept;
 
+	// Insert Dummy of proportions multiplicative of WindowPadding
+	void Dummy(float mult_w, float mult_h) noexcept;
+	// Insert Dummy of proportions multiplicative of WindowPadding.x
+	void DummyX(float mult) noexcept;
+	// Insert Dummy of proportions multiplicative of WindowPadding.y
+	void DummyY(float mult) noexcept;
+
+	// Insert Separator with vertical padding multiplicative of WindowPadding.y
+	void Separator(float mult) noexcept;
+
 	void SetNextWindowMinClientSize(const ImVec2& min) noexcept;
 
 	void DockNextWindowTo(unsigned id, bool first_use = false) noexcept;
@@ -74,10 +84,12 @@ namespace ImGui {
 		const ImVec2& uv1, // bottom-right of region
 		unsigned tint = 0xFFFFFFFF // modulo texture channels
 	) noexcept;
+
 	void DrawRect(
 		const ImVec2& dims, float width,
 		float round, unsigned color = 0xFFFFFFFF
 	) noexcept;
+
 	void DrawRectFilled(
 		const ImVec2& dims, float round,
 		unsigned color = 0xFFFFFFFF

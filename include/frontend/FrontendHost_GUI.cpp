@@ -55,11 +55,9 @@ void FrontendHost::setup_gui_callables() noexcept {
 	static auto s_menu_file__recent_files = FrontendInterface::register_menu("",
 	{ 0, "File" }, [&]() noexcept {
 		if (!s_file_mru.size()) { return; }
-		ImGui::Spacing();
-		ImGui::Separator();
-		ImGui::Spacing();
+		ImGui::Separator(1.0f);
 		ImGui::TextUnformatted("Recently opened:");
-		ImGui::Spacing(); ImGui::Spacing();
+		ImGui::DummyY(2.0f);
 
 		if (FrontendInterface::was_menu_clicked()) {
 			for (auto& e : s_file_mru.span()) { e.exists(); }
@@ -68,7 +66,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 		bool clicked = FrontendInterface::was_menu_clicked();
 
 		for (auto& entry : s_file_mru.span()) {
-			if (ImGui::MenuItem(entry->filename().string().c_str(),
+			if (ImGui::MenuItem(("• " + entry->filename().string()).c_str(),
 				nullptr, nullptr, clicked ? entry.exists() : entry))
 			{
 				load_file_from_disk(entry->string());
@@ -103,13 +101,13 @@ void FrontendHost::setup_gui_callables() noexcept {
 		#endif
 			ImGui::PopFont();
 
-			ImGui::Spacing(); ImGui::Spacing();
+			ImGui::Separator(2.0f);
 
 			ImGui::TextUnformatted("Version: ");
 			ImGui::SameLine();
 			ImGui::TextUnformatted(AppVer.with_hash);
 
-			ImGui::Spacing(); ImGui::Spacing();
+			ImGui::DummyY(1.0f);
 
 			ImGui::TextLinkOpenURL("License",
 				"https://github.com/janitor-raus/CubeChip/blob/master/LICENSE.txt");
@@ -143,7 +141,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 		static bool s_click_active{};
 
 		if (!s_click_active) { s_scale_factor = int(FrontendInterface::get_ui_text_scaling() * 100); }
-		ImGui::SliderInt("UI Text Scale", &s_scale_factor, 50, 150, "%d%%");
+		ImGui::SliderInt("UI Text Scale", &s_scale_factor, 100, 200, "%d%%");
 
 		s_click_active = ImGui::IsItemActive();
 		if (ImGui::IsItemDeactivatedAfterEdit()) {
@@ -205,7 +203,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 			}
 			ImGui::EndDisabled();
 
-			ImGui::Spacing();
+			ImGui::DummyY(1.0f);
 
 			if (ImGui::BeginTable("LogTable", 4, ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_RowBg
 				| ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY
