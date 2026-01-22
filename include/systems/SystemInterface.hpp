@@ -149,17 +149,17 @@ public:
 	f32  get_real_system_framerate() const noexcept;
 
 protected:
-	void set_frame_stop_flag(bool state) noexcept { m_stop_frame_flag.store(state, mo::relaxed); }
-	auto get_frame_stop_flag()     const noexcept { return m_stop_frame_flag.load(mo::relaxed);  }
+	void set_frame_stop_flag(bool state) noexcept { m_stop_frame_flag.store(state, mo::release); }
+	auto get_frame_stop_flag()     const noexcept { return m_stop_frame_flag.load(mo::acquire);  }
 
 private:
 	void notify_next_frame(bool state) noexcept {
-		m_next_frame_flag.store(state, mo::relaxed);
+		m_next_frame_flag.store(state, mo::release);
 		m_next_frame_flag.notify_one();
 	}
 	void await_next_frame(bool state) noexcept {
-		m_next_frame_flag.wait(state, mo::relaxed);
-		m_next_frame_flag.store(state, mo::relaxed);
+		m_next_frame_flag.wait(state, mo::acquire);
+		m_next_frame_flag.store(state, mo::release);
 	}
 
 protected:
