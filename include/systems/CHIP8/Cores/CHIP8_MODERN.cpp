@@ -219,9 +219,8 @@ void CHIP8_MODERN::renderVideoData() {
 	#pragma region 0 instruction branch
 
 	void CHIP8_MODERN::instruction_00E0() noexcept {
-		if (Quirk.waitVblank) [[unlikely]]
-			{ triggerInterrupt(Interrupt::FRAME); }
-		::fill(mDisplayBuffer);
+		mDisplayBuffer.initialize();
+		if (Quirk.waitVblank) [[unlikely]] { triggerInterrupt(Interrupt::FRAME); }
 	}
 	void CHIP8_MODERN::instruction_00EE() noexcept {
 		mCurrentPC = mStackBank[--mStackTop & 0xF];
@@ -419,9 +418,6 @@ void CHIP8_MODERN::renderVideoData() {
 	}
 
 	void CHIP8_MODERN::instruction_DxyN(s32 X, s32 Y, s32 N) noexcept {
-		if (Quirk.waitVblank) [[unlikely]]
-			{ triggerInterrupt(Interrupt::FRAME); }
-
 		auto pX = mRegisterV[X] & (cDisplayW - 1);
 		auto pY = mRegisterV[Y] & (cDisplayH - 1);
 
@@ -453,6 +449,8 @@ void CHIP8_MODERN::renderVideoData() {
 				}
 				return;
 		}
+
+		if (Quirk.waitVblank) [[unlikely]] { triggerInterrupt(Interrupt::FRAME); }
 	}
 
 	#pragma endregion
@@ -478,8 +476,8 @@ void CHIP8_MODERN::renderVideoData() {
 		::assign_cast(mRegisterV[X], mDelayTimer);
 	}
 	void CHIP8_MODERN::instruction_Fx0A(s32 X) noexcept {
-		triggerInterrupt(Interrupt::INPUT);
 		mInputReg = &mRegisterV[X];
+		triggerInterrupt(Interrupt::INPUT);
 	}
 	void CHIP8_MODERN::instruction_Fx15(s32 X) noexcept {
 		::assign_cast(mDelayTimer, mRegisterV[X]);

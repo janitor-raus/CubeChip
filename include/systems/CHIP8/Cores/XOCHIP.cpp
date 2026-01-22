@@ -362,14 +362,14 @@ void XOCHIP::scrollDisplayRT() {
 	#pragma region 0 instruction branch
 
 	void XOCHIP::instruction_00CN(s32 N) noexcept {
+		if (N) { scrollDisplayDN(N); }
 		if (Quirk.waitScroll) [[unlikely]]
 			{ triggerInterrupt(Interrupt::FRAME); }
-		if (N) { scrollDisplayDN(N); }
 	}
 	void XOCHIP::instruction_00DN(s32 N) noexcept {
+		if (N) { scrollDisplayUP(N); }
 		if (Quirk.waitScroll) [[unlikely]]
 			{ triggerInterrupt(Interrupt::FRAME); }
-		if (N) { scrollDisplayUP(N); }
 	}
 	void XOCHIP::instruction_00E0() noexcept {
 		if (mPlanarMask & 0x1) { mDisplayBuffer[0].initialize(); }
@@ -381,14 +381,14 @@ void XOCHIP::scrollDisplayRT() {
 		mCurrentPC = mStackBank[--mStackTop & 0xF];
 	}
 	void XOCHIP::instruction_00FB() noexcept {
+		scrollDisplayRT();
 		if (Quirk.waitScroll) [[unlikely]]
 			{ triggerInterrupt(Interrupt::FRAME); }
-		scrollDisplayRT();
 	}
 	void XOCHIP::instruction_00FC() noexcept {
+		scrollDisplayLT();
 		if (Quirk.waitScroll) [[unlikely]]
 			{ triggerInterrupt(Interrupt::FRAME); }
-		scrollDisplayLT();
 	}
 	void XOCHIP::instruction_00FD() noexcept {
 		triggerInterrupt(Interrupt::SOUND);
@@ -707,8 +707,8 @@ void XOCHIP::scrollDisplayRT() {
 		::assign_cast(mRegisterV[X], mDelayTimer);
 	}
 	void XOCHIP::instruction_Fx0A(s32 X) noexcept {
-		triggerInterrupt(Interrupt::INPUT);
 		mInputReg = &mRegisterV[X];
+		triggerInterrupt(Interrupt::INPUT);
 	}
 	void XOCHIP::instruction_Fx15(s32 X) noexcept {
 		::assign_cast(mDelayTimer, mRegisterV[X]);

@@ -200,11 +200,9 @@ protected:
 #define LOOP_DISPATCH(LOOP_FUNCTION)					\
 	if (has_system_state(EmuState::BENCH)) [[likely]] {	\
 		set_frame_stop_flag(hasInterrupt());			\
-		LOOP_FUNCTION([&]() noexcept					\
-			{ return !get_frame_stop_flag(); });		\
+		LOOP_FUNCTION([&]() noexcept { return !get_frame_stop_flag(); }); \
 	} else {											\
-		LOOP_FUNCTION([&]() noexcept					\
-			{ return !hasInterrupt() && mCycleCount < mTargetCPF; }); \
+		LOOP_FUNCTION([&]() noexcept { return !hasInterrupt() && mCycleCount < mTargetCPF; }); \
 	}
 
 protected:

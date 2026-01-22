@@ -501,12 +501,12 @@ void MEGACHIP::scrollBuffersRT() {
 		}
 	}
 	void MEGACHIP::instruction_00E0() noexcept {
-		triggerInterrupt(Interrupt::FRAME);
 		if (isManualRefresh()) {
 			flushAllVideoBuffers();
 		} else {
 			mDisplayBuffer.initialize();
 		}
+		triggerInterrupt(Interrupt::FRAME);
 	}
 	void MEGACHIP::instruction_00EE() noexcept {
 		mCurrentPC = mStackBank[--mStackTop & 0xF];
@@ -529,21 +529,20 @@ void MEGACHIP::scrollBuffersRT() {
 		triggerInterrupt(Interrupt::SOUND);
 	}
 	void MEGACHIP::instruction_00FE() noexcept {
-		triggerInterrupt(Interrupt::FRAME);
 		prepDisplayArea(Resolution::LO);
+		triggerInterrupt(Interrupt::FRAME);
 	}
 	void MEGACHIP::instruction_00FF() noexcept {
-		triggerInterrupt(Interrupt::FRAME);
 		prepDisplayArea(Resolution::HI);
+		triggerInterrupt(Interrupt::FRAME);
 	}
 
 	void MEGACHIP::instruction_0010() noexcept {
-		triggerInterrupt(Interrupt::FRAME);
 		prepDisplayArea(Resolution::LO);
 		scrapAllVideoBuffers();
+		triggerInterrupt(Interrupt::FRAME);
 	}
 	void MEGACHIP::instruction_0011() noexcept {
-		triggerInterrupt(Interrupt::FRAME);
 		prepDisplayArea(Resolution::MC);
 
 		selectBlendingAlgo(BlendMode::ALPHA_BLEND);
@@ -552,6 +551,8 @@ void MEGACHIP::scrollBuffersRT() {
 
 		mTexture.reset();
 		mTrack.reset();
+
+		triggerInterrupt(Interrupt::FRAME);
 	}
 	void MEGACHIP::instruction_01NN(s32 NN) noexcept {
 		::assign_cast(mRegisterI, (NN << 16) | NNNN());
@@ -796,9 +797,6 @@ void MEGACHIP::scrollBuffersRT() {
 	}
 
 	void MEGACHIP::instruction_DxyN(s32 X, s32 Y, s32 N) noexcept {
-		if (Quirk.waitVblank) [[unlikely]]
-			{ triggerInterrupt(Interrupt::FRAME); }
-
 		if (isManualRefresh()) {
 			const auto originX = mRegisterV[X] + 0;
 			const auto originY = mRegisterV[Y] + 0;
@@ -905,6 +903,8 @@ void MEGACHIP::scrollBuffersRT() {
 				::assign_cast(mRegisterV[0xF], collisions != 0);
 			}
 		}
+
+		if (Quirk.waitVblank) [[unlikely]] { triggerInterrupt(Interrupt::FRAME); }
 	}
 
 	#pragma endregion
@@ -930,14 +930,14 @@ void MEGACHIP::scrollBuffersRT() {
 		::assign_cast(mRegisterV[X], mDelayTimer);
 	}
 	void MEGACHIP::instruction_Fx0A(s32 X) noexcept {
-		triggerInterrupt(Interrupt::INPUT);
-		mInputReg = &mRegisterV[X];
 		if (isManualRefresh()) [[unlikely]] {
 			mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
 				frame.metadata = ++mDisplayDevice.metadata_staging;
 				frame.copy_from(mBackgroundBuffer);
 			});
 		}
+		mInputReg = &mRegisterV[X];
+		triggerInterrupt(Interrupt::INPUT);
 	}
 	void MEGACHIP::instruction_Fx15(s32 X) noexcept {
 		::assign_cast(mDelayTimer, mRegisterV[X]);

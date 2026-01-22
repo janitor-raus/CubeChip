@@ -277,40 +277,40 @@ void SCHIP_MODERN::scrollDisplayRT() {
 	#pragma region 0 instruction branch
 
 	void SCHIP_MODERN::instruction_00CN(s32 N) noexcept {
+		if (N) { scrollDisplayDN(N); }
 		if (Quirk.waitScroll) [[unlikely]]
 			{ triggerInterrupt(Interrupt::FRAME); }
-		if (N) { scrollDisplayDN(N); }
 	}
 	void SCHIP_MODERN::instruction_00E0() noexcept {
+		mDisplayBuffer.initialize();
 		if (Quirk.waitVblank) [[unlikely]]
 			{ triggerInterrupt(Interrupt::FRAME); }
-		mDisplayBuffer.initialize();
 	}
 	void SCHIP_MODERN::instruction_00EE() noexcept {
 		mCurrentPC = mStackBank[--mStackTop & 0xF];
 	}
 	void SCHIP_MODERN::instruction_00FB() noexcept {
+		scrollDisplayRT();
 		if (Quirk.waitScroll) [[unlikely]]
 			{ triggerInterrupt(Interrupt::FRAME); }
-		scrollDisplayRT();
 	}
 	void SCHIP_MODERN::instruction_00FC() noexcept {
+		scrollDisplayLT();
 		if (Quirk.waitScroll) [[unlikely]]
 			{ triggerInterrupt(Interrupt::FRAME); }
-		scrollDisplayLT();
 	}
 	void SCHIP_MODERN::instruction_00FD() noexcept {
 		triggerInterrupt(Interrupt::SOUND);
 	}
 	void SCHIP_MODERN::instruction_00FE() noexcept {
+		prepDisplayArea(Resolution::LO);
 		if (Quirk.waitVblank) [[unlikely]]
 			{ triggerInterrupt(Interrupt::FRAME); }
-		prepDisplayArea(Resolution::LO);
 	}
 	void SCHIP_MODERN::instruction_00FF() noexcept {
+		prepDisplayArea(Resolution::HI);
 		if (Quirk.waitVblank) [[unlikely]]
 			{ triggerInterrupt(Interrupt::FRAME); }
-		prepDisplayArea(Resolution::HI);
 	}
 
 	#pragma endregion
@@ -508,9 +508,6 @@ void SCHIP_MODERN::scrollDisplayRT() {
 	}
 
 	void SCHIP_MODERN::instruction_DxyN(s32 X, s32 Y, s32 N) noexcept {
-		if (Quirk.waitVblank) [[unlikely]]
-			{ triggerInterrupt(Interrupt::FRAME); }
-
 		const auto pX = mRegisterV[X] & (mDisplay.W - 1);
 		const auto pY = mRegisterV[Y] & (mDisplay.H - 1);
 
@@ -543,6 +540,8 @@ void SCHIP_MODERN::scrollDisplayRT() {
 				}
 				break;
 		}
+
+		if (Quirk.waitVblank) [[unlikely]] { triggerInterrupt(Interrupt::FRAME); }
 	}
 
 	#pragma endregion
@@ -568,8 +567,8 @@ void SCHIP_MODERN::scrollDisplayRT() {
 		::assign_cast(mRegisterV[X], mDelayTimer);
 	}
 	void SCHIP_MODERN::instruction_Fx0A(s32 X) noexcept {
-		triggerInterrupt(Interrupt::INPUT);
 		mInputReg = &mRegisterV[X];
+		triggerInterrupt(Interrupt::INPUT);
 	}
 	void SCHIP_MODERN::instruction_Fx15(s32 X) noexcept {
 		::assign_cast(mDelayTimer, mRegisterV[X]);

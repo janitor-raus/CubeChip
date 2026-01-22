@@ -266,8 +266,8 @@ void CHIP8E::renderVideoData() {
 	#pragma region 0 instruction branch
 
 	void CHIP8E::instruction_00E0() noexcept {
+		mDisplayBuffer.initialize();
 		triggerInterrupt(Interrupt::FRAME);
-		::fill(mDisplayBuffer);
 	}
 	void CHIP8E::instruction_00EE() noexcept {
 		mCurrentPC = mStackBank[--mStackTop & 0xF];
@@ -491,8 +491,6 @@ void CHIP8E::renderVideoData() {
 	}
 
 	void CHIP8E::instruction_DxyN(s32 X, s32 Y, s32 N) noexcept {
-		triggerInterrupt(Interrupt::FRAME);
-
 		auto pX = mRegisterV[X] & (cDisplayW - 1);
 		auto pY = mRegisterV[Y] & (cDisplayH - 1);
 
@@ -516,6 +514,8 @@ void CHIP8E::renderVideoData() {
 				}
 				return;
 		}
+
+		triggerInterrupt(Interrupt::FRAME);
 	}
 
 	#pragma endregion
@@ -544,8 +544,8 @@ void CHIP8E::renderVideoData() {
 		::assign_cast(mRegisterV[X], mDelayTimer);
 	}
 	void CHIP8E::instruction_Fx0A(s32 X) noexcept {
-		triggerInterrupt(Interrupt::INPUT);
 		mInputReg = &mRegisterV[X];
+		triggerInterrupt(Interrupt::INPUT);
 	}
 	void CHIP8E::instruction_Fx15(s32 X) noexcept {
 		::assign_cast(mDelayTimer, mRegisterV[X]);
@@ -571,8 +571,8 @@ void CHIP8E::renderVideoData() {
 		mMemoryBank[mRegisterI + 2] = bcd.digit[0];
 	}
 	void CHIP8E::instruction_Fx4F(s32 X) noexcept {
-		triggerInterrupt(Interrupt::DELAY);
 		::assign_cast(mDelayTimer, mRegisterV[X]);
+		triggerInterrupt(Interrupt::DELAY);
 	}
 	void CHIP8E::instruction_FN55(s32 N) noexcept {
 		for (auto idx = 0; idx <= N; ++idx) { mMemoryBank[mRegisterI + idx] = mRegisterV[idx]; }

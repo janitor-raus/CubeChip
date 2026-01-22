@@ -272,8 +272,8 @@ void SCHIP_LEGACY::scrollDisplayRT() {
 		scrollDisplayDN(N);
 	}
 	void SCHIP_LEGACY::instruction_00E0() noexcept {
-		triggerInterrupt(Interrupt::FRAME);
 		mDisplayBuffer.initialize();
+		triggerInterrupt(Interrupt::FRAME);
 	}
 	void SCHIP_LEGACY::instruction_00EE() noexcept {
 		mCurrentPC = mStackBank[--mStackTop & 0xF];
@@ -288,12 +288,12 @@ void SCHIP_LEGACY::scrollDisplayRT() {
 		triggerInterrupt(Interrupt::SOUND);
 	}
 	void SCHIP_LEGACY::instruction_00FE() noexcept {
-		triggerInterrupt(Interrupt::FRAME);
 		prepDisplayArea(Resolution::LO);
+		triggerInterrupt(Interrupt::FRAME);
 	}
 	void SCHIP_LEGACY::instruction_00FF() noexcept {
-		triggerInterrupt(Interrupt::FRAME);
 		prepDisplayArea(Resolution::HI);
+		triggerInterrupt(Interrupt::FRAME);
 	}
 
 	#pragma endregion
@@ -501,9 +501,6 @@ void SCHIP_LEGACY::scrollDisplayRT() {
 	}
 
 	void SCHIP_LEGACY::instruction_DxyN(s32 X, s32 Y, s32 N) noexcept {
-		if (Quirk.waitVblank) [[unlikely]]
-			{ triggerInterrupt(Interrupt::FRAME); }
-
 		if (isLargerDisplay()) {
 			const auto offsetX = 8 - (mRegisterV[X] & 7);
 			const auto originX = mRegisterV[X] & 0x78;
@@ -552,6 +549,8 @@ void SCHIP_LEGACY::scrollDisplayRT() {
 			}
 			::assign_cast(mRegisterV[0xF], collisions != 0);
 		}
+
+		if (Quirk.waitVblank) [[unlikely]] { triggerInterrupt(Interrupt::FRAME); }
 	}
 
 	#pragma endregion
@@ -577,8 +576,8 @@ void SCHIP_LEGACY::scrollDisplayRT() {
 		::assign_cast(mRegisterV[X], mDelayTimer);
 	}
 	void SCHIP_LEGACY::instruction_Fx0A(s32 X) noexcept {
-		triggerInterrupt(Interrupt::INPUT);
 		mInputReg = &mRegisterV[X];
+		triggerInterrupt(Interrupt::INPUT);
 	}
 	void SCHIP_LEGACY::instruction_Fx15(s32 X) noexcept {
 		::assign_cast(mDelayTimer, mRegisterV[X]);

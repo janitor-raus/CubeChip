@@ -295,8 +295,8 @@ void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 	#pragma region 0 instruction branch
 
 	void CHIP8X::instruction_00E0() noexcept {
+		mDisplayBuffer.initialize();
 		triggerInterrupt(Interrupt::FRAME);
-		::fill(mDisplayBuffer);
 	}
 	void CHIP8X::instruction_00EE() noexcept {
 		mCurrentPC = mStackBank[--mStackTop & 0xF];
@@ -502,8 +502,6 @@ void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 	}
 
 	void CHIP8X::instruction_DxyN(s32 X, s32 Y, s32 N) noexcept {
-		triggerInterrupt(Interrupt::FRAME);
-
 		auto pX = mRegisterV[X] & (cDisplayW - 1);
 		auto pY = mRegisterV[Y] & (cDisplayH - 1);
 
@@ -527,6 +525,8 @@ void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 				}
 				return;
 		}
+
+		triggerInterrupt(Interrupt::FRAME);
 	}
 
 	#pragma endregion
@@ -558,8 +558,8 @@ void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 		::assign_cast(mRegisterV[X], mDelayTimer);
 	}
 	void CHIP8X::instruction_Fx0A(s32 X) noexcept {
-		triggerInterrupt(Interrupt::INPUT);
 		mInputReg = &mRegisterV[X];
+		triggerInterrupt(Interrupt::INPUT);
 	}
 	void CHIP8X::instruction_Fx15(s32 X) noexcept {
 		::assign_cast(mDelayTimer, mRegisterV[X]);
