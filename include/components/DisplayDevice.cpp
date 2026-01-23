@@ -6,7 +6,6 @@
 
 #include "DisplayDevice.hpp"
 #include "LifetimeWrapperSDL.hpp"
-#include "FrontendInterface.hpp"
 #include "AtomSharedPtr.hpp"
 #include "BasicVideoSpec.hpp"
 #include "BasicLogger.hpp"
@@ -15,12 +14,12 @@
 
 /*==================================================================*/
 
-static auto renderer() noexcept { return FrontendInterface::get_current_renderer(); }
+#define RENDERER FrontendInterface::get_current_renderer()
 
 struct DisplayDevice::DisplayContext {
 	using Callable = DisplayDevice::Callable;
 
-	AtomSharedPtr<std::string> m_display_name;
+	AtomSharedPtr<ImLabel> m_window_label;
 	AtomSharedPtr<Callable>    m_osd_callable;
 	FrontendInterface::Hook    m_render_hook;
 	SDL_Unique<SDL_Texture>    m_stream_texture;
@@ -32,17 +31,18 @@ struct DisplayDevice::DisplayContext {
 	std::atomic<bool> m_utilize_shaders{};
 
 	bool  m_disable_menubar = true;
+	bool  m_fullscreen_mode = false;
 	bool* m_is_window_alive = nullptr;
 
 	ez::Frame m_old_target_size{};
 
 	DisplayContext(std::size_t W, std::size_t H, const char* name, std::size_t bpp) noexcept
-		: m_display_name(std::make_shared<std::string>(name))
+		: m_window_label(std::make_shared<ImLabel>(name))
 		, m_osd_callable(nullptr)
 		, m_render_hook(FrontendInterface::register_window(
 			[&]() noexcept { render_display_window(); }))
 		, m_stream_texture(BasicVideoSpec::create_stream_texture(
-			::renderer(), static_cast<int>(W), static_cast<int>(H)))
+			RENDERER, static_cast<int>(W), static_cast<int>(H)))
 		, m_swapchain(bpp, static_cast<int>(W), static_cast<int>(H))
 	{}
 
@@ -51,7 +51,7 @@ private:
 		m_swapchain.present([&](auto frame) noexcept {
 			const auto& metadata = frame.buffer.metadata;
 
-			BasicVideoSpec::write_stream_texture(::renderer(),
+			BasicVideoSpec::write_stream_texture(RENDERER,
 				m_stream_texture, frame.buffer.data());
 
 			const auto rotation = m_screen_rotation.load(mo::relaxed);
@@ -71,19 +71,12 @@ private:
 			const auto border_width = metadata.get_border_width() / 2 * 2;
 			const auto borders_vec2 = ImVec2(float(border_width), float(border_width));
 			const auto padding_vec2 = ImVec2(margin * 2, margin * 2) + borders_vec2;
+			const auto window_label = *m_window_label.load(mo::relaxed); // copy
+			const auto show_menubar = m_disable_menubar ? ImGuiWindowFlags_None : ImGuiWindowFlags_MenuBar;
+			const auto window_flags = show_menubar | ImGuiWindowFlags_NoCollapse
+				| ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 
-			ImGui::DockNextWindowTo(FrontendInterface::get_main_dockspace_id(), true);
-			ImGui::SetNextWindowMinClientSize(ImVec2(float(dar_viewport.w), float(dar_viewport.h))
-				* min_zoom + padding_vec2 + borders_vec2);
-
-			const auto window_name = m_display_name.load(mo::relaxed);
-			if (ImGui::Begin(window_name->c_str(), m_is_window_alive, ImGuiWindowFlags_NoCollapse
-				| ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
-				| (m_disable_menubar ? ImGuiWindowFlags_None : ImGuiWindowFlags_MenuBar)
-			)) {
-				FrontendInterface::call_autohide_menubar(
-					window_name->c_str(), m_disable_menubar);
-
+			const auto s_window_contents = [&]() noexcept {
 			// calc padding/borders spacing in advance
 				const auto origin_point = ImGui::GetCursorPos();
 				const auto display_zone = ImGui::GetContentRegionAvail();
@@ -111,12 +104,12 @@ private:
 				if (metadata.enabled) {
 					if (new_target_size != m_old_target_size) {
 						m_target_texture.reset(BasicVideoSpec::create_target_texture(
-							::renderer(), new_target_size.w, new_target_size.h, true));
+							RENDERER, new_target_size.w, new_target_size.h, true));
 						m_old_target_size = new_target_size;
 					}
 
 					BasicVideoSpec::write_stream_texture(
-						::renderer(), m_target_texture, m_stream_texture);
+						RENDERER, m_target_texture, m_stream_texture);
 
 					ImGui::SetCursorPos(origin_point + ImGui::floor(
 						(display_zone - borders_area) * 0.5f));
@@ -156,6 +149,14 @@ private:
 
 				auto osd_callable = m_osd_callable.load(mo::relaxed);
 				if (osd_callable) { (*osd_callable)(); }
+
+				// toggle fullscreen mode on double-click
+				if (ImGui::IsWindowHovered(ImGuiHoveredFlags_RootWindow
+					| ImGuiHoveredFlags_NoPopupHierarchy
+					| ImGuiHoveredFlags_AllowWhenBlockedByActiveItem
+				) && !ImGui::IsAnyItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+					m_fullscreen_mode = !m_fullscreen_mode;
+				}
 
 				#ifdef DISPLAYDEVICEDEBUG
 				ImGui::SetCursorPos(origin_point);
@@ -204,6 +205,31 @@ private:
 					ImGui::EndTable();
 				}
 				#endif
+			};
+
+			if (m_fullscreen_mode) {
+				const auto* viewport = ImGui::GetMainViewport();
+				ImGui::SetNextWindowPos(viewport->Pos);
+				ImGui::SetNextWindowSize(viewport->Size);
+
+				const auto temp_label = window_label.get_id() + "_fullscreen";
+				if (ImGui::Begin(temp_label.c_str(), nullptr, window_flags | ImGuiWindowFlags_NoMove
+					| ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings
+				)) { s_window_contents(); }
+				ImGui::End();
+			}
+
+			ImGui::DockNextWindowTo(FrontendInterface::get_main_dockspace_id(), true);
+			ImGui::SetNextWindowMinClientSize(ImVec2(float(dar_viewport.w), float(dar_viewport.h))
+				* min_zoom + padding_vec2 + borders_vec2);
+
+			if (ImGui::Begin(window_label->c_str(), m_is_window_alive, window_flags)) {
+				if (!m_fullscreen_mode) {
+					FrontendInterface::call_autohide_menubar(
+						window_label->c_str(), m_disable_menubar);
+
+					s_window_contents();
+				}
 			}
 			ImGui::End();
 		});
@@ -291,12 +317,12 @@ void DisplayDevice::set_utilize_shaders(bool enable) noexcept {
 	m_context->m_utilize_shaders.store(enable, mo::relaxed);
 }
 
-auto DisplayDevice::get_window_label() const noexcept -> std::string {
-	return *m_context->m_display_name.load(mo::relaxed);
+auto DisplayDevice::get_window_label() const noexcept -> ImLabel {
+	return *m_context->m_window_label.load(mo::relaxed);
 }
 
 void DisplayDevice::set_window_label(std::string_view name) noexcept {
-	m_context->m_display_name.store(std::make_shared<std::string>(name), mo::relaxed);
+	m_context->m_window_label.store(std::make_shared<ImLabel>(name), mo::relaxed);
 }
 
 void DisplayDevice::set_shutdown_signal(bool* signal) noexcept {

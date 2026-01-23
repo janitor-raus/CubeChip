@@ -427,7 +427,7 @@ void CHIP8_MODERN::renderVideoData() {
 			[[likely]]
 			case 1:
 				drawByte(pX, pY, mMemoryBank[mRegisterI]);
-				return;
+				break;
 
 			[[unlikely]]
 			case 0:
@@ -436,18 +436,18 @@ void CHIP8_MODERN::renderVideoData() {
 					drawByte(pX + 0, pY, mMemoryBank[mRegisterI + I++]);
 					drawByte(pX + 8, pY, mMemoryBank[mRegisterI + I++]);
 
-					if (!Quirk.wrapSprite && pY == (cDisplayH - 1)) { return; }
+					if (!Quirk.wrapSprite && pY == (cDisplayH - 1)) { break; }
 				}
-				return;
+				break;
 
 			[[unlikely]]
 			default:
 				for (auto H = 0; H < N; ++H, ++pY &= (cDisplayH - 1))
 				{
 					drawByte(pX, pY, mMemoryBank[mRegisterI + H]);
-					if (!Quirk.wrapSprite && pY == (cDisplayH - 1)) { return; }
+					if (!Quirk.wrapSprite && pY == (cDisplayH - 1)) { break; }
 				}
-				return;
+				break;
 		}
 
 		if (Quirk.waitVblank) [[unlikely]] { triggerInterrupt(Interrupt::FRAME); }

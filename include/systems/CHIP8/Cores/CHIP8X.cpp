@@ -509,21 +509,21 @@ void CHIP8X::drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 
 		switch (N) {
 			[[unlikely]]
-			case 0: return;
+			case 0: break;
 
 			[[likely]]
 			case 1:
 				drawByte(pX, pY, mMemoryBank[mRegisterI]);
-				return;
+				break;
 
 			[[unlikely]]
 			default:
 				for (auto H = 0; H < N; ++H)
 				{
 					drawByte(pX, pY, mMemoryBank[mRegisterI + H]);
-					if (++pY == cDisplayH) { return; }
+					if (++pY == cDisplayH) { break; }
 				}
-				return;
+				break;
 		}
 
 		triggerInterrupt(Interrupt::FRAME);

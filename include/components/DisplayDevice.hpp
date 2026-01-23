@@ -62,7 +62,7 @@ public:
 	bool get_utilize_shaders() const noexcept;
 	void set_utilize_shaders(bool enable) noexcept;
 
-	auto get_window_label() const noexcept -> std::string;
+	auto get_window_label() const noexcept -> ImLabel;
 	void set_window_label(std::string_view name) noexcept;
 
 	void set_shutdown_signal(bool* signal) noexcept;

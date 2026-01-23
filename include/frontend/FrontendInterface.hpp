@@ -30,8 +30,9 @@ struct ImLabel {
 	std::string value;
 
 	ImLabel() noexcept = default;
-	ImLabel(std::string v) noexcept : value(std::move(v)) {}
-	ImLabel(const char* v) noexcept : value(v) {}
+	ImLabel(std::string v)      noexcept : value(std::move(v)) {}
+	ImLabel(std::string_view v) noexcept : value(v) {}
+	ImLabel(const char* v)      noexcept : value(v) {}
 
 	/*==================================================================*/
 
