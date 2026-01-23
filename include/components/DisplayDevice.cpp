@@ -77,6 +77,9 @@ private:
 				| ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 
 			const auto s_window_contents = [&]() noexcept {
+				FrontendInterface::call_autohide_menubar(
+					window_label->c_str(), m_disable_menubar);
+
 			// calc padding/borders spacing in advance
 				const auto origin_point = ImGui::GetCursorPos();
 				const auto display_zone = ImGui::GetContentRegionAvail();
@@ -224,12 +227,7 @@ private:
 				* min_zoom + padding_vec2 + borders_vec2);
 
 			if (ImGui::Begin(window_label->c_str(), m_is_window_alive, window_flags)) {
-				if (!m_fullscreen_mode) {
-					FrontendInterface::call_autohide_menubar(
-						window_label->c_str(), m_disable_menubar);
-
-					s_window_contents();
-				}
+				if (!m_fullscreen_mode) { s_window_contents(); }
 			}
 			ImGui::End();
 		});
