@@ -55,8 +55,7 @@ void FrontendInterface::invoke_registered_windows() noexcept {
 
 	do {
 		while (windows.offset < windows.buffer.size()) {
-			auto& entry = windows.buffer[windows.offset];
-			if (auto shared_ptr = entry.lock()) {
+			if (auto shared_ptr = windows.buffer[windows.offset].lock()) {
 				(*shared_ptr)(); ++windows.offset;
 			} else {
 				windows.buffer.erase(windows.buffer.begin() + windows.offset);
@@ -100,16 +99,24 @@ void FrontendInterface::invoke_registered_menus(const LabelKey& window_key) noex
 	if (window == s_hooks->menus.registry.end()) { return; }
 
 	do {
+		// iterate over all registered menu tabs for this window
 		for (auto& [menu_key, hooks] : window->second) {
 			if (hooks.buffer.empty()) { continue; }
+
+			// clean-up pass before we enter BeginMenu tabs
+			hooks.buffer.erase(std::remove_if(
+					hooks.buffer.begin(), hooks.buffer.end(),
+					[](auto& w) noexcept { return w.expired(); }
+			), hooks.buffer.end());
 
 			if (ImGui::BeginMenu(menu_key.second.c_str())) {
 				hooks.first_hit = !std::exchange(hooks.has_focus, true);
 				s_active_menu = &hooks;
 
+				// invoke all registered hooks for this menu tabs
 				while (hooks.offset < hooks.buffer.size()) {
-					auto& entry = hooks.buffer[hooks.offset];
-					if (auto shared_ptr = entry.lock()) {
+					// if the weak_ptr is expired, erase it, otherwise invoke it
+					if (auto shared_ptr = hooks.buffer[hooks.offset].lock()) {
 						(*shared_ptr)(); ++hooks.offset;
 					} else {
 						hooks.buffer.erase(hooks.buffer.begin() + hooks.offset);
@@ -173,7 +180,6 @@ void FrontendInterface::init_context(const char* home_dir) {
 
 	s_hooks = std::make_unique<RegistryAggregate>();
 
-	ImGui::StyleColorsDark(&s_default_style);
 	s_default_style.WindowPadding     = ImVec2(6.0f, 6.0f);
 	s_default_style.FramePadding      = ImVec2(8.0f, 4.0f);
 	s_default_style.ItemSpacing       = ImVec2(8.0f, 2.0f);
@@ -374,26 +380,19 @@ void FrontendInterface::call_menubar(const char* window_name) noexcept {
 }
 
 void FrontendInterface::call_autohide_menubar(const char* window_name, bool& hidden) noexcept {
+	const bool is_window_focused = ImGui::IsWindowFocused(
+		ImGuiFocusedFlags_RootAndChildWindows);
 
-	if (hidden) {
-		if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && (
-			ImGui::IsKeyPressed(ImGuiKey_LeftAlt) || ImGui::IsKeyPressed(ImGuiKey_RightAlt)
-		)) { hidden = false; return; }
+	if (is_window_focused) {
+		if (ImGui::IsKeyReleased(ImGuiKey_LeftAlt) ||
+			ImGui::IsKeyReleased(ImGuiKey_RightAlt)
+		) { hidden = !hidden; }
 	} else {
-		if (ImGui::IsKeyPressed(ImGuiKey_LeftAlt) ||
-			ImGui::IsKeyPressed(ImGuiKey_RightAlt)) { hidden = true; }
+		hidden = true;
 	}
 
-	bool menu_or_popup_hovered = false;
-
-	if (ImGui::BeginMenuBar()) {
-		menu_or_popup_hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)
-			&& (ImGui::IsAnyItemHovered() || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId));
-
+	if (!hidden && ImGui::BeginMenuBar()) {
 		invoke_registered_menus(window_name);
 		ImGui::EndMenuBar();
 	}
-
-	if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
-		!menu_or_popup_hovered && !ImGui::GetIO().WantCaptureMouse) { hidden = true; }
 }

@@ -27,8 +27,9 @@ void MEGACHIP::initializeSystem() noexcept {
 
 	prepDisplayArea(Resolution::LO);
 
-	mDisplayDevice.metadata_staging
-		.set_texture_zoom(2).set_inner_margin(4)
+	mDisplayDevice.metadata_staging()
+		.set_minimum_zoom(2)
+		.set_inner_margin(4)
 		.enabled = true;
 }
 
@@ -291,7 +292,7 @@ void MEGACHIP::renderAudioData() {
 			{ makePulseWave, &mVoices[VOICE::BUZZER] },
 		});
 
-		mDisplayDevice.metadata_staging.set_border_color_if(
+		mDisplayDevice.metadata_staging().set_border_color_if(
 			!!mAudioTimers[VOICE::BUZZER], sBitColors[1]);
 	}
 	else {
@@ -302,7 +303,7 @@ void MEGACHIP::renderAudioData() {
 			{ makePulseWave, &mVoices[VOICE::BUZZER] },
 		});
 
-		mDisplayDevice.metadata_staging.set_border_color_if(
+		mDisplayDevice.metadata_staging().set_border_color_if(
 			!!::accumulate(mAudioTimers), sBitColors[1]);
 	}
 }
@@ -327,7 +328,7 @@ void MEGACHIP::renderVideoData() {
 		}
 
 		mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-			frame.metadata = ++mDisplayDevice.metadata_staging;
+			frame.metadata = ++mDisplayDevice.metadata_staging();
 			frame.copy_from(mBackgroundBuffer);
 		});
 	}
@@ -337,14 +338,14 @@ void MEGACHIP::prepDisplayArea(Resolution mode) {
 	isManualRefresh(mode == Resolution::MC);
 
 	if (isManualRefresh()) {
-		mDisplayDevice.metadata_staging
+		mDisplayDevice.metadata_staging()
 			.set_viewport(cDisplayW_M8, cDisplayH_M8)
 			.set_texture_tint(RGBA::Black);
 		Quirk.waitVblank = false;
 		mTargetCPF = cInstSpeedMC;
 	}
 	else {
-		mDisplayDevice.metadata_staging
+		mDisplayDevice.metadata_staging()
 			.set_viewport(cDisplayW_M8, cDisplayW_M8 >> 1)
 			.set_texture_tint(cBitColors[0]);
 
@@ -413,7 +414,7 @@ void MEGACHIP::scrapAllVideoBuffers() {
 
 void MEGACHIP::flushAllVideoBuffers() {
 	mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = ++mDisplayDevice.metadata_staging;
+		frame.metadata = ++mDisplayDevice.metadata_staging();
 		frame.copy_from(mBackgroundBuffer);
 	});
 
@@ -424,7 +425,7 @@ void MEGACHIP::flushAllVideoBuffers() {
 
 void MEGACHIP::blendAndFlushBuffers() {
 	mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = ++mDisplayDevice.metadata_staging;
+		frame.metadata = ++mDisplayDevice.metadata_staging();
 		frame.copy_from(mLastRenderBuffer, mBackgroundBuffer, RGBA::alpha_blend);
 	});
 }
@@ -575,7 +576,8 @@ void MEGACHIP::scrollBuffersRT() {
 		mTexture.H = NN ? NN : 256;
 	}
 	void MEGACHIP::instruction_05NN(s32 NN) noexcept {
-		mDisplayDevice.metadata_staging.rmw_texture_tint().set_A(NN & 0xFF);
+		mDisplayDevice.metadata_staging()
+			.rmw_texture_tint().set_A(NN & 0xFF);
 	}
 	void MEGACHIP::instruction_060N(s32 N) noexcept {
 		startAudioTrack(N == 0);
@@ -932,7 +934,7 @@ void MEGACHIP::scrollBuffersRT() {
 	void MEGACHIP::instruction_Fx0A(s32 X) noexcept {
 		if (isManualRefresh()) [[unlikely]] {
 			mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-				frame.metadata = ++mDisplayDevice.metadata_staging;
+				frame.metadata = ++mDisplayDevice.metadata_staging();
 				frame.copy_from(mBackgroundBuffer);
 			});
 		}

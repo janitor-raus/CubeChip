@@ -159,7 +159,7 @@ private:
 
 public:
 	/**
-	 * @brief Registers a function to be called during the window rendering phase.
+	 * @brief Registers a nothrow function to be called during the window rendering phase.
 	 * Returns a Hook (shared_ptr) that is used to manage lifetime of the registration.
 	 * When the Hook is destroyed, the function is unregistered automatically.
 	 * Nesting is allowed, but unless lifetime persists, the hooks will be erased
@@ -181,7 +181,7 @@ public:
 	}
 
 	/**
-	 * @brief Registers a function to be called during the main menu rendering phase.
+	 * @brief Registers a nothrow function to be called during the main menu rendering phase.
 	 * Returns a Hook (shared_ptr) that is used to manage lifetime of the registration.
 	 * When the Hook is destroyed, the function is unregistered automatically.
 	 */

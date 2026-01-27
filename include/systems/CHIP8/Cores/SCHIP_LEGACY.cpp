@@ -31,9 +31,9 @@ void SCHIP_LEGACY::initializeSystem() noexcept {
 
 	prepDisplayArea(Resolution::LO);
 
-	mDisplayDevice.metadata_staging
+	mDisplayDevice.metadata_staging()
 		.set_viewport(cDisplayW, cDisplayH)
-		.set_texture_zoom(4).set_inner_margin(4)
+		.set_minimum_zoom(4).set_inner_margin(4)
 		.set_texture_tint(sBitColors[0])
 		.enabled = true;
 }
@@ -226,13 +226,13 @@ void SCHIP_LEGACY::renderAudioData() {
 		{ makePulseWave, &mVoices[VOICE::BUZZER] },
 	});
 
-	mDisplayDevice.metadata_staging.set_border_color_if(
+	mDisplayDevice.metadata_staging().set_border_color_if(
 		!!::accumulate(mAudioTimers), sBitColors[1]);
 }
 
 void SCHIP_LEGACY::renderVideoData() {
 	mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = ++mDisplayDevice.metadata_staging;
+		frame.metadata = ++mDisplayDevice.metadata_staging();
 		frame.copy_from(mDisplayBuffer, isUsingPixelTrails()
 			? [](u32 pixel) noexcept { return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
 			: [](u32 pixel) noexcept { return sBitColors[pixel >> 3]; }

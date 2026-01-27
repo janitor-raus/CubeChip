@@ -31,7 +31,7 @@ void SCHIP_MODERN::initializeSystem() noexcept {
 
 	prepDisplayArea(Resolution::LO);
 
-	mDisplayDevice.metadata_staging
+	mDisplayDevice.metadata_staging()
 		.set_viewport(64, 32)
 		.set_inner_margin(4)
 		.set_texture_tint(sBitColors[0])
@@ -226,13 +226,13 @@ void SCHIP_MODERN::renderAudioData() {
 		{ makePulseWave, &mVoices[VOICE::BUZZER] },
 	});
 
-	mDisplayDevice.metadata_staging.set_border_color_if(
+	mDisplayDevice.metadata_staging().set_border_color_if(
 		!!::accumulate(mAudioTimers), sBitColors[1]);
 }
 
 void SCHIP_MODERN::renderVideoData() {
 	mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = ++mDisplayDevice.metadata_staging;
+		frame.metadata = ++mDisplayDevice.metadata_staging();
 		frame.copy_from(mDisplayBuffer, isUsingPixelTrails()
 			? [](u32 pixel) noexcept { return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
 			: [](u32 pixel) noexcept { return sBitColors[pixel >> 3]; }
@@ -253,8 +253,9 @@ void SCHIP_MODERN::prepDisplayArea(const Resolution mode) {
 	const auto W = isLargerDisplay() ? cDisplayW : cDisplayW / 2;
 	const auto H = isLargerDisplay() ? cDisplayH : cDisplayH / 2;
 
-	mDisplayDevice.metadata_staging.set_viewport(W, H)
-		.set_texture_zoom(isLargerDisplay() ? 4 : 8);
+	mDisplayDevice.metadata_staging()
+		.set_viewport(W, H)
+		.set_minimum_zoom(isLargerDisplay() ? 4 : 8);
 
 	mDisplay.set(W, H);
 

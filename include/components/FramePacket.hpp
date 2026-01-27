@@ -88,9 +88,9 @@ struct FramePacket {
 		ez::u8 texture_zoom = 1;
 
 	public:
-		constexpr auto  get_texture_zoom() const noexcept { return texture_zoom; }
-		// Forces a mininum zoom level for the textre (1-16x)
-		constexpr self& set_texture_zoom(ez::s32 scale) noexcept {
+		constexpr auto  get_minimum_zoom() const noexcept { return texture_zoom; }
+		// Forces a mininum zoom level for the texture (1-16x)
+		constexpr self& set_minimum_zoom(ez::s32 scale) noexcept {
 			texture_zoom = ez::u8(std::clamp(scale, 1, 16));
 			return *this;
 		}

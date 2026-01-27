@@ -39,16 +39,13 @@ public:
 	 * storage, as well as for writing to the swapchain's internal
 	 * metadata instance to propagate state changes atomically.
 	**/
-	FramePacket::Metadata
-		metadata_staging;
-
-private:
-	DisplayDevice(std::size_t W, std::size_t H, const char* name, std::size_t bpp, int) noexcept;
+	auto metadata_staging() noexcept -> FramePacket::Metadata&;
 
 public:
 	DisplayDevice(std::size_t W, std::size_t H, const char* name = nullptr, std::size_t bpp = 4) noexcept;
 
 	~DisplayDevice() noexcept;
+
 	DisplayDevice(DisplayDevice&&) noexcept;
 	DisplayDevice& operator=(DisplayDevice&&) noexcept;
 
@@ -67,29 +64,6 @@ public:
 
 	void set_shutdown_signal(bool* signal) noexcept;
 	void set_osd_callable(Callable callable) noexcept;
-
-	#if !defined(NDEBUG) || defined(DEBUG)
-private:
-	void bind_debug_menu_hooks() noexcept;
-	void free_debug_menu_hooks() noexcept;
-
-	FrontendInterface::Hook m_debug_border_width;
-	FrontendInterface::Hook m_debug_inner_margin;
-
-	FrontendInterface::Hook m_debug_border_color;
-	FrontendInterface::Hook m_debug_texture_tint;
-
-	FrontendInterface::Hook m_debug_texture_zoom;
-	FrontendInterface::Hook m_debug_pixel_ratio;
-
-	FrontendInterface::Hook m_debug_linear_scaling;
-	FrontendInterface::Hook m_debug_screen_rotation;
-
-	FrontendInterface::Hook m_debug_shaders_enabled;
-	FrontendInterface::Hook m_debug_screen_enabled;
-
-	FrontendInterface::Hook m_reserved[2]{};
-	#endif
 };
 
 /*==================================================================*/
@@ -97,4 +71,6 @@ private:
 namespace osd {
 	void simple_text_overlay(const std::string& overlay_data) noexcept;
 	void key_press_indicator(float phase) noexcept;
+
+	inline void key_press_indicator(double phase) noexcept { key_press_indicator(float(phase)); }
 }

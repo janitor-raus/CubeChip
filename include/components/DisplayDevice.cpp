@@ -19,66 +19,75 @@
 struct DisplayDevice::DisplayContext {
 	using Callable = DisplayDevice::Callable;
 
-	AtomSharedPtr<ImLabel> m_window_label;
-	AtomSharedPtr<Callable>    m_osd_callable;
-	FrontendInterface::Hook    m_render_hook;
-	SDL_Unique<SDL_Texture>    m_stream_texture;
-	SDL_Unique<SDL_Texture>    m_target_texture;
-	DisplayDevice::Swapchain   m_swapchain;
+	AtomSharedPtr<ImLabel>   m_window_label;
+	AtomSharedPtr<Callable>  m_osd_callable;
+	SDL_Unique<SDL_Texture>  m_stream_texture;
+	SDL_Unique<SDL_Texture>  m_target_texture;
+	DisplayDevice::Swapchain m_swapchain;
+	FramePacket::Metadata    m_staging_data;
 
-	std::atomic<int>  m_screen_rotation{};
-	std::atomic<bool> m_integer_scaling{};
-	std::atomic<bool> m_utilize_shaders{};
-
-	bool  m_disable_menubar = true;
-	bool  m_fullscreen_mode = false;
-	bool* m_is_window_alive = nullptr;
+	FrontendInterface::Hook  m_settings_menu_hook;
+	FrontendInterface::Hook  m_debugger_menu_hook;
+	FrontendInterface::Hook  m_render_window_hook;
 
 	ez::Frame m_old_target_size{};
+
+	bool* m_is_window_alive = nullptr; // wire pointer to detect window closure
+	bool  m_disable_menubar = true;
+	bool  m_view_debug_menu = false;
+	bool  m_fullscreen_mode = false;
+
+	int   m_screen_rotation{};
+	bool  m_integer_scaling{};
+	bool  m_utilize_shaders{};
 
 	DisplayContext(std::size_t W, std::size_t H, const char* name, std::size_t bpp) noexcept
 		: m_window_label(std::make_shared<ImLabel>(name))
 		, m_osd_callable(nullptr)
-		, m_render_hook(FrontendInterface::register_window(
-			[&]() noexcept { render_display_window(); }))
-		, m_stream_texture(BasicVideoSpec::create_stream_texture(
-			RENDERER, static_cast<int>(W), static_cast<int>(H)))
-		, m_swapchain(bpp, static_cast<int>(W), static_cast<int>(H))
-	{}
+		, m_stream_texture(BasicVideoSpec::create_stream_texture(RENDERER, int(W), int(H)))
+		, m_swapchain(bpp, int(W), int(H))
+		, m_staging_data(int(W), int(H))
+		, m_settings_menu_hook(bind_settings_menu())
+		, m_debugger_menu_hook(nullptr)
+		, m_render_window_hook(FrontendInterface::register_window([&]() noexcept { render_window(); }))
+	{
+		if (m_staging_data.get_base_frame().area() != (W * H)) {
+			blog.newEntry<BLOG::WRN>("Display W/H out of size bounds, clamping!");
+		}
+	}
 
 private:
-	void render_display_window() noexcept {
+	void render_window() noexcept {
 		m_swapchain.present([&](auto frame) noexcept {
-			const auto& metadata = frame.buffer.metadata;
+			const auto& metadata = m_view_debug_menu
+				? m_staging_data : frame.buffer.metadata;
 
 			BasicVideoSpec::write_stream_texture(RENDERER,
 				m_stream_texture, frame.buffer.data());
 
-			const auto rotation = m_screen_rotation.load(mo::relaxed);
-			const auto integer  = m_integer_scaling.load(mo::relaxed);
-
-			const auto px_ratio = float(metadata.get_pixel_ratio());
-			const auto margin   = float(metadata.get_inner_margin());
-			const auto min_zoom = float(metadata.get_texture_zoom());
-
-			const auto cur_viewport = metadata.get_viewport();
-			const auto dar_viewport = (rotation & 1)
-				? ez::Rect(cur_viewport.y, cur_viewport.x,
-					int(cur_viewport.h * px_ratio), cur_viewport.w)
-				: ez::Rect(cur_viewport.x, cur_viewport.y,
-					int(cur_viewport.w * px_ratio), cur_viewport.h);
-
-			const auto border_width = metadata.get_border_width() / 2 * 2;
-			const auto borders_vec2 = ImVec2(float(border_width), float(border_width));
-			const auto padding_vec2 = ImVec2(margin * 2, margin * 2) + borders_vec2;
-			const auto window_label = *m_window_label.load(mo::relaxed); // copy
-			const auto show_menubar = m_disable_menubar ? ImGuiWindowFlags_None : ImGuiWindowFlags_MenuBar;
-			const auto window_flags = show_menubar | ImGuiWindowFlags_NoCollapse
-				| ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+			const auto window_label = m_window_label.load(mo::relaxed);
+			const auto window_flags = ImGuiWindowFlags_NoCollapse
+				| ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
+				| (m_disable_menubar ? ImGuiWindowFlags_None : ImGuiWindowFlags_MenuBar);
 
 			const auto s_window_contents = [&]() noexcept {
 				FrontendInterface::call_autohide_menubar(
-					window_label->c_str(), m_disable_menubar);
+					*window_label, m_disable_menubar);
+
+				const auto px_ratio = float(metadata.get_pixel_ratio());
+				const auto margin   = float(metadata.get_inner_margin());
+				const auto min_zoom = float(metadata.get_minimum_zoom());
+
+				const auto cur_viewport = metadata.get_viewport();
+				const auto dar_viewport = (m_screen_rotation & 1)
+					? ez::Rect(cur_viewport.y, cur_viewport.x,
+						int(cur_viewport.h * px_ratio), cur_viewport.w)
+					: ez::Rect(cur_viewport.x, cur_viewport.y,
+						int(cur_viewport.w * px_ratio), cur_viewport.h);
+
+				const auto border_width = metadata.get_border_width() / 2 * 2;
+				const auto borders_vec2 = ImVec2(float(border_width), float(border_width));
+				const auto padding_vec2 = ImVec2(margin * 2, margin * 2) + borders_vec2;
 
 			// calc padding/borders spacing in advance
 				const auto origin_point = ImGui::GetCursorPos();
@@ -95,7 +104,7 @@ private:
 
 			// calc drawing areas fixed by AR for consistency
 				const auto texture_area = ImVec2(float(dar_viewport.w), float(dar_viewport.h))
-					* std::max(integer ? std::floor(base_AR) : base_AR, min_zoom);
+					* std::max(m_integer_scaling ? std::floor(base_AR) : base_AR, min_zoom);
 				const auto borders_area = texture_area + padding_vec2;
 
 			// calc target texture size for integer nn -> fractional linear scaling
@@ -132,8 +141,8 @@ private:
 					ImGui::SetCursorPos(origin_point + ImGui::floor(
 						(display_zone - texture_area) * 0.5f));
 
-					ImGui::DrawRotatedImage(m_target_texture, texture_area, rotation, uv0, uv1,
-						RGBA(0xFF, 0xFF, 0xFF, metadata.get_texture_tint().A).ABGR());
+					ImGui::DrawRotatedImage(m_target_texture, texture_area, m_screen_rotation,
+						uv0, uv1, RGBA(0xFF, 0xFF, 0xFF, metadata.get_texture_tint().A).ABGR());
 				}
 
 				if (metadata.get_border_width() >= 1.0f) {
@@ -215,7 +224,7 @@ private:
 				ImGui::SetNextWindowPos(viewport->Pos);
 				ImGui::SetNextWindowSize(viewport->Size);
 
-				const auto temp_label = window_label.get_id() + "_fullscreen";
+				const auto temp_label = window_label->get_id() + "_fullscreen";
 				if (ImGui::Begin(temp_label.c_str(), nullptr, window_flags | ImGuiWindowFlags_NoMove
 					| ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings
 				)) { s_window_contents(); }
@@ -223,96 +232,146 @@ private:
 			}
 
 			ImGui::DockNextWindowTo(FrontendInterface::get_main_dockspace_id(), true);
-			ImGui::SetNextWindowMinClientSize(ImVec2(float(dar_viewport.w), float(dar_viewport.h))
-				* min_zoom + padding_vec2 + borders_vec2);
+			ImGui::SetNextWindowMinClientSize(ImVec2(float(480), float(360)));
+			//ImGui::SetNextWindowMinClientSize(ImVec2(float(dar_viewport.w), float(dar_viewport.h))
+			//	* min_zoom + padding_vec2 + borders_vec2); // old constraint
 
-			if (ImGui::Begin(window_label->c_str(), m_is_window_alive, window_flags)) {
+			if (ImGui::Begin(*window_label, m_is_window_alive, window_flags)) {
 				if (!m_fullscreen_mode) { s_window_contents(); }
 			}
 			ImGui::End();
 		});
 	}
+
+	auto bind_settings_menu() noexcept -> FrontendInterface::Hook {
+		return FrontendInterface::register_menu(*m_window_label.load(mo::relaxed),
+		{ 89, "Settings" }, [&]() noexcept {{
+			ImGui::Separator(2.0f);
+			if (ImGui::Checkbox("Enable Debug Menu?", &m_view_debug_menu)) {
+				if (m_view_debug_menu) {
+					m_debugger_menu_hook = bind_debugger_menu();
+				} else {
+					m_debugger_menu_hook.reset();
+				}
+			}
+		}});
+	}
+
+	auto bind_debugger_menu() noexcept -> FrontendInterface::Hook {
+		return FrontendInterface::register_menu(*m_window_label.load(mo::relaxed),
+		{ 90, "Debug" }, [&]() noexcept {{
+			int value = m_staging_data.get_border_width();
+			if (ImGui::SliderInt("Border Width", &value, 0, 32, "%d", ImGuiSliderFlags_AlwaysClamp)) {
+				m_staging_data.set_border_width(value);
+			}
+		} {
+			int value = m_staging_data.get_inner_margin();
+			if (ImGui::SliderInt("Inner Margin", &value, 0, 32, "%d", ImGuiSliderFlags_AlwaysClamp)) {
+				m_staging_data.set_inner_margin(value);
+			}
+		} {
+			const auto value = m_staging_data.get_border_color();
+			float color[3] = { (value.R / 255.0f), (value.G / 255.0f), (value.B / 255.0f) };
+			if (ImGui::ColorEdit3("Border Color", color)) {
+				m_staging_data.set_border_color(RGBA(
+					ez::u8(color[0] * 255.0f), ez::u8(color[1] * 255.0f),
+					ez::u8(color[2] * 255.0f), ez::u8(255)
+				));
+			}
+		} {
+			const auto value = m_staging_data.get_texture_tint();
+			float color[4] = { (value.R / 255.0f), (value.G / 255.0f), (value.B / 255.0f), (value.A / 255.0f) };
+			if (ImGui::ColorEdit4("Texture Tint", color, ImGuiColorEditFlags_AlphaPreviewHalf)) {
+				m_staging_data.set_texture_tint(RGBA(
+					ez::u8(color[0] * 255.0f), ez::u8(color[1] * 255.0f),
+					ez::u8(color[2] * 255.0f), ez::u8(color[3] * 255.0f)
+				));
+			}
+		} {
+			int value = m_staging_data.get_minimum_zoom();
+			if (ImGui::SliderInt("Minimum Zoom", &value, 1, 16, "%d", ImGuiSliderFlags_AlwaysClamp)) {
+				m_staging_data.set_minimum_zoom(value);
+			}
+		} {
+			float value = m_staging_data.get_pixel_ratio();
+			if (ImGui::SliderFloat("Pixel Ratio", &value, 0.1f, 4.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
+				m_staging_data.set_pixel_ratio(value);
+			}
+		} {
+			int value = m_integer_scaling;
+			static const char* labels[] = { "Fractional", "Integer" };
+			if (ImGui::Combo("Screen Scaling", &value, labels, IM_ARRAYSIZE(labels))) {
+				m_integer_scaling = value != 0;
+			}
+		} {
+			int value = m_screen_rotation;
+			static const char* labels[] = { "0 degrees", "90 degrees", "180 degrees", "270 degrees" };
+			if (ImGui::Combo("Screen Rotation", &value, labels, IM_ARRAYSIZE(labels))) {
+				m_screen_rotation = value;
+			}
+		} {
+			int value = m_utilize_shaders;
+			if (ImGui::SliderInt("Shaders Enabled?", &value, 0, 1, "", ImGuiSliderFlags_NoInput)) {
+				m_utilize_shaders = value != 0;
+			}
+		} {
+			int value = m_staging_data.enabled ? 1 : 0;
+			if (ImGui::SliderInt("Screen Enabled?", &value, 0, 1, "", ImGuiSliderFlags_NoInput)) {
+				m_staging_data.enabled = value != 0;
+			}
+		}});
+	}
 };
 
 /*==================================================================*/
 
-DisplayDevice::DisplayDevice(std::size_t W, std::size_t H, const char* name, std::size_t bpp, int) noexcept
-	: m_context(std::make_unique<DisplayContext>(W, H, name, bpp))
-	, metadata_staging(static_cast<int>(W), static_cast<int>(H))
-{
-#if !defined(NDEBUG) || defined(DEBUG)
-	bind_debug_menu_hooks();
-#endif
-}
-
 DisplayDevice::DisplayDevice(std::size_t W, std::size_t H, const char* name, std::size_t bpp) noexcept
-	: DisplayDevice(
+	: m_context(std::make_unique<DisplayContext>(
 		std::clamp(W, std::size_t(1), std::size_t(8192)),
 		std::clamp(H, std::size_t(1), std::size_t(8192)),
 		name ? name : "Unnamed Display",
-		std::clamp(bpp, std::size_t(1), std::size_t(6)), 0
-	)
-{
-	if (metadata_staging.get_base_frame().area() != (W * H)) {
-		blog.newEntry<BLOG::WRN>("Display W/H out of size bounds, clamping!");
-	}
-}
+		std::clamp(bpp, std::size_t(1), std::size_t(6))
+	))
+{}
 
 DisplayDevice::~DisplayDevice() noexcept = default;
 
-#if !defined(NDEBUG) || defined(DEBUG)
-DisplayDevice::DisplayDevice(DisplayDevice&& other) noexcept
-	: m_context(std::move(other.m_context))
-	, metadata_staging(std::move(other.metadata_staging))
-{
-	other.free_debug_menu_hooks();
-	this->bind_debug_menu_hooks();
-}
-
-DisplayDevice& DisplayDevice::operator=(DisplayDevice&& other) noexcept {
-	if (this != &other) {
-		m_context = std::move(other.m_context);
-		metadata_staging = std::move(other.metadata_staging);
-
-		other.free_debug_menu_hooks();
-		this->bind_debug_menu_hooks();
-	}
-	return *this;
-}
-#else
 DisplayDevice::DisplayDevice(DisplayDevice&&) noexcept = default;
 DisplayDevice& DisplayDevice::operator=(DisplayDevice&&) noexcept = default;
-#endif
 
 /*==================================================================*/
 
 auto DisplayDevice::swapchain()       noexcept ->       Swapchain& { return m_context->m_swapchain; }
 auto DisplayDevice::swapchain() const noexcept -> const Swapchain& { return m_context->m_swapchain; }
 
+auto DisplayDevice::metadata_staging() noexcept -> FramePacket::Metadata& {
+	return m_context->m_staging_data;
+}
+
 /*==================================================================*/
 
 int  DisplayDevice::get_screen_rotation() const noexcept {
-	return m_context->m_screen_rotation.load(mo::relaxed);
+	return m_context->m_screen_rotation;
 }
 
 void DisplayDevice::set_screen_rotation(int rotation) noexcept {
-	m_context->m_screen_rotation.store(rotation & 3, mo::relaxed);
+	m_context->m_screen_rotation = rotation & 3;
 }
 
 bool DisplayDevice::get_integer_scaling() const noexcept {
-	return m_context->m_integer_scaling.load(mo::relaxed);
+	return m_context->m_integer_scaling;
 }
 
 void DisplayDevice::set_integer_scaling(bool enable) noexcept {
-	m_context->m_integer_scaling.store(enable, mo::relaxed);
+	m_context->m_integer_scaling = enable;
 }
 
 bool DisplayDevice::get_utilize_shaders() const noexcept {
-	return m_context->m_utilize_shaders.load(mo::relaxed);
+	return m_context->m_utilize_shaders;
 }
 
 void DisplayDevice::set_utilize_shaders(bool enable) noexcept {
-	m_context->m_utilize_shaders.store(enable, mo::relaxed);
+	m_context->m_utilize_shaders = enable;
 }
 
 auto DisplayDevice::get_window_label() const noexcept -> ImLabel {
@@ -330,115 +389,6 @@ void DisplayDevice::set_shutdown_signal(bool* signal) noexcept {
 void DisplayDevice::set_osd_callable(Callable callable) noexcept {
 	m_context->m_osd_callable.store(std::make_shared<Callable>(std::move(callable)), mo::relaxed);
 }
-
-#if !defined(NDEBUG) || defined(DEBUG)
-void DisplayDevice::bind_debug_menu_hooks() noexcept {
-	const auto window_label = ImLabel(get_window_label());
-
-	m_debug_border_width = FrontendInterface::register_menu(window_label,
-	{ 0, "Debug" }, [&]() noexcept {
-		int value = metadata_staging.get_border_width();
-		if (ImGui::SliderInt("Border Width", &value, 0, 32, "%d", ImGuiSliderFlags_AlwaysClamp)) {
-			metadata_staging.set_border_width(value);
-		}
-	});
-
-	m_debug_inner_margin = FrontendInterface::register_menu(window_label,
-	{ 0, "Debug" }, [&]() noexcept {
-		int value = metadata_staging.get_inner_margin();
-		if (ImGui::SliderInt("Inner Margin", &value, 0, 32, "%d", ImGuiSliderFlags_AlwaysClamp)) {
-			metadata_staging.set_inner_margin(value);
-		}
-	});
-
-	m_debug_border_color = FrontendInterface::register_menu(window_label,
-	{ 0, "Debug" }, [&]() noexcept {
-		const auto value = metadata_staging.get_border_color();
-		float color[3] = { (value.R / 255.0f), (value.G / 255.0f), (value.B / 255.0f) };
-		if (ImGui::ColorEdit3("Border Color", color)) {
-			metadata_staging.set_border_color(RGBA(
-				ez::u8(color[0] * 255.0f), ez::u8(color[1] * 255.0f),
-				ez::u8(color[2] * 255.0f), 255
-			));
-		}
-	});
-
-	m_debug_texture_tint = FrontendInterface::register_menu(window_label,
-	{ 0, "Debug" }, [&]() noexcept {
-		const auto value = metadata_staging.get_texture_tint();
-		float color[4] = { (value.R / 255.0f), (value.G / 255.0f), (value.B / 255.0f), (value.A / 255.0f) };
-		if (ImGui::ColorEdit4("Texture Tint", color, ImGuiColorEditFlags_AlphaPreviewHalf)) {
-			metadata_staging.set_texture_tint(RGBA(
-				ez::u8(color[0] * 255.0f), ez::u8(color[1] * 255.0f),
-				ez::u8(color[2] * 255.0f), ez::u8(color[3] * 255.0f)
-			));
-		}
-	});
-
-	m_debug_texture_zoom = FrontendInterface::register_menu(window_label,
-	{ 0, "Debug" }, [&]() noexcept {
-		int value = metadata_staging.get_texture_zoom();
-		if (ImGui::SliderInt("Texture Zoom", &value, 1, 16, "%d", ImGuiSliderFlags_AlwaysClamp)) {
-			metadata_staging.set_texture_zoom(value);
-		}
-	});
-
-	m_debug_pixel_ratio = FrontendInterface::register_menu(window_label,
-	{ 0, "Debug" }, [&]() noexcept {
-		float value = metadata_staging.get_pixel_ratio();
-		if (ImGui::SliderFloat("Pixel Ratio", &value, 0.1f, 4.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
-			metadata_staging.set_pixel_ratio(value);
-		}
-	});
-
-	m_debug_linear_scaling = FrontendInterface::register_menu(window_label,
-	{ 0, "Debug" }, [&]() noexcept {
-		int value = get_integer_scaling();
-		static const char* labels[] = { "Fractional", "Integer" };
-		if (ImGui::Combo("Screen Scaling", &value, labels, IM_ARRAYSIZE(labels))) {
-			set_integer_scaling(value != 0);
-		}
-	});
-
-	m_debug_screen_rotation = FrontendInterface::register_menu(window_label,
-	{ 0, "Debug" }, [&]() noexcept {
-		int value = get_screen_rotation();
-		static const char* labels[] = { "0 degrees", "90 degrees", "180 degrees", "270 degrees" };
-		if (ImGui::Combo("Screen Rotation", &value, labels, IM_ARRAYSIZE(labels))) {
-			set_screen_rotation(value);
-		}
-	});
-
-	m_debug_shaders_enabled = FrontendInterface::register_menu(window_label,
-	{ 0, "Debug" }, [&]() noexcept {
-		int value = get_utilize_shaders();
-		if (ImGui::SliderInt("Shaders Enabled?", &value, 0, 1, "", ImGuiSliderFlags_NoInput)) {
-			set_utilize_shaders(value != 0);
-		}
-	});
-
-	m_debug_screen_enabled = FrontendInterface::register_menu(window_label,
-	{ 0, "Debug" }, [&]() noexcept {
-		int value = metadata_staging.enabled ? 1 : 0;
-		if (ImGui::SliderInt("Screen Enabled?", &value, 0, 1, "", ImGuiSliderFlags_NoInput)) {
-			metadata_staging.enabled = (value != 0);
-		}
-	});
-}
-
-void DisplayDevice::free_debug_menu_hooks() noexcept {
-	m_debug_border_width.reset();
-	m_debug_inner_margin.reset();
-	m_debug_border_color.reset();
-	m_debug_texture_tint.reset();
-	m_debug_texture_zoom.reset();
-	m_debug_pixel_ratio.reset();
-	m_debug_linear_scaling.reset();
-	m_debug_screen_rotation.reset();
-	m_debug_shaders_enabled.reset();
-	m_debug_screen_enabled.reset();
-}
-#endif
 
 /*==================================================================*/
 

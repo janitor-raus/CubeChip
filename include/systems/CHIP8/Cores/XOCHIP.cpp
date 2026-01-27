@@ -33,7 +33,7 @@ void XOCHIP::initializeSystem() noexcept {
 
 	prepDisplayArea(Resolution::LO);
 
-	mDisplayDevice.metadata_staging
+	mDisplayDevice.metadata_staging()
 		.set_texture_tint(mBitColors[0])
 		.enabled = true;
 }
@@ -255,7 +255,7 @@ void XOCHIP::renderAudioData() {
 		{ makePulseWave,   &mVoices[VOICE::BUZZER] },
 	});
 
-	mDisplayDevice.metadata_staging.set_border_color_if(
+	mDisplayDevice.metadata_staging().set_border_color_if(
 		!!mAudioTimers[VOICE::BUZZER], mBitColors[1]);
 }
 
@@ -278,7 +278,7 @@ void XOCHIP::renderVideoData() {
 	);
 
 	mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = ++mDisplayDevice.metadata_staging;
+		frame.metadata = ++mDisplayDevice.metadata_staging();
 		frame.copy_from(tempBuffer, [&](auto pixel) noexcept { return mBitColors[pixel]; });
 	});
 }
@@ -289,9 +289,10 @@ void XOCHIP::prepDisplayArea(const Resolution mode) {
 	const auto W = isLargerDisplay() ? cDisplayW : cDisplayW / 2;
 	const auto H = isLargerDisplay() ? cDisplayH : cDisplayH / 2;
 
-	mDisplayDevice.metadata_staging.set_viewport(W, H)
+	mDisplayDevice.metadata_staging()
+		.set_viewport(W, H)
 		.set_inner_margin(4)
-		.set_texture_zoom(isLargerDisplay() ? 4 : 8);
+		.set_minimum_zoom(isLargerDisplay() ? 4 : 8);
 
 	mDisplay.set(W, H);
 
