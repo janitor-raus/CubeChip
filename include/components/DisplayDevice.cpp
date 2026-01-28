@@ -219,6 +219,16 @@ private:
 				#endif
 			};
 
+			ImGui::DockNextWindowTo(FrontendInterface::get_main_dockspace_id(), true);
+			ImGui::SetNextWindowMinClientSize(ImVec2(float(480), float(360)));
+			//ImGui::SetNextWindowMinClientSize(ImVec2(float(dar_viewport.w), float(dar_viewport.h))
+			//	* min_zoom + padding_vec2 + borders_vec2); // old constraint
+
+			if (ImGui::Begin(*window_label, m_is_window_alive, window_flags)) {
+				if (!m_fullscreen_mode) { s_window_contents(); }
+			}
+			ImGui::End();
+
 			if (m_fullscreen_mode) {
 				const auto* viewport = ImGui::GetMainViewport();
 				ImGui::SetNextWindowPos(viewport->Pos);
@@ -230,16 +240,6 @@ private:
 				)) { s_window_contents(); }
 				ImGui::End();
 			}
-
-			ImGui::DockNextWindowTo(FrontendInterface::get_main_dockspace_id(), true);
-			ImGui::SetNextWindowMinClientSize(ImVec2(float(480), float(360)));
-			//ImGui::SetNextWindowMinClientSize(ImVec2(float(dar_viewport.w), float(dar_viewport.h))
-			//	* min_zoom + padding_vec2 + borders_vec2); // old constraint
-
-			if (ImGui::Begin(*window_label, m_is_window_alive, window_flags)) {
-				if (!m_fullscreen_mode) { s_window_contents(); }
-			}
-			ImGui::End();
 		});
 	}
 
