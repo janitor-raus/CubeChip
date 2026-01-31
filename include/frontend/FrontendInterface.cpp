@@ -37,7 +37,7 @@ bool FrontendInterface::merge_overflowing_windows() noexcept {
 
 	auto& dst_windows = s_hooks->windows.registry.buffer;
 
-	blog.newEntry<BLOG::DBG>("{} overflow windows found.", src_windows.size());
+	blog.debug("{} overflow windows found.", src_windows.size());
 
 	dst_windows.insert(dst_windows.end(),
 		std::make_move_iterator(src_windows.begin()),
@@ -77,7 +77,7 @@ bool FrontendInterface::merge_overflowing_menus(const LabelKey& window_key) noex
 		if (src_hooks.buffer.empty()) { continue; }
 		auto& dst_hooks = s_hooks->menus.registry[window_key.get_id_or_label()][menu_key];
 
-		blog.newEntry<BLOG::DBG>("{} overflow hooks for menu \"{}\" found.",
+		blog.debug("{} overflow hooks for menu \"{}\" found.",
 			src_hooks.buffer.size(), menu_key.second.c_str());
 
 		dst_hooks.buffer.insert(dst_hooks.buffer.end(),

@@ -14,15 +14,15 @@
 /*==================================================================*/
 
 class MEGACHIP final : public Chip8_CoreInterface {
-	static constexpr u64 cTotalMemory = 16_MiB;
-	static constexpr u32 cGameLoadPos = 0x200;
-	static constexpr u32 cStartOffset = 0x200;
-	static constexpr f32 cRefreshRate = 60.0f;
+	static constexpr u64 c_sys_memory_size  = 16_MiB;
+	static constexpr u32 c_game_load_pos    = 0x200;
+	static constexpr u32 c_sys_boot_pos     = 0x200;
+	static constexpr f32 c_sys_refresh_rate = 60.0f;
 
-	static constexpr s32 cDisplayW_C8 = 128;
-	static constexpr s32 cDisplayH_C8 =  64;
-	static constexpr s32 cInstSpeedHi =  45;
-	static constexpr s32 cInstSpeedLo =  30;
+	static constexpr s32 cDisplayW_C8   = 128;
+	static constexpr s32 cDisplayH_C8   =  64;
+	static constexpr s32 c_sys_speed_hi =  45;
+	static constexpr s32 c_sys_speed_lo =  30;
 
 	static constexpr s32 cDisplayW_M8 =  256;
 	static constexpr s32 cDisplayH_M8 =  192;
@@ -30,17 +30,17 @@ class MEGACHIP final : public Chip8_CoreInterface {
 
 /*==================================================================*/
 
-	void initializeFontColors() noexcept;
+	void init_font_sprite_colors() noexcept;
 
 	struct Texture {
-		s32 W{}, H{};
+		s32 w{}, h{};
 		s32 collide = 0xFF;
 		s32 opacity = 0xFF;
-		u32 fontOffset{};
+		u32 font_pos{};
 
 		constexpr void reset() noexcept
 			{ *this = Texture{}; }
-	} mTexture;
+	} m_texture;
 
 	enum BlendMode {
 		ALPHA_BLEND  = 0,
@@ -48,13 +48,12 @@ class MEGACHIP final : public Chip8_CoreInterface {
 		MULTIPLY     = 5,
 	};
 
-	RGBA::BlendFunc mBlendFunc{};
+	RGBA::BlendFunc m_blend_callable{};
 
-	void selectBlendingAlgo(s32 mode) noexcept;
+	void set_blend_callable(s32 mode) noexcept;
 
-	void scrapAllVideoBuffers();
-	void flushAllVideoBuffers();
-	void blendAndFlushBuffers();
+	void scrap_all_video_buffers() noexcept;
+	void flush_all_video_buffers(bool by_blending, bool and_advance) noexcept;
 
 	struct TrackData {
 		u8*  data{};
@@ -64,74 +63,74 @@ class MEGACHIP final : public Chip8_CoreInterface {
 		constexpr void reset() noexcept
 			{ *this = TrackData{}; }
 
-		constexpr bool isOn() const noexcept
+		constexpr bool enabled() const noexcept
 			{ return data != nullptr; }
 
 		constexpr auto pos(Phase head) const noexcept
 			{ return data[u32(head * size)] - 128; }
-	} mTrack;
+	} m_track;
 
-	void startAudioTrack(bool repeat) noexcept;
+	void start_audio_track(bool repeat) noexcept;
 
-	static void makeByteWave(f32* data, u32 size, Voice* voice, Stream*) noexcept;
+	static void make_stream_wave(f32* data, u32 size, Voice* voice, Stream*) noexcept;
 
 	FixedMap2D<u8, cDisplayW_C8, cDisplayH_C8>
-		mDisplayBuffer; // legacy 128x64 buffer
+		m_display_buffer; // legacy 128x64 buffer
 
 	FixedMap2D<RGBA, cDisplayW_M8, cDisplayH_M8>
-		mLastRenderBuffer; // buffer of last rendered frame
+		m_old_render_buffer; // buffer of last rendered frame
 	FixedMap2D<RGBA, cDisplayW_M8, cDisplayH_M8>
-		mBackgroundBuffer; // primary draw buffer
+		m_background_buffer; // primary draw buffer
 	FixedMap2D<u8, cDisplayW_M8, cDisplayH_M8>
-		mCollisionMap; // collision detection map based on palette index
+		m_collision_map; // collision detection map based on palette index
 	FixedMap2D<RGBA, 256, 1>
-		mColorPalette; // 256-color palette
+		m_color_palette; // 256-color palette
 
-	std::array<RGBA, 10> mFontColor{};
+	std::array<RGBA, 10> m_font_colors{};
 
-	MemoryBank<cTotalMemory>
-		mMemoryBank{};
+	MemoryBank<c_sys_memory_size>
+		m_memory_bank{};
 
 /*==================================================================*/
 
-	auto NNNN() const noexcept { return mMemoryBank[mCurrentPC] << 8 | mMemoryBank[mCurrentPC + 1]; }
+	auto NNNN() const noexcept { return m_memory_bank[m_current_pc] << 8 | m_memory_bank[m_current_pc + 1]; }
 
 public:
 	MEGACHIP() noexcept
 		: Chip8_CoreInterface(DisplayDevice(cDisplayW_M8, cDisplayH_M8, "MEGACHIP"))
 	{}
 
-	static constexpr bool validateProgram(
+	static constexpr bool validate_program(
 		const char* fileData,
 		const size_type fileSize
 	) noexcept {
 		if (!fileData || !fileSize) { return false; }
-		return fileSize + cGameLoadPos <= cTotalMemory;
+		return fileSize + c_game_load_pos <= c_sys_memory_size;
 	}
 
 private:
-	void initializeSystem() noexcept override;
-	void handleCycleLoop() noexcept override;
+	void initialize_system() noexcept override;
+	void handle_cycle_loop() noexcept override;
 
 	template <typename Lambda>
-	void instructionLoop(Lambda&& condition) noexcept;
+	void instruction_loop(Lambda&& condition) noexcept;
 
-	void renderAudioData() override;
-	void renderVideoData() override;
+	void push_audio_data() override;
+	void push_video_data() override;
 
-	void prepDisplayArea(const Resolution mode) override;
+	void set_display_properties(const Resolution mode) override;
 
-	void skipInstruction() noexcept override;
+	void skip_instruction() noexcept override;
 
-	void scrollDisplayUP(s32 N);
-	void scrollDisplayDN(s32 N);
-	void scrollDisplayLT();
-	void scrollDisplayRT();
+	void scroll_display_up(s32 N);
+	void scroll_display_dn(s32 N);
+	void scroll_display_lt();
+	void scroll_display_rt();
 
-	void scrollBuffersUP(s32 N);
-	void scrollBuffersDN(s32 N);
-	void scrollBuffersLT();
-	void scrollBuffersRT();
+	void scroll_buffers_up(s32 N);
+	void scroll_buffers_dn(s32 N);
+	void scroll_buffers_lt();
+	void scroll_buffers_rt();
 
 /*==================================================================*/
 	#pragma region 0 instruction branch

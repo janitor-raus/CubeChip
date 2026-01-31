@@ -15,13 +15,13 @@
 Json CoreRegistry::s_game_database{};
 Json CoreRegistry::s_custom_core_cfg{};
 
-static bool loadJsonFromFile(std::string_view json_file_path, Json& output) noexcept {
-	if (auto jsonData = ::read_file_data(json_file_path)) {
+static bool load_json_from_file(std::string_view json_file_path, Json& output) noexcept {
+	if (auto json_data = ::read_file_data(json_file_path)) {
 		try {
-			output = Json::parse(jsonData->begin(), jsonData->end());
+			output = Json::parse(json_data->begin(), json_data->end());
 			return true;
 		} catch (const Json::parse_error& e) {
-			blog.newEntry<BLOG::ERR>("Exception triggered trying to parse JSON file:"
+			blog.error("Exception triggered trying to parse JSON file:"
 				" \"{}\" [{}]", json_file_path, e.what());
 		}
 	}
@@ -38,25 +38,23 @@ bool CoreRegistry::validate_by_sha1_hash(const char* fileData, std::size_t fileS
 	return false;
 }
 
-bool CoreRegistry::validate_by_extension(const char* fileData, std::size_t fileSize, const std::string& fileType) noexcept {
-	auto it = get_registry_map().find(fileType);
-	const auto matchingCores = it != get_registry_map().end() ? &it->second : nullptr;
+bool CoreRegistry::validate_by_extension(const char* file_data, std::size_t file_size, const std::string& file_type) noexcept {
+	auto it = get_registry_map().find(file_type);
+	const auto matched_cores = it != get_registry_map().end() ? &it->second : nullptr;
 
-	if (!matchingCores || matchingCores->empty()) {
-		blog.newEntry<BLOG::WRN>(
-			"Unable to match Program to an existing System variant!");
+	if (!matched_cores || matched_cores->empty()) {
+		blog.warn("Unable to match Program to an existing System variant!");
 		return false;
 	} else {
 		s_potential_cores.clear();
-		for (const auto& core : *matchingCores) {
-			if (core.test_game_file(fileData, fileSize)) {
+		for (const auto& core : *matched_cores) {
+			if (core.test_game_file(file_data, file_size)) {
 				s_potential_cores.push_back(core);
 			}
 		}
 
 		if (s_potential_cores.empty()) {
-			blog.newEntry<BLOG::WRN>(
-				"Program rejected by all eligible System variants!");
+			blog.warn("Program rejected by all eligible System variants!");
 			return false;
 		} else {
 			return true;
@@ -65,15 +63,15 @@ bool CoreRegistry::validate_by_extension(const char* fileData, std::size_t fileS
 }
 
 bool CoreRegistry::validate_game_file(
-	const char* fileData, std::size_t fileSize,
-	const std::string& fileType,
-	const std::string& fileSHA1
+	const char* file_data, std::size_t file_size,
+	const std::string& file_type,
+	const std::string& file_sha1
 ) noexcept {
-	if (fileSHA1.empty()) {
-		return validate_by_extension(fileData, fileSize, fileType);
+	if (file_sha1.empty()) {
+		return validate_by_extension(file_data, file_size, file_type);
 	} else {
-		return validate_by_extension(fileData, fileSize, fileType); // placeholder
-		//return validateProgramByHash(fileData, fileSize, fileSHA1);
+		return validate_by_extension(file_data, file_size, file_type); // placeholder
+		//return validateProgramByHash(file_data, file_size, file_sha1);
 	}
 }
 
@@ -84,8 +82,7 @@ bool CoreRegistry::register_new_core(CoreConstructor&& ctor,
 	for (const auto& ext : reg.known_extensions) {
 		try { get_registry_map()[ext].push_back(reg); }
 		catch (const std::exception& e) {
-			blog.newEntry<BLOG::ERR>(
-				"Exception triggered trying to register Emulator Core! [{}]", e.what());
+			blog.error("Exception triggered trying to register Emulator Core! [{}]", e.what());
 			return false;
 		}
 	}
@@ -99,8 +96,7 @@ SystemInterface* CoreRegistry::construct_new_core(std::size_t idx) noexcept {
 		s_selected_core = s_potential_cores[idx];
 		return s_selected_core.construct_core();
 	} catch (const std::exception& e) {
-		blog.newEntry<BLOG::ERR>(
-			"Exception triggered trying to construct Emulator Core! [{}]", e.what());
+		blog.error("Exception triggered trying to construct Emulator Core! [{}]", e.what());
 		return nullptr;
 	}
 }
@@ -109,12 +105,10 @@ void CoreRegistry::load_game_database(std::string_view db_file_path) noexcept {
 	static const auto default_db_path = (::get_base_path() / fs::Path("programDB.json")).string();
 	std::string_view normalized_path = db_file_path.empty() ? default_db_path : db_file_path;
 
-	if (!loadJsonFromFile(normalized_path, s_game_database)) {
+	if (!load_json_from_file(normalized_path, s_game_database)) {
 		s_game_database.clear();
-		blog.newEntry<BLOG::WRN>("Failed to load ProgramDB:"
-			" \"{}\"", normalized_path);
+		blog.warn("Failed to load ProgramDB: \"{}\"", normalized_path);
 	} else {
-		blog.newEntry<BLOG::INF>("Successfully loaded ProgramDB:"
-			" \"{}\"", normalized_path);
+		blog.warn("Successfully loaded ProgramDB: \"{}\"", normalized_path);
 	}
 }

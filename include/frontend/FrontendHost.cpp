@@ -105,13 +105,13 @@ void FrontendHost::replace_system_core(SystemID id) {
 /*==================================================================*/
 
 void FrontendHost::load_file_from_disk(std::string_view gameFile) {
-	blog.newEntry<BLOG::INF>("Attempting to load: \"{}\"", gameFile);
+	blog.info("Attempting to load: \"{}\"", gameFile);
 	if (HDM->load_and_validate_file(gameFile)) {
-		blog.newEntry<BLOG::INF>("File has been accepted!");
+		blog.info("File has been accepted!");
 		s_file_mru.insert(gameFile);
 		replace_system_core(0 /* XXX */);
 	} else {
-		blog.newEntry<BLOG::INF>("Path has been rejected!");
+		blog.info("Path has been rejected!");
 	}
 }
 
@@ -144,7 +144,7 @@ FrontendHost* FrontendHost::init_application(
 
 	GAB = GlobalAudioBase::initialize(GAB_settings);
 	if (!GAB->has_audio_output()) {
-		blog.newEntry<BLOG::WRN>("Audio Subsystem is not available!");
+		blog.warn("Audio Subsystem is not available!");
 	}
 
 	BVS = BasicVideoSpec::initialize(BVS_settings);
@@ -248,42 +248,40 @@ int FrontendHost::process_client_frame() {
 
 void FrontendHost::handle_main_hotkeys() {
 	static BasicKeyboard Input;
-	Input.updateStates();
+	Input.update_states();
 
-	if (Input.isPressed(KEY(F8))) {
+	if (Input.is_pressed(KEY(F8))) {
 		CoreRegistry::load_game_database();
 	}
 
 	if (m_systems[0]) {
-		if (Input.areAnyHeld(KEY(LSHIFT), KEY(RSHIFT))
-			&& Input.isPressed(KEY(ESCAPE))
+		if (Input.are_any_held(KEY(LSHIFT), KEY(RSHIFT))
+			&& Input.is_pressed(KEY(ESCAPE))
 		) {
 			discard_system_core(0 /* XXX */);
-			blog.newEntry<BLOG::INF>(
-				"Emulator core exited manually.");
+			blog.info("Emulator core exited manually.");
 			return;
 		}
-		if (Input.isPressed(KEY(BACKSPACE))) {
+		if (Input.is_pressed(KEY(BACKSPACE))) {
 			replace_system_core(0 /* XXX */);
-			blog.newEntry<BLOG::INF>(
-				"Emulator core restarted manually.");
+			blog.info("Emulator core restarted manually.");
 			return;
 		}
-		if (Input.isPressed(KEY(F9))) {
+		if (Input.is_pressed(KEY(F9))) {
 			if (auto* system = system_with_id(0 /* XXX */)) {
 				if (auto paused = system->core->try_pause_system()) {
-					blog.newEntry<BLOG::INF>("System has been {} by hotkey!",
+					blog.info("System has been {} by hotkey!",
 						*paused ? "paused" : "unpaused");
 				}
 			}
 		}
-		if (Input.isPressed(KEY(F11))) {
+		if (Input.is_pressed(KEY(F11))) {
 			if (auto* system = system_with_id(0 /* XXX */)) {
 				system->statistics = !system->statistics;
 				toggle_system_statistics(*system);
 			}
 		}
-		if (Input.isPressed(KEY(F10))) {
+		if (Input.is_pressed(KEY(F10))) {
 			if (auto* system = system_with_id(0 /* XXX */)) {
 				system->delimiters = !system->delimiters;
 				toggle_system_delimiters(*system);

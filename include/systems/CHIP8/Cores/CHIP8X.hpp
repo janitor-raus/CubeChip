@@ -14,62 +14,67 @@
 /*==================================================================*/
 
 class CHIP8X final : public Chip8_CoreInterface {
-	static constexpr u64 cTotalMemory = 4_KiB;
-	static constexpr u32 cGameLoadPos = 0x300;
-	static constexpr u32 cStartOffset = 0x300;
-	static constexpr f32 cRefreshRate = 61.0f;
+	static constexpr u64 c_sys_memory_size  = 4_KiB;
+	static constexpr u32 c_game_load_pos    = 0x300;
+	static constexpr u32 c_sys_boot_pos     = 0x300;
+	static constexpr f32 c_sys_refresh_rate = 61.0f;
 
-	static constexpr s32 cResSizeMult =  8;
-	static constexpr s32 cDisplayW = 64;
-	static constexpr s32 cDisplayH = 32;
-	static constexpr s32 cInstSpeedHi = 30;
-	static constexpr s32 cInstSpeedLo = 15;
-
-	static constexpr u32 cMaxDisplayW = 64;
-	static constexpr u32 cMaxDisplayH = 32;
+	static constexpr s32 cResSizeMult   =  8;
+	static constexpr s32 c_sys_screen_W = 64;
+	static constexpr s32 c_sys_screen_H = 32;
+	static constexpr s32 c_sys_speed_hi = 30;
+	static constexpr s32 c_sys_speed_lo = 15;
 
 private:
-	u32 mBackgroundColor = 0x00;
-	u32 mColorResolution = 0xFC;
+	u32 m_background_color = 0x00;
+	u32 m_color_pixel_mask = 0xFC;
 
-	FixedMap2D<RGBA, (cDisplayW >> 3), cDisplayH>
-		mColoredBuffer{};
+	FixedMap2D<RGBA, (c_sys_screen_W >> 3), c_sys_screen_H>
+		m_colored_buffer{};
 
-	FixedMap2D<u8, cDisplayW, cDisplayH>
-		mDisplayBuffer{};
+	FixedMap2D<u8, c_sys_screen_W, c_sys_screen_H>
+		m_display_buffer{};
 
-	MemoryBank<cTotalMemory>
-		mMemoryBank{};
+	MemoryBank<c_sys_memory_size>
+		m_memory_bank{};
 
-	void setBuzzerPitch(s32 pitch) noexcept;
+	void set_pulse_pitch(s32 pitch) noexcept;
 
-	void drawLoresColor(s32 X, s32 Y, s32 idx)        noexcept;
-	void drawHiresColor(s32 X, s32 Y, s32 idx, s32 N) noexcept;
+	static constexpr std::array<RGBA, 8> c_fore_colors = {
+		0x000000FF, 0xEE1111FF, 0x1111EEFF, 0xEE11EEFF,
+		0x11EE11FF, 0xEEEE11FF, 0x11EEEEFF, 0xEEEEEEFF,
+	};
+	static constexpr std::array<RGBA, 4> c_back_colors = {
+		0x111133FF, 0x111111FF, 0x113311FF, 0x331111FF,
+	};
+
+	void color_lores_zone(s32 X, s32 Y, s32 idx)        noexcept;
+	void color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept;
 
 public:
 	CHIP8X() noexcept
-		: Chip8_CoreInterface(DisplayDevice(cDisplayW, cDisplayH, "CHIP-8X"))
+		: Chip8_CoreInterface(DisplayDevice(c_sys_screen_W, c_sys_screen_H, "CHIP-8X"))
 	{}
 
-	static constexpr bool validateProgram(
+	static constexpr bool validate_program(
 		const char* fileData,
 		const size_type fileSize
 	) noexcept {
 		if (!fileData || !fileSize) { return false; }
-		return fileSize + cGameLoadPos <= cTotalMemory;
+		return fileSize + c_game_load_pos <= c_sys_memory_size;
 	}
 
 private:
-	void initializeSystem() noexcept override;
-	void handleCycleLoop() noexcept override;
+	void initialize_system() noexcept override;
+	void handle_cycle_loop() noexcept override;
 
 	template <typename Lambda>
-	void instructionLoop(Lambda&& condition) noexcept;
+	void instruction_loop(Lambda&& condition) noexcept;
 
-	void renderAudioData() override;
-	void renderVideoData() override;
+	void push_audio_data() override;
+	void push_video_data() override;
 
-	void prepDisplayArea(const Resolution) override {}
+	void set_display_properties(const Resolution) override {}
 
 /*==================================================================*/
 	#pragma region 0 instruction branch

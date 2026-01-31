@@ -11,18 +11,18 @@
 
 /*==================================================================*/
 
-void BasicKeyboard::updateStates() noexcept {
+void BasicKeyboard::update_states() noexcept {
 	std::copy_n(EXEC_POLICY(unseq)
-		mCurState, TOTALKEYS, mOldState);
+		m_new_state, TOTALKEYS, m_old_state);
 
 	std::copy_n(EXEC_POLICY(unseq)
-		SDL_GetKeyboardState(nullptr), TOTALKEYS, mCurState);
+		SDL_GetKeyboardState(nullptr), TOTALKEYS, m_new_state);
 }
 
-void BasicMouse::updateStates() noexcept {
-	mOldState = mCurState;
+void BasicMouse::update_states() noexcept {
+	m_old_state = m_new_state;
 
-	const auto oldX = mPosX, oldY = mPosY;
-	mCurState = SDL_GetMouseState(&mPosX, &mPosY);
-	mRelX = mPosX - oldX; mRelY = mPosY - oldY;
+	const auto old_X = m_pos_X, old_Y = m_pos_Y;
+	m_new_state = SDL_GetMouseState(&m_pos_X, &m_pos_Y);
+	m_rel_X = m_pos_X - old_X; m_rel_Y = m_pos_Y - old_Y;
 }

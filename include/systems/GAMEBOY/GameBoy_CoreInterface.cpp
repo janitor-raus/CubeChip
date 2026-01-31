@@ -15,28 +15,28 @@
 
 GameBoy_CoreInterface::GameBoy_CoreInterface() noexcept {
 	if (const auto* path{ HDM->addSystemDir("savestate", "GAMEBOY") })
-		{ sSavestatePath = *path / HDM->getFileSHA1(); }
+		{ s_savestate_path = *path / HDM->getFileSHA1(); }
 
-	mAudioDevice.addAudioStream(STREAM::MAIN, 48'000, 1);
-	mAudioDevice.resumeStreams();
+	m_audio_device.addAudioStream(STREAM::MAIN, 48'000, 1);
+	m_audio_device.resumeStreams();
 
-	loadPresetBinds();
+	load_preset_binds();
 }
 
 /*==================================================================*/
 
-void GameBoy_CoreInterface::mainSystemLoop() {
+void GameBoy_CoreInterface::main_system_loop() {
 	if (!isSystemRunning())
 		[[unlikely]] { return; }
 
-	updateKeyStates();
-	instructionLoop();
-	renderAudioData();
-	renderVideoData();
+	update_key_states();
+	instruction_loop();
+	push_audio_data();
+	push_video_data();
 	pushOverlayData();
 }
 
-void GameBoy_CoreInterface::loadPresetBinds() {
+void GameBoy_CoreInterface::load_preset_binds() {
 	static constexpr auto _{ SDL_SCANCODE_UNKNOWN };
 	static constexpr SimpleKeyMapping defaultKeyMappings[]{
 		{0x7, KEY(G), _}, // START
@@ -49,7 +49,7 @@ void GameBoy_CoreInterface::loadPresetBinds() {
 		{0x0, KEY(D), _}, // →
 	};
 
-	loadCustomBinds(std::span(defaultKeyMappings));
+	load_custom_binds(std::span(defaultKeyMappings));
 }
 
 u32  GameBoy_CoreInterface::getKeyStates() {
@@ -57,7 +57,7 @@ u32  GameBoy_CoreInterface::getKeyStates() {
 
 	Input->updateStates();
 
-	for (const auto& mapping : mCustomBinds) {
+	for (const auto& mapping : m_custom_binds) {
 		if (Input->areAnyHeld(mapping.key, mapping.alt)) {
 			keyStates |= 1u << mapping.idx;
 		}
@@ -66,7 +66,7 @@ u32  GameBoy_CoreInterface::getKeyStates() {
 	return keyStates;
 }
 
-void GameBoy_CoreInterface::copyGameToMemory(u8* dest) noexcept {
+void GameBoy_CoreInterface::copy_game_to_memory(u8* dest) noexcept {
 	std::copy_n(EXEC_POLICY(unseq)
 		HDM->getFileData(),
 		HDM->getFileSize(),

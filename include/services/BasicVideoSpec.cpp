@@ -40,8 +40,7 @@ struct FatalError : public std::runtime_error {
 
 [[noreturn]] static
 void throw_fatal_error(unsigned line, const char* function) noexcept(false) {
-	blog.newEntry<BLOG::FTL>("L{} : {}(): {}",
-		line, function, SDL_GetError());
+	blog.fatal("L{} : {}(): {}", line, function, SDL_GetError());
 
 	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,
 		"Fatal SDL Error", SDL_GetError(), nullptr);
@@ -119,8 +118,7 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 		success = false; return;
 	}
 	catch (const std::exception& e) {
-		blog.newEntry<BLOG::FTL>("{}(): Unknown exception caught: {}",
-			__func__, e.what());
+		blog.fatal("{}(): Unknown exception caught: {}", __func__, e.what());
 		success = false; return;
 	}
 }
@@ -260,8 +258,7 @@ static SDL_Texture* create_texture(
 		return nullptr;
 	}
 	catch (const std::exception& e) {
-		blog.newEntry<BLOG::FTL>("{}(): Unknown exception caught: {}",
-			__func__, e.what());
+		blog.fatal("{}(): Unknown exception caught: {}", __func__, e.what());
 		return nullptr;
 	}
 }
@@ -362,8 +359,7 @@ bool BasicVideoSpec::render_present(std::function<void()> render_callable) noexc
 		return false;
 	}
 	catch (const std::exception& e) {
-		blog.newEntry<BLOG::FTL>("{}(): Unknown exception caught: {}",
-			__func__, e.what());
+		blog.fatal("{}(): Unknown exception caught: {}", __func__, e.what());
 		return false;
 	}
 }

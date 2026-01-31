@@ -32,27 +32,27 @@ enum BIC_Button : unsigned {
 class BasicKeyboard final {
 	static constexpr auto TOTALKEYS = 0u + SDL_SCANCODE_COUNT;
 
-	bool mOldState[TOTALKEYS]{};
-	bool mCurState[TOTALKEYS]{};
+	bool m_old_state[TOTALKEYS]{};
+	bool m_new_state[TOTALKEYS]{};
 
 public:
-	void updateStates() noexcept;
+	void update_states() noexcept;
 
-	bool isHeldPrev(SDL_Scancode key) const noexcept { return mOldState[key]; }
-	bool isHeld    (SDL_Scancode key) const noexcept { return mCurState[key]; }
-	bool isPressed (SDL_Scancode key) const noexcept { return !isHeldPrev(key) &&  isHeld(key); }
-	bool isReleased(SDL_Scancode key) const noexcept { return  isHeldPrev(key) && !isHeld(key); }
+	bool was_held   (SDL_Scancode key) const noexcept { return m_old_state[key]; }
+	bool is_held    (SDL_Scancode key) const noexcept { return m_new_state[key]; }
+	bool is_pressed (SDL_Scancode key) const noexcept { return !was_held(key) &&  is_held(key); }
+	bool is_released(SDL_Scancode key) const noexcept { return  was_held(key) && !is_held(key); }
 
 	template <std::same_as<SDL_Scancode>... S>
 		requires (sizeof...(S) >= 1)
-	bool areAllHeld(S... code) const noexcept {
-		return (isHeld(code) && ...);
+	bool are_all_held(S... code) const noexcept {
+		return (is_held(code) && ...);
 	}
 
 	template <std::same_as<SDL_Scancode>... S>
 		requires (sizeof...(S) >= 1)
-	bool areAnyHeld(S... code) const noexcept {
-		return (isHeld(code) || ...);
+	bool are_any_held(S... code) const noexcept {
+		return (is_held(code) || ...);
 	}
 };
 
@@ -63,33 +63,33 @@ public:
 	#pragma region BasicMouse Class
 
 class BasicMouse final {
-	unsigned mCurState{}, mOldState{};
-	float mPosX{}, mPosY{};
-	float mRelX{}, mRelY{};
+	unsigned m_new_state{}, m_old_state{};
+	float m_pos_X{}, m_pos_Y{};
+	float m_rel_X{}, m_rel_Y{};
 
 public:
-	void updateStates() noexcept;
+	void update_states() noexcept;
 
-	float getRelX() const noexcept { return mRelX; }
-	float getRelY() const noexcept { return mRelY; }
-	float getPosX() const noexcept { return mPosX; }
-	float getPosY() const noexcept { return mPosY; }
+	float getRelX() const noexcept { return m_rel_X; }
+	float getRelY() const noexcept { return m_rel_Y; }
+	float getPosX() const noexcept { return m_pos_X; }
+	float getPosY() const noexcept { return m_pos_Y; }
 
-	bool isHeldPrev(BIC_Button key) const noexcept { return mOldState & key; }
-	bool isHeld    (BIC_Button key) const noexcept { return mCurState & key; }
-	bool isPressed (BIC_Button key) const noexcept { return !isHeldPrev(key) &&  isHeld(key); }
-	bool isReleased(BIC_Button key) const noexcept { return  isHeldPrev(key) && !isHeld(key); }
+	bool was_held   (BIC_Button key) const noexcept { return m_old_state & key; }
+	bool is_held    (BIC_Button key) const noexcept { return m_new_state & key; }
+	bool is_pressed (BIC_Button key) const noexcept { return !was_held(key) &&  is_held(key); }
+	bool is_released(BIC_Button key) const noexcept { return  was_held(key) && !is_held(key); }
 
 	template <std::convertible_to<BIC_Button>... S>
 		requires (sizeof...(S) >= 1)
-	bool areAllHeld(S... code) const noexcept {
-		return (isHeld(code) && ...);
+	bool are_all_held(S... code) const noexcept {
+		return (is_held(code) && ...);
 	}
 
 	template <std::convertible_to<BIC_Button>... S>
 		requires (sizeof...(S) >= 1)
-	bool areAnyHeld(S... code) const noexcept {
-		return (isHeld(code) || ...);
+	bool are_any_held(S... code) const noexcept {
+		return (is_held(code) || ...);
 	}
 };
 

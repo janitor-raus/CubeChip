@@ -7,6 +7,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <cstdint>
 #include <memory>
 
@@ -75,10 +76,22 @@ struct LogEntry {
 	const std::string message{};  // the actual string message
 
 	constexpr LogEntry() noexcept = default;
-	LogEntry(BLOG::LEVEL level, std::string message) noexcept;
+	LogEntry(BLOG::LEVEL level, std::uint32_t source, std::string message) noexcept;
 
 	std::string as_string() const noexcept;
 };
+
+class ScopedLogSource {
+	std::uint32_t m_previous_source{};
+
+public:
+	ScopedLogSource(const std::string& src_name) noexcept;
+
+	~ScopedLogSource() noexcept;
+};
+
+[[nodiscard]] std::uint32_t get_source_index(const std::string& src_name) noexcept;
+[[nodiscard]] std::string   get_source_name(std::uint32_t src_id) noexcept;
 
 /*==================================================================*/
 	#pragma region BasicLogger Singleton Class
@@ -112,19 +125,50 @@ public:
 	auto get_log_path() const noexcept -> std::string;
 
 private:
-	template <BLOG::LEVEL LOG_LEVEL>
-	void newEntry_(std::string&& message) noexcept;
+	void push_entry(BLOG::LEVEL level, std::string&& message) noexcept;
 
 public:
-	template <BLOG::LEVEL LOG_LEVEL, typename... Args>
-	void newEntry(std::string&& message, Args&&... args) noexcept {
-		newEntry_<LOG_LEVEL>(fmt::vformat(message, fmt::make_format_args(args...)));
+	#if !defined(NDEBUG) || defined(DEBUG) // only push these in debug builds
+	template <typename... Args>
+	void debug(fmt::format_string<Args...> fmt, Args&&... args) noexcept {
+		push_entry(BLOG::DBG, fmt::format(fmt, std::forward<Args>(args)...));
 	}
+	void debug(std::string&& message) noexcept { push_entry(BLOG::DBG, std::move(message)); }
+	void debug(const char* message) noexcept { push_entry(BLOG::DBG, std::string(message)); }
+	#else
+	template <typename... Args>
+	void debug(fmt::format_string<Args...>, Args&&...) noexcept {}
+	void debug(std::string&&) noexcept {}
+	void debug(const char*) noexcept {}
+	#endif
 
-	template <BLOG::LEVEL LOG_LEVEL, typename... Args>
-	void newEntry(const std::string& message, Args&&... args) noexcept {
-		newEntry_<LOG_LEVEL>(fmt::vformat(message, fmt::make_format_args(args...)));
+	template <typename... Args>
+	void info(fmt::format_string<Args...> fmt, Args&&... args) noexcept {
+		push_entry(BLOG::INF, fmt::format(fmt, std::forward<Args>(args)...));
 	}
+	void info(std::string&& message) noexcept { push_entry(BLOG::INF, std::move(message)); }
+	void info(const char* message) noexcept { push_entry(BLOG::INF, std::string(message)); }
+
+	template <typename... Args>
+	void warn(fmt::format_string<Args...> fmt, Args&&... args) noexcept {
+		push_entry(BLOG::WRN, fmt::format(fmt, std::forward<Args>(args)...));
+	}
+	void warn(std::string&& message) noexcept { push_entry(BLOG::WRN, std::move(message)); }
+	void warn(const char* message) noexcept { push_entry(BLOG::WRN, std::string(message)); }
+
+	template <typename... Args>
+	void error(fmt::format_string<Args...> fmt, Args&&... args) noexcept {
+		push_entry(BLOG::ERR, fmt::format(fmt, std::forward<Args>(args)...));
+	}
+	void error(std::string&& message) noexcept { push_entry(BLOG::ERR, std::move(message)); }
+	void error(const char* message) noexcept { push_entry(BLOG::ERR, std::string(message)); }
+
+	template <typename... Args>
+	void fatal(fmt::format_string<Args...> fmt, Args&&... args) noexcept {
+		push_entry(BLOG::FTL, fmt::format(fmt, std::forward<Args>(args)...));
+	}
+	void fatal(std::string&& message) noexcept { push_entry(BLOG::FTL, std::move(message)); }
+	void fatal(const char* message) noexcept { push_entry(BLOG::FTL, std::string(message)); }
 };
 
 	#pragma endregion

@@ -52,7 +52,7 @@ struct DisplayDevice::DisplayContext {
 		, m_render_window_hook(FrontendInterface::register_window([&]() noexcept { render_window(); }))
 	{
 		if (m_staging_data.get_base_frame().area() != (W * H)) {
-			blog.newEntry<BLOG::WRN>("Display W/H out of size bounds, clamping!");
+			blog.warn("Display W/H out of size bounds, clamping!");
 		}
 	}
 

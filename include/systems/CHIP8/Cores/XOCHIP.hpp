@@ -14,27 +14,27 @@
 /*==================================================================*/
 
 class XOCHIP final : public Chip8_CoreInterface {
-	static constexpr u64 cTotalMemory = 64_KiB;
-	static constexpr u32 cGameLoadPos =   512;
-	static constexpr u32 cStartOffset =   512;
-	static constexpr f32 cRefreshRate = 60.0f;
+	static constexpr u64 c_sys_memory_size  = 64_KiB;
+	static constexpr u32 c_game_load_pos    =   512;
+	static constexpr u32 c_sys_boot_pos     =   512;
+	static constexpr f32 c_sys_refresh_rate = 60.0f;
 
 	static constexpr s32 cResSizeMult =     8;
 	static constexpr s32 cScreenSizeX =    64;
 	static constexpr s32 cScreenSizeY =    32;
-	static constexpr s32 cInstSpeedHi = 50000;
-	static constexpr s32 cInstSpeedLo =  1000;
+	static constexpr s32 c_sys_speed_hi = 50000;
+	static constexpr s32 c_sys_speed_lo =  1000;
 
-	static constexpr u32 cDisplayW = 128;
-	static constexpr u32 cDisplayH =  64;
+	static constexpr u32 c_sys_screen_W = 128;
+	static constexpr u32 c_sys_screen_H =  64;
 
 private:
-	static inline thread_local u32 mPlanarMask = 0x1;
+	static inline thread_local u32 m_plane_mask = 0x1;
 
-	Map2D<u8> mDisplayBuffer[4];
+	Map2D<u8> m_display_buffer[4];
 
-	MemoryBank<cTotalMemory>
-		mMemoryBank{};
+	MemoryBank<c_sys_memory_size>
+		m_memory_bank{};
 
 	struct DisplayRes final {
 		s32 W{}, H{};
@@ -45,12 +45,12 @@ private:
 
 /*==================================================================*/
 
-	std::array<RGBA, 16> mBitColors{};
+	std::array<RGBA, 16> m_bit_colors{};
 
 	// 332 RGB color mapping: SHR 5 | SHR 2 | SHR 0
 	// R/G: 0x00, 0x20, 0x40, 0x60, 0x80, 0xA0, 0xC0, 0xFF
 	//  B : 0x00,             0x60,       0xA0,       0xFF
-	static constexpr std::array<RGBA, 256> sColorPalette{ {
+	static constexpr std::array<RGBA, 256> s_color_palette = {
 		0x00000000, 0x00006000, 0x0000A000, 0x0000FF00,
 		0x00200000, 0x00206000, 0x0020A000, 0x0020FF00,
 		0x00400000, 0x00406000, 0x0040A000, 0x0040FF00,
@@ -115,9 +115,7 @@ private:
 		0xFFA00000, 0xFFA06000, 0xFFA0A000, 0xFFA0FF00,
 		0xFFC00000, 0xFFC06000, 0xFFC0A000, 0xFFC0FF00,
 		0xFFFF0000, 0xFFFF6000, 0xFFFFA000, 0xFFFFFF00,
-	} };
-
-	void setColorBit332(s32 bit, s32 index) noexcept;
+	};
 
 /*==================================================================*/
 
@@ -128,7 +126,7 @@ private:
 	 * Optionally, one can skip part of the formula as: 31.25 * 2^((pitch - 64) / 48)
 	 * The entries in the array are pre-calculated (floating-point) frequencies in int format
 	 */
-	static constexpr std::array<u32, 256> sPitchFreqLUT{{
+	static constexpr std::array<u32, 256> s_pitch_frequency_lut = {
 		0x41466CD5, 0x41494FB1, 0x414C3D4C, 0x414F35CD,
 		0x4152395F, 0x4155482A, 0x41586256, 0x415B8812,
 		0x415EB985, 0x4161F6DB, 0x41654042, 0x416895E7,
@@ -193,26 +191,26 @@ private:
 		0x43D2395F, 0x43D54829, 0x43D86258, 0x43DB8812,
 		0x43DEB983, 0x43E1F6DC, 0x43E54042, 0x43E895E6,
 		0x43EBF7F6, 0x43EF669C, 0x43F2E20A, 0x43F66A72,
-	}};
+	};
 
 	using PatternData = std::array<u8, 16>;
-	static inline thread_local PatternData mPattern{{
+	static inline thread_local PatternData m_pulse_pattern = {
 		0x0F, 0x00,	0x0F, 0x00, 0x0F, 0x00, 0x0F, 0x00,
 		0x0F, 0x00,	0x0F, 0x00, 0x0F, 0x00, 0x0F, 0x00,
-	}};
+	};
 
-	void setPatternPitch(s32 pitch) noexcept;
+	void set_pattern_pitch(s32 pitch) noexcept;
 
-	static void makePatternWave(f32* data, u32 size, Voice* voice, Stream*) noexcept;
+	static void make_pattern_wave(f32* data, u32 size, Voice* voice, Stream*) noexcept;
 
 /*==================================================================*/
 
-	auto NNNN() const noexcept { return mMemoryBank[mCurrentPC] << 8 | mMemoryBank[mCurrentPC + 1]; }
+	auto NNNN() const noexcept { return m_memory_bank[m_current_pc] << 8 | m_memory_bank[m_current_pc + 1]; }
 
 public:
 	XOCHIP() noexcept
-		: Chip8_CoreInterface(DisplayDevice(cDisplayW, cDisplayH, "XOCHIP"))
-		, mDisplayBuffer{
+		: Chip8_CoreInterface(DisplayDevice(c_sys_screen_W, c_sys_screen_H, "XOCHIP"))
+		, m_display_buffer{
 			{cScreenSizeX, cScreenSizeY},
 			{cScreenSizeX, cScreenSizeY},
 			{cScreenSizeX, cScreenSizeY},
@@ -220,32 +218,32 @@ public:
 		}
 	{}
 
-	static constexpr bool validateProgram(
+	static constexpr bool validate_program(
 		const char* fileData,
 		const size_type fileSize
 	) noexcept {
 		if (!fileData || !fileSize) { return false; }
-		return fileSize + cGameLoadPos <= cTotalMemory;
+		return fileSize + c_game_load_pos <= c_sys_memory_size;
 	}
 
 private:
-	void initializeSystem() noexcept override;
-	void handleCycleLoop() noexcept override;
+	void initialize_system() noexcept override;
+	void handle_cycle_loop() noexcept override;
 
 	template <typename Lambda>
-	void instructionLoop(Lambda&& condition) noexcept;
+	void instruction_loop(Lambda&& condition) noexcept;
 
-	void renderAudioData() override;
-	void renderVideoData() override;
+	void push_audio_data() override;
+	void push_video_data() override;
 
-	void prepDisplayArea(const Resolution mode) override;
+	void set_display_properties(const Resolution mode) override;
 
-	void skipInstruction() noexcept override;
+	void skip_instruction() noexcept override;
 
-	void scrollDisplayUP(s32 N);
-	void scrollDisplayDN(s32 N);
-	void scrollDisplayLT();
-	void scrollDisplayRT();
+	void scroll_display_up(s32 N);
+	void scroll_display_dn(s32 N);
+	void scroll_display_lt();
+	void scroll_display_rt();
 
 /*==================================================================*/
 	#pragma region 0 instruction branch

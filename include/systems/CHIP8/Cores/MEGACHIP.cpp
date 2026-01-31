@@ -14,33 +14,33 @@ REGISTER_CORE(MEGACHIP, ".mc8")
 
 /*==================================================================*/
 
-void MEGACHIP::initializeSystem() noexcept {
-	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
-	copyFontToMemory(mMemoryBank.data(), 180);
+void MEGACHIP::initialize_system() noexcept {
+	copy_game_to_memory(m_memory_bank.data() + c_game_load_pos);
+	copy_font_to_memory(m_memory_bank.data(), 180);
 
-	set_base_system_framerate(cRefreshRate);
+	set_base_system_framerate(c_sys_refresh_rate);
 
-	mVoices[VOICE::UNIQUE].userdata = &mAudioTimers[VOICE::UNIQUE];
-	mVoices[VOICE::BUZZER].userdata = &mAudioTimers[VOICE::BUZZER];
+	m_voices[VOICE::UNIQUE].userdata = &m_audio_timers[VOICE::UNIQUE];
+	m_voices[VOICE::BUZZER].userdata = &m_audio_timers[VOICE::BUZZER];
 
-	mCurrentPC = cStartOffset;
+	m_current_pc = c_sys_boot_pos;
 
-	prepDisplayArea(Resolution::LO);
+	set_display_properties(Resolution::LO);
 
-	mDisplayDevice.metadata_staging()
+	m_display_device.metadata_staging()
 		.set_minimum_zoom(2)
 		.set_inner_margin(4)
 		.enabled = true;
 }
 
-void MEGACHIP::handleCycleLoop() noexcept
-	{ LOOP_DISPATCH(instructionLoop); }
+void MEGACHIP::handle_cycle_loop() noexcept
+	{ LOOP_DISPATCH(instruction_loop); }
 
 template <typename Lambda>
-void MEGACHIP::instructionLoop(Lambda&& condition) noexcept {
-	for (mCycleCount = 0; condition(); ++mCycleCount) {
-		const auto HI = mMemoryBank[mCurrentPC++];
-		const auto LO = mMemoryBank[mCurrentPC++];
+void MEGACHIP::instruction_loop(Lambda&& condition) noexcept {
+	for (m_cycle_count = 0; condition(); ++m_cycle_count) {
+		const auto HI = m_memory_bank[m_current_pc++];
+		const auto LO = m_memory_bank[m_current_pc++];
 
 		#define _NNN ((HI << 8 | LO) & 0xFFF)
 		#define _X (HI & 0xF)
@@ -49,7 +49,7 @@ void MEGACHIP::instructionLoop(Lambda&& condition) noexcept {
 
 		switch (HI) {
 			CASE_xNF(0x00):
-				if (isManualRefresh()) {
+				if (use_manual_vsync()) {
 					switch (_NNN) {
 						case 0x0010:
 							instruction_0010();
@@ -105,13 +105,13 @@ void MEGACHIP::instructionLoop(Lambda&& condition) noexcept {
 									instruction_09NN(LO);
 									break;
 								[[unlikely]]
-								default: instructionError(HI, LO);
+								default: instruction_error(HI, LO);
 							}
 					}
 				}
 				else {
 					if (_X) [[unlikely]] {
-						instructionError(HI, LO);
+						instruction_error(HI, LO);
 					} else {
 						switch (LO) {
 							case 0x11:
@@ -145,7 +145,7 @@ void MEGACHIP::instructionLoop(Lambda&& condition) noexcept {
 								instruction_00FF();
 								break;
 							[[unlikely]]
-							default: instructionError(HI, LO);
+							default: instruction_error(HI, LO);
 						}
 					}
 				}
@@ -164,7 +164,7 @@ void MEGACHIP::instructionLoop(Lambda&& condition) noexcept {
 				break;
 			CASE_xNF(0x50):
 				if (_N) [[unlikely]] {
-					instructionError(HI, LO);
+					instruction_error(HI, LO);
 				} else {
 					instruction_5xy0(_X, Y_);
 				}
@@ -205,12 +205,12 @@ void MEGACHIP::instructionLoop(Lambda&& condition) noexcept {
 						instruction_8xyE(_X, Y_);
 						break;
 					[[unlikely]]
-					default: instructionError(HI, LO);
+					default: instruction_error(HI, LO);
 				}
 				break;
 			CASE_xNF(0x90):
 				if (_N) [[unlikely]] {
-					instructionError(HI, LO);
+					instruction_error(HI, LO);
 				} else {
 					instruction_9xy0(_X, Y_);
 				}
@@ -236,7 +236,7 @@ void MEGACHIP::instructionLoop(Lambda&& condition) noexcept {
 						instruction_ExA1(_X);
 						break;
 					[[unlikely]]
-					default: instructionError(HI, LO);
+					default: instruction_error(HI, LO);
 				}
 				break;
 			CASE_xNF(0xF0):
@@ -278,110 +278,107 @@ void MEGACHIP::instructionLoop(Lambda&& condition) noexcept {
 						instruction_FN85(_X);
 						break;
 						[[unlikely]]
-					default: instructionError(HI, LO);
+					default: instruction_error(HI, LO);
 				}
 				break;
 		}
 	}
 }
 
-void MEGACHIP::renderAudioData() {
-	if (isManualRefresh()) {
-		mixAudioData({
-			{ makeByteWave,  &mVoices[VOICE::UNIQUE] },
-			{ makePulseWave, &mVoices[VOICE::BUZZER] },
+void MEGACHIP::push_audio_data() {
+	if (use_manual_vsync()) {
+		mix_audio_data({
+			{ make_stream_wave, &m_voices[VOICE::UNIQUE] },
+			{ make_pulse_wave,  &m_voices[VOICE::BUZZER] },
 		});
 
-		mDisplayDevice.metadata_staging().set_border_color_if(
-			!!mAudioTimers[VOICE::BUZZER], sBitColors[1]);
+		m_display_device.metadata_staging().set_border_color_if(
+			!!m_audio_timers[VOICE::BUZZER], s_bit_colors[1]);
 	}
 	else {
-		mixAudioData({
-			{ makePulseWave, &mVoices[VOICE::ID_0] },
-			{ makePulseWave, &mVoices[VOICE::ID_1] },
-			{ makePulseWave, &mVoices[VOICE::ID_2] },
-			{ makePulseWave, &mVoices[VOICE::BUZZER] },
+		mix_audio_data({
+			{ make_pulse_wave, &m_voices[VOICE::ID_0] },
+			{ make_pulse_wave, &m_voices[VOICE::ID_1] },
+			{ make_pulse_wave, &m_voices[VOICE::ID_2] },
+			{ make_pulse_wave, &m_voices[VOICE::BUZZER] },
 		});
 
-		mDisplayDevice.metadata_staging().set_border_color_if(
-			!!::accumulate(mAudioTimers), sBitColors[1]);
+		m_display_device.metadata_staging().set_border_color_if(
+			!!::accumulate(m_audio_timers), s_bit_colors[1]);
 	}
 }
 
-void MEGACHIP::renderVideoData() {
-	if (!isManualRefresh()) {
-		auto calc_color = isUsingPixelTrails()
-			? [](u8 pixel) { return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
-			: [](u8 pixel) { return sBitColors[pixel >> 3]; };
+void MEGACHIP::push_video_data() {
+	if (!use_manual_vsync()) {
+		auto calc_color = use_pixel_trails()
+			? [](u8 pixel) { return RGBA::premul(s_bit_colors[pixel != 0], c_bit_weight[pixel]); }
+			: [](u8 pixel) { return s_bit_colors[pixel >> 3]; };
 
-		for (auto i = 0u; i < mDisplayBuffer.size(); ++i) {
-			auto pixel = mDisplayBuffer[i];
+		for (auto i = 0u; i < m_display_buffer.size(); ++i) {
+			auto pixel = m_display_buffer[i];
 			auto color = calc_color(pixel);
 
 			auto x = (i % cDisplayW_C8) * 2;
 			auto y = (i / cDisplayW_C8) * 2;
 
-			mBackgroundBuffer(x + 0, y + 0) = color;
-			mBackgroundBuffer(x + 1, y + 0) = color;
-			mBackgroundBuffer(x + 0, y + 1) = color;
-			mBackgroundBuffer(x + 1, y + 1) = color;
+			m_background_buffer(x + 0, y + 0) = color;
+			m_background_buffer(x + 1, y + 0) = color;
+			m_background_buffer(x + 0, y + 1) = color;
+			m_background_buffer(x + 1, y + 1) = color;
 		}
 
-		mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-			frame.metadata = ++mDisplayDevice.metadata_staging();
-			frame.copy_from(mBackgroundBuffer);
-		});
+		flush_all_video_buffers(false, false);
 	}
 }
 
-void MEGACHIP::prepDisplayArea(Resolution mode) {
-	isManualRefresh(mode == Resolution::MC);
+void MEGACHIP::set_display_properties(Resolution mode) {
+	use_manual_vsync(mode == Resolution::MC);
 
-	if (isManualRefresh()) {
-		mDisplayDevice.metadata_staging()
+	if (use_manual_vsync()) {
+		m_display_device.metadata_staging()
 			.set_viewport(cDisplayW_M8, cDisplayH_M8)
 			.set_texture_tint(RGBA::Black);
-		Quirk.waitVblank = false;
-		mTargetCPF = cInstSpeedMC;
+		Quirk.await_vblank = false;
+		m_target_cpf = cInstSpeedMC;
 	}
 	else {
-		mDisplayDevice.metadata_staging()
+		m_display_device.metadata_staging()
 			.set_viewport(cDisplayW_M8, cDisplayW_M8 >> 1)
-			.set_texture_tint(cBitColors[0]);
+			.set_texture_tint(c_bit_colors[0]);
 
-		isLargerDisplay(mode != Resolution::LO);
+		use_hires_screen(mode != Resolution::LO);
 
-		Quirk.waitVblank = !isLargerDisplay();
-		mTargetCPF = isLargerDisplay() ? cInstSpeedLo : cInstSpeedHi;
+		Quirk.await_vblank = !use_hires_screen();
+		m_target_cpf = use_hires_screen() ? c_sys_speed_lo : c_sys_speed_hi;
 	}
 };
 
 /*==================================================================*/
 
-void MEGACHIP::skipInstruction() noexcept {
-	mCurrentPC += mMemoryBank[mCurrentPC] == 0x01 ? 4 : 2;
+void MEGACHIP::skip_instruction() noexcept {
+	m_current_pc += m_memory_bank[m_current_pc] == 0x01 ? 4 : 2;
 }
 
-void MEGACHIP::scrollDisplayUP(s32 N) {
-	mDisplayBuffer.shift(0, -N);
+void MEGACHIP::scroll_display_up(s32 N) {
+	m_display_buffer.shift(0, -N);
 }
-void MEGACHIP::scrollDisplayDN(s32 N) {
-	mDisplayBuffer.shift(0, +N);
+void MEGACHIP::scroll_display_dn(s32 N) {
+	m_display_buffer.shift(0, +N);
 }
-void MEGACHIP::scrollDisplayLT() {
-	mDisplayBuffer.shift(-4, 0);
+void MEGACHIP::scroll_display_lt() {
+	m_display_buffer.shift(-4, 0);
 }
-void MEGACHIP::scrollDisplayRT() {
-	mDisplayBuffer.shift(+4, 0);
+void MEGACHIP::scroll_display_rt() {
+	m_display_buffer.shift(+4, 0);
 }
 
 /*==================================================================*/
 
-void MEGACHIP::initializeFontColors() noexcept {
+void MEGACHIP::init_font_sprite_colors() noexcept {
 	for (auto i = 0; i < 10; ++i) {
 		const auto mult = u8(255 - 11 * i);
 
-		mFontColor[i] = RGBA{
+		m_font_colors[i] = RGBA{
 			ez::fixed_scale8(mult, 264),
 			ez::fixed_scale8(mult, 291),
 			ez::fixed_scale8(mult, 309),
@@ -389,70 +386,69 @@ void MEGACHIP::initializeFontColors() noexcept {
 	}
 }
 
-void MEGACHIP::selectBlendingAlgo(s32 mode) noexcept {
+void MEGACHIP::set_blend_callable(s32 mode) noexcept {
 	switch (mode) {
 		case BlendMode::LINEAR_DODGE:
-			mBlendFunc = RGBA::Blend::LinearDodge;
+			m_blend_callable = RGBA::Blend::LinearDodge;
 			break;
 
 		case BlendMode::MULTIPLY:
-			mBlendFunc = RGBA::Blend::Multiply;
+			m_blend_callable = RGBA::Blend::Multiply;
 			break;
 
 		default:
 		case BlendMode::ALPHA_BLEND:
-			mBlendFunc = RGBA::Blend::None;
+			m_blend_callable = RGBA::Blend::None;
 			break;
 	}
 }
 
-void MEGACHIP::scrapAllVideoBuffers() {
-	mLastRenderBuffer.initialize();
-	mBackgroundBuffer.initialize();
-	mCollisionMap.initialize();
+void MEGACHIP::scrap_all_video_buffers() noexcept {
+	m_old_render_buffer.initialize();
+	m_background_buffer.initialize();
+	m_collision_map.initialize();
 }
 
-void MEGACHIP::flushAllVideoBuffers() {
-	mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = ++mDisplayDevice.metadata_staging();
-		frame.copy_from(mBackgroundBuffer);
+void MEGACHIP::flush_all_video_buffers(bool by_blending, bool and_advance) noexcept {
+	m_display_device.swapchain().acquire([&](auto& frame) noexcept {
+		frame.metadata = ++m_display_device.metadata_staging();
+		if (by_blending) {
+			frame.copy_from(m_old_render_buffer, m_background_buffer, RGBA::alpha_blend);
+		} else {
+			frame.copy_from(m_background_buffer);
+		}
 	});
 
-	mLastRenderBuffer = mBackgroundBuffer;
-	mBackgroundBuffer.initialize();
-	mCollisionMap.initialize();
+	if (and_advance) {
+		m_old_render_buffer = m_background_buffer;
+		m_background_buffer.initialize();
+		m_collision_map.initialize();
+	}
 }
 
-void MEGACHIP::blendAndFlushBuffers() {
-	mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = ++mDisplayDevice.metadata_staging();
-		frame.copy_from(mLastRenderBuffer, mBackgroundBuffer, RGBA::alpha_blend);
-	});
-}
+void MEGACHIP::start_audio_track(bool repeat) noexcept {
+	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
 
-void MEGACHIP::startAudioTrack(bool repeat) noexcept {
-	if (auto* stream = mAudioDevice.at(STREAM::MAIN)) {
+		m_track.loop = repeat;
+		m_track.data = &m_memory_bank[m_register_I + 6];
+		m_track.size = m_memory_bank[m_register_I + 2] << 16
+					 | m_memory_bank[m_register_I + 3] <<  8
+					 | m_memory_bank[m_register_I + 4];
 
-		mTrack.loop = repeat;
-		mTrack.data = &mMemoryBank[mRegisterI + 6];
-		mTrack.size = mMemoryBank[mRegisterI + 2] << 16
-					| mMemoryBank[mRegisterI + 3] <<  8
-					| mMemoryBank[mRegisterI + 4];
-
-		const bool oob = mTrack.data + mTrack.size > &mMemoryBank.back();
-		if (!mTrack.size || oob) { mTrack.reset(); }
+		const bool oob = m_track.data + m_track.size > &m_memory_bank.back();
+		if (!m_track.size || oob) { m_track.reset(); }
 		else {
-			mVoices[VOICE::UNIQUE].set_phase(0.0).set_step(get_framerate_multiplier() * (
-				(mMemoryBank[mRegisterI + 0] << 8 | mMemoryBank[mRegisterI + 1]) \
-				/ f64(mTrack.size) / stream->get_freq())).userdata = &mTrack;
+			m_voices[VOICE::UNIQUE].set_phase(0.0).set_step(get_framerate_multiplier() * (
+				(m_memory_bank[m_register_I + 0] << 8 | m_memory_bank[m_register_I + 1]) \
+				/ f64(m_track.size) / stream->get_freq())).userdata = &m_track;
 		}
 	}
 }
 
-void MEGACHIP::makeByteWave(f32* data, u32 size, Voice* voice, Stream*) noexcept {
+void MEGACHIP::make_stream_wave(f32* data, u32 size, Voice* voice, Stream*) noexcept {
 	if (!voice || !voice->userdata) [[unlikely]] { return; }
 	if (auto* track = static_cast<TrackData*>(voice->userdata)) {
-		if (!track->isOn()) { return; }
+		if (!track->enabled()) { return; }
 
 		for (auto i = 0u; i < size; ++i) {
 			const auto head = voice->peek_raw_phase(i);
@@ -467,131 +463,131 @@ void MEGACHIP::makeByteWave(f32* data, u32 size, Voice* voice, Stream*) noexcept
 	}
 }
 
-void MEGACHIP::scrollBuffersUP(s32 N) {
-	mLastRenderBuffer.shift(0, -N);
-	blendAndFlushBuffers();
+void MEGACHIP::scroll_buffers_up(s32 N) {
+	m_old_render_buffer.shift(0, -N);
+	flush_all_video_buffers(true, false);
 }
-void MEGACHIP::scrollBuffersDN(s32 N) {
-	mLastRenderBuffer.shift(0, +N);
-	blendAndFlushBuffers();
+void MEGACHIP::scroll_buffers_dn(s32 N) {
+	m_old_render_buffer.shift(0, +N);
+	flush_all_video_buffers(true, false);
 }
-void MEGACHIP::scrollBuffersLT() {
-	mLastRenderBuffer.shift(-4, 0);
-	blendAndFlushBuffers();
+void MEGACHIP::scroll_buffers_lt() {
+	m_old_render_buffer.shift(-4, 0);
+	flush_all_video_buffers(true, false);
 }
-void MEGACHIP::scrollBuffersRT() {
-	mLastRenderBuffer.shift(+4, 0);
-	blendAndFlushBuffers();
+void MEGACHIP::scroll_buffers_rt() {
+	m_old_render_buffer.shift(+4, 0);
+	flush_all_video_buffers(true, false);
 }
 
 /*==================================================================*/
 	#pragma region 0 instruction branch
 
 	void MEGACHIP::instruction_00BN(s32 N) noexcept {
-		if (isManualRefresh()) {
-			scrollBuffersUP(N);
+		if (use_manual_vsync()) {
+			scroll_buffers_up(N);
 		} else {
-			scrollDisplayUP(N);
+			scroll_display_up(N);
 		}
 	}
 	void MEGACHIP::instruction_00CN(s32 N) noexcept {
-		if (isManualRefresh()) {
-			scrollBuffersDN(N);
+		if (use_manual_vsync()) {
+			scroll_buffers_dn(N);
 		} else {
-			scrollDisplayDN(N);
+			scroll_display_dn(N);
 		}
 	}
 	void MEGACHIP::instruction_00E0() noexcept {
-		if (isManualRefresh()) {
-			flushAllVideoBuffers();
+		if (use_manual_vsync()) {
+			flush_all_video_buffers(true, true);
 		} else {
-			mDisplayBuffer.initialize();
+			m_display_buffer.initialize();
 		}
-		triggerInterrupt(Interrupt::FRAME);
+		trigger_interrupt(Interrupt::FRAME);
 	}
 	void MEGACHIP::instruction_00EE() noexcept {
-		mCurrentPC = mStackBank[--mStackTop & 0xF];
+		m_current_pc = m_stack_bank[--m_stack_head & 0xF];
 	}
 	void MEGACHIP::instruction_00FB() noexcept {
-		if (isManualRefresh()) {
-			scrollBuffersRT();
+		if (use_manual_vsync()) {
+			scroll_buffers_rt();
 		} else {
-			scrollDisplayRT();
+			scroll_display_rt();
 		}
 	}
 	void MEGACHIP::instruction_00FC() noexcept {
-		if (isManualRefresh()) {
-			scrollBuffersLT();
+		if (use_manual_vsync()) {
+			scroll_buffers_lt();
 		} else {
-			scrollDisplayLT();
+			scroll_display_lt();
 		}
 	}
 	void MEGACHIP::instruction_00FD() noexcept {
-		triggerInterrupt(Interrupt::SOUND);
+		trigger_interrupt(Interrupt::SOUND);
 	}
 	void MEGACHIP::instruction_00FE() noexcept {
-		prepDisplayArea(Resolution::LO);
-		triggerInterrupt(Interrupt::FRAME);
+		set_display_properties(Resolution::LO);
+		trigger_interrupt(Interrupt::FRAME);
 	}
 	void MEGACHIP::instruction_00FF() noexcept {
-		prepDisplayArea(Resolution::HI);
-		triggerInterrupt(Interrupt::FRAME);
+		set_display_properties(Resolution::HI);
+		trigger_interrupt(Interrupt::FRAME);
 	}
 
 	void MEGACHIP::instruction_0010() noexcept {
-		prepDisplayArea(Resolution::LO);
-		scrapAllVideoBuffers();
-		triggerInterrupt(Interrupt::FRAME);
+		set_display_properties(Resolution::LO);
+		scrap_all_video_buffers();
+		trigger_interrupt(Interrupt::FRAME);
 	}
 	void MEGACHIP::instruction_0011() noexcept {
-		prepDisplayArea(Resolution::MC);
+		set_display_properties(Resolution::MC);
 
-		selectBlendingAlgo(BlendMode::ALPHA_BLEND);
-		initializeFontColors();
-		scrapAllVideoBuffers();
+		set_blend_callable(BlendMode::ALPHA_BLEND);
+		init_font_sprite_colors();
+		scrap_all_video_buffers();
 
-		mTexture.reset();
-		mTrack.reset();
+		m_texture.reset();
+		m_track.reset();
 
-		triggerInterrupt(Interrupt::FRAME);
+		trigger_interrupt(Interrupt::FRAME);
 	}
 	void MEGACHIP::instruction_01NN(s32 NN) noexcept {
-		::assign_cast(mRegisterI, (NN << 16) | NNNN());
-		::assign_cast_add(mCurrentPC, 2);
+		::assign_cast(m_register_I, (NN << 16) | NNNN());
+		::assign_cast_add(m_current_pc, 2);
 	}
 	void MEGACHIP::instruction_02NN(s32 NN) noexcept {
 		for (auto pos = 0, byte = 0; pos < NN; byte += 4) {
-			mColorPalette(++pos) = {
-				mMemoryBank[mRegisterI + byte + 1],
-				mMemoryBank[mRegisterI + byte + 2],
-				mMemoryBank[mRegisterI + byte + 3],
-				mMemoryBank[mRegisterI + byte + 0],
+			m_color_palette(++pos) = {
+				m_memory_bank[m_register_I + byte + 1],
+				m_memory_bank[m_register_I + byte + 2],
+				m_memory_bank[m_register_I + byte + 3],
+				m_memory_bank[m_register_I + byte + 0],
 			};
 		}
 	}
 	void MEGACHIP::instruction_03NN(s32 NN) noexcept {
-		mTexture.W = NN ? NN : 256;
+		m_texture.w = NN ? NN : 256;
 	}
 	void MEGACHIP::instruction_04NN(s32 NN) noexcept {
-		mTexture.H = NN ? NN : 256;
+		m_texture.h = NN ? NN : 256;
 	}
 	void MEGACHIP::instruction_05NN(s32 NN) noexcept {
-		mDisplayDevice.metadata_staging()
+		m_display_device.metadata_staging()
 			.rmw_texture_tint().set_A(NN & 0xFF);
 	}
 	void MEGACHIP::instruction_060N(s32 N) noexcept {
-		startAudioTrack(N == 0);
+		start_audio_track(N == 0);
 	}
 	void MEGACHIP::instruction_0700() noexcept {
-		mTrack.reset();
+		m_track.reset();
 	}
 	void MEGACHIP::instruction_080N(s32 N) noexcept {
 		static constexpr u8 opacity[]{ 0xFF, 0x3F, 0x7F, 0xBF };
-		::assign_cast(mTexture.opacity, opacity[N > 3 ? 0 : N]);
-		selectBlendingAlgo(N);
+		::assign_cast(m_texture.opacity, opacity[N > 3 ? 0 : N]);
+		set_blend_callable(N);
 	}
 	void MEGACHIP::instruction_09NN(s32 NN) noexcept {
-		mTexture.collide = NN;
+		m_texture.collide = NN;
 	}
 
 	#pragma endregion
@@ -601,7 +597,7 @@ void MEGACHIP::scrollBuffersRT() {
 	#pragma region 1 instruction branch
 
 	void MEGACHIP::instruction_1NNN(s32 NNN) noexcept {
-		performProgJump(NNN);
+		jump_program_to(NNN);
 	}
 
 	#pragma endregion
@@ -611,8 +607,8 @@ void MEGACHIP::scrollBuffersRT() {
 	#pragma region 2 instruction branch
 
 	void MEGACHIP::instruction_2NNN(s32 NNN) noexcept {
-		mStackBank[mStackTop++ & 0xF] = mCurrentPC;
-		performProgJump(NNN);
+		m_stack_bank[m_stack_head++ & 0xF] = m_current_pc;
+		jump_program_to(NNN);
 	}
 
 	#pragma endregion
@@ -622,7 +618,7 @@ void MEGACHIP::scrollBuffersRT() {
 	#pragma region 3 instruction branch
 
 	void MEGACHIP::instruction_3xNN(s32 X, s32 NN) noexcept {
-		if (mRegisterV[X] == NN) { skipInstruction(); }
+		if (m_registers_V[X] == NN) { skip_instruction(); }
 	}
 
 	#pragma endregion
@@ -632,7 +628,7 @@ void MEGACHIP::scrollBuffersRT() {
 	#pragma region 4 instruction branch
 
 	void MEGACHIP::instruction_4xNN(s32 X, s32 NN) noexcept {
-		if (mRegisterV[X] != NN) { skipInstruction(); }
+		if (m_registers_V[X] != NN) { skip_instruction(); }
 	}
 
 	#pragma endregion
@@ -642,7 +638,7 @@ void MEGACHIP::scrollBuffersRT() {
 	#pragma region 5 instruction branch
 
 	void MEGACHIP::instruction_5xy0(s32 X, s32 Y) noexcept {
-		if (mRegisterV[X] == mRegisterV[Y]) { skipInstruction(); }
+		if (m_registers_V[X] == m_registers_V[Y]) { skip_instruction(); }
 	}
 
 	#pragma endregion
@@ -652,7 +648,7 @@ void MEGACHIP::scrollBuffersRT() {
 	#pragma region 6 instruction branch
 
 	void MEGACHIP::instruction_6xNN(s32 X, s32 NN) noexcept {
-		::assign_cast(mRegisterV[X], NN);
+		::assign_cast(m_registers_V[X], NN);
 	}
 
 	#pragma endregion
@@ -662,7 +658,7 @@ void MEGACHIP::scrollBuffersRT() {
 	#pragma region 7 instruction branch
 
 	void MEGACHIP::instruction_7xNN(s32 X, s32 NN) noexcept {
-		::assign_cast_add(mRegisterV[X], NN);
+		::assign_cast_add(m_registers_V[X], NN);
 	}
 
 	#pragma endregion
@@ -672,41 +668,41 @@ void MEGACHIP::scrollBuffersRT() {
 	#pragma region 8 instruction branch
 
 	void MEGACHIP::instruction_8xy0(s32 X, s32 Y) noexcept {
-		::assign_cast(mRegisterV[X], mRegisterV[Y]);
+		::assign_cast(m_registers_V[X], m_registers_V[Y]);
 	}
 	void MEGACHIP::instruction_8xy1(s32 X, s32 Y) noexcept {
-		::assign_cast_or(mRegisterV[X], mRegisterV[Y]);
+		::assign_cast_or(m_registers_V[X], m_registers_V[Y]);
 	}
 	void MEGACHIP::instruction_8xy2(s32 X, s32 Y) noexcept {
-		::assign_cast_and(mRegisterV[X], mRegisterV[Y]);
+		::assign_cast_and(m_registers_V[X], m_registers_V[Y]);
 	}
 	void MEGACHIP::instruction_8xy3(s32 X, s32 Y) noexcept {
-		::assign_cast_xor(mRegisterV[X], mRegisterV[Y]);
+		::assign_cast_xor(m_registers_V[X], m_registers_V[Y]);
 	}
 	void MEGACHIP::instruction_8xy4(s32 X, s32 Y) noexcept {
-		const auto sum = mRegisterV[X] + mRegisterV[Y];
-		::assign_cast(mRegisterV[X], sum);
-		::assign_cast(mRegisterV[0xF], sum >> 8);
+		const auto sum = m_registers_V[X] + m_registers_V[Y];
+		::assign_cast(m_registers_V[X], sum);
+		::assign_cast(m_registers_V[0xF], sum >> 8);
 	}
 	void MEGACHIP::instruction_8xy5(s32 X, s32 Y) noexcept {
-		const bool nborrow = mRegisterV[X] >= mRegisterV[Y];
-		::assign_cast_sub(mRegisterV[X], mRegisterV[Y]);
-		::assign_cast(mRegisterV[0xF], nborrow);
+		const bool nborrow = m_registers_V[X] >= m_registers_V[Y];
+		::assign_cast_sub(m_registers_V[X], m_registers_V[Y]);
+		::assign_cast(m_registers_V[0xF], nborrow);
 	}
 	void MEGACHIP::instruction_8xy7(s32 X, s32 Y) noexcept {
-		const bool nborrow = mRegisterV[Y] >= mRegisterV[X];
-		::assign_cast_rsub(mRegisterV[X], mRegisterV[Y]);
-		::assign_cast(mRegisterV[0xF], nborrow);
+		const bool nborrow = m_registers_V[Y] >= m_registers_V[X];
+		::assign_cast_rsub(m_registers_V[X], m_registers_V[Y]);
+		::assign_cast(m_registers_V[0xF], nborrow);
 	}
 	void MEGACHIP::instruction_8xy6(s32 X, s32  ) noexcept {
-		const bool lsb = (mRegisterV[X] & 0x01) != 0;
-		::assign_cast_shr(mRegisterV[X], 1);
-		::assign_cast(mRegisterV[0xF], lsb);
+		const bool lsb = (m_registers_V[X] & 0x01) != 0;
+		::assign_cast_shr(m_registers_V[X], 1);
+		::assign_cast(m_registers_V[0xF], lsb);
 	}
 	void MEGACHIP::instruction_8xyE(s32 X, s32  ) noexcept {
-		const bool msb = (mRegisterV[X] & 0x80) != 0;
-		::assign_cast_shl(mRegisterV[X], 1);
-		::assign_cast(mRegisterV[0xF], msb);
+		const bool msb = (m_registers_V[X] & 0x80) != 0;
+		::assign_cast_shl(m_registers_V[X], 1);
+		::assign_cast(m_registers_V[0xF], msb);
 	}
 
 	#pragma endregion
@@ -716,7 +712,7 @@ void MEGACHIP::scrollBuffersRT() {
 	#pragma region 9 instruction branch
 
 	void MEGACHIP::instruction_9xy0(s32 X, s32 Y) noexcept {
-		if (mRegisterV[X] != mRegisterV[Y]) { skipInstruction(); }
+		if (m_registers_V[X] != m_registers_V[Y]) { skip_instruction(); }
 	}
 
 	#pragma endregion
@@ -726,7 +722,7 @@ void MEGACHIP::scrollBuffersRT() {
 	#pragma region A instruction branch
 
 	void MEGACHIP::instruction_ANNN(s32 NNN) noexcept {
-		::assign_cast(mRegisterI, NNN);
+		::assign_cast(m_register_I, NNN);
 	}
 
 	#pragma endregion
@@ -736,7 +732,7 @@ void MEGACHIP::scrollBuffersRT() {
 	#pragma region B instruction branch
 
 	void MEGACHIP::instruction_BXNN(s32 X, s32 NNN) noexcept {
-		performProgJump(NNN + mRegisterV[X]);
+		jump_program_to(NNN + m_registers_V[X]);
 	}
 
 	#pragma endregion
@@ -746,7 +742,7 @@ void MEGACHIP::scrollBuffersRT() {
 	#pragma region C instruction branch
 
 	void MEGACHIP::instruction_CxNN(s32 X, s32 NN) noexcept {
-		::assign_cast(mRegisterV[X], RNG->next() & NN);
+		::assign_cast(m_registers_V[X], RNG->next() & NN);
 	}
 
 	#pragma endregion
@@ -766,7 +762,7 @@ void MEGACHIP::scrollBuffersRT() {
 			const auto offsetX = originX + B;
 
 			if (DATA >> (WIDTH - 1 - B) & 0x1) {
-				auto& pixel = mDisplayBuffer(offsetX, originY);
+				auto& pixel = m_display_buffer(offsetX, originY);
 				if (!((pixel ^= 0x8) & 0x8)) { collided = true; }
 			}
 			if (offsetX == cDisplayW_C8 - 1) { return collided; }
@@ -784,8 +780,8 @@ void MEGACHIP::scrollBuffersRT() {
 		for (auto B = 0; B < WIDTH; ++B) {
 			const auto offsetX = originX + B;
 
-			auto& pixelHI = mDisplayBuffer(offsetX, originY + 0);
-			auto& pixelLO = mDisplayBuffer(offsetX, originY + 1);
+			auto& pixelHI = m_display_buffer(offsetX, originY + 0);
+			auto& pixelLO = m_display_buffer(offsetX, originY + 1);
 
 			if (DATA >> (WIDTH - 1 - B) & 0x1) {
 				collided |= !!(pixelHI & 0x8);
@@ -799,67 +795,68 @@ void MEGACHIP::scrollBuffersRT() {
 	}
 
 	void MEGACHIP::instruction_DxyN(s32 X, s32 Y, s32 N) noexcept {
-		if (isManualRefresh()) {
-			const auto originX = mRegisterV[X] + 0;
-			const auto originY = mRegisterV[Y] + 0;
+		if (use_manual_vsync()) {
+			const auto originX = m_registers_V[X] + 0;
+			const auto originY = m_registers_V[Y] + 0;
 
-			mRegisterV[0xF] = 0;
+			m_registers_V[0xF] = 0;
 
-			if (!Quirk.wrapSprite && originY >= cDisplayH_M8) { return; }
-			if (mTexture.fontOffset != mRegisterI) [[likely]] { goto paintTexture; }
+			if (!Quirk.wrap_sprites && originY >= cDisplayH_M8) { return; }
+			if (m_texture.font_pos != m_register_I) [[likely]] { goto paintTexture; }
 
 			for (auto rowN = 0, offsetY = originY; rowN < N; ++rowN)
 			{
-				if (Quirk.wrapSprite && offsetY >= cDisplayH_M8) { continue; }
-				const auto octoPixelBatch = mMemoryBank[mRegisterI + rowN];
+				if (Quirk.wrap_sprites && offsetY >= cDisplayH_M8) { continue; }
+				const auto octoPixelBatch = m_memory_bank[m_register_I + rowN];
 
 				for (auto colN = 7, offsetX = originX; colN >= 0; --colN)
 				{
-					if (octoPixelBatch >> colN & 0x1)
-						{ mBackgroundBuffer(offsetX, offsetY) = mFontColor[rowN]; }
+					if (octoPixelBatch >> colN & 0x1) {
+						m_background_buffer(offsetX, offsetY) = m_font_colors[rowN];
+					}
 
-					if (!Quirk.wrapSprite && offsetX == (cDisplayW_M8 - 1))
+					if (!Quirk.wrap_sprites && offsetX == (cDisplayW_M8 - 1))
 						{ break; } else { ++offsetX &= (cDisplayW_M8 - 1); }
 				}
-				if (!Quirk.wrapSprite && offsetY == (cDisplayW_M8 - 1))
+				if (!Quirk.wrap_sprites && offsetY == (cDisplayW_M8 - 1))
 					{ break; } else { ++offsetY &= (cDisplayW_M8 - 1); }
 			}
 			return;
 
 		paintTexture:
-			if (mRegisterI + mTexture.W * mTexture.H >= cTotalMemory)
-				[[unlikely]] { mTexture.reset(); return; }
+			if (m_register_I + m_texture.w * m_texture.h >= c_sys_memory_size)
+				[[unlikely]] { m_texture.reset(); return; }
 
-			for (auto rowN = 0, offsetY = originY; rowN < mTexture.H; ++rowN)
+			for (auto rowN = 0, offsetY = originY; rowN < m_texture.h; ++rowN)
 			{
-				if (Quirk.wrapSprite && offsetY >= cDisplayH_M8) { continue; }
-				const auto offsetI = rowN * mTexture.W;
+				if (Quirk.wrap_sprites && offsetY >= cDisplayH_M8) { continue; }
+				const auto offsetI = rowN * m_texture.w;
 
-				for (auto colN = 0, offsetX = originX; colN < mTexture.W; ++colN)
+				for (auto colN = 0, offsetX = originX; colN < m_texture.w; ++colN)
 				{
-					if (const auto sourceColorIdx = mMemoryBank[mRegisterI + offsetI + colN])
+					if (const auto sourceColorIdx = m_memory_bank[m_register_I + offsetI + colN])
 					{
-						auto& collideCoord = mCollisionMap(offsetX, offsetY);
-						auto& backbufCoord = mBackgroundBuffer(offsetX, offsetY);
+						auto& collideCoord = m_collision_map(offsetX, offsetY);
+						auto& backbufCoord = m_background_buffer(offsetX, offsetY);
 
-						if (collideCoord == mTexture.collide)
-							[[unlikely]] { mRegisterV[0xF] = 1; }
+						if (collideCoord == m_texture.collide)
+							[[unlikely]] { m_registers_V[0xF] = 1; }
 
 						collideCoord = sourceColorIdx;
-						backbufCoord = RGBA::composite_blend(mColorPalette(sourceColorIdx), \
-							backbufCoord, mBlendFunc, u8(mTexture.opacity));
+						backbufCoord = RGBA::composite_blend(m_color_palette(sourceColorIdx), \
+							backbufCoord, m_blend_callable, u8(m_texture.opacity));
 					}
-					if (!Quirk.wrapSprite && offsetX == (cDisplayW_M8 - 1))
+					if (!Quirk.wrap_sprites && offsetX == (cDisplayW_M8 - 1))
 						{ break; } else { ++offsetX &= (cDisplayW_M8 - 1); }
 				}
-				if (!Quirk.wrapSprite && offsetY == (cDisplayH_M8 - 1))
+				if (!Quirk.wrap_sprites && offsetY == (cDisplayH_M8 - 1))
 					{ break; } else { ++offsetY %= cDisplayH_M8; }
 			}
 		} else {
-			if (isLargerDisplay()) {
-				const auto offsetX = 8 - (mRegisterV[X] & 7);
-				const auto originX = mRegisterV[X] & 0x78;
-				const auto originY = mRegisterV[Y] & 0x3F;
+			if (use_hires_screen()) {
+				const auto offsetX = 8 - (m_registers_V[X] & 7);
+				const auto originX = m_registers_V[X] & 0x78;
+				const auto originY = m_registers_V[Y] & 0x3F;
 
 				auto collisions = 0;
 
@@ -868,8 +865,8 @@ void MEGACHIP::scrollBuffersRT() {
 						const auto offsetY = originY + rowN;
 
 						collisions += drawSingleBytes(originX, offsetY, offsetX ? 24 : 16, (
-							mMemoryBank[mRegisterI + 2 * rowN + 0] << 8 |
-							mMemoryBank[mRegisterI + 2 * rowN + 1] << 0
+							m_memory_bank[m_register_I + 2 * rowN + 0] << 8 |
+							m_memory_bank[m_register_I + 2 * rowN + 1] << 0
 						) << offsetX);
 
 						if (offsetY == (cDisplayH_C8 - 1)) { break; }
@@ -879,17 +876,17 @@ void MEGACHIP::scrollBuffersRT() {
 						const auto offsetY = originY + rowN;
 
 						collisions += drawSingleBytes(originX, offsetY, offsetX ? 16 : 8,
-							mMemoryBank[mRegisterI + rowN] << offsetX);
+							m_memory_bank[m_register_I + rowN] << offsetX);
 
 						if (offsetY == (cDisplayH_C8 - 1)) { break; }
 					}
 				}
-				::assign_cast(mRegisterV[0xF], collisions);
+				::assign_cast(m_registers_V[0xF], collisions);
 			}
 			else {
-				const auto offsetX = 16 - 2 * (mRegisterV[X] & 0x07);
-				const auto originX = mRegisterV[X] * 2 & 0x70;
-				const auto originY = mRegisterV[Y] * 2 & 0x3F;
+				const auto offsetX = 16 - 2 * (m_registers_V[X] & 0x07);
+				const auto originX = m_registers_V[X] * 2 & 0x70;
+				const auto originY = m_registers_V[Y] * 2 & 0x3F;
 				const auto lengthN = N == 0 ? 16 : N;
 
 				auto collisions = 0;
@@ -898,15 +895,15 @@ void MEGACHIP::scrollBuffersRT() {
 					const auto offsetY = originY + rowN * 2;
 
 					collisions += drawDoubleBytes(originX, offsetY, 0x20,
-						ez::bit_dup8(mMemoryBank[mRegisterI + rowN]) << offsetX);
+						ez::bit_dup8(m_memory_bank[m_register_I + rowN]) << offsetX);
 
 					if (offsetY == (cDisplayH_C8 - 2)) { break; }
 				}
-				::assign_cast(mRegisterV[0xF], collisions != 0);
+				::assign_cast(m_registers_V[0xF], collisions != 0);
 			}
 		}
 
-		if (Quirk.waitVblank) [[unlikely]] { triggerInterrupt(Interrupt::FRAME); }
+		if (Quirk.await_vblank) [[unlikely]] { trigger_interrupt(Interrupt::FRAME); }
 	}
 
 	#pragma endregion
@@ -916,10 +913,10 @@ void MEGACHIP::scrollBuffersRT() {
 	#pragma region E instruction branch
 
 	void MEGACHIP::instruction_Ex9E(s32 X) noexcept {
-		if (keyHeld_P1(mRegisterV[X])) { skipInstruction(); }
+		if (is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
 	}
 	void MEGACHIP::instruction_ExA1(s32 X) noexcept {
-		if (!keyHeld_P1(mRegisterV[X])) { skipInstruction(); }
+		if (!is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
 	}
 
 	#pragma endregion
@@ -929,57 +926,54 @@ void MEGACHIP::scrollBuffersRT() {
 	#pragma region F instruction branch
 
 	void MEGACHIP::instruction_Fx07(s32 X) noexcept {
-		::assign_cast(mRegisterV[X], mDelayTimer);
+		::assign_cast(m_registers_V[X], m_delay_timer);
 	}
 	void MEGACHIP::instruction_Fx0A(s32 X) noexcept {
-		if (isManualRefresh()) [[unlikely]] {
-			mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-				frame.metadata = ++mDisplayDevice.metadata_staging();
-				frame.copy_from(mBackgroundBuffer);
-			});
+		if (use_manual_vsync()) [[unlikely]] {
+			flush_all_video_buffers(false, false);
 		}
-		mInputReg = &mRegisterV[X];
-		triggerInterrupt(Interrupt::INPUT);
+		m_key_reg_ref = &m_registers_V[X];
+		trigger_interrupt(Interrupt::INPUT);
 	}
 	void MEGACHIP::instruction_Fx15(s32 X) noexcept {
-		::assign_cast(mDelayTimer, mRegisterV[X]);
+		::assign_cast(m_delay_timer, m_registers_V[X]);
 	}
 	void MEGACHIP::instruction_Fx18(s32 X) noexcept {
-		startVoiceAt(VOICE::BUZZER, mRegisterV[X] + (mRegisterV[X] == 1));
+		start_voice_at(VOICE::BUZZER, m_registers_V[X] + (m_registers_V[X] == 1));
 	}
 	void MEGACHIP::instruction_Fx1E(s32 X) noexcept {
-		::assign_cast_add(mRegisterI, mRegisterV[X]);
+		::assign_cast_add(m_register_I, m_registers_V[X]);
 	}
 	void MEGACHIP::instruction_Fx29(s32 X) noexcept {
-		::assign_cast(mRegisterI, (mRegisterV[X] & 0xF) * 5 + cSmallFontOffset);
-		::assign_cast(mTexture.fontOffset, mRegisterI);
+		::assign_cast(m_register_I, (m_registers_V[X] & 0xF) * 5 + c_small_font_offset);
+		::assign_cast(m_texture.font_pos, m_register_I);
 	}
 	void MEGACHIP::instruction_Fx30(s32 X) noexcept {
-		::assign_cast(mRegisterI, (mRegisterV[X] & 0xF) * 10 + cLargeFontOffset);
-		::assign_cast(mTexture.fontOffset, mRegisterI);
+		::assign_cast(m_register_I, (m_registers_V[X] & 0xF) * 10 + c_large_font_offset);
+		::assign_cast(m_texture.font_pos, m_register_I);
 	}
 	void MEGACHIP::instruction_Fx33(s32 X) noexcept {
-		const TriBCD bcd{ mRegisterV[X] };
+		const TriBCD bcd{ m_registers_V[X] };
 
-		mMemoryBank[mRegisterI + 0] = bcd.digit[2];
-		mMemoryBank[mRegisterI + 1] = bcd.digit[1];
-		mMemoryBank[mRegisterI + 2] = bcd.digit[0];
+		m_memory_bank[m_register_I + 0] = bcd.digit[2];
+		m_memory_bank[m_register_I + 1] = bcd.digit[1];
+		m_memory_bank[m_register_I + 2] = bcd.digit[0];
 	}
 	void MEGACHIP::instruction_FN55(s32 N) noexcept {
 		for (auto idx = 0; idx <= N; ++idx) {
-			mMemoryBank[mRegisterI + idx] = mRegisterV[idx];
+			m_memory_bank[m_register_I + idx] = m_registers_V[idx];
 		}
 	}
 	void MEGACHIP::instruction_FN65(s32 N) noexcept {
 		for (auto idx = 0; idx <= N; ++idx) {
-			mRegisterV[idx] = mMemoryBank[mRegisterI + idx];
+			m_registers_V[idx] = m_memory_bank[m_register_I + idx];
 		}
 	}
 	void MEGACHIP::instruction_FN75(s32 N) noexcept {
-		setPermaRegs(std::min(N, 7) + 1);
+		set_permaregs(std::min(N, 7) + 1);
 	}
 	void MEGACHIP::instruction_FN85(s32 N) noexcept {
-		getPermaRegs(std::min(N, 7) + 1);
+		get_permaregs(std::min(N, 7) + 1);
 	}
 
 	#pragma endregion

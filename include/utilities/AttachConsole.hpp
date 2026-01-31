@@ -8,8 +8,8 @@
 
 /*==================================================================*/
 
-namespace Console {
-	void Attach() noexcept;
-	void Show()   noexcept;
-	void Hide()   noexcept;
+namespace console {
+	void attach() noexcept;
+	void show()   noexcept;
+	void hide()   noexcept;
 }

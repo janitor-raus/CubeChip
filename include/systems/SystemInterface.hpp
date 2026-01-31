@@ -163,8 +163,8 @@ private:
 	}
 
 protected:
-	virtual void mainSystemLoop() = 0;
-	virtual void initializeSystem() noexcept = 0;
+	virtual void main_system_loop() = 0;
+	virtual void initialize_system() noexcept = 0;
 
 protected:
 	template <typename... Args>

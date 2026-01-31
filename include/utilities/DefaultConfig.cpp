@@ -13,10 +13,10 @@ auto TomlConfig::write_into_file(
 	const toml::table& table,
 	const char* filename
 ) noexcept -> Expected<bool, std::error_code> {
-	std::ofstream outFile(filename, std::ios::out);
-	if (!outFile) { return ::make_unexpected(std::make_error_code(std::errc::permission_denied)); }
+	std::ofstream output_file(filename, std::ios::out);
+	if (!output_file) { return ::make_unexpected(std::make_error_code(std::errc::permission_denied)); }
 
-	try { if (outFile << table) { return true; } else { throw std::exception(); } }
+	try { if (output_file << table) { return true; } else { throw std::exception(); } }
 	catch (...) { return ::make_unexpected(std::make_error_code(std::errc::io_error)); }
 }
 

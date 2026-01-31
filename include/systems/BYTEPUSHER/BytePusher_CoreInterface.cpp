@@ -14,56 +14,56 @@
 /*==================================================================*/
 
 BytePusher_CoreInterface::BytePusher_CoreInterface(DisplayDevice display_device) noexcept
-	: mDisplayDevice(std::move(display_device))
+	: m_display_device(std::move(display_device))
 {
 	if (auto* path = HDM->add_user_directory("savestate", "BYTEPUSHER")) {
-		sSavestatePath = (*path / HDM->get_loaded_file_sha1()).string();
+		s_savestate_path = (*path / HDM->get_loaded_file_sha1()).string();
 	}
 
-	mDisplayDevice.set_osd_callable([&]() {
+	m_display_device.set_osd_callable([&]() {
 		if (!has_system_state(EmuState::STATS)) { return; }
 		osd::simple_text_overlay(copy_statistics_string());
 	});
-	mDisplayDevice.set_shutdown_signal(&m_is_system_alive);
+	m_display_device.set_shutdown_signal(&m_is_system_alive);
 
-	loadPresetBinds();
+	load_preset_binds();
 }
 
 /*==================================================================*/
 
-void BytePusher_CoreInterface::mainSystemLoop() {
-	instructionLoop();
-	renderAudioData();
+void BytePusher_CoreInterface::main_system_loop() {
+	instruction_loop();
+	push_audio_data();
 	create_statistics_data();
-	renderVideoData();
+	push_video_data();
 }
 
-void BytePusher_CoreInterface::loadPresetBinds() noexcept {
+void BytePusher_CoreInterface::load_preset_binds() noexcept {
 	static constexpr auto _ = SDL_SCANCODE_UNKNOWN;
-	static constexpr SimpleKeyMapping defaultKeyMappings[]{
+	static constexpr SimpleKeyMapping default_key_mappings[]{
 		{0x1, KEY(1), _}, {0x2, KEY(2), _}, {0x3, KEY(3), _}, {0xC, KEY(4), _},
 		{0x4, KEY(Q), _}, {0x5, KEY(W), _}, {0x6, KEY(E), _}, {0xD, KEY(R), _},
 		{0x7, KEY(A), _}, {0x8, KEY(S), _}, {0x9, KEY(D), _}, {0xE, KEY(F), _},
 		{0xA, KEY(Z), _}, {0x0, KEY(X), _}, {0xB, KEY(C), _}, {0xF, KEY(V), _},
 	};
 
-	loadCustomBinds(std::span(defaultKeyMappings));
+	load_custom_binds(std::span(default_key_mappings));
 }
 
-u32  BytePusher_CoreInterface::getKeyStates() noexcept {
-	auto keyStates = 0u;
+u32  BytePusher_CoreInterface::get_key_states() noexcept {
+	auto key_states = 0u;
 
-	Input->updateStates();
+	Input->update_states();
 
-	for (const auto& mapping : mCustomBinds) {
-		if (Input->areAnyHeld(mapping.key, mapping.alt))
-			{ keyStates |= 1u << mapping.idx; }
+	for (const auto& mapping : m_custom_binds) {
+		if (Input->are_any_held(mapping.key, mapping.alt))
+			{ key_states |= 1u << mapping.idx; }
 	}
 
-	return keyStates;
+	return key_states;
 }
 
-void BytePusher_CoreInterface::copyGameToMemory(u8* dest) noexcept {
+void BytePusher_CoreInterface::copy_game_to_memory(u8* dest) noexcept {
 	std::copy_n(EXEC_POLICY(unseq)
 		HDM->get_loaded_file_data(), HDM->get_loaded_file_size(), dest);
 }

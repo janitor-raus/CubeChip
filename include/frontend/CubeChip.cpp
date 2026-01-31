@@ -77,7 +77,7 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 	auto result = options.parse(argc, argv);
 
 	if (result.count("version")) {
-		Console::Attach();
+		console::attach();
 		fmt::println("{} compiled on: {} ({})",
 			AppName, AppVer.with_date, AppVer.ghash);
 
@@ -85,7 +85,7 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 	}
 
 	if (result.count("help")) {
-		Console::Attach();
+		console::attach();
 		fmt::println("{}", options.help({ "Runtime", "Configuration", "General" }));
 
 		return SDL_APP_SUCCESS;

@@ -15,7 +15,7 @@
 	#include <windows.h>
 	#include <iostream>
 
-	void Console::Attach() noexcept {
+	void console::attach() noexcept {
 		if (GetConsoleWindow()) { return; }
 
 		if (!AttachConsole(ATTACH_PARENT_PROCESS))
@@ -29,16 +29,16 @@
 		std::ios::sync_with_stdio(true);
 	}
 
-	void Console::Show() noexcept {
+	void console::show() noexcept {
 		ShowWindow(GetConsoleWindow(), SW_SHOW);
 	}
 
-	void Console::Hide() noexcept {
+	void console::hide() noexcept {
 		ShowWindow(GetConsoleWindow(), SW_HIDE);
 	}
 
 #else
-	void Console::Attach() noexcept {}
-	void Console::Show()   noexcept {}
-	void Console::Hide()   noexcept {}
+	void console::attach() noexcept {}
+	void console::show()   noexcept {}
+	void console::hide()   noexcept {}
 #endif

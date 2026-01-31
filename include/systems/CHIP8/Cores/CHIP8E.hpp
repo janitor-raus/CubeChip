@@ -14,47 +14,47 @@
 /*==================================================================*/
 
 class CHIP8E final : public Chip8_CoreInterface {
-	static constexpr u64 cTotalMemory = 4_KiB;
-	static constexpr u32 cGameLoadPos = 0x200;
-	static constexpr u32 cStartOffset = 0x200;
-	static constexpr f32 cRefreshRate = 60.0f;
+	static constexpr u64 c_sys_memory_size  = 4_KiB;
+	static constexpr u32 c_game_load_pos    = 0x200;
+	static constexpr u32 c_sys_boot_pos     = 0x200;
+	static constexpr f32 c_sys_refresh_rate = 60.0f;
 
-	static constexpr s32 cDisplayW = 64;
-	static constexpr s32 cDisplayH = 32;
-	static constexpr s32 cInstSpeedHi = 30;
-	static constexpr s32 cInstSpeedLo = 15;
+	static constexpr s32 c_sys_screen_W = 64;
+	static constexpr s32 c_sys_screen_H = 32;
+	static constexpr s32 c_sys_speed_hi = 30;
+	static constexpr s32 c_sys_speed_lo = 15;
 
 private:
-	FixedMap2D<u8, cDisplayW, cDisplayH>
-		mDisplayBuffer{};
+	FixedMap2D<u8, c_sys_screen_W, c_sys_screen_H>
+		m_display_buffer{};
 
-	MemoryBank<cTotalMemory>
-		mMemoryBank{};
+	MemoryBank<c_sys_memory_size>
+		m_memory_bank{};
 
 public:
 	CHIP8E() noexcept
-		: Chip8_CoreInterface(DisplayDevice(cDisplayW, cDisplayH, "CHIP-8E"))
+		: Chip8_CoreInterface(DisplayDevice(c_sys_screen_W, c_sys_screen_H, "CHIP-8E"))
 	{}
 
-	static constexpr bool validateProgram(
+	static constexpr bool validate_program(
 		const char* fileData,
 		const size_type fileSize
 	) noexcept {
 		if (!fileData || !fileSize) { return false; }
-		return fileSize + cGameLoadPos <= cTotalMemory;
+		return fileSize + c_game_load_pos <= c_sys_memory_size;
 	}
 
 private:
-	void initializeSystem() noexcept override;
-	void handleCycleLoop() noexcept override;
+	void initialize_system() noexcept override;
+	void handle_cycle_loop() noexcept override;
 
 	template <typename Lambda>
-	void instructionLoop(Lambda&& condition) noexcept;
+	void instruction_loop(Lambda&& condition) noexcept;
 
-	void renderAudioData() override;
-	void renderVideoData() override;
+	void push_audio_data() override;
+	void push_video_data() override;
 
-	void prepDisplayArea(const Resolution) override {}
+	void set_display_properties(const Resolution) override {}
 
 /*==================================================================*/
 	#pragma region 0 instruction branch

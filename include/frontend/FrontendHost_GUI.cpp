@@ -44,7 +44,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 
 			Thread([]() noexcept {
 				if (!SDL_OpenURL(s_home_url.c_str())) {
-					blog.newEntry<BLOG::ERR>("Failed to open Data folder! [{}]", SDL_GetError());
+					blog.error("Failed to open Data folder! [{}]", SDL_GetError());
 				}
 				s_opening_url.store(false, mo::release);
 			}).detach();
@@ -196,7 +196,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 
 				Thread([log_path_copy = std::move(current_log_path)]() noexcept {
 					if (!SDL_OpenURL(("file:///" + log_path_copy).c_str())) {
-						blog.newEntry<BLOG::ERR>("Failed to open Log file! [{}]", SDL_GetError());
+						blog.error("Failed to open Log file! [{}]", SDL_GetError());
 					}
 					s_opening_log.store(false, mo::release);
 				}).detach();
@@ -205,12 +205,14 @@ void FrontendHost::setup_gui_callables() noexcept {
 
 			ImGui::DummyY(1.0f);
 
-			if (ImGui::BeginTable("LogTable", 4, ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_RowBg
+			if (ImGui::BeginTable("LogTable", 6, ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_RowBg
 				| ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY
 			)) {
 				ImGui::TableSetupScrollFreeze(1, 1);
 				ImGui::TableSetupColumn("#",        ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_PreferSortAscending);
+				ImGui::TableSetupColumn("tID",      ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort);
 				ImGui::TableSetupColumn("Time",     ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort);
+				ImGui::TableSetupColumn("Source",   ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort);
 				ImGui::TableSetupColumn("Severity", ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort);
 				ImGui::TableSetupColumn("Message",  ImGuiTableColumnFlags_NoSort);
 				ImGui::TableHeadersRow();
@@ -232,14 +234,20 @@ void FrontendHost::setup_gui_callables() noexcept {
 					ImGui::Text("%u", entry.index);
 
 					ImGui::TableSetColumnIndex(1);
+					ImGui::Text("%u", entry.thread);
+
+					ImGui::TableSetColumnIndex(2);
 					ImGui::TextUnformatted(NanoTime(entry.time)
 						.format_as_timer().c_str());
 
-					ImGui::TableSetColumnIndex(2);
+					ImGui::TableSetColumnIndex(3);
+					ImGui::TextUnformatted(::get_source_name(entry.source).c_str());
+
+					ImGui::TableSetColumnIndex(4);
 					ImGui::TextUnformatted(BLOG(entry.level).as_string(),
 						RGBA(BLOG(entry.level).as_color()).XBGR());
 
-					ImGui::TableSetColumnIndex(3);
+					ImGui::TableSetColumnIndex(5);
 					ImGui::TextUnformatted(entry.message.c_str());
 				};
 

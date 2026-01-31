@@ -28,7 +28,7 @@ static toml::table s_config_model{};
 /*==================================================================*/
 
 static void trigger_fatal_error(const char* error) noexcept {
-	blog.newEntry<BLOG::FTL>(error);
+	blog.fatal(error);
 	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING,
 		"Fatal Initialization Error", error, nullptr);
 }
@@ -68,7 +68,7 @@ bool HomeDirManager::set_home_path(
 {
 	if (!overrideHome.empty()) {
 		if (::is_location_writable(overrideHome.data())) {
-			blog.newEntry<BLOG::INF>("Home path override successful!");
+			blog.info("Home path override successful!");
 			s_home_path = overrideHome;
 			return true;
 		} else {
@@ -79,7 +79,7 @@ bool HomeDirManager::set_home_path(
 
 	if (forcePortable) {
 		if (::is_location_writable(::get_base_path())) {
-			blog.newEntry<BLOG::INF>("Forced portable mode successful!");
+			blog.info("Forced portable mode successful!");
 			s_home_path = ::get_base_path();
 			return true;
 		} else {
@@ -95,8 +95,7 @@ bool HomeDirManager::set_home_path(
 				s_home_path = ::get_base_path();
 				return true;
 			} else {
-				blog.newEntry<BLOG::ERR>(
-					"Portable mode: cannot write to location, falling back to Home path!");
+				blog.error("Portable mode: cannot write to location, falling back to Home path!");
 			}
 		}
 	}
@@ -116,21 +115,19 @@ bool HomeDirManager::set_home_path(
 void HomeDirManager::parse_app_config_file() const noexcept {
 	if (const auto result = TomlConfig::parse_from_file(s_config_at.c_str())) {
 		TomlConfig::update_existing_table_contents(s_config_model, result.table());
-		blog.newEntry<BLOG::INF>(
-			"[TOML] App Config found, previous settings loaded!");
+		blog.info("[TOML] App Config found, previous settings loaded!");
 	} else {
-		blog.newEntry<BLOG::WRN>(
-			"[TOML] App Config failed to parse! [{}]", result.error().description());
+		blog.warn("[TOML] App Config failed to parse!"
+			" [{}]", result.error().description());
 	}
 }
 
 void HomeDirManager::write_app_config_file() const noexcept {
 	if (const auto result = TomlConfig::write_into_file(s_config_model, s_config_at.c_str())) {
-		blog.newEntry<BLOG::INF>(
-			"[TOML] App Config written to file successfully!");
+		blog.info("[TOML] App Config written to file successfully!");
 	} else {
-		blog.newEntry<BLOG::ERR>(
-			"[TOML] Failed to write App Config, runtime settings lost! [{}]", result.error().message());
+		blog.error("[TOML] Failed to write App Config, runtime settings lost!"
+			" [{}]", result.error().message());
 	}
 }
 
@@ -175,7 +172,7 @@ auto HomeDirManager::add_user_directory(const Path& sub, const Path& sys) noexce
 		m_user_directories.push_back(new_dir_path);
 		return &m_user_directories.back();
 	} else {
-		blog.newEntry<BLOG::ERR>("Unable to create directory: \"{}\" [{}]",
+		blog.error("Unable to create directory: \"{}\" [{}]",
 			new_dir_path.string(), dirCreated.error().message());
 		return nullptr;
 	}
@@ -190,34 +187,34 @@ void HomeDirManager::clear_cached_file_data() noexcept {
 bool HomeDirManager::load_and_validate_file(const Path& gamePath) noexcept {
 	const auto fileExists = fs::is_regular_file(gamePath);
 	if (!fileExists) {
-		blog.newEntry<BLOG::WRN>("Path is ineligible: \"{}\" [{}]",
+		blog.warn("Path is ineligible: \"{}\" [{}]",
 			gamePath.string(), fileExists.error().message());
 		return false;
 	}
 	if (!fileExists.value()) {
-		blog.newEntry<BLOG::WRN>("{}: \"{}\"",
+		blog.warn("{}: \"{}\"",
 			"Path is not a regular file", gamePath.string());
 		return false;
 	}
 
 	const auto fileSize = fs::file_size(gamePath);
 	if (!fileSize) {
-		blog.newEntry<BLOG::WRN>("Path is ineligible: \"{}\" [{}]",
+		blog.warn("Path is ineligible: \"{}\" [{}]",
 			gamePath.string(), fileExists.error().message());
 		return false;
 	}
 	if (fileSize.value() == 0) {
-		blog.newEntry<BLOG::WRN>("File must not be empty!");
+		blog.warn("File must not be empty!");
 		return false;
 	}
 	if (fileSize.value() >= 32_MiB) {
-		blog.newEntry<BLOG::WRN>("File is too large!");
+		blog.warn("File is too large!");
 		return false;
 	}
 
 	auto fileData = ::read_file_data(gamePath);
 	if (!fileData) {
-		blog.newEntry<BLOG::WRN>("Path is ineligible: \"{}\" [{}]",
+		blog.warn("Path is ineligible: \"{}\" [{}]",
 			gamePath.string(), fileData.error().message());
 		return false;
 	} else {
@@ -225,7 +222,7 @@ bool HomeDirManager::load_and_validate_file(const Path& gamePath) noexcept {
 	}
 
 	const auto tempSHA1 = SHA1::from_data(m_file_data.data(), m_file_data.size());
-	blog.newEntry<BLOG::INF>("File SHA1: {}", tempSHA1);
+	blog.info("File SHA1: {}", tempSHA1);
 
 	if (s_validator(m_file_data.data(), m_file_data.size(),
 		gamePath.extension().string(), tempSHA1))

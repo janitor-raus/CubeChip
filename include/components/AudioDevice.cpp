@@ -34,7 +34,7 @@ bool AudioDevice::add_audio_stream(
 		device ? device : SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr);
 
 	if (!ptr) {
-		blog.newEntry<BLOG::WRN>("Failed to open audio stream: {}", SDL_GetError());
+		blog.warn("Failed to open audio stream: {}", SDL_GetError());
 		return false;
 	}
 

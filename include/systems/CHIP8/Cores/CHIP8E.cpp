@@ -13,38 +13,38 @@ REGISTER_CORE(CHIP8E, ".c8e")
 
 /*==================================================================*/
 
-void CHIP8E::initializeSystem() noexcept {
-	::generate_n(mMemoryBank, 0, cTotalMemory,
+void CHIP8E::initialize_system() noexcept {
+	::generate_n(m_memory_bank, 0, c_sys_memory_size,
 		[&]() noexcept { return RNG->next<u8>(); });
 
-	copyGameToMemory(mMemoryBank.data() + cGameLoadPos);
-	copyFontToMemory(mMemoryBank.data(), 80);
+	copy_game_to_memory(m_memory_bank.data() + c_game_load_pos);
+	copy_font_to_memory(m_memory_bank.data(), 80);
 
-	set_base_system_framerate(cRefreshRate);
+	set_base_system_framerate(c_sys_refresh_rate);
 
-	mVoices[VOICE::ID_0].userdata = &mAudioTimers[VOICE::ID_0];
-	mVoices[VOICE::ID_1].userdata = &mAudioTimers[VOICE::ID_1];
-	mVoices[VOICE::ID_2].userdata = &mAudioTimers[VOICE::ID_2];
-	mVoices[VOICE::ID_3].userdata = &mAudioTimers[VOICE::ID_3];
+	m_voices[VOICE::ID_0].userdata = &m_audio_timers[VOICE::ID_0];
+	m_voices[VOICE::ID_1].userdata = &m_audio_timers[VOICE::ID_1];
+	m_voices[VOICE::ID_2].userdata = &m_audio_timers[VOICE::ID_2];
+	m_voices[VOICE::ID_3].userdata = &m_audio_timers[VOICE::ID_3];
 
-	mCurrentPC = cStartOffset;
-	mTargetCPF = cInstSpeedHi;
+	m_current_pc = c_sys_boot_pos;
+	m_target_cpf = c_sys_speed_hi;
 
-	mDisplayDevice.metadata_staging()
-		.set_viewport(cDisplayW, cDisplayH)
+	m_display_device.metadata_staging()
+		.set_viewport(c_sys_screen_W, c_sys_screen_H)
 		.set_minimum_zoom(8).set_inner_margin(4)
-		.set_texture_tint(sBitColors[0])
+		.set_texture_tint(s_bit_colors[0])
 		.enabled = true;
 }
 
-void CHIP8E::handleCycleLoop() noexcept
-	{ LOOP_DISPATCH(instructionLoop); }
+void CHIP8E::handle_cycle_loop() noexcept
+	{ LOOP_DISPATCH(instruction_loop); }
 
 template <typename Lambda>
-void CHIP8E::instructionLoop(Lambda&& condition) noexcept {
-	for (mCycleCount = 0; condition(); ++mCycleCount) {
-		const auto HI = mMemoryBank[mCurrentPC++];
-		const auto LO = mMemoryBank[mCurrentPC++];
+void CHIP8E::instruction_loop(Lambda&& condition) noexcept {
+	for (m_cycle_count = 0; condition(); ++m_cycle_count) {
+		const auto HI = m_memory_bank[m_current_pc++];
+		const auto LO = m_memory_bank[m_current_pc++];
 
 		#define _NNN ((HI << 8 | LO) & 0xFFF)
 		#define _X (HI & 0xF)
@@ -67,7 +67,7 @@ void CHIP8E::instructionLoop(Lambda&& condition) noexcept {
 						instruction_00F2();
 						break;
 					[[unlikely]]
-					default: instructionError(HI, LO);
+					default: instruction_error(HI, LO);
 				}
 				break;
 			case 0x01:
@@ -79,7 +79,7 @@ void CHIP8E::instructionLoop(Lambda&& condition) noexcept {
 						instruction_0188();
 						break;
 					[[unlikely]]
-					default: instructionError(HI, LO);
+					default: instruction_error(HI, LO);
 				}
 				break;
 			CASE_xNF(0x10):
@@ -109,7 +109,7 @@ void CHIP8E::instructionLoop(Lambda&& condition) noexcept {
 						instruction_5xy3(_X, Y_);
 						break;
 					[[unlikely]]
-					default: instructionError(HI, LO);
+					default: instruction_error(HI, LO);
 				}
 				break;
 			CASE_xNF(0x60):
@@ -148,12 +148,12 @@ void CHIP8E::instructionLoop(Lambda&& condition) noexcept {
 						instruction_8xyE(_X, Y_);
 						break;
 					[[unlikely]]
-					default: instructionError(HI, LO);
+					default: instruction_error(HI, LO);
 				}
 				break;
 			CASE_xNF(0x90):
 				if (_N) [[unlikely]] {
-					instructionError(HI, LO);
+					instruction_error(HI, LO);
 				} else {
 					instruction_9xy0(_X, Y_);
 				}
@@ -182,7 +182,7 @@ void CHIP8E::instructionLoop(Lambda&& condition) noexcept {
 						instruction_ExA1(_X);
 						break;
 					[[unlikely]]
-					default: instructionError(HI, LO);
+					default: instruction_error(HI, LO);
 				}
 				break;
 			CASE_xNF(0xF0):
@@ -227,36 +227,36 @@ void CHIP8E::instructionLoop(Lambda&& condition) noexcept {
 						instruction_FxE7(_X);
 						break;
 					[[unlikely]]
-					default: instructionError(HI, LO);
+					default: instruction_error(HI, LO);
 				}
 				break;
 		}
 	}
 }
 
-void CHIP8E::renderAudioData() {
-		mixAudioData({
-		{ makePulseWave, &mVoices[VOICE::ID_0] },
-		{ makePulseWave, &mVoices[VOICE::ID_1] },
-		{ makePulseWave, &mVoices[VOICE::ID_2] },
-		{ makePulseWave, &mVoices[VOICE::BUZZER] },
+void CHIP8E::push_audio_data() {
+		mix_audio_data({
+		{ make_pulse_wave, &m_voices[VOICE::ID_0] },
+		{ make_pulse_wave, &m_voices[VOICE::ID_1] },
+		{ make_pulse_wave, &m_voices[VOICE::ID_2] },
+		{ make_pulse_wave, &m_voices[VOICE::BUZZER] },
 	});
 
-		mDisplayDevice.metadata_staging().set_border_color_if(
-		!!::accumulate(mAudioTimers), sBitColors[1]);
+		m_display_device.metadata_staging().set_border_color_if(
+		!!::accumulate(m_audio_timers), s_bit_colors[1]);
 }
 
-void CHIP8E::renderVideoData() {
-	mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = ++mDisplayDevice.metadata_staging();
-		frame.copy_from(mDisplayBuffer, isUsingPixelTrails()
-			? [](u32 pixel) noexcept { return RGBA::premul(sBitColors[pixel != 0], cBitWeight[pixel]); }
-			: [](u32 pixel) noexcept { return sBitColors[pixel >> 3]; }
+void CHIP8E::push_video_data() {
+	m_display_device.swapchain().acquire([&](auto& frame) noexcept {
+		frame.metadata = ++m_display_device.metadata_staging();
+		frame.copy_from(m_display_buffer, use_pixel_trails()
+			? [](u32 pixel) noexcept { return RGBA::premul(s_bit_colors[pixel != 0], c_bit_weight[pixel]); }
+			: [](u32 pixel) noexcept { return s_bit_colors[pixel >> 3]; }
 		);
 	});
 
 	std::for_each(EXEC_POLICY(unseq)
-		mDisplayBuffer.begin(), mDisplayBuffer.end(),
+		m_display_buffer.begin(), m_display_buffer.end(),
 		[](auto& pixel) noexcept
 			{ ::assign_cast(pixel, (pixel & 0x8) | (pixel >> 1)); }
 	);
@@ -266,23 +266,23 @@ void CHIP8E::renderVideoData() {
 	#pragma region 0 instruction branch
 
 	void CHIP8E::instruction_00E0() noexcept {
-		mDisplayBuffer.initialize();
-		triggerInterrupt(Interrupt::FRAME);
+		m_display_buffer.initialize();
+		trigger_interrupt(Interrupt::FRAME);
 	}
 	void CHIP8E::instruction_00EE() noexcept {
-		mCurrentPC = mStackBank[--mStackTop & 0xF];
+		m_current_pc = m_stack_bank[--m_stack_head & 0xF];
 	}
 	void CHIP8E::instruction_00ED() noexcept {
-		triggerInterrupt(Interrupt::SOUND);
+		trigger_interrupt(Interrupt::SOUND);
 	}
 	void CHIP8E::instruction_00F2() noexcept {
 		// no operation
 	}
 	void CHIP8E::instruction_0151() noexcept {
-		triggerInterrupt(Interrupt::DELAY);
+		trigger_interrupt(Interrupt::DELAY);
 	}
 	void CHIP8E::instruction_0188() noexcept {
-		skipInstruction();
+		skip_instruction();
 	}
 
 	#pragma endregion
@@ -292,7 +292,7 @@ void CHIP8E::renderVideoData() {
 	#pragma region 1 instruction branch
 
 	void CHIP8E::instruction_1NNN(s32 NNN) noexcept {
-		performProgJump(NNN);
+		jump_program_to(NNN);
 	}
 
 	#pragma endregion
@@ -302,8 +302,8 @@ void CHIP8E::renderVideoData() {
 	#pragma region 2 instruction branch
 
 	void CHIP8E::instruction_2NNN(s32 NNN) noexcept {
-		mStackBank[mStackTop++ & 0xF] = mCurrentPC;
-		performProgJump(NNN);
+		m_stack_bank[m_stack_head++ & 0xF] = m_current_pc;
+		jump_program_to(NNN);
 	}
 
 	#pragma endregion
@@ -313,7 +313,7 @@ void CHIP8E::renderVideoData() {
 	#pragma region 3 instruction branch
 
 	void CHIP8E::instruction_3xNN(s32 X, s32 NN) noexcept {
-		if (mRegisterV[X] == NN) { skipInstruction(); }
+		if (m_registers_V[X] == NN) { skip_instruction(); }
 	}
 
 	#pragma endregion
@@ -323,7 +323,7 @@ void CHIP8E::renderVideoData() {
 	#pragma region 4 instruction branch
 
 	void CHIP8E::instruction_4xNN(s32 X, s32 NN) noexcept {
-		if (mRegisterV[X] != NN) { skipInstruction(); }
+		if (m_registers_V[X] != NN) { skip_instruction(); }
 	}
 
 	#pragma endregion
@@ -333,19 +333,19 @@ void CHIP8E::renderVideoData() {
 	#pragma region 5 instruction branch
 
 	void CHIP8E::instruction_5xy0(s32 X, s32 Y) noexcept {
-		if (mRegisterV[X] == mRegisterV[Y]) { skipInstruction(); }
+		if (m_registers_V[X] == m_registers_V[Y]) { skip_instruction(); }
 	}
 	void CHIP8E::instruction_5xy1(s32 X, s32 Y) noexcept {
-		if (mRegisterV[X] > mRegisterV[Y]) { skipInstruction(); }
+		if (m_registers_V[X] > m_registers_V[Y]) { skip_instruction(); }
 	}
 	void CHIP8E::instruction_5xy2(s32 X, s32 Y) noexcept {
 		for (auto Z = 0; Z + X <= Y; ++Z) {
-			mMemoryBank[mRegisterI++] = mRegisterV[Z + X];
+			m_memory_bank[m_register_I++] = m_registers_V[Z + X];
 		}
 	}
 	void CHIP8E::instruction_5xy3(s32 X, s32 Y) noexcept {
 		for (auto Z = 0; Z + X <= Y; ++Z) {
-			mRegisterV[Z + X] = mMemoryBank[mRegisterI++];
+			m_registers_V[Z + X] = m_memory_bank[m_register_I++];
 		}
 	}
 
@@ -356,7 +356,7 @@ void CHIP8E::renderVideoData() {
 	#pragma region 6 instruction branch
 
 	void CHIP8E::instruction_6xNN(s32 X, s32 NN) noexcept {
-		::assign_cast(mRegisterV[X], NN);
+		::assign_cast(m_registers_V[X], NN);
 	}
 
 	#pragma endregion
@@ -366,7 +366,7 @@ void CHIP8E::renderVideoData() {
 	#pragma region 7 instruction branch
 
 	void CHIP8E::instruction_7xNN(s32 X, s32 NN) noexcept {
-		::assign_cast_add(mRegisterV[X], NN);
+		::assign_cast_add(m_registers_V[X], NN);
 	}
 
 	#pragma endregion
@@ -376,44 +376,44 @@ void CHIP8E::renderVideoData() {
 	#pragma region 8 instruction branch
 
 	void CHIP8E::instruction_8xy0(s32 X, s32 Y) noexcept {
-		::assign_cast(mRegisterV[X], mRegisterV[Y]);
+		::assign_cast(m_registers_V[X], m_registers_V[Y]);
 	}
 	void CHIP8E::instruction_8xy1(s32 X, s32 Y) noexcept {
-		::assign_cast_or(mRegisterV[X], mRegisterV[Y]);
-		::assign_cast(mRegisterV[0xF], 0);
+		::assign_cast_or(m_registers_V[X], m_registers_V[Y]);
+		::assign_cast(m_registers_V[0xF], 0);
 	}
 	void CHIP8E::instruction_8xy2(s32 X, s32 Y) noexcept {
-		::assign_cast_and(mRegisterV[X], mRegisterV[Y]);
-		::assign_cast(mRegisterV[0xF], 0);
+		::assign_cast_and(m_registers_V[X], m_registers_V[Y]);
+		::assign_cast(m_registers_V[0xF], 0);
 	}
 	void CHIP8E::instruction_8xy3(s32 X, s32 Y) noexcept {
-		::assign_cast_xor(mRegisterV[X], mRegisterV[Y]);
-		::assign_cast(mRegisterV[0xF], 0);
+		::assign_cast_xor(m_registers_V[X], m_registers_V[Y]);
+		::assign_cast(m_registers_V[0xF], 0);
 	}
 	void CHIP8E::instruction_8xy4(s32 X, s32 Y) noexcept {
-		const auto sum = mRegisterV[X] + mRegisterV[Y];
-		::assign_cast(mRegisterV[X], sum);
-		::assign_cast(mRegisterV[0xF], sum >> 8);
+		const auto sum = m_registers_V[X] + m_registers_V[Y];
+		::assign_cast(m_registers_V[X], sum);
+		::assign_cast(m_registers_V[0xF], sum >> 8);
 	}
 	void CHIP8E::instruction_8xy5(s32 X, s32 Y) noexcept {
-		const bool nborrow = mRegisterV[X] >= mRegisterV[Y];
-		::assign_cast_sub(mRegisterV[X], mRegisterV[Y]);
-		::assign_cast(mRegisterV[0xF], nborrow);
+		const bool nborrow = m_registers_V[X] >= m_registers_V[Y];
+		::assign_cast_sub(m_registers_V[X], m_registers_V[Y]);
+		::assign_cast(m_registers_V[0xF], nborrow);
 	}
 	void CHIP8E::instruction_8xy7(s32 X, s32 Y) noexcept {
-		const bool nborrow = mRegisterV[Y] >= mRegisterV[X];
-		::assign_cast_rsub(mRegisterV[X], mRegisterV[Y]);
-		::assign_cast(mRegisterV[0xF], nborrow);
+		const bool nborrow = m_registers_V[Y] >= m_registers_V[X];
+		::assign_cast_rsub(m_registers_V[X], m_registers_V[Y]);
+		::assign_cast(m_registers_V[0xF], nborrow);
 	}
 	void CHIP8E::instruction_8xy6(s32 X, s32 Y) noexcept {
-		const bool lsb = (mRegisterV[Y] & 1) == 1;
-		::assign_cast(mRegisterV[X], mRegisterV[Y] >> 1);
-		::assign_cast(mRegisterV[0xF], lsb);
+		const bool lsb = (m_registers_V[Y] & 1) == 1;
+		::assign_cast(m_registers_V[X], m_registers_V[Y] >> 1);
+		::assign_cast(m_registers_V[0xF], lsb);
 	}
 	void CHIP8E::instruction_8xyE(s32 X, s32 Y) noexcept {
-		const bool msb = (mRegisterV[Y] >> 7) == 1;
-		::assign_cast(mRegisterV[X], mRegisterV[Y] << 1);
-		::assign_cast(mRegisterV[0xF], msb);
+		const bool msb = (m_registers_V[Y] >> 7) == 1;
+		::assign_cast(m_registers_V[X], m_registers_V[Y] << 1);
+		::assign_cast(m_registers_V[0xF], msb);
 	}
 
 	#pragma endregion
@@ -423,7 +423,7 @@ void CHIP8E::renderVideoData() {
 	#pragma region 9 instruction branch
 
 	void CHIP8E::instruction_9xy0(s32 X, s32 Y) noexcept {
-		if (mRegisterV[X] != mRegisterV[Y]) { skipInstruction(); }
+		if (m_registers_V[X] != m_registers_V[Y]) { skip_instruction(); }
 	}
 
 	#pragma endregion
@@ -433,7 +433,7 @@ void CHIP8E::renderVideoData() {
 	#pragma region A instruction branch
 
 	void CHIP8E::instruction_ANNN(s32 NNN) noexcept {
-		::assign_cast(mRegisterI, NNN);
+		::assign_cast(m_register_I, NNN);
 	}
 
 	#pragma endregion
@@ -443,10 +443,10 @@ void CHIP8E::renderVideoData() {
 	#pragma region B instruction branch
 
 	void CHIP8E::instruction_BBNN(s32 NN) noexcept {
-		performProgJump(mCurrentPC - 2 - NN);
+		jump_program_to(m_current_pc - 2 - NN);
 	}
 	void CHIP8E::instruction_BFNN(s32 NN) noexcept {
-		performProgJump(mCurrentPC - 2 + NN);
+		jump_program_to(m_current_pc - 2 + NN);
 	}
 
 	#pragma endregion
@@ -456,7 +456,7 @@ void CHIP8E::renderVideoData() {
 	#pragma region C instruction branch
 
 	void CHIP8E::instruction_CxNN(s32 X, s32 NN) noexcept {
-		::assign_cast(mRegisterV[X], RNG->next() & NN);
+		::assign_cast(m_registers_V[X], RNG->next() & NN);
 	}
 
 	#pragma endregion
@@ -473,28 +473,28 @@ void CHIP8E::renderVideoData() {
 
 			[[likely]]
 			case 0b10000000:
-				if (!((mDisplayBuffer(X, Y) ^= 0x8) & 0x8))
-					{ mRegisterV[0xF] = 1; }
+				if (!((m_display_buffer(X, Y) ^= 0x8) & 0x8))
+					{ m_registers_V[0xF] = 1; }
 				return;
 
 			[[unlikely]]
 			default:
 				for (auto B = 0; B < 8; ++B) {
 					if (DATA & 0x80 >> B) {
-						if (!((mDisplayBuffer(X, Y) ^= 0x8) & 0x8))
-							{ mRegisterV[0xF] = 1; }
+						if (!((m_display_buffer(X, Y) ^= 0x8) & 0x8))
+							{ m_registers_V[0xF] = 1; }
 					}
-					if (++X == cDisplayW) { return; }
+					if (++X == c_sys_screen_W) { return; }
 				}
 				return;
 		}
 	}
 
 	void CHIP8E::instruction_DxyN(s32 X, s32 Y, s32 N) noexcept {
-		auto pX = mRegisterV[X] & (cDisplayW - 1);
-		auto pY = mRegisterV[Y] & (cDisplayH - 1);
+		auto pX = m_registers_V[X] & (c_sys_screen_W - 1);
+		auto pY = m_registers_V[Y] & (c_sys_screen_H - 1);
 
-		mRegisterV[0xF] = 0;
+		m_registers_V[0xF] = 0;
 
 		switch (N) {
 			[[unlikely]]
@@ -502,20 +502,20 @@ void CHIP8E::renderVideoData() {
 
 			[[likely]]
 			case 1:
-				drawByte(pX, pY, mMemoryBank[mRegisterI]);
+				drawByte(pX, pY, m_memory_bank[m_register_I]);
 				break;
 
 			[[unlikely]]
 			default:
 				for (auto H = 0; H < N; ++H)
 				{
-					drawByte(pX, pY, mMemoryBank[mRegisterI + H]);
-					if (++pY == cDisplayH) { break; }
+					drawByte(pX, pY, m_memory_bank[m_register_I + H]);
+					if (++pY == c_sys_screen_H) { break; }
 				}
 				break;
 		}
 
-		triggerInterrupt(Interrupt::FRAME);
+		trigger_interrupt(Interrupt::FRAME);
 	}
 
 	#pragma endregion
@@ -525,10 +525,10 @@ void CHIP8E::renderVideoData() {
 	#pragma region E instruction branch
 
 	void CHIP8E::instruction_Ex9E(s32 X) noexcept {
-		if (keyHeld_P1(mRegisterV[X])) { skipInstruction(); }
+		if (is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
 	}
 	void CHIP8E::instruction_ExA1(s32 X) noexcept {
-		if (!keyHeld_P1(mRegisterV[X])) { skipInstruction(); }
+		if (!is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
 	}
 
 	#pragma endregion
@@ -538,55 +538,55 @@ void CHIP8E::renderVideoData() {
 	#pragma region F instruction branch
 
 	void CHIP8E::instruction_Fx03(s32  ) noexcept {
-		triggerInterrupt(Interrupt::FRAME);
+		trigger_interrupt(Interrupt::FRAME);
 	}
 	void CHIP8E::instruction_Fx07(s32 X) noexcept {
-		::assign_cast(mRegisterV[X], mDelayTimer);
+		::assign_cast(m_registers_V[X], m_delay_timer);
 	}
 	void CHIP8E::instruction_Fx0A(s32 X) noexcept {
-		mInputReg = &mRegisterV[X];
-		triggerInterrupt(Interrupt::INPUT);
+		m_key_reg_ref = &m_registers_V[X];
+		trigger_interrupt(Interrupt::INPUT);
 	}
 	void CHIP8E::instruction_Fx15(s32 X) noexcept {
-		::assign_cast(mDelayTimer, mRegisterV[X]);
+		::assign_cast(m_delay_timer, m_registers_V[X]);
 	}
 	void CHIP8E::instruction_Fx18(s32 X) noexcept {
-		startVoice(mRegisterV[X] + (mRegisterV[X] == 1));
+		start_voice(m_registers_V[X] + (m_registers_V[X] == 1));
 	}
 	void CHIP8E::instruction_Fx1B(s32 X) noexcept {
-		::assign_cast_add(mCurrentPC, mRegisterV[X]);
+		::assign_cast_add(m_current_pc, m_registers_V[X]);
 	}
 	void CHIP8E::instruction_Fx1E(s32 X) noexcept {
-		::assign_cast_add(mRegisterI, mRegisterV[X]);
-		::assign_cast_and(mRegisterI, 0xFFF);
+		::assign_cast_add(m_register_I, m_registers_V[X]);
+		::assign_cast_and(m_register_I, 0xFFF);
 	}
 	void CHIP8E::instruction_Fx29(s32 X) noexcept {
-		::assign_cast(mRegisterI, (mRegisterV[X] & 0xF) * 5 + cSmallFontOffset);
+		::assign_cast(m_register_I, (m_registers_V[X] & 0xF) * 5 + c_small_font_offset);
 	}
 	void CHIP8E::instruction_Fx33(s32 X) noexcept {
-		const TriBCD bcd{ mRegisterV[X] };
+		const TriBCD bcd{ m_registers_V[X] };
 
-		mMemoryBank[mRegisterI + 0] = bcd.digit[2];
-		mMemoryBank[mRegisterI + 1] = bcd.digit[1];
-		mMemoryBank[mRegisterI + 2] = bcd.digit[0];
+		m_memory_bank[m_register_I + 0] = bcd.digit[2];
+		m_memory_bank[m_register_I + 1] = bcd.digit[1];
+		m_memory_bank[m_register_I + 2] = bcd.digit[0];
 	}
 	void CHIP8E::instruction_Fx4F(s32 X) noexcept {
-		::assign_cast(mDelayTimer, mRegisterV[X]);
-		triggerInterrupt(Interrupt::DELAY);
+		::assign_cast(m_delay_timer, m_registers_V[X]);
+		trigger_interrupt(Interrupt::DELAY);
 	}
 	void CHIP8E::instruction_FN55(s32 N) noexcept {
-		for (auto idx = 0; idx <= N; ++idx) { mMemoryBank[mRegisterI + idx] = mRegisterV[idx]; }
-		::assign_cast_add(mRegisterI, N + 1);
+		for (auto idx = 0; idx <= N; ++idx) { m_memory_bank[m_register_I + idx] = m_registers_V[idx]; }
+		::assign_cast_add(m_register_I, N + 1);
 	}
 	void CHIP8E::instruction_FN65(s32 N) noexcept {
-		for (auto idx = 0; idx <= N; ++idx) { mRegisterV[idx] = mMemoryBank[mRegisterI + idx]; }
-		::assign_cast_add(mRegisterI, N + 1);
+		for (auto idx = 0; idx <= N; ++idx) { m_registers_V[idx] = m_memory_bank[m_register_I + idx]; }
+		::assign_cast_add(m_register_I, N + 1);
 	}
 	void CHIP8E::instruction_FxE3(s32  ) noexcept {
-		triggerInterrupt(Interrupt::FRAME);
+		trigger_interrupt(Interrupt::FRAME);
 	}
 	void CHIP8E::instruction_FxE7(s32  ) noexcept {
-		triggerInterrupt(Interrupt::FRAME);
+		trigger_interrupt(Interrupt::FRAME);
 	}
 
 

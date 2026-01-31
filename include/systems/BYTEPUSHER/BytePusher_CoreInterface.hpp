@@ -16,40 +16,40 @@
 class BytePusher_CoreInterface : public SystemInterface {
 
 protected:
-	static inline thread_local std::string sSavestatePath{};
+	static inline thread_local std::string s_savestate_path{};
 
 	enum STREAM { MAIN };
 	enum VOICE { ID_0, COUNT };
 
-	DisplayDevice mDisplayDevice;
+	DisplayDevice m_display_device;
 
-	AudioDevice mAudioDevice;
+	AudioDevice m_audio_device;
 
-	std::vector<SimpleKeyMapping> mCustomBinds;
+	std::vector<SimpleKeyMapping> m_custom_binds;
 
-	u32  getKeyStates() noexcept;
-	void loadPresetBinds() noexcept;
+	u32  get_key_states() noexcept;
+	void load_preset_binds() noexcept;
 
 	template <IsContiguousContainer T>
-		requires (SameValueTypes<T, decltype(mCustomBinds)>)
-	void loadCustomBinds(const T& binds) {
-		mCustomBinds.assign(std::begin(binds), std::end(binds));
+		requires (SameValueTypes<T, decltype(m_custom_binds)>)
+	void load_custom_binds(const T& binds) {
+		m_custom_binds.assign(std::begin(binds), std::end(binds));
 	}
 
-	void copyGameToMemory(u8* dest) noexcept;
+	void copy_game_to_memory(u8* dest) noexcept;
 
-	virtual void instructionLoop() noexcept = 0;
-	virtual void renderAudioData() = 0;
-	virtual void renderVideoData() = 0;
+	virtual void instruction_loop() noexcept = 0;
+	virtual void push_audio_data() = 0;
+	virtual void push_video_data() = 0;
 
 protected:
 	BytePusher_CoreInterface(DisplayDevice display_device) noexcept;
 
 public:
-	void mainSystemLoop() override;
+	void main_system_loop() override;
 
 protected:
-	static constexpr RGBA cBitColors[]{
+	static constexpr RGBA c_bit_colors[]{
 		0x000000FF, 0x000033FF, 0x000066FF, 0x000099FF,
 		0x0000CCFF, 0x0000FFFF, 0x003300FF, 0x003333FF,
 		0x003366FF, 0x003399FF, 0x0033CCFF, 0x0033FFFF,

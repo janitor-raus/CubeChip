@@ -17,9 +17,9 @@
 /*==================================================================*/
 
 class GAMEBOY_CLASSIC final : public GameBoy_CoreInterface {
-	static constexpr u64 cTotalMemory{   64_KiB };
+	static constexpr u64 c_sys_memory_size{   64_KiB };
 	static constexpr u32 cSafezoneOOB{        8 };
-	static constexpr f32 cRefreshRate{ 59.7275f };
+	static constexpr f32 c_sys_refresh_rate{ 59.7275f };
 	static constexpr s32 cResSizeMult{        2 };
 	static constexpr s32 cScreenSizeX{      160 };
 	static constexpr s32 cScreenSizeY{      144 };
@@ -27,15 +27,15 @@ class GAMEBOY_CLASSIC final : public GameBoy_CoreInterface {
 	static constexpr s32 cScreenSizeT{    23040 };
 
 private:
-	void instructionLoop() noexcept override;
-	void renderAudioData() override;
-	void renderVideoData() override;
+	void instruction_loop() noexcept override;
+	void push_audio_data() override;
+	void push_video_data() override;
 
 	class MMU {
 	public:
 
 
-	std::array<u8, cTotalMemory> mMemoryBanks{};
+	std::array<u8, c_sys_memory_size> mMemoryBanks{};
 
 		/* Memory Map */
 		std::span<u8, 0x0100> mBootRomBank{ mMemoryBanks.begin() + 0x0000, 0x0100 }; // BOOT ROM
@@ -144,7 +144,7 @@ private:
 	u8 mInputControl{};
 	u8 mInputData[2]{};
 
-	void updateKeyStates() noexcept override {
+	void update_key_states() noexcept override {
 		const auto keyState{ static_cast<u8>(getKeyStates()) };
 		const auto keysDPAD{ static_cast<u8>(keyState & 0xF) };
 		const auto keysBTNS{ static_cast<u8>(keyState >>  4) };
@@ -324,7 +324,7 @@ private:
 public:
 	GAMEBOY_CLASSIC();
 
-	static constexpr bool validateProgram(
+	static constexpr bool validate_program(
 		const char* fileData,
 		const size_type   fileSize
 	) noexcept {

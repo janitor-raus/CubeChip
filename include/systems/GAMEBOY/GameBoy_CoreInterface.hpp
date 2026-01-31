@@ -21,33 +21,33 @@ protected:
 		ID_0, ID_1, ID_2, ID_3, COUNT
 	};
 
-	static inline Path sSavestatePath{};
+	static inline Path s_savestate_path{};
 
-	AudioDevice mAudioDevice;
+	AudioDevice m_audio_device;
 
-	std::vector<SimpleKeyMapping> mCustomBinds;
+	std::vector<SimpleKeyMapping> m_custom_binds;
 
 	u32  getKeyStates();
-	void loadPresetBinds();
+	void load_preset_binds();
 
 	template <IsContiguousContainer T> requires
-		SameValueTypes<T, decltype(mCustomBinds)>
-	void loadCustomBinds(const T& binds) {
-		mCustomBinds.assign(std::begin(binds), std::end(binds));
+		SameValueTypes<T, decltype(m_custom_binds)>
+	void load_custom_binds(const T& binds) {
+		m_custom_binds.assign(std::begin(binds), std::end(binds));
 	}
 
-	void copyGameToMemory(u8* dest) noexcept;
+	void copy_game_to_memory(u8* dest) noexcept;
 
-	virtual void updateKeyStates() noexcept = 0;
-	virtual void instructionLoop() noexcept = 0;
-	virtual void renderAudioData() = 0;
-	virtual void renderVideoData() = 0;
+	virtual void update_key_states() noexcept = 0;
+	virtual void instruction_loop() noexcept = 0;
+	virtual void push_audio_data() = 0;
+	virtual void push_video_data() = 0;
 
 protected:
 	GameBoy_CoreInterface() noexcept;
 
 public:
-	void mainSystemLoop() override final;
+	void main_system_loop() override final;
 };
 
 #endif

@@ -16,14 +16,14 @@ REGISTER_CORE(GAMEBOY_CLASSIC, ".gb")
 
 GAMEBOY_CLASSIC::GAMEBOY_CLASSIC() {
 
-	setBaseSystemFramerate(cRefreshRate);
+	setBaseSystemFramerate(c_sys_refresh_rate);
 	setViewportSizes(true, cScreenSizeX, cScreenSizeY, cResSizeMult, 2);
 }
 
 /*==================================================================*/
 
-void GAMEBOY_CLASSIC::instructionLoop() noexcept {
-	const auto maxCycles{ static_cast<s32>(cCylesPerSec / cRefreshRate) };
+void GAMEBOY_CLASSIC::instruction_loop() noexcept {
+	const auto maxCycles{ static_cast<s32>(cCylesPerSec / c_sys_refresh_rate) };
 
 	auto curCycles{ 0 };
 	while (curCycles < maxCycles) {
@@ -31,11 +31,11 @@ void GAMEBOY_CLASSIC::instructionLoop() noexcept {
 	}
 }
 
-void GAMEBOY_CLASSIC::renderAudioData() {
+void GAMEBOY_CLASSIC::push_audio_data() {
 
 }
 
-void GAMEBOY_CLASSIC::renderVideoData() {
+void GAMEBOY_CLASSIC::push_video_data() {
 
 }
 

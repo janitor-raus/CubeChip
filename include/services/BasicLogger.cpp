@@ -7,6 +7,7 @@
 #include <fmt/ostream.h>
 #include <fmt/chrono.h>
 
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <atomic>
@@ -22,13 +23,74 @@
 
 /*==================================================================*/
 
-static thread_local auto s_format_buffer = std::string(512, '\0');
+struct LogSource {
+	std::unordered_map<std::string, std::uint32_t>
+		table{};
+
+	std::atomic<std::uint32_t>
+		count{}; // sync fence for m_names
+
+	std::mutex guard{};
+
+	std::array<std::string, 251>
+		names{};
+
+public:
+	static auto* initialize() noexcept {
+		static LogSource instance{};
+		return &instance;
+	}
+
+private:
+	LogSource() noexcept = default;
+};
+
+static LogSource* s_logger_sources = nullptr;
+
+std::uint32_t get_source_index(const std::string& src_name) noexcept {
+	std::scoped_lock lock(s_logger_sources->guard);
+
+	auto it = s_logger_sources->table.find(src_name);
+	if (it != s_logger_sources->table.end()) { return it->second; }
+
+	const auto dest_index = s_logger_sources->count
+		.fetch_add(1, std::memory_order::acq_rel);
+
+	s_logger_sources->table.emplace(src_name, dest_index);
+	s_logger_sources->names[dest_index] = src_name;
+	return dest_index;
+}
+
+std::string get_source_name(std::uint32_t src_id) noexcept {
+	return src_id < s_logger_sources->count.load(std::memory_order::acquire)
+		? s_logger_sources->names[src_id] : std::string();
+}
+
+static thread_local std::uint32_t s_this_source = 0;
+
+ScopedLogSource::ScopedLogSource(const std::string& src_name) noexcept
+	: m_previous_source(s_this_source)
+{
+	s_this_source = ::get_source_index(src_name);
+}
+
+ScopedLogSource::~ScopedLogSource() noexcept {
+	s_this_source = m_previous_source;
+}
+
+/*==================================================================*/
+
+[[nodiscard]] static
+auto& get_format_buffer() noexcept {
+	static thread_local auto s_format_buffer = std::string(512, '\0');
+	return s_format_buffer;
+}
 
 static void standard_string_formatter_for_LogEntry(const LogEntry& entry) noexcept {
-	s_format_buffer.clear();
-	fmt::format_to(std::back_inserter(s_format_buffer), "{0})\t{1}\t{2}\t{3}\n",
-		entry.index, NanoTime(entry.time).format_as_timer(),
-		BLOG(entry.level).as_string(), entry.message);
+	get_format_buffer().clear();
+	fmt::format_to(std::back_inserter(get_format_buffer()), "{0})\t{1}\t{2}\t{3}\t{4}\t{5}\n",
+		entry.index, entry.thread, NanoTime(entry.time).format_as_timer(),
+		::get_source_name(entry.source), BLOG(entry.level).as_string(), entry.message);
 }
 
 static std::string s_log_file_path{};
@@ -37,22 +99,27 @@ static void touch_file_timestamp() noexcept {
 	(void) fs::last_write_time(s_log_file_path, fs::Time::clock::now());
 }
 
-static std::atomic<unsigned> s_next_tid{ 1u };
-
-static thread_local unsigned s_this_tid = s_next_tid \
-	.fetch_add(1u, std::memory_order::relaxed);
 
 /*==================================================================*/
 
-static auto monotonicCount() noexcept {
-	static std::atomic<std::uint32_t> counter = 1;
-	return counter.fetch_add(1, std::memory_order::relaxed);
+[[nodiscard]] static
+auto get_current_tid() noexcept {
+	static std::atomic<std::uint32_t> s_next_tid = 1u;
+	static thread_local auto s_this_tid = s_next_tid \
+		.fetch_add(1u, std::memory_order::relaxed);
+	return s_this_tid;
 }
 
-LogEntry::LogEntry(BLOG::LEVEL level, std::string message) noexcept
-	: thread (s_this_tid)
-	, index  (monotonicCount())
-	, source (0) // XXX
+[[nodiscard]] static
+auto monotonic_count() noexcept {
+	static std::atomic<std::uint32_t> counter = 1u;
+	return counter.fetch_add(1, std::memory_order::acq_rel);
+}
+
+LogEntry::LogEntry(BLOG::LEVEL level, std::uint32_t source, std::string message) noexcept
+	: thread (get_current_tid())
+	, index  (monotonic_count())
+	, source (source)
 	, level  (level)
 	, time   (Millis::raw())
 	, message(std::move(message))
@@ -60,7 +127,7 @@ LogEntry::LogEntry(BLOG::LEVEL level, std::string message) noexcept
 
 std::string LogEntry::as_string() const noexcept {
 	::standard_string_formatter_for_LogEntry(*this);
-	return s_format_buffer;
+	return get_format_buffer();
 }
 
 /*==================================================================*/
@@ -77,9 +144,6 @@ class BasicLoggerContext {
 
 	std::size_t m_last_flush_pos{};
 	std::size_t m_last_flush_time{};
-
-	std::unordered_map<std::string, std::size_t>
-		m_logger_sources_map{};
 
 	LogBuffer m_log_backtrace_buffer;
 
@@ -106,7 +170,10 @@ class BasicLoggerContext {
 
 		for (const auto& entry : snapshot) {
 			::standard_string_formatter_for_LogEntry(entry);
-			m_log_file_handle.write(s_format_buffer.data(), s_format_buffer.size());
+			m_log_file_handle.write(
+				get_format_buffer().data(),
+				get_format_buffer().size()
+			);
 		}
 
 		m_log_file_handle.flush();
@@ -119,18 +186,17 @@ class BasicLoggerContext {
 	void create_log(const std::string& filename, const std::string& directory) noexcept {
 		auto current_time = NanoTime(Millis::initial_wall());
 
-		blog.newEntry<BLOG::INF>("Logging started on {}",
+		blog.info("Logging started on {}",
 			current_time.format_as_datetime("{:%Y-%m-%d, at %H:%M:%S}"));
 
 		if (filename.empty() || directory.empty()) {
-			blog.newEntry<BLOG::ERR>(
-				"Log file name/path cannot be blank!");
+			blog.error("Log file name/path cannot be blank!");
 			return;
 		}
 
 		if (!fs::create_directories(directory)) {
-			blog.newEntry<BLOG::ERR>(
-				"Failed to create subfolder structure for Log file: \"{}\"", directory);
+			blog.error("Failed to create subfolder structure for Log file:"
+				" \"{}\"", directory);
 			return;
 		}
 
@@ -139,9 +205,8 @@ class BasicLoggerContext {
 
 		m_log_file_handle.open(s_log_file_path, std::ios::trunc);
 		if (!m_log_file_handle) {
-			blog.newEntry<BLOG::ERR>(
-				"Unable to create new Log file: \"{}\"",
-				std::exchange(s_log_file_path, {}));
+			blog.error("Unable to create new Log file:"
+				" \"{}\"", std::exchange(s_log_file_path, {}));
 		}
 
 		const auto cutoff_time = fs::Time::clock::now() - std::chrono::days(7);
@@ -193,7 +258,10 @@ public:
 
 BasicLogger::BasicLogger() noexcept
 	: m_context(std::make_unique<BasicLoggerContext>())
-{}
+{
+	s_logger_sources = LogSource::initialize();
+	(void) ::get_source_index("global");
+}
 
 BasicLogger::~BasicLogger() noexcept = default;
 
@@ -213,16 +281,9 @@ auto BasicLogger::get_log_path() const noexcept -> std::string {
 	return s_log_file_path;
 }
 
-template <BLOG::LEVEL LOG_LEVEL>
-void BasicLogger::newEntry_(std::string&& message) noexcept {
-	if (m_context) { m_context->buffer().push(LogEntry(LOG_LEVEL, message)); }
+void BasicLogger::push_entry(BLOG::LEVEL level, std::string&& message) noexcept {
+	if (m_context) { m_context->buffer().push(LogEntry(level, s_this_source, std::move(message))); }
 }
-
-template void BasicLogger::newEntry_<BLOG::DBG>(std::string&&) noexcept;
-template void BasicLogger::newEntry_<BLOG::INF>(std::string&&) noexcept;
-template void BasicLogger::newEntry_<BLOG::WRN>(std::string&&) noexcept;
-template void BasicLogger::newEntry_<BLOG::ERR>(std::string&&) noexcept;
-template void BasicLogger::newEntry_<BLOG::FTL>(std::string&&) noexcept;
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/

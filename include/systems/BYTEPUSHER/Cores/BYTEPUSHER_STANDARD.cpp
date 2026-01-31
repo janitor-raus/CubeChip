@@ -14,40 +14,40 @@ REGISTER_CORE(BYTEPUSHER_STANDARD, ".BytePusher")
 
 /*==================================================================*/
 
-void BYTEPUSHER_STANDARD::initializeSystem() noexcept {
-	copyGameToMemory(mMemoryBank.data());
+void BYTEPUSHER_STANDARD::initialize_system() noexcept {
+	copy_game_to_memory(m_memory_bank.data());
 
-	set_base_system_framerate(cRefreshRate);
+	set_base_system_framerate(c_sys_refresh_rate);
 
-	mAudioDevice.add_audio_stream(STREAM::MAIN, u32(get_real_system_framerate() * cAudioLength));
-	mAudioDevice.resume_streams();
+	m_audio_device.add_audio_stream(STREAM::MAIN, u32(get_real_system_framerate() * cAudioLength));
+	m_audio_device.resume_streams();
 
-	mDisplayDevice.metadata_staging()
-		.set_viewport(cDisplayW, cDisplayH)
+	m_display_device.metadata_staging()
+		.set_viewport(c_sys_screen_W, c_sys_screen_H)
 		.set_minimum_zoom(2).set_inner_margin(4)
-		.set_texture_tint(cBitColors[0])
+		.set_texture_tint(c_bit_colors[0])
 		.enabled = true;
 }
 
 /*==================================================================*/
 
-void BYTEPUSHER_STANDARD::instructionLoop() noexcept {
-	const auto inputStates = getKeyStates();
+void BYTEPUSHER_STANDARD::instruction_loop() noexcept {
+	const auto inputStates = get_key_states();
 	      auto progPointer = readData<3>(2);
 
-	::assign_cast(mMemoryBank[0], inputStates >> 0x8);
-	::assign_cast(mMemoryBank[1], inputStates & 0xFF);
+	::assign_cast(m_memory_bank[0], inputStates >> 0x8);
+	::assign_cast(m_memory_bank[1], inputStates & 0xFF);
 
 	for (auto cycleCount = 0; cycleCount < 0x10000; ++cycleCount) {
-		mMemoryBank[readData<3>(progPointer + 3)] =
-		mMemoryBank[readData<3>(progPointer + 0)];
+		m_memory_bank[readData<3>(progPointer + 3)] =
+		m_memory_bank[readData<3>(progPointer + 0)];
 		progPointer = readData<3>(progPointer + 6);
 	}
 }
 
-void BYTEPUSHER_STANDARD::renderAudioData() {
-	if (auto* stream = mAudioDevice.at(STREAM::MAIN)) {
-		const auto samplesOffset = mMemoryBank.data() + (readData<2>(6) << 8);
+void BYTEPUSHER_STANDARD::push_audio_data() {
+	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
+		const auto samplesOffset = m_memory_bank.data() + (readData<2>(6) << 8);
 		auto buffer = ::allocate_n<f32>(stream->get_next_buffer_size(get_real_system_framerate()))
 			.as_value().release_as_container();
 
@@ -58,15 +58,15 @@ void BYTEPUSHER_STANDARD::renderAudioData() {
 			[](const auto sample) noexcept { return s8(sample) * (master_gain / 127.0f); }
 		);
 
-		mAudioDevice[STREAM::MAIN].push_audio_data(buffer);
+		m_audio_device[STREAM::MAIN].push_audio_data(buffer);
 	}
 }
 
-void BYTEPUSHER_STANDARD::renderVideoData() {
-	mDisplayDevice.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = ++mDisplayDevice.metadata_staging();
-		frame.copy_from(mMemoryBank.data() + (readData<1>(5) << 16), cDisplayW * cDisplayH,
-			[](u32 pixel) noexcept { return cBitColors[pixel]; }
+void BYTEPUSHER_STANDARD::push_video_data() {
+	m_display_device.swapchain().acquire([&](auto& frame) noexcept {
+		frame.metadata = ++m_display_device.metadata_staging();
+		frame.copy_from(m_memory_bank.data() + (readData<1>(5) << 16), c_sys_screen_W * c_sys_screen_H,
+			[](u32 pixel) noexcept { return c_bit_colors[pixel]; }
 		);
 	});
 }

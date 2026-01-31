@@ -14,8 +14,9 @@
 
 void SystemInterface::start_workers() noexcept {
 	if (!m_system_thread.joinable()) {
-		initializeSystem();
+		initialize_system();
 		m_system_thread = Thread([&](StopToken token) noexcept {
+			blog.info("System thread started.");
 			SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 			thread_affinity::set_affinity(~0b11ull);
 
@@ -23,7 +24,7 @@ void SystemInterface::start_workers() noexcept {
 				await_next_frame(false);
 
 				m_timer.start();
-				mainSystemLoop();
+				main_system_loop();
 
 				m_elapsed_frames += 1;
 				m_benched_frames = has_system_state(EmuState::BENCH)
@@ -33,6 +34,7 @@ void SystemInterface::start_workers() noexcept {
 	}
 	if (!m_timing_thread.joinable()) {
 		m_timing_thread = Thread([&](StopToken token) noexcept {
+			blog.info("Timing thread started.");
 			SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 			thread_affinity::set_affinity(0b11ull);
 

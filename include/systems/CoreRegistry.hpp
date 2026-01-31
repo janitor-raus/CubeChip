@@ -75,7 +75,7 @@ static auto CONCAT_TOKENS(sCoreRegID_, __COUNTER__) = \
 	CoreRegistry::register_new_core( \
 		[]() -> SystemInterface* { \
 			return new (std::align_val_t(HDIS), std::nothrow) CoreType(); \
-		}, CoreType::validateProgram, { __VA_ARGS__ } \
+		}, CoreType::validate_program, { __VA_ARGS__ } \
 	);
 
 /*==================================================================*/
