@@ -16,7 +16,6 @@ void SystemInterface::start_workers() noexcept {
 	if (!m_system_thread.joinable()) {
 		initialize_system();
 		m_system_thread = Thread([&](StopToken token) noexcept {
-			blog.info("System thread started.");
 			SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 			thread_affinity::set_affinity(~0b11ull);
 
@@ -34,7 +33,6 @@ void SystemInterface::start_workers() noexcept {
 	}
 	if (!m_timing_thread.joinable()) {
 		m_timing_thread = Thread([&](StopToken token) noexcept {
-			blog.info("Timing thread started.");
 			SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 			thread_affinity::set_affinity(0b11ull);
 
