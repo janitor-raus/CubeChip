@@ -14,20 +14,14 @@
 /*==================================================================*/
 
 class BYTEPUSHER_STANDARD final : public BytePusher_CoreInterface {
-	static constexpr u64 c_sys_memory_size = 16_MiB;
-	static constexpr u32 cSafezoneOOB =     8;
+	static constexpr u64 c_sys_memory_size  = 16_MiB;
 	static constexpr f32 c_sys_refresh_rate = 60.0f;
 
-	static constexpr s32 cAudioLength = 256;
-	static constexpr s32 cResSizeMult =   2;
 	static constexpr s32 c_sys_screen_W = 256;
 	static constexpr s32 c_sys_screen_H = 256;
 
-	static constexpr u32 cMaxDisplayW = 256;
-	static constexpr u32 cMaxDisplayH = 256;
-
 private:
-	std::array<u8, c_sys_memory_size + cSafezoneOOB>
+	std::array<u8, c_sys_memory_size + 8>
 		m_memory_bank{};
 
 	template<u32 T> requires (T >= 1 && T <= 3)

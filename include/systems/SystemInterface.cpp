@@ -36,11 +36,11 @@ void SystemInterface::start_workers() noexcept {
 			SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 			thread_affinity::set_affinity(0b11ull);
 
-			FrameLimiter Pacer(get_real_system_framerate());
+			FrameLimiter pacer(get_real_system_framerate());
 
 			do {
-				if (Pacer.isFrameReady(!has_system_state(EmuState::BENCH))) {
-					Pacer.setLimiterProperties(get_real_system_framerate());
+				if (pacer.isFrameReady(!has_system_state(EmuState::BENCH))) {
+					pacer.setLimiterProperties(get_real_system_framerate());
 
 					if (!can_system_work()) [[unlikely]] { continue; }
 
@@ -66,12 +66,9 @@ void SystemInterface::stop_workers() noexcept {
 
 SystemInterface::SystemInterface() noexcept
 	: m_statistics_data(std::make_shared<std::string>())
+	, m_rng(std::make_unique<Well512>())
+	, m_input(std::make_unique<BasicKeyboard>())
 {
-	static thread_local auto sRNG   = std::make_unique<Well512>();
-	static thread_local auto sInput = std::make_unique<BasicKeyboard>();
-	RNG   = sRNG.get();
-	Input = sInput.get();
-
 	m_statistics_work_buffer.reserve(1_KiB);
 }
 

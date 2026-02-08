@@ -15,7 +15,7 @@ REGISTER_CORE(CHIP8E, ".c8e")
 
 void CHIP8E::initialize_system() noexcept {
 	::generate_n(m_memory_bank, 0, c_sys_memory_size,
-		[&]() noexcept { return RNG->next<u8>(); });
+		[&]() noexcept { return m_rng->next<u8>(); });
 
 	copy_game_to_memory(m_memory_bank.data() + c_game_load_pos);
 	copy_font_to_memory(m_memory_bank.data(), 80);
@@ -31,7 +31,6 @@ void CHIP8E::initialize_system() noexcept {
 	m_target_cpf = c_sys_speed_hi;
 
 	m_display_device.metadata_staging()
-		.set_viewport(c_sys_screen_W, c_sys_screen_H)
 		.set_minimum_zoom(8).set_inner_margin(4)
 		.set_texture_tint(s_bit_colors[0])
 		.enabled = true;
@@ -249,24 +248,27 @@ void CHIP8E::push_audio_data() {
 void CHIP8E::push_video_data() {
 	m_display_device.swapchain().acquire([&](auto& frame) noexcept {
 		frame.metadata = ++m_display_device.metadata_staging();
-		frame.copy_from(m_display_buffer, use_pixel_trails()
+		frame.copy_from(m_display_map, use_pixel_trails()
 			? [](u32 pixel) noexcept { return RGBA::premul(s_bit_colors[pixel != 0], c_bit_weight[pixel]); }
 			: [](u32 pixel) noexcept { return s_bit_colors[pixel >> 3]; }
 		);
 	});
 
-	std::for_each(EXEC_POLICY(unseq)
-		m_display_buffer.begin(), m_display_buffer.end(),
-		[](auto& pixel) noexcept
-			{ ::assign_cast(pixel, (pixel & 0x8) | (pixel >> 1)); }
-	);
+	if (use_pixel_trails()) {
+		std::for_each(EXEC_POLICY(unseq)
+			m_display_map.begin(), m_display_map.end(),
+			[](auto& pixel) noexcept {
+				::assign_cast(pixel, (pixel & 0x8) | (pixel >> 1));
+			}
+		);
+	}
 }
 
 /*==================================================================*/
 	#pragma region 0 instruction branch
 
 	void CHIP8E::instruction_00E0() noexcept {
-		m_display_buffer.initialize();
+		m_display_map.fill();
 		trigger_interrupt(Interrupt::FRAME);
 	}
 	void CHIP8E::instruction_00EE() noexcept {
@@ -291,7 +293,7 @@ void CHIP8E::push_video_data() {
 /*==================================================================*/
 	#pragma region 1 instruction branch
 
-	void CHIP8E::instruction_1NNN(s32 NNN) noexcept {
+	void CHIP8E::instruction_1NNN(u32 NNN) noexcept {
 		jump_program_to(NNN);
 	}
 
@@ -301,7 +303,7 @@ void CHIP8E::push_video_data() {
 /*==================================================================*/
 	#pragma region 2 instruction branch
 
-	void CHIP8E::instruction_2NNN(s32 NNN) noexcept {
+	void CHIP8E::instruction_2NNN(u32 NNN) noexcept {
 		m_stack_bank[m_stack_head++ & 0xF] = m_current_pc;
 		jump_program_to(NNN);
 	}
@@ -312,7 +314,7 @@ void CHIP8E::push_video_data() {
 /*==================================================================*/
 	#pragma region 3 instruction branch
 
-	void CHIP8E::instruction_3xNN(s32 X, s32 NN) noexcept {
+	void CHIP8E::instruction_3xNN(u32 X, u32 NN) noexcept {
 		if (m_registers_V[X] == NN) { skip_instruction(); }
 	}
 
@@ -322,7 +324,7 @@ void CHIP8E::push_video_data() {
 /*==================================================================*/
 	#pragma region 4 instruction branch
 
-	void CHIP8E::instruction_4xNN(s32 X, s32 NN) noexcept {
+	void CHIP8E::instruction_4xNN(u32 X, u32 NN) noexcept {
 		if (m_registers_V[X] != NN) { skip_instruction(); }
 	}
 
@@ -332,18 +334,18 @@ void CHIP8E::push_video_data() {
 /*==================================================================*/
 	#pragma region 5 instruction branch
 
-	void CHIP8E::instruction_5xy0(s32 X, s32 Y) noexcept {
+	void CHIP8E::instruction_5xy0(u32 X, u32 Y) noexcept {
 		if (m_registers_V[X] == m_registers_V[Y]) { skip_instruction(); }
 	}
-	void CHIP8E::instruction_5xy1(s32 X, s32 Y) noexcept {
+	void CHIP8E::instruction_5xy1(u32 X, u32 Y) noexcept {
 		if (m_registers_V[X] > m_registers_V[Y]) { skip_instruction(); }
 	}
-	void CHIP8E::instruction_5xy2(s32 X, s32 Y) noexcept {
+	void CHIP8E::instruction_5xy2(u32 X, u32 Y) noexcept {
 		for (auto Z = 0; Z + X <= Y; ++Z) {
 			m_memory_bank[m_register_I++] = m_registers_V[Z + X];
 		}
 	}
-	void CHIP8E::instruction_5xy3(s32 X, s32 Y) noexcept {
+	void CHIP8E::instruction_5xy3(u32 X, u32 Y) noexcept {
 		for (auto Z = 0; Z + X <= Y; ++Z) {
 			m_registers_V[Z + X] = m_memory_bank[m_register_I++];
 		}
@@ -355,7 +357,7 @@ void CHIP8E::push_video_data() {
 /*==================================================================*/
 	#pragma region 6 instruction branch
 
-	void CHIP8E::instruction_6xNN(s32 X, s32 NN) noexcept {
+	void CHIP8E::instruction_6xNN(u32 X, u32 NN) noexcept {
 		::assign_cast(m_registers_V[X], NN);
 	}
 
@@ -365,7 +367,7 @@ void CHIP8E::push_video_data() {
 /*==================================================================*/
 	#pragma region 7 instruction branch
 
-	void CHIP8E::instruction_7xNN(s32 X, s32 NN) noexcept {
+	void CHIP8E::instruction_7xNN(u32 X, u32 NN) noexcept {
 		::assign_cast_add(m_registers_V[X], NN);
 	}
 
@@ -375,42 +377,42 @@ void CHIP8E::push_video_data() {
 /*==================================================================*/
 	#pragma region 8 instruction branch
 
-	void CHIP8E::instruction_8xy0(s32 X, s32 Y) noexcept {
+	void CHIP8E::instruction_8xy0(u32 X, u32 Y) noexcept {
 		::assign_cast(m_registers_V[X], m_registers_V[Y]);
 	}
-	void CHIP8E::instruction_8xy1(s32 X, s32 Y) noexcept {
+	void CHIP8E::instruction_8xy1(u32 X, u32 Y) noexcept {
 		::assign_cast_or(m_registers_V[X], m_registers_V[Y]);
 		::assign_cast(m_registers_V[0xF], 0);
 	}
-	void CHIP8E::instruction_8xy2(s32 X, s32 Y) noexcept {
+	void CHIP8E::instruction_8xy2(u32 X, u32 Y) noexcept {
 		::assign_cast_and(m_registers_V[X], m_registers_V[Y]);
 		::assign_cast(m_registers_V[0xF], 0);
 	}
-	void CHIP8E::instruction_8xy3(s32 X, s32 Y) noexcept {
+	void CHIP8E::instruction_8xy3(u32 X, u32 Y) noexcept {
 		::assign_cast_xor(m_registers_V[X], m_registers_V[Y]);
 		::assign_cast(m_registers_V[0xF], 0);
 	}
-	void CHIP8E::instruction_8xy4(s32 X, s32 Y) noexcept {
+	void CHIP8E::instruction_8xy4(u32 X, u32 Y) noexcept {
 		const auto sum = m_registers_V[X] + m_registers_V[Y];
 		::assign_cast(m_registers_V[X], sum);
 		::assign_cast(m_registers_V[0xF], sum >> 8);
 	}
-	void CHIP8E::instruction_8xy5(s32 X, s32 Y) noexcept {
+	void CHIP8E::instruction_8xy5(u32 X, u32 Y) noexcept {
 		const bool nborrow = m_registers_V[X] >= m_registers_V[Y];
 		::assign_cast_sub(m_registers_V[X], m_registers_V[Y]);
 		::assign_cast(m_registers_V[0xF], nborrow);
 	}
-	void CHIP8E::instruction_8xy7(s32 X, s32 Y) noexcept {
+	void CHIP8E::instruction_8xy7(u32 X, u32 Y) noexcept {
 		const bool nborrow = m_registers_V[Y] >= m_registers_V[X];
 		::assign_cast_rsub(m_registers_V[X], m_registers_V[Y]);
 		::assign_cast(m_registers_V[0xF], nborrow);
 	}
-	void CHIP8E::instruction_8xy6(s32 X, s32 Y) noexcept {
+	void CHIP8E::instruction_8xy6(u32 X, u32 Y) noexcept {
 		const bool lsb = (m_registers_V[Y] & 1) == 1;
 		::assign_cast(m_registers_V[X], m_registers_V[Y] >> 1);
 		::assign_cast(m_registers_V[0xF], lsb);
 	}
-	void CHIP8E::instruction_8xyE(s32 X, s32 Y) noexcept {
+	void CHIP8E::instruction_8xyE(u32 X, u32 Y) noexcept {
 		const bool msb = (m_registers_V[Y] >> 7) == 1;
 		::assign_cast(m_registers_V[X], m_registers_V[Y] << 1);
 		::assign_cast(m_registers_V[0xF], msb);
@@ -422,7 +424,7 @@ void CHIP8E::push_video_data() {
 /*==================================================================*/
 	#pragma region 9 instruction branch
 
-	void CHIP8E::instruction_9xy0(s32 X, s32 Y) noexcept {
+	void CHIP8E::instruction_9xy0(u32 X, u32 Y) noexcept {
 		if (m_registers_V[X] != m_registers_V[Y]) { skip_instruction(); }
 	}
 
@@ -432,7 +434,7 @@ void CHIP8E::push_video_data() {
 /*==================================================================*/
 	#pragma region A instruction branch
 
-	void CHIP8E::instruction_ANNN(s32 NNN) noexcept {
+	void CHIP8E::instruction_ANNN(u32 NNN) noexcept {
 		::assign_cast(m_register_I, NNN);
 	}
 
@@ -442,10 +444,10 @@ void CHIP8E::push_video_data() {
 /*==================================================================*/
 	#pragma region B instruction branch
 
-	void CHIP8E::instruction_BBNN(s32 NN) noexcept {
+	void CHIP8E::instruction_BBNN(u32 NN) noexcept {
 		jump_program_to(m_current_pc - 2 - NN);
 	}
-	void CHIP8E::instruction_BFNN(s32 NN) noexcept {
+	void CHIP8E::instruction_BFNN(u32 NN) noexcept {
 		jump_program_to(m_current_pc - 2 + NN);
 	}
 
@@ -455,8 +457,8 @@ void CHIP8E::push_video_data() {
 /*==================================================================*/
 	#pragma region C instruction branch
 
-	void CHIP8E::instruction_CxNN(s32 X, s32 NN) noexcept {
-		::assign_cast(m_registers_V[X], RNG->next() & NN);
+	void CHIP8E::instruction_CxNN(u32 X, u32 NN) noexcept {
+		::assign_cast(m_registers_V[X], m_rng->next() & NN);
 	}
 
 	#pragma endregion
@@ -465,7 +467,7 @@ void CHIP8E::push_video_data() {
 /*==================================================================*/
 	#pragma region D instruction branch
 
-	void CHIP8E::drawByte(s32 X, s32 Y, u32 DATA) noexcept {
+	void CHIP8E::draw_byte(u32 X, u32 Y, u32 DATA) noexcept {
 		switch (DATA) {
 			[[unlikely]]
 			case 0b00000000:
@@ -473,7 +475,7 @@ void CHIP8E::push_video_data() {
 
 			[[likely]]
 			case 0b10000000:
-				if (!((m_display_buffer(X, Y) ^= 0x8) & 0x8))
+				if (!((m_display_map(X, Y) ^= 0x8) & 0x8))
 					{ m_registers_V[0xF] = 1; }
 				return;
 
@@ -481,7 +483,7 @@ void CHIP8E::push_video_data() {
 			default:
 				for (auto B = 0; B < 8; ++B) {
 					if (DATA & 0x80 >> B) {
-						if (!((m_display_buffer(X, Y) ^= 0x8) & 0x8))
+						if (!((m_display_map(X, Y) ^= 0x8) & 0x8))
 							{ m_registers_V[0xF] = 1; }
 					}
 					if (++X == c_sys_screen_W) { return; }
@@ -490,7 +492,7 @@ void CHIP8E::push_video_data() {
 		}
 	}
 
-	void CHIP8E::instruction_DxyN(s32 X, s32 Y, s32 N) noexcept {
+	void CHIP8E::instruction_DxyN(u32 X, u32 Y, u32 N) noexcept {
 		auto pX = m_registers_V[X] & (c_sys_screen_W - 1);
 		auto pY = m_registers_V[Y] & (c_sys_screen_H - 1);
 
@@ -502,14 +504,14 @@ void CHIP8E::push_video_data() {
 
 			[[likely]]
 			case 1:
-				drawByte(pX, pY, m_memory_bank[m_register_I]);
+				draw_byte(pX, pY, m_memory_bank[m_register_I]);
 				break;
 
 			[[unlikely]]
 			default:
-				for (auto H = 0; H < N; ++H)
+				for (auto H = 0u; H < N; ++H)
 				{
-					drawByte(pX, pY, m_memory_bank[m_register_I + H]);
+					draw_byte(pX, pY, m_memory_bank[m_register_I + H]);
 					if (++pY == c_sys_screen_H) { break; }
 				}
 				break;
@@ -524,10 +526,10 @@ void CHIP8E::push_video_data() {
 /*==================================================================*/
 	#pragma region E instruction branch
 
-	void CHIP8E::instruction_Ex9E(s32 X) noexcept {
+	void CHIP8E::instruction_Ex9E(u32 X) noexcept {
 		if (is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
 	}
-	void CHIP8E::instruction_ExA1(s32 X) noexcept {
+	void CHIP8E::instruction_ExA1(u32 X) noexcept {
 		if (!is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
 	}
 
@@ -537,55 +539,55 @@ void CHIP8E::push_video_data() {
 /*==================================================================*/
 	#pragma region F instruction branch
 
-	void CHIP8E::instruction_Fx03(s32  ) noexcept {
+	void CHIP8E::instruction_Fx03(u32  ) noexcept {
 		trigger_interrupt(Interrupt::FRAME);
 	}
-	void CHIP8E::instruction_Fx07(s32 X) noexcept {
+	void CHIP8E::instruction_Fx07(u32 X) noexcept {
 		::assign_cast(m_registers_V[X], m_delay_timer);
 	}
-	void CHIP8E::instruction_Fx0A(s32 X) noexcept {
+	void CHIP8E::instruction_Fx0A(u32 X) noexcept {
 		m_key_reg_ref = &m_registers_V[X];
 		trigger_interrupt(Interrupt::INPUT);
 	}
-	void CHIP8E::instruction_Fx15(s32 X) noexcept {
+	void CHIP8E::instruction_Fx15(u32 X) noexcept {
 		::assign_cast(m_delay_timer, m_registers_V[X]);
 	}
-	void CHIP8E::instruction_Fx18(s32 X) noexcept {
+	void CHIP8E::instruction_Fx18(u32 X) noexcept {
 		start_voice(m_registers_V[X] + (m_registers_V[X] == 1));
 	}
-	void CHIP8E::instruction_Fx1B(s32 X) noexcept {
+	void CHIP8E::instruction_Fx1B(u32 X) noexcept {
 		::assign_cast_add(m_current_pc, m_registers_V[X]);
 	}
-	void CHIP8E::instruction_Fx1E(s32 X) noexcept {
+	void CHIP8E::instruction_Fx1E(u32 X) noexcept {
 		::assign_cast_add(m_register_I, m_registers_V[X]);
 		::assign_cast_and(m_register_I, 0xFFF);
 	}
-	void CHIP8E::instruction_Fx29(s32 X) noexcept {
+	void CHIP8E::instruction_Fx29(u32 X) noexcept {
 		::assign_cast(m_register_I, (m_registers_V[X] & 0xF) * 5 + c_small_font_offset);
 	}
-	void CHIP8E::instruction_Fx33(s32 X) noexcept {
+	void CHIP8E::instruction_Fx33(u32 X) noexcept {
 		const TriBCD bcd{ m_registers_V[X] };
 
 		m_memory_bank[m_register_I + 0] = bcd.digit[2];
 		m_memory_bank[m_register_I + 1] = bcd.digit[1];
 		m_memory_bank[m_register_I + 2] = bcd.digit[0];
 	}
-	void CHIP8E::instruction_Fx4F(s32 X) noexcept {
+	void CHIP8E::instruction_Fx4F(u32 X) noexcept {
 		::assign_cast(m_delay_timer, m_registers_V[X]);
 		trigger_interrupt(Interrupt::DELAY);
 	}
-	void CHIP8E::instruction_FN55(s32 N) noexcept {
-		for (auto idx = 0; idx <= N; ++idx) { m_memory_bank[m_register_I + idx] = m_registers_V[idx]; }
+	void CHIP8E::instruction_FN55(u32 N) noexcept {
+		for (auto i = 0u; i <= N; ++i) { m_memory_bank[m_register_I + i] = m_registers_V[i]; }
 		::assign_cast_add(m_register_I, N + 1);
 	}
-	void CHIP8E::instruction_FN65(s32 N) noexcept {
-		for (auto idx = 0; idx <= N; ++idx) { m_registers_V[idx] = m_memory_bank[m_register_I + idx]; }
+	void CHIP8E::instruction_FN65(u32 N) noexcept {
+		for (auto i = 0u; i <= N; ++i) { m_registers_V[i] = m_memory_bank[m_register_I + i]; }
 		::assign_cast_add(m_register_I, N + 1);
 	}
-	void CHIP8E::instruction_FxE3(s32  ) noexcept {
+	void CHIP8E::instruction_FxE3(u32  ) noexcept {
 		trigger_interrupt(Interrupt::FRAME);
 	}
-	void CHIP8E::instruction_FxE7(s32  ) noexcept {
+	void CHIP8E::instruction_FxE7(u32  ) noexcept {
 		trigger_interrupt(Interrupt::FRAME);
 	}
 

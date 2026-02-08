@@ -59,8 +59,6 @@ struct SimpleKeyMapping {
 };
 
 class HomeDirManager;
-class BasicVideoSpec;
-class GlobalAudioBase;
 
 /*==================================================================*/
 
@@ -75,7 +73,6 @@ class alignas(HDIS) SystemInterface {
 	std::atomic<bool> m_stop_frame_flag{};
 
 protected:
-	bool m_shutdown_signal = true;
 	bool m_is_system_alive = true;
 
 protected:
@@ -89,8 +86,8 @@ private:
 protected:
 	static inline HomeDirManager* HDM{};
 
-	Well512*       RNG{};
-	BasicKeyboard* Input{};
+	std::unique_ptr<Well512>       m_rng;
+	std::unique_ptr<BasicKeyboard> m_input;
 
 public:
 	void start_workers() noexcept;
@@ -149,8 +146,8 @@ public:
 	f32  get_real_system_framerate() const noexcept;
 
 protected:
-	void set_frame_stop_flag(bool state) noexcept { m_stop_frame_flag.store(state, mo::release); }
-	auto get_frame_stop_flag()     const noexcept { return m_stop_frame_flag.load(mo::acquire);  }
+	void set_frame_stop_flag(bool state) noexcept { m_stop_frame_flag.store(state, mo::relaxed); }
+	auto get_frame_stop_flag()     const noexcept { return m_stop_frame_flag.load(mo::relaxed);  }
 
 private:
 	void notify_next_frame(bool state) noexcept {

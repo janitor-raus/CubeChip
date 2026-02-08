@@ -15,11 +15,18 @@
 
 /*==================================================================*/
 
-template <IsContiguousContainer Object>
+template <IsContiguousContainer Object, typename V = ValueType<Object>>
 	requires (!std::is_rvalue_reference_v<Object>)
-inline signed accumulate(Object& array, signed val = {}) noexcept {
+inline signed accumulate(Object& array, V val = V()) noexcept {
 	return std::accumulate(
 		std::begin(array), std::end(array), val);
+}
+
+template <IsContiguousContainer Object, typename V = ValueType<Object>, typename Fn>
+	requires (!std::is_rvalue_reference_v<Object> && std::is_invocable_v<Fn, V, V>)
+inline signed accumulate(Object& array, Fn fn, V val = V()) noexcept {
+	return std::accumulate(
+		std::begin(array), std::end(array), val, fn);
 }
 
 template <IsContiguousContainer Object, typename V = ValueType<Object>>

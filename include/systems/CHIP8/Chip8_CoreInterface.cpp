@@ -46,13 +46,13 @@ Chip8_CoreInterface::Chip8_CoreInterface(DisplayDevice display_device) noexcept
 void Chip8_CoreInterface::update_key_states() noexcept {
 	if (!m_custom_binds.size()) { return; }
 
-	Input->update_states();
+	m_input->update_states();
 
 	m_keys_last = m_keys_this;
 	m_keys_this = 0;
 
 	for (const auto& mapping : m_custom_binds) {
-		if (Input->are_any_held(mapping.key, mapping.alt))
+		if (m_input->are_any_held(mapping.key, mapping.alt))
 			{ m_keys_this |= 1 << mapping.idx; }
 	}
 
@@ -252,14 +252,18 @@ void Chip8_CoreInterface::make_pulse_wave(f32* data, u32 size, Voice* voice, Str
 	voice->step_phase(size);
 }
 
-void Chip8_CoreInterface::instruction_error(u32 HI, u32 LO) {
-	blog.info("Unknown instruction: 0x{:02X}{:02X}", HI, LO);
+void Chip8_CoreInterface::instruction_error(u32 HI, u32 LO) noexcept {
+	blog.info("Unknown instruction: 0x{:04X}", (HI << 8) | LO);
 	trigger_interrupt(Interrupt::ERROR);
 }
 
 void Chip8_CoreInterface::trigger_interrupt(Interrupt type) noexcept {
 	set_frame_stop_flag(true);
 	m_interrupt = type;
+}
+
+void Chip8_CoreInterface::trigger_interrupt(Interrupt type, bool cond) noexcept {
+	if (cond) [[unlikely]] { trigger_interrupt(type); }
 }
 
 /*==================================================================*/

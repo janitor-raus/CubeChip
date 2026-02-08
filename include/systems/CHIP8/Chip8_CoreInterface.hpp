@@ -22,8 +22,8 @@ protected:
 		BUZZER = ID_3, UNIQUE = ID_0,
 	};
 
-	static inline thread_local std::string s_permaregs_path{};
-	static inline thread_local std::string s_savestate_path{};
+	static inline std::string s_permaregs_path{};
+	static inline std::string s_savestate_path{};
 	static constexpr f32 c_tonal_offset = 160.0f;
 
 	struct TriBCD final {
@@ -42,8 +42,6 @@ protected:
 	};
 
 /*==================================================================*/
-
-	DisplayDevice m_display_device;
 
 	AudioDevice m_audio_device;
 
@@ -73,6 +71,9 @@ private:
 	u32  m_keys_loop{}; // bitfield of keys repeating input on Fx0A
 
 protected:
+	u8*  m_key_reg_ref{};
+
+protected:
 	void update_key_states() noexcept;
 	void load_preset_binds() noexcept;
 
@@ -86,6 +87,10 @@ protected:
 	bool catch_key_press(u8* keyReg) noexcept;
 	bool is_key_held_P1(u32 keyIndex) const noexcept;
 	bool is_key_held_P2(u32 keyIndex) const noexcept;
+
+/*==================================================================*/
+
+	DisplayDevice m_display_device;
 
 /*==================================================================*/
 
@@ -149,27 +154,27 @@ protected:
 	u32 m_current_pc{};
 	u32 m_register_I{};
 
-	u8* m_key_reg_ref{};
-
 	u32 m_delay_timer{};
 
 	u32 m_stack_head{};
 
-	static inline thread_local
+	static inline
 	std::array<u8, 16>
 		s_permaregs_V{};
 
+	alignas(sizeof(u8) * 16)
 	std::array<u8, 16>
 		m_registers_V{};
 
-	alignas(HDIS)
+	alignas(sizeof(u32) * 16)
 	std::array<u32, 16>
 		m_stack_bank{};
 
 /*==================================================================*/
 
-	void instruction_error(u32 HI, u32 LO);
+	void instruction_error(u32 HI, u32 LO) noexcept;
 	void trigger_interrupt(Interrupt type) noexcept;
+	void trigger_interrupt(Interrupt type, bool cond) noexcept;
 
 private:
 	void set_file_permaregs(u32 X) noexcept;
@@ -253,7 +258,7 @@ protected:
 		0xFE, 0x62, 0x60, 0x64, 0x7C, 0x64, 0x60, 0x62, 0xFE, 0x00, // E
 		0xFE, 0x66, 0x62, 0x64, 0x7C, 0x64, 0x60, 0x60, 0xF0, 0x00, // F
 	};
-	static inline thread_local std::array<u8, 240> s_fonts_data = c_fonts_data;
+	static inline std::array<u8, 240> s_fonts_data = c_fonts_data;
 
 	static constexpr std::array<RGBA, 16> c_bit_colors = { // 0-1 monochrome, 0-15 palette color
 		0x181C20FF, 0xE4DCD4FF, 0x8C8884FF, 0x403C38FF,
@@ -261,7 +266,7 @@ protected:
 		0x501010FF, 0x105010FF, 0x50B0C0FF, 0xF08010FF,
 		0xE06090FF, 0xE0F090FF, 0xB050F0FF, 0x704020FF,
 	};
-	static inline thread_local std::array<RGBA, 16> s_bit_colors = c_bit_colors;
+	static inline std::array<RGBA, 16> s_bit_colors = c_bit_colors;
 
 /*==================================================================*/
 

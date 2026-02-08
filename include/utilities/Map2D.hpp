@@ -92,8 +92,6 @@ template <typename Container>
 SpanIterator(Container&) -> SpanIterator<std::remove_pointer_t<decltype(
 		std::data(std::declval<Container&>()))>>;
 
-/*==================================================================*/
-
 template <typename T>
 class Map2D final {
 	using self = Map2D;
@@ -128,8 +126,8 @@ public:
 	constexpr bool      empty()      const noexcept { return size() == 0; }
 	constexpr auto      span()       const noexcept { return std::span(data(), size()); }
 
-	constexpr size_type width()  const noexcept { return m_size_x; }
-	constexpr size_type height() const noexcept { return m_size_y; }
+	constexpr axis_size width()  const noexcept { return m_size_x; }
+	constexpr axis_size height() const noexcept { return m_size_y; }
 
 	constexpr pointer       data()       noexcept { return m_data; }
 	constexpr const_pointer data() const noexcept { return m_data; }

@@ -15,7 +15,7 @@ REGISTER_CORE(CHIP8X, ".c8x")
 
 void CHIP8X::initialize_system() noexcept {
 	::generate_n(m_memory_bank, 0, c_sys_memory_size,
-		[&]() noexcept { return RNG->next<u8>(); });
+		[&]() noexcept { return m_rng->next<u8>(); });
 
 	copy_game_to_memory(m_memory_bank.data() + c_game_load_pos);
 	copy_font_to_memory(m_memory_bank.data(), 80);
@@ -29,10 +29,9 @@ void CHIP8X::initialize_system() noexcept {
 	m_target_cpf = c_sys_speed_hi;
 
 	// test first color rect as the original hardware did
-	m_colored_buffer(0, 0) = c_fore_colors[2];
+	m_colored_map(0, 0) = c_fore_colors[2];
 
 	m_display_device.metadata_staging()
-		.set_viewport(c_sys_screen_W, c_sys_screen_H)
 		.set_minimum_zoom(8).set_inner_margin(4)
 		.set_texture_tint(c_back_colors[m_background_color])
 		.enabled = true;
@@ -234,40 +233,42 @@ void CHIP8X::push_video_data() {
 	if (use_pixel_trails()) {
 		m_display_device.swapchain().acquire([&](auto& frame) noexcept {
 			frame.metadata = ++m_display_device.metadata_staging();
-			frame.copy_from(m_display_buffer, [&](auto& pixel) noexcept {
+			frame.copy_from(m_display_map, [&](auto& pixel) noexcept {
 				if (pixel == 0) {
 					return c_back_colors[m_background_color];
 				} else {
-					const auto idx = &pixel - m_display_buffer.data();
-					const auto Y = (idx / c_sys_screen_W) & m_color_pixel_mask;
-					const auto X = (idx % c_sys_screen_W) >> 3;
-					return RGBA::premul(m_colored_buffer(X, Y), c_bit_weight[pixel]);
+					const auto idx = &pixel - m_display_map.data();
+					const auto y = (idx / c_sys_screen_W) & m_color_pixel_mask;
+					const auto x = (idx % c_sys_screen_W) >> 3;
+					return RGBA::premul(m_colored_map(x, y), c_bit_weight[pixel]);
 				}
 			});
 		});
 
 		std::for_each(EXEC_POLICY(unseq)
-			m_display_buffer.begin(), m_display_buffer.end(),
-			[](auto& pixel) noexcept { ::assign_cast(pixel, (pixel & 0x8) | (pixel >> 1)); }
+			m_display_map.begin(), m_display_map.end(),
+			[](auto& pixel) noexcept {
+				::assign_cast(pixel, (pixel & 0x8) | (pixel >> 1));
+			}
 		);
 	} else {
 		m_display_device.swapchain().acquire([&](auto& frame) noexcept {
 			frame.metadata = ++m_display_device.metadata_staging();
-			frame.copy_from(m_display_buffer, [&](auto& pixel) noexcept {
+			frame.copy_from(m_display_map, [&](auto& pixel) noexcept {
 				if (pixel == 0) {
 					return c_back_colors[m_background_color];
 				} else {
-					const auto idx = &pixel - m_display_buffer.data();
-					const auto Y = (idx / c_sys_screen_W) & m_color_pixel_mask;
-					const auto X = (idx % c_sys_screen_W) >> 3;
-					return m_colored_buffer(X, Y);
+					const auto idx = &pixel - m_display_map.data();
+					const auto y = (idx / c_sys_screen_W) & m_color_pixel_mask;
+					const auto x = (idx % c_sys_screen_W) >> 3;
+					return m_colored_map(x, y);
 				}
 			});
 		});
 	}
 }
 
-void CHIP8X::set_pulse_pitch(s32 pitch) noexcept {
+void CHIP8X::set_pulse_pitch(u32 pitch) noexcept {
 	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
 		m_voices[VOICE::UNIQUE].set_step((c_tonal_offset + (
 			(0xFF - (pitch ? pitch : 0x80)) >> 3 << 4)
@@ -275,18 +276,18 @@ void CHIP8X::set_pulse_pitch(s32 pitch) noexcept {
 	}
 }
 
-void CHIP8X::color_lores_zone(s32 X, s32 Y, s32 idx) noexcept {
-	for (auto pY = 0, maxH = Y >> 4; pY <= maxH; ++pY) {
-		for (auto pX = 0, maxW = X >> 4; pX <= maxW; ++pX) {
-			m_colored_buffer((X + pX) & 0x7, ((Y + pY) << 2) & 0x1F) = c_fore_colors[idx & 0x7];
+void CHIP8X::color_lores_zone(u32 X, u32 Y, u32 idx) noexcept {
+	for (auto pY = 0u, maxH = Y >> 4; pY <= maxH; ++pY) {
+		for (auto pX = 0u, maxW = X >> 4; pX <= maxW; ++pX) {
+			m_colored_map((X + pX) & 0x7, ((Y + pY) << 2) & 0x1F) = c_fore_colors[idx & 0x7];
 		}
 	}
 	m_color_pixel_mask = 0xFC;
 }
 
-void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
+void CHIP8X::color_hires_zone(u32 X, u32 Y, u32 idx, u32 N) noexcept {
 	for (auto pY = Y, pX = X >> 3; pY < Y + N; ++pY) {
-		m_colored_buffer(pX & 0x7, pY & 0x1F) = c_fore_colors[idx & 0x7];
+		m_colored_map(pX & 0x7, pY & 0x1F) = c_fore_colors[idx & 0x7];
 	}
 	m_color_pixel_mask = 0xFF;
 }
@@ -295,7 +296,7 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 	#pragma region 0 instruction branch
 
 	void CHIP8X::instruction_00E0() noexcept {
-		m_display_buffer.initialize();
+		m_display_map.fill();
 		trigger_interrupt(Interrupt::FRAME);
 	}
 	void CHIP8X::instruction_00EE() noexcept {
@@ -312,7 +313,7 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 /*==================================================================*/
 	#pragma region 1 instruction branch
 
-	void CHIP8X::instruction_1NNN(s32 NNN) noexcept {
+	void CHIP8X::instruction_1NNN(u32 NNN) noexcept {
 		jump_program_to(NNN);
 	}
 
@@ -322,7 +323,7 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 /*==================================================================*/
 	#pragma region 2 instruction branch
 
-	void CHIP8X::instruction_2NNN(s32 NNN) noexcept {
+	void CHIP8X::instruction_2NNN(u32 NNN) noexcept {
 		m_stack_bank[m_stack_head++ & 0xF] = m_current_pc;
 		jump_program_to(NNN);
 	}
@@ -333,7 +334,7 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 /*==================================================================*/
 	#pragma region 3 instruction branch
 
-	void CHIP8X::instruction_3xNN(s32 X, s32 NN) noexcept {
+	void CHIP8X::instruction_3xNN(u32 X, u32 NN) noexcept {
 		if (m_registers_V[X] == NN) { skip_instruction(); }
 	}
 
@@ -343,7 +344,7 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 /*==================================================================*/
 	#pragma region 4 instruction branch
 
-	void CHIP8X::instruction_4xNN(s32 X, s32 NN) noexcept {
+	void CHIP8X::instruction_4xNN(u32 X, u32 NN) noexcept {
 		if (m_registers_V[X] != NN) { skip_instruction(); }
 	}
 
@@ -353,10 +354,10 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 /*==================================================================*/
 	#pragma region 5 instruction branch
 
-	void CHIP8X::instruction_5xy0(s32 X, s32 Y) noexcept {
+	void CHIP8X::instruction_5xy0(u32 X, u32 Y) noexcept {
 		if (m_registers_V[X] == m_registers_V[Y]) { skip_instruction(); }
 	}
-	void CHIP8X::instruction_5xy1(s32 X, s32 Y) noexcept {
+	void CHIP8X::instruction_5xy1(u32 X, u32 Y) noexcept {
 		const auto lenX = (m_registers_V[X] & 0x70) + (m_registers_V[Y] & 0x70);
 		const auto lenY = (m_registers_V[X] + m_registers_V[Y]) & 0x7;
 		::assign_cast(m_registers_V[X], lenX | lenY);
@@ -368,7 +369,7 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 /*==================================================================*/
 	#pragma region 6 instruction branch
 
-	void CHIP8X::instruction_6xNN(s32 X, s32 NN) noexcept {
+	void CHIP8X::instruction_6xNN(u32 X, u32 NN) noexcept {
 		::assign_cast(m_registers_V[X], NN);
 	}
 
@@ -378,7 +379,7 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 /*==================================================================*/
 	#pragma region 7 instruction branch
 
-	void CHIP8X::instruction_7xNN(s32 X, s32 NN) noexcept {
+	void CHIP8X::instruction_7xNN(u32 X, u32 NN) noexcept {
 		::assign_cast_add(m_registers_V[X], NN);
 	}
 
@@ -388,39 +389,39 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 /*==================================================================*/
 	#pragma region 8 instruction branch
 
-	void CHIP8X::instruction_8xy0(s32 X, s32 Y) noexcept {
+	void CHIP8X::instruction_8xy0(u32 X, u32 Y) noexcept {
 		::assign_cast(m_registers_V[X], m_registers_V[Y]);
 	}
-	void CHIP8X::instruction_8xy1(s32 X, s32 Y) noexcept {
+	void CHIP8X::instruction_8xy1(u32 X, u32 Y) noexcept {
 		::assign_cast_or(m_registers_V[X], m_registers_V[Y]);
 	}
-	void CHIP8X::instruction_8xy2(s32 X, s32 Y) noexcept {
+	void CHIP8X::instruction_8xy2(u32 X, u32 Y) noexcept {
 		::assign_cast_and(m_registers_V[X], m_registers_V[Y]);
 	}
-	void CHIP8X::instruction_8xy3(s32 X, s32 Y) noexcept {
+	void CHIP8X::instruction_8xy3(u32 X, u32 Y) noexcept {
 		::assign_cast_xor(m_registers_V[X], m_registers_V[Y]);
 	}
-	void CHIP8X::instruction_8xy4(s32 X, s32 Y) noexcept {
+	void CHIP8X::instruction_8xy4(u32 X, u32 Y) noexcept {
 		const auto sum = m_registers_V[X] + m_registers_V[Y];
 		::assign_cast(m_registers_V[X], sum);
 		::assign_cast(m_registers_V[0xF], sum >> 8);
 	}
-	void CHIP8X::instruction_8xy5(s32 X, s32 Y) noexcept {
+	void CHIP8X::instruction_8xy5(u32 X, u32 Y) noexcept {
 		const bool nborrow = m_registers_V[X] >= m_registers_V[Y];
 		::assign_cast_sub(m_registers_V[X], m_registers_V[Y]);
 		::assign_cast(m_registers_V[0xF], nborrow);
 	}
-	void CHIP8X::instruction_8xy7(s32 X, s32 Y) noexcept {
+	void CHIP8X::instruction_8xy7(u32 X, u32 Y) noexcept {
 		const bool nborrow = m_registers_V[Y] >= m_registers_V[X];
 		::assign_cast_rsub(m_registers_V[X], m_registers_V[Y]);
 		::assign_cast(m_registers_V[0xF], nborrow);
 	}
-	void CHIP8X::instruction_8xy6(s32 X, s32 Y) noexcept {
+	void CHIP8X::instruction_8xy6(u32 X, u32 Y) noexcept {
 		const bool lsb = (m_registers_V[Y] & 1) == 1;
 		::assign_cast(m_registers_V[X], m_registers_V[Y] >> 1);
 		::assign_cast(m_registers_V[0xF], lsb);
 	}
-	void CHIP8X::instruction_8xyE(s32 X, s32 Y) noexcept {
+	void CHIP8X::instruction_8xyE(u32 X, u32 Y) noexcept {
 		const bool msb = (m_registers_V[Y] >> 7) == 1;
 		::assign_cast(m_registers_V[X], m_registers_V[Y] << 1);
 		::assign_cast(m_registers_V[0xF], msb);
@@ -432,7 +433,7 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 /*==================================================================*/
 	#pragma region 9 instruction branch
 
-	void CHIP8X::instruction_9xy0(s32 X, s32 Y) noexcept {
+	void CHIP8X::instruction_9xy0(u32 X, u32 Y) noexcept {
 		if (m_registers_V[X] != m_registers_V[Y]) { skip_instruction(); }
 	}
 
@@ -442,7 +443,7 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 /*==================================================================*/
 	#pragma region A instruction branch
 
-	void CHIP8X::instruction_ANNN(s32 NNN) noexcept {
+	void CHIP8X::instruction_ANNN(u32 NNN) noexcept {
 		::assign_cast(m_register_I, NNN);
 	}
 
@@ -452,7 +453,7 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 /*==================================================================*/
 	#pragma region B instruction branch
 
-	void CHIP8X::instruction_BxyN(s32 X, s32 Y, s32 N) noexcept {
+	void CHIP8X::instruction_BxyN(u32 X, u32 Y, u32 N) noexcept {
 		if (N) {
 			color_hires_zone(m_registers_V[X], m_registers_V[X + 1], m_registers_V[Y] & 0x7, N);
 		} else {
@@ -466,8 +467,8 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 /*==================================================================*/
 	#pragma region C instruction branch
 
-	void CHIP8X::instruction_CxNN(s32 X, s32 NN) noexcept {
-		::assign_cast(m_registers_V[X], RNG->next() & NN);
+	void CHIP8X::instruction_CxNN(u32 X, u32 NN) noexcept {
+		::assign_cast(m_registers_V[X], m_rng->next() & NN);
 	}
 
 	#pragma endregion
@@ -476,7 +477,7 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 /*==================================================================*/
 	#pragma region D instruction branch
 
-	void CHIP8X::drawByte(s32 X, s32 Y, u32 DATA) noexcept {
+	void CHIP8X::draw_byte(u32 X, u32 Y, u32 DATA) noexcept {
 		switch (DATA) {
 			[[unlikely]]
 			case 0b00000000:
@@ -484,7 +485,7 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 
 			[[likely]]
 			case 0b10000000:
-				if (!((m_display_buffer(X, Y) ^= 0x8) & 0x8))
+				if (!((m_display_map(X, Y) ^= 0x8) & 0x8))
 					{ m_registers_V[0xF] = 1; }
 				return;
 
@@ -492,7 +493,7 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 			default:
 				for (auto B = 0; B < 8; ++B) {
 					if (DATA & 0x80 >> B) {
-						if (!((m_display_buffer(X, Y) ^= 0x8) & 0x8))
+						if (!((m_display_map(X, Y) ^= 0x8) & 0x8))
 							{ m_registers_V[0xF] = 1; }
 					}
 					if (++X == c_sys_screen_W) { return; }
@@ -501,7 +502,7 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 		}
 	}
 
-	void CHIP8X::instruction_DxyN(s32 X, s32 Y, s32 N) noexcept {
+	void CHIP8X::instruction_DxyN(u32 X, u32 Y, u32 N) noexcept {
 		auto pX = m_registers_V[X] & (c_sys_screen_W - 1);
 		auto pY = m_registers_V[Y] & (c_sys_screen_H - 1);
 
@@ -513,14 +514,14 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 
 			[[likely]]
 			case 1:
-				drawByte(pX, pY, m_memory_bank[m_register_I]);
+				draw_byte(pX, pY, m_memory_bank[m_register_I]);
 				break;
 
 			[[unlikely]]
 			default:
-				for (auto H = 0; H < N; ++H)
+				for (auto H = 0u; H < N; ++H)
 				{
-					drawByte(pX, pY, m_memory_bank[m_register_I + H]);
+					draw_byte(pX, pY, m_memory_bank[m_register_I + H]);
 					if (++pY == c_sys_screen_H) { break; }
 				}
 				break;
@@ -535,16 +536,16 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 /*==================================================================*/
 	#pragma region E instruction branch
 
-	void CHIP8X::instruction_Ex9E(s32 X) noexcept {
+	void CHIP8X::instruction_Ex9E(u32 X) noexcept {
 		if (is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
 	}
-	void CHIP8X::instruction_ExA1(s32 X) noexcept {
+	void CHIP8X::instruction_ExA1(u32 X) noexcept {
 		if (!is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
 	}
-	void CHIP8X::instruction_ExF2(s32 X) noexcept {
+	void CHIP8X::instruction_ExF2(u32 X) noexcept {
 		if (is_key_held_P2(m_registers_V[X])) { skip_instruction(); }
 	}
-	void CHIP8X::instruction_ExF5(s32 X) noexcept {
+	void CHIP8X::instruction_ExF5(u32 X) noexcept {
 		if (!is_key_held_P2(m_registers_V[X])) { skip_instruction(); }
 	}
 
@@ -554,44 +555,44 @@ void CHIP8X::color_hires_zone(s32 X, s32 Y, s32 idx, s32 N) noexcept {
 /*==================================================================*/
 	#pragma region F instruction branch
 
-	void CHIP8X::instruction_Fx07(s32 X) noexcept {
+	void CHIP8X::instruction_Fx07(u32 X) noexcept {
 		::assign_cast(m_registers_V[X], m_delay_timer);
 	}
-	void CHIP8X::instruction_Fx0A(s32 X) noexcept {
+	void CHIP8X::instruction_Fx0A(u32 X) noexcept {
 		m_key_reg_ref = &m_registers_V[X];
 		trigger_interrupt(Interrupt::INPUT);
 	}
-	void CHIP8X::instruction_Fx15(s32 X) noexcept {
+	void CHIP8X::instruction_Fx15(u32 X) noexcept {
 		::assign_cast(m_delay_timer, m_registers_V[X]);
 	}
-	void CHIP8X::instruction_Fx18(s32 X) noexcept {
+	void CHIP8X::instruction_Fx18(u32 X) noexcept {
 		m_audio_timers[VOICE::UNIQUE].set(m_registers_V[X] + (m_registers_V[X] == 1));
 	}
-	void CHIP8X::instruction_Fx1E(s32 X) noexcept {
+	void CHIP8X::instruction_Fx1E(u32 X) noexcept {
 		::assign_cast_add(m_register_I, m_registers_V[X]);
 	}
-	void CHIP8X::instruction_Fx29(s32 X) noexcept {
+	void CHIP8X::instruction_Fx29(u32 X) noexcept {
 		::assign_cast(m_register_I, (m_registers_V[X] & 0xF) * 5 + c_small_font_offset);
 	}
-	void CHIP8X::instruction_Fx33(s32 X) noexcept {
+	void CHIP8X::instruction_Fx33(u32 X) noexcept {
 		const TriBCD bcd{ m_registers_V[X] };
 
 		m_memory_bank[m_register_I + 0] = bcd.digit[2];
 		m_memory_bank[m_register_I + 1] = bcd.digit[1];
 		m_memory_bank[m_register_I + 2] = bcd.digit[0];
 	}
-	void CHIP8X::instruction_FN55(s32 N) noexcept {
-		for (auto idx = 0; idx <= N; ++idx) { m_memory_bank[m_register_I + idx] = m_registers_V[idx]; }
+	void CHIP8X::instruction_FN55(u32 N) noexcept {
+		for (auto i = 0u; i <= N; ++i) { m_memory_bank[m_register_I + i] = m_registers_V[i]; }
 		::assign_cast_add(m_register_I, N + 1);
 	}
-	void CHIP8X::instruction_FN65(s32 N) noexcept {
-		for (auto idx = 0; idx <= N; ++idx) { m_registers_V[idx] = m_memory_bank[m_register_I + idx]; }
+	void CHIP8X::instruction_FN65(u32 N) noexcept {
+		for (auto i = 0u; i <= N; ++i) { m_registers_V[i] = m_memory_bank[m_register_I + i]; }
 		::assign_cast_add(m_register_I, N + 1);
 	}
-	void CHIP8X::instruction_FxF8(s32 X) noexcept {
+	void CHIP8X::instruction_FxF8(u32 X) noexcept {
 		set_pulse_pitch(m_registers_V[X]);
 	}
-	void CHIP8X::instruction_FxFB(s32) noexcept {
+	void CHIP8X::instruction_FxFB(u32) noexcept {
 		trigger_interrupt(Interrupt::FRAME);
 	}
 

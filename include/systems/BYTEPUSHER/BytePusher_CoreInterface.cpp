@@ -53,10 +53,10 @@ void BytePusher_CoreInterface::load_preset_binds() noexcept {
 u32  BytePusher_CoreInterface::get_key_states() noexcept {
 	auto key_states = 0u;
 
-	Input->update_states();
+	m_input->update_states();
 
 	for (const auto& mapping : m_custom_binds) {
-		if (Input->are_any_held(mapping.key, mapping.alt))
+		if (m_input->are_any_held(mapping.key, mapping.alt))
 			{ key_states |= 1u << mapping.idx; }
 	}
 

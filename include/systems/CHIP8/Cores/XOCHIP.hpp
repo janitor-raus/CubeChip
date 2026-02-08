@@ -19,29 +19,20 @@ class XOCHIP final : public Chip8_CoreInterface {
 	static constexpr u32 c_sys_boot_pos     =   512;
 	static constexpr f32 c_sys_refresh_rate = 60.0f;
 
-	static constexpr s32 cResSizeMult =     8;
-	static constexpr s32 cScreenSizeX =    64;
-	static constexpr s32 cScreenSizeY =    32;
-	static constexpr s32 c_sys_speed_hi = 50000;
-	static constexpr s32 c_sys_speed_lo =  1000;
+	static constexpr u32 c_sys_speed_hi = 50000;
+	static constexpr u32 c_sys_speed_lo =  1000;
 
 	static constexpr u32 c_sys_screen_W = 128;
 	static constexpr u32 c_sys_screen_H =  64;
 
 private:
-	static inline thread_local u32 m_plane_mask = 0x1;
-
-	Map2D<u8> m_display_buffer[4];
-
 	MemoryBank<c_sys_memory_size>
 		m_memory_bank{};
 
-	struct DisplayRes final {
-		s32 W{}, H{};
-		constexpr s32 pixels() const noexcept { return W * H; }
-		constexpr void clear() noexcept { W = H = 0; }
-		constexpr void set(u32 w, u32 h) noexcept { W = w; H = h; }
-	} mDisplay;
+	std::array<u8, c_sys_screen_W * c_sys_screen_H>
+		m_display_buffer[4]{};
+
+	Map2D<u8> m_display_map[4];
 
 /*==================================================================*/
 
@@ -50,7 +41,7 @@ private:
 	// 332 RGB color mapping: SHR 5 | SHR 2 | SHR 0
 	// R/G: 0x00, 0x20, 0x40, 0x60, 0x80, 0xA0, 0xC0, 0xFF
 	//  B : 0x00,             0x60,       0xA0,       0xFF
-	static constexpr std::array<RGBA, 256> s_color_palette = {
+	static constexpr std::array<RGBA, 256> c_color_palette = {
 		0x00000000, 0x00006000, 0x0000A000, 0x0000FF00,
 		0x00200000, 0x00206000, 0x0020A000, 0x0020FF00,
 		0x00400000, 0x00406000, 0x0040A000, 0x0040FF00,
@@ -126,7 +117,7 @@ private:
 	 * Optionally, one can skip part of the formula as: 31.25 * 2^((pitch - 64) / 48)
 	 * The entries in the array are pre-calculated (floating-point) frequencies in int format
 	 */
-	static constexpr std::array<u32, 256> s_pitch_frequency_lut = {
+	static constexpr std::array<u32, 256> c_pitch_frequency_lut = {
 		0x41466CD5, 0x41494FB1, 0x414C3D4C, 0x414F35CD,
 		0x4152395F, 0x4155482A, 0x41586256, 0x415B8812,
 		0x415EB985, 0x4161F6DB, 0x41654042, 0x416895E7,
@@ -194,10 +185,14 @@ private:
 	};
 
 	using PatternData = std::array<u8, 16>;
-	static inline thread_local PatternData m_pulse_pattern = {
-		0x0F, 0x00,	0x0F, 0x00, 0x0F, 0x00, 0x0F, 0x00,
-		0x0F, 0x00,	0x0F, 0x00, 0x0F, 0x00, 0x0F, 0x00,
-	};
+
+	static auto& pulse_pattern_data() noexcept {
+		static thread_local PatternData s_pattern = {
+			0x0F, 0x00,	0x0F, 0x00, 0x0F, 0x00, 0x0F, 0x00,
+			0x0F, 0x00,	0x0F, 0x00, 0x0F, 0x00, 0x0F, 0x00,
+		};
+		return s_pattern;
+	}
 
 	void set_pattern_pitch(s32 pitch) noexcept;
 
@@ -205,16 +200,18 @@ private:
 
 /*==================================================================*/
 
+	u32 m_plane_mask = 0x1;
+
 	auto NNNN() const noexcept { return m_memory_bank[m_current_pc] << 8 | m_memory_bank[m_current_pc + 1]; }
 
 public:
 	XOCHIP() noexcept
 		: Chip8_CoreInterface(DisplayDevice(c_sys_screen_W, c_sys_screen_H, "XOCHIP"))
-		, m_display_buffer{
-			{cScreenSizeX, cScreenSizeY},
-			{cScreenSizeX, cScreenSizeY},
-			{cScreenSizeX, cScreenSizeY},
-			{cScreenSizeX, cScreenSizeY},
+		, m_display_map{
+			Map2D(m_display_buffer[P0].data(), c_sys_screen_W/2, c_sys_screen_H/2),
+			Map2D(m_display_buffer[P1].data(), c_sys_screen_W/2, c_sys_screen_H/2),
+			Map2D(m_display_buffer[P2].data(), c_sys_screen_W/2, c_sys_screen_H/2),
+			Map2D(m_display_buffer[P3].data(), c_sys_screen_W/2, c_sys_screen_H/2),
 		}
 	{}
 
@@ -236,12 +233,12 @@ private:
 	void push_audio_data() override;
 	void push_video_data() override;
 
-	void set_display_properties(const Resolution mode) override;
+	void set_display_properties(const Resolution) override {};
 
 	void skip_instruction() noexcept override;
 
-	void scroll_display_up(s32 N);
-	void scroll_display_dn(s32 N);
+	void scroll_display_up(u32 N);
+	void scroll_display_dn(u32 N);
 	void scroll_display_lt();
 	void scroll_display_rt();
 
@@ -249,9 +246,9 @@ private:
 	#pragma region 0 instruction branch
 
 	// 00DN - scroll selected color plane N lines down
-	void instruction_00CN(s32 N) noexcept;
+	void instruction_00CN(u32 N) noexcept;
 	// 00DN - scroll selected color plane N lines up
-	void instruction_00DN(s32 N) noexcept;
+	void instruction_00DN(u32 N) noexcept;
 	// 00E0 - erase selected color plane
 	void instruction_00E0() noexcept;
 	// 00EE - return from subroutine
@@ -274,7 +271,7 @@ private:
 	#pragma region 1 instruction branch
 
 	// 1NNN - jump to NNN
-	void instruction_1NNN(s32 NNN) noexcept;
+	void instruction_1NNN(u32 NNN) noexcept;
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
@@ -283,7 +280,7 @@ private:
 	#pragma region 2 instruction branch
 
 	// 2NNN - call subroutine at NNN
-	void instruction_2NNN(s32 NNN) noexcept;
+	void instruction_2NNN(u32 NNN) noexcept;
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
@@ -292,7 +289,7 @@ private:
 	#pragma region 3 instruction branch
 
 	// 3XNN - skip next instruction if VX == NN
-	void instruction_3xNN(s32 X, s32 NN) noexcept;
+	void instruction_3xNN(u32 X, u32 NN) noexcept;
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
@@ -301,7 +298,7 @@ private:
 	#pragma region 4 instruction branch
 
 	// 4XNN - skip next instruction if VX != NN
-	void instruction_4xNN(s32 X, s32 NN) noexcept;
+	void instruction_4xNN(u32 X, u32 NN) noexcept;
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
@@ -310,13 +307,13 @@ private:
 	#pragma region 5 instruction branch
 
 	// 5XY0 - skip next instruction if VX == VY
-	void instruction_5xy0(s32 X, s32 Y) noexcept;
+	void instruction_5xy0(u32 X, u32 Y) noexcept;
 	// 5XY2 - store range of registers to memory
-	void instruction_5xy2(s32 X, s32 Y) noexcept;
+	void instruction_5xy2(u32 X, u32 Y) noexcept;
 	// 5XY3 - load range of registers from memory
-	void instruction_5xy3(s32 X, s32 Y) noexcept;
+	void instruction_5xy3(u32 X, u32 Y) noexcept;
 	// 5XY4 - load range of colors from memory *EXPERIMENTAL*
-	void instruction_5xy4(s32 X, s32 Y) noexcept;
+	void instruction_5xy4(u32 X, u32 Y) noexcept;
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
@@ -325,7 +322,7 @@ private:
 	#pragma region 6 instruction branch
 
 	// 6XNN - set VX = NN
-	void instruction_6xNN(s32 X, s32 NN) noexcept;
+	void instruction_6xNN(u32 X, u32 NN) noexcept;
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
@@ -334,7 +331,7 @@ private:
 	#pragma region 7 instruction branch
 
 	// 7XNN - set VX = VX + NN
-	void instruction_7xNN(s32 X, s32 NN) noexcept;
+	void instruction_7xNN(u32 X, u32 NN) noexcept;
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
@@ -343,23 +340,23 @@ private:
 	#pragma region 8 instruction branch
 
 	// 8XY0 - set VX = VY
-	void instruction_8xy0(s32 X, s32 Y) noexcept;
+	void instruction_8xy0(u32 X, u32 Y) noexcept;
 	// 8XY1 - set VX = VX | VY
-	void instruction_8xy1(s32 X, s32 Y) noexcept;
+	void instruction_8xy1(u32 X, u32 Y) noexcept;
 	// 8XY2 - set VX = VX & VY
-	void instruction_8xy2(s32 X, s32 Y) noexcept;
+	void instruction_8xy2(u32 X, u32 Y) noexcept;
 	// 8XY3 - set VX = VX ^ VY
-	void instruction_8xy3(s32 X, s32 Y) noexcept;
+	void instruction_8xy3(u32 X, u32 Y) noexcept;
 	// 8XY4 - set VX = VX + VY, VF = carry
-	void instruction_8xy4(s32 X, s32 Y) noexcept;
+	void instruction_8xy4(u32 X, u32 Y) noexcept;
 	// 8XY5 - set VX = VX - VY, VF = !borrow
-	void instruction_8xy5(s32 X, s32 Y) noexcept;
+	void instruction_8xy5(u32 X, u32 Y) noexcept;
 	// 8XY7 - set VX = VY - VX, VF = !borrow
-	void instruction_8xy7(s32 X, s32 Y) noexcept;
+	void instruction_8xy7(u32 X, u32 Y) noexcept;
 	// 8XY6 - set VX = VY >> 1, VF = carry
-	void instruction_8xy6(s32 X, s32 Y) noexcept;
+	void instruction_8xy6(u32 X, u32 Y) noexcept;
 	// 8XYE - set VX = VY << 1, VF = carry
-	void instruction_8xyE(s32 X, s32 Y) noexcept;
+	void instruction_8xyE(u32 X, u32 Y) noexcept;
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
@@ -368,7 +365,7 @@ private:
 	#pragma region 9 instruction branch
 
 	// 9XY0 - skip next instruction if VX != VY
-	void instruction_9xy0(s32 X, s32 Y) noexcept;
+	void instruction_9xy0(u32 X, u32 Y) noexcept;
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
@@ -377,7 +374,7 @@ private:
 	#pragma region A instruction branch
 
 	// ANNN - set I = NNN
-	void instruction_ANNN(s32 NNN) noexcept;
+	void instruction_ANNN(u32 NNN) noexcept;
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
@@ -386,7 +383,7 @@ private:
 	#pragma region B instruction branch
 
 	// BNNN - jump to NNN + V0
-	void instruction_BNNN(s32 NNN) noexcept;
+	void instruction_BNNN(u32 NNN) noexcept;
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
@@ -395,7 +392,7 @@ private:
 	#pragma region C instruction branch
 
 	// CXNN - set VX = rnd(256) & NN
-	void instruction_CxNN(s32 X, s32 NN) noexcept;
+	void instruction_CxNN(u32 X, u32 NN) noexcept;
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
@@ -403,7 +400,7 @@ private:
 /*==================================================================*/
 	#pragma region D instruction branch
 
-	void drawByte(s32 X, s32 Y, s32 P, u32 DATA) noexcept;
+	void draw_byte(u32 X, u32 Y, u32 P, u32 DATA) noexcept;
 
 	enum Plane {
 		P0, P1, P2, P3,
@@ -415,7 +412,7 @@ private:
 
 	// For planar mask N (0000 to 1111), count set bits
 	// to the right of bit (currently drawn plane) 0..3
-	static constexpr u8 sPlaneMult[4][16] = {
+	static constexpr u8 s_plane_mask[4][16] = {
 		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, // Plane 0
 		{0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1}, // Plane 1
 		{0,1,1,2,0,1,1,2,0,1,1,2,0,1,1,2}, // Plane 2
@@ -423,16 +420,16 @@ private:
 	};
 
 	template <std::size_t P>
-	void drawSingleRow(s32 X, s32 Y) noexcept;
+	void draw_single_row(u32 X, u32 Y) noexcept;
 
 	template <std::size_t P>
-	void drawDoubleRow(s32 X, s32 Y) noexcept;
+	void draw_double_row(u32 X, u32 Y) noexcept;
 
 	template <std::size_t P>
-	void drawMultiRow (s32 X, s32 Y, s32 N) noexcept;
+	void draw_n_rows(u32 X, u32 Y, u32 N) noexcept;
 
 	// DXYN - draw N sprite rows at VX and VY
-	void instruction_DxyN(s32 X, s32 Y, s32 N) noexcept;
+	void instruction_DxyN(u32 X, u32 Y, u32 N) noexcept;
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
@@ -441,9 +438,9 @@ private:
 	#pragma region E instruction branch
 
 	// EX9E - skip next instruction if key VX down (p1)
-	void instruction_Ex9E(s32 X) noexcept;
+	void instruction_Ex9E(u32 X) noexcept;
 	// EXA1 - skip next instruction if key VX up (p1)
-	void instruction_ExA1(s32 X) noexcept;
+	void instruction_ExA1(u32 X) noexcept;
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
@@ -456,33 +453,33 @@ private:
 	// F002 - load 16-byte audio pattern from RAM at I
 	void instruction_F002() noexcept;
 	// FN01 - set plane drawing to N
-	void instruction_FN01(s32 N) noexcept;
+	void instruction_FN01(u32 N) noexcept;
 	// FX07 - set VX = delay timer
-	void instruction_Fx07(s32 X) noexcept;
+	void instruction_Fx07(u32 X) noexcept;
 	// FX0A - set VX = key, wait for keypress
-	void instruction_Fx0A(s32 X) noexcept;
+	void instruction_Fx0A(u32 X) noexcept;
 	// FX15 - set delay timer = VX
-	void instruction_Fx15(s32 X) noexcept;
+	void instruction_Fx15(u32 X) noexcept;
 	// FX18 - set sound timer = VX
-	void instruction_Fx18(s32 X) noexcept;
+	void instruction_Fx18(u32 X) noexcept;
 	// FX1E - set I = I + VX
-	void instruction_Fx1E(s32 X) noexcept;
+	void instruction_Fx1E(u32 X) noexcept;
 	// FX29 - set I to 5-byte hex sprite from VX
-	void instruction_Fx29(s32 X) noexcept;
+	void instruction_Fx29(u32 X) noexcept;
 	// FX30 - set I to 10-byte hex sprite from VX
-	void instruction_Fx30(s32 X) noexcept;
+	void instruction_Fx30(u32 X) noexcept;
 	// FX33 - store BCD of VX to RAM at I..I+2
-	void instruction_Fx33(s32 X) noexcept;
+	void instruction_Fx33(u32 X) noexcept;
 	// FX3A - set sound pitch = VX
-	void instruction_Fx3A(s32 X) noexcept;
+	void instruction_Fx3A(u32 X) noexcept;
 	// FN55 - store V0..VN to RAM at I..I+N
-	void instruction_FN55(s32 N) noexcept;
+	void instruction_FN55(u32 N) noexcept;
 	// FN65 - load V0..VN from RAM at I..I+N
-	void instruction_FN65(s32 N) noexcept;
+	void instruction_FN65(u32 N) noexcept;
 	// FN75 - store V0..VN to the permanent regs
-	void instruction_FN75(s32 N) noexcept;
+	void instruction_FN75(u32 N) noexcept;
 	// FN85 - load V0..VN from the permanent regs
-	void instruction_FN85(s32 N) noexcept;
+	void instruction_FN85(u32 N) noexcept;
 
 	#pragma endregion
 /*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/

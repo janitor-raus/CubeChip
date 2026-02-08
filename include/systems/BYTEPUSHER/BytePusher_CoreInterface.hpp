@@ -16,7 +16,7 @@
 class BytePusher_CoreInterface : public SystemInterface {
 
 protected:
-	static inline thread_local std::string s_savestate_path{};
+	static inline std::string s_savestate_path{};
 
 	enum STREAM { MAIN };
 	enum VOICE { ID_0, COUNT };
