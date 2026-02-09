@@ -39,8 +39,8 @@ private:
 	}
 
 	void instruction_loop() noexcept override;
-	void push_audio_data() override;
-	void push_video_data() override;
+	void push_audio_data() noexcept override;
+	void push_video_data() noexcept override;
 
 public:
 	BYTEPUSHER_STANDARD() noexcept

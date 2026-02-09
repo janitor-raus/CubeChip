@@ -247,7 +247,7 @@ void XOCHIP::instruction_loop(Lambda&& condition) noexcept {
 	}
 }
 
-void XOCHIP::push_audio_data() {
+void XOCHIP::push_audio_data() noexcept {
 	mix_audio_data({
 		{ make_pattern_wave, &m_voices[VOICE::UNIQUE] },
 		{ make_pulse_wave,   &m_voices[VOICE::BUZZER] },
@@ -257,7 +257,7 @@ void XOCHIP::push_audio_data() {
 		!!m_audio_timers[VOICE::BUZZER], m_bit_colors[1]);
 }
 
-void XOCHIP::push_video_data() {
+void XOCHIP::push_video_data() noexcept {
 	std::array<u8, c_sys_screen_W * c_sys_screen_H> composite_buffer{};
 
 	const auto merge_bit_color = [&](unsigned idx) noexcept {
@@ -324,25 +324,25 @@ void XOCHIP::skip_instruction() noexcept {
 	::assign_cast_add(m_current_pc, NNNN() == 0xF000 ? 4 : 2);
 }
 
-void XOCHIP::scroll_display_up(u32 N) {
+void XOCHIP::scroll_display_up(u32 N) noexcept {
 	if (m_plane_mask & P0M) { m_display_map[0].shift(0, -s32(N)); }
 	if (m_plane_mask & P1M) { m_display_map[1].shift(0, -s32(N)); }
 	if (m_plane_mask & P2M) { m_display_map[2].shift(0, -s32(N)); }
 	if (m_plane_mask & P3M) { m_display_map[3].shift(0, -s32(N)); }
 }
-void XOCHIP::scroll_display_dn(u32 N) {
+void XOCHIP::scroll_display_dn(u32 N) noexcept {
 	if (m_plane_mask & P0M) { m_display_map[0].shift(0, +s32(N)); }
 	if (m_plane_mask & P1M) { m_display_map[1].shift(0, +s32(N)); }
 	if (m_plane_mask & P2M) { m_display_map[2].shift(0, +s32(N)); }
 	if (m_plane_mask & P3M) { m_display_map[3].shift(0, +s32(N)); }
 }
-void XOCHIP::scroll_display_lt() {
+void XOCHIP::scroll_display_lt() noexcept {
 	if (m_plane_mask & P0M) { m_display_map[0].shift(-4, 0); }
 	if (m_plane_mask & P1M) { m_display_map[1].shift(-4, 0); }
 	if (m_plane_mask & P2M) { m_display_map[2].shift(-4, 0); }
 	if (m_plane_mask & P3M) { m_display_map[3].shift(-4, 0); }
 }
-void XOCHIP::scroll_display_rt() {
+void XOCHIP::scroll_display_rt() noexcept {
 	if (m_plane_mask & P0M) { m_display_map[0].shift(+4, 0); }
 	if (m_plane_mask & P1M) { m_display_map[1].shift(+4, 0); }
 	if (m_plane_mask & P2M) { m_display_map[2].shift(+4, 0); }

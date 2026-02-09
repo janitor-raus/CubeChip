@@ -44,7 +44,7 @@ void BYTEPUSHER_STANDARD::instruction_loop() noexcept {
 	}
 }
 
-void BYTEPUSHER_STANDARD::push_audio_data() {
+void BYTEPUSHER_STANDARD::push_audio_data() noexcept {
 	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
 		const auto samples = std::span(m_memory_bank.data() + (readData<2>(6) << 8), 256);
 		auto buffer = ::allocate_n<f32>(stream->get_next_buffer_size(get_real_system_framerate()))
@@ -61,7 +61,7 @@ void BYTEPUSHER_STANDARD::push_audio_data() {
 	}
 }
 
-void BYTEPUSHER_STANDARD::push_video_data() {
+void BYTEPUSHER_STANDARD::push_video_data() noexcept {
 	m_display_device.swapchain().acquire([&](auto& frame) noexcept {
 		frame.metadata = ++m_display_device.metadata_staging();
 		frame.copy_from(m_memory_bank.data() + (readData<1>(5) << 16), c_sys_screen_W * c_sys_screen_H,

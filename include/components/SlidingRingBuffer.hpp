@@ -117,7 +117,7 @@ private:
 		}
 
 		[[nodiscard]] auto safe() const noexcept {
-			std::unique_lock lock(buf.mGuard);
+			std::scoped_lock lock(buf.mGuard);
 			return snapshot();
 		}
 	};
@@ -158,7 +158,7 @@ private:
 		}
 
 		[[nodiscard]] auto safe() const noexcept {
-			std::unique_lock lock(buf.mGuard);
+			std::scoped_lock lock(buf.mGuard);
 			return snapshot();
 		}
 	};
@@ -169,7 +169,7 @@ public:
 	 * @note This method is thread-safe, but cannot run concurrently with push() or safe_snapshot_*() calls.
 	 */
 	void clear_buffer() noexcept {
-		std::unique_lock lock(mGuard);
+		std::scoped_lock lock(mGuard);
 		const static auto sDefaultT
 			= std::make_shared<T>();
 

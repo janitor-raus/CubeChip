@@ -173,7 +173,7 @@ public:
 			s_hooks->windows.registry.buffer.push_back(shared_ptr);
 			s_hooks->windows.registry_lock.unlock();
 		} else {
-			std::unique_lock lock(s_hooks->windows.overflow_lock); // must wait to acquire
+			std::scoped_lock lock(s_hooks->windows.overflow_lock); // must wait to acquire
 			s_hooks->windows.overflow.buffer.push_back(shared_ptr);
 		}
 
@@ -194,7 +194,7 @@ public:
 				[menu_title].buffer.push_back(shared_ptr);
 			s_hooks->menus.registry_lock.unlock();
 		} else {
-			std::unique_lock lock(s_hooks->menus.overflow_lock); // must wait to acquire
+			std::scoped_lock lock(s_hooks->menus.overflow_lock); // must wait to acquire
 			s_hooks->menus.overflow[window_tag.get_id_or_label()] \
 				[menu_title].buffer.push_back(shared_ptr);
 		}

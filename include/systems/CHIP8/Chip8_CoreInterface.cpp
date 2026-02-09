@@ -207,7 +207,7 @@ void Chip8_CoreInterface::append_statistics_data() noexcept {
 
 /*==================================================================*/
 
-void Chip8_CoreInterface::start_voice(s32 duration, s32 tone) noexcept {
+void Chip8_CoreInterface::start_voice(u32 duration, u32 tone) noexcept {
 	auto voice_index = 0;
 	start_voice_at(voice_index, duration, tone);
 	if (duration) { ++voice_index %= VOICE::COUNT - 1; }

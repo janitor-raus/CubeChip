@@ -48,12 +48,12 @@ using mo = std::memory_order;
 		AtomSharedPtr& operator=(const AtomSharedPtr&) = delete;
 
 		void store(const std::shared_ptr<T>& ptr, std::memory_order = std::memory_order::seq_cst) noexcept {
-			std::unique_lock lock(m_lock);
+			std::scoped_lock lock(m_lock);
 			m_ptr = ptr;
 		}
 
 		void store(std::shared_ptr<T>&& ptr, std::memory_order = std::memory_order::seq_cst) noexcept {
-			std::unique_lock lock(m_lock);
+			std::scoped_lock lock(m_lock);
 			m_ptr = std::move(ptr);
 		}
 
@@ -63,14 +63,14 @@ using mo = std::memory_order;
 		}
 
 		auto exchange(const std::shared_ptr<T>& ptr, std::memory_order = std::memory_order::seq_cst) noexcept {
-			std::unique_lock lock(m_lock);
+			std::scoped_lock lock(m_lock);
 			auto old = std::move(m_ptr);
 			m_ptr = ptr;
 			return old;
 		}
 
 		auto exchange(std::shared_ptr<T>&& ptr, std::memory_order = std::memory_order::seq_cst) noexcept {
-			std::unique_lock lock(m_lock);
+			std::scoped_lock lock(m_lock);
 			auto old = std::move(m_ptr);
 			m_ptr = std::move(ptr);
 			return old;

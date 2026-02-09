@@ -218,7 +218,7 @@ void SCHIP_LEGACY::instruction_loop(Lambda&& condition) noexcept {
 	}
 }
 
-void SCHIP_LEGACY::push_audio_data() {
+void SCHIP_LEGACY::push_audio_data() noexcept {
 	mix_audio_data({
 		{ make_pulse_wave, &m_voices[VOICE::ID_0] },
 		{ make_pulse_wave, &m_voices[VOICE::ID_1] },
@@ -227,10 +227,10 @@ void SCHIP_LEGACY::push_audio_data() {
 	});
 
 	m_display_device.metadata_staging().set_border_color_if(
-		!!::accumulate(m_audio_timers), s_bit_colors[1]);
+		!!::accumulate(m_audio_timers, 0), s_bit_colors[1]);
 }
 
-void SCHIP_LEGACY::push_video_data() {
+void SCHIP_LEGACY::push_video_data() noexcept {
 	m_display_device.swapchain().acquire([&](auto& frame) noexcept {
 		frame.metadata = ++m_display_device.metadata_staging();
 		frame.copy_from(m_display_map, use_pixel_trails()
@@ -251,13 +251,13 @@ void SCHIP_LEGACY::push_video_data() {
 
 /*==================================================================*/
 
-void SCHIP_LEGACY::scroll_display_dn(u32 N) {
+void SCHIP_LEGACY::scroll_display_dn(u32 N) noexcept {
 	m_display_map.shift(0, +N);
 }
-void SCHIP_LEGACY::scroll_display_lt() {
+void SCHIP_LEGACY::scroll_display_lt() noexcept {
 	m_display_map.shift(-4, 0);
 }
-void SCHIP_LEGACY::scroll_display_rt() {
+void SCHIP_LEGACY::scroll_display_rt() noexcept {
 	m_display_map.shift(+4, 0);
 }
 

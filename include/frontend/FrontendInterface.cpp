@@ -30,7 +30,7 @@ static bool  s_pending_style_changes = true;
 /*==================================================================*/
 
 bool FrontendInterface::merge_overflowing_windows() noexcept {
-	std::unique_lock lock(s_hooks->windows.overflow_lock);
+	std::scoped_lock lock(s_hooks->windows.overflow_lock);
 
 	auto& src_windows = s_hooks->windows.overflow.buffer;
 	if (src_windows.empty()) { return false; }
@@ -49,7 +49,7 @@ bool FrontendInterface::merge_overflowing_windows() noexcept {
 }
 
 void FrontendInterface::invoke_registered_windows() noexcept {
-	std::unique_lock lock(s_hooks->windows.registry_lock);
+	std::scoped_lock lock(s_hooks->windows.registry_lock);
 
 	auto& windows = s_hooks->windows.registry;
 
@@ -67,7 +67,7 @@ void FrontendInterface::invoke_registered_windows() noexcept {
 }
 
 bool FrontendInterface::merge_overflowing_menus(const LabelKey& window_key) noexcept {
-	std::unique_lock lock(s_hooks->menus.overflow_lock);
+	std::scoped_lock lock(s_hooks->menus.overflow_lock);
 
 	auto& src_window = s_hooks->menus.overflow[window_key.get_id_or_label()];
 	if (src_window.empty()) { return false; }
@@ -92,7 +92,7 @@ bool FrontendInterface::merge_overflowing_menus(const LabelKey& window_key) noex
 }
 
 void FrontendInterface::invoke_registered_menus(const LabelKey& window_key) noexcept {
-	std::unique_lock lock(s_hooks->menus.registry_lock);
+	std::scoped_lock lock(s_hooks->menus.registry_lock);
 
 	merge_overflowing_menus(window_key); // unconditional first merge
 	auto window = s_hooks->menus.registry.find(window_key.get_id_or_label());

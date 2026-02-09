@@ -136,7 +136,7 @@ public:
 		std::is_nothrow_invocable_v<Fn, BufferView<true>> &&
 		std::is_nothrow_invocable_v<Fn, BufferView<false>>
 	) {
-		std::unique_lock lock(m_context->m_reader_lock);
+		std::scoped_lock lock(m_context->m_reader_lock);
 
 		if (getFlag(m_context->m_swap_ptr.load(std::memory_order::acquire))) {
 			m_context->m_read_ptr.store(subFlag(m_context->m_swap_ptr.exchange(
@@ -175,7 +175,7 @@ public:
 	decltype(auto) acquire(Fn&& function) noexcept(
 		std::is_nothrow_invocable_v<Fn, Buffer&>
 	) {
-		std::unique_lock lock(m_context->m_worker_lock);
+		std::scoped_lock lock(m_context->m_worker_lock);
 
 		if constexpr (std::is_void_v<std::invoke_result_t<Fn, Buffer&>>) {
 			std::forward<Fn>(function)(*m_context->m_work_ptr);

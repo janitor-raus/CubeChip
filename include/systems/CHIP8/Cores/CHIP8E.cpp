@@ -233,7 +233,7 @@ void CHIP8E::instruction_loop(Lambda&& condition) noexcept {
 	}
 }
 
-void CHIP8E::push_audio_data() {
+void CHIP8E::push_audio_data() noexcept {
 		mix_audio_data({
 		{ make_pulse_wave, &m_voices[VOICE::ID_0] },
 		{ make_pulse_wave, &m_voices[VOICE::ID_1] },
@@ -242,10 +242,10 @@ void CHIP8E::push_audio_data() {
 	});
 
 		m_display_device.metadata_staging().set_border_color_if(
-		!!::accumulate(m_audio_timers), s_bit_colors[1]);
+		!!::accumulate(m_audio_timers, 0), s_bit_colors[1]);
 }
 
-void CHIP8E::push_video_data() {
+void CHIP8E::push_video_data() noexcept {
 	m_display_device.swapchain().acquire([&](auto& frame) noexcept {
 		frame.metadata = ++m_display_device.metadata_staging();
 		frame.copy_from(m_display_map, use_pixel_trails()

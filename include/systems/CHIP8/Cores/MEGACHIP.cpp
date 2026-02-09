@@ -284,7 +284,7 @@ void MEGACHIP::instruction_loop(Lambda&& condition) noexcept {
 	}
 }
 
-void MEGACHIP::push_audio_data() {
+void MEGACHIP::push_audio_data() noexcept {
 	if (use_manual_vsync()) {
 		mix_audio_data({
 			{ make_stream_wave, &m_voices[VOICE::UNIQUE] },
@@ -303,11 +303,11 @@ void MEGACHIP::push_audio_data() {
 		});
 
 		m_display_device.metadata_staging().set_border_color_if(
-			!!::accumulate(m_audio_timers), s_bit_colors[1]);
+			!!::accumulate(m_audio_timers, 0), s_bit_colors[1]);
 	}
 }
 
-void MEGACHIP::push_video_data() {
+void MEGACHIP::push_video_data() noexcept {
 	if (!use_manual_vsync()) {
 		auto calc_color = use_pixel_trails()
 			? [](u8 pixel) { return RGBA::premul(s_bit_colors[pixel != 0], c_bit_weight[pixel]); }
@@ -329,13 +329,14 @@ void MEGACHIP::push_video_data() {
 	}
 }
 
-void MEGACHIP::set_display_properties(Resolution mode) {
+void MEGACHIP::set_display_properties(Resolution mode) noexcept {
 	use_manual_vsync(mode == Resolution::MC);
 
 	if (use_manual_vsync()) {
 		m_display_device.metadata_staging()
 			.set_viewport(c_sys_screen_W, c_sys_screen_H)
 			.set_texture_tint(RGBA::Black);
+
 		Quirk.await_vblank = false;
 		m_target_cpf = c_sys_speed_lo * 100;
 	}
@@ -344,10 +345,15 @@ void MEGACHIP::set_display_properties(Resolution mode) {
 			.set_viewport(c_sys_screen_W, c_sys_screen_W/2)
 			.set_texture_tint(c_bit_colors[0]);
 
-		use_hires_screen(mode != Resolution::LO);
-
-		Quirk.await_vblank = !use_hires_screen();
-		m_target_cpf = use_hires_screen() ? c_sys_speed_lo : c_sys_speed_hi;
+		if (mode == Resolution::LO) {
+			use_hires_screen(false);
+			Quirk.await_vblank = true;
+			m_target_cpf = c_sys_speed_hi;
+		} else {
+			use_hires_screen(true);
+			Quirk.await_vblank = false;
+			m_target_cpf = c_sys_speed_lo;
+		}
 	}
 };
 
@@ -357,16 +363,16 @@ void MEGACHIP::skip_instruction() noexcept {
 	m_current_pc += m_memory_bank[m_current_pc] == 0x01 ? 4 : 2;
 }
 
-void MEGACHIP::scroll_display_up(u32 N) {
+void MEGACHIP::scroll_display_up(u32 N) noexcept {
 	m_display_map.shift(0, -N);
 }
-void MEGACHIP::scroll_display_dn(u32 N) {
+void MEGACHIP::scroll_display_dn(u32 N) noexcept {
 	m_display_map.shift(0, +N);
 }
-void MEGACHIP::scroll_display_lt() {
+void MEGACHIP::scroll_display_lt() noexcept {
 	m_display_map.shift(-4, 0);
 }
-void MEGACHIP::scroll_display_rt() {
+void MEGACHIP::scroll_display_rt() noexcept {
 	m_display_map.shift(+4, 0);
 }
 
@@ -465,19 +471,19 @@ void MEGACHIP::make_stream_wave(f32* data, u32 size, Voice* voice, Stream*) noex
 	}
 }
 
-void MEGACHIP::scroll_buffers_up(u32 N) {
+void MEGACHIP::scroll_buffers_up(u32 N) noexcept {
 	m_old_render_map.shift(0, -s32(N));
 	flush_all_video_buffers(true, false);
 }
-void MEGACHIP::scroll_buffers_dn(u32 N) {
+void MEGACHIP::scroll_buffers_dn(u32 N) noexcept {
 	m_old_render_map.shift(0, +s32(N));
 	flush_all_video_buffers(true, false);
 }
-void MEGACHIP::scroll_buffers_lt() {
+void MEGACHIP::scroll_buffers_lt() noexcept {
 	m_old_render_map.shift(-4, 0);
 	flush_all_video_buffers(true, false);
 }
-void MEGACHIP::scroll_buffers_rt() {
+void MEGACHIP::scroll_buffers_rt() noexcept {
 	m_old_render_map.shift(+4, 0);
 	flush_all_video_buffers(true, false);
 }

@@ -73,10 +73,8 @@ private:
 	template <typename Lambda>
 	void instruction_loop(Lambda&& condition) noexcept;
 
-	void push_audio_data() override;
-	void push_video_data() override;
-
-	void set_display_properties(const Resolution) override {}
+	void push_audio_data() noexcept override;
+	void push_video_data() noexcept override;
 
 /*==================================================================*/
 	#pragma region 0 instruction branch

@@ -218,7 +218,7 @@ void CHIP8X::instruction_loop(Lambda&& condition) noexcept {
 	}
 }
 
-void CHIP8X::push_audio_data() {
+void CHIP8X::push_audio_data() noexcept {
 	mix_audio_data({
 		{ make_pulse_wave, &m_voices[VOICE::UNIQUE] },
 		{ make_pulse_wave, &m_voices[VOICE::BUZZER] },
@@ -226,10 +226,10 @@ void CHIP8X::push_audio_data() {
 
 	static constexpr u32 idx[]{ 2, 7, 4, 1 };
 	m_display_device.metadata_staging().set_border_color_if(
-		!!::accumulate(m_audio_timers), c_fore_colors[idx[m_background_color]]);
+		!!::accumulate(m_audio_timers, 0), c_fore_colors[idx[m_background_color]]);
 }
 
-void CHIP8X::push_video_data() {
+void CHIP8X::push_video_data() noexcept {
 	if (use_pixel_trails()) {
 		m_display_device.swapchain().acquire([&](auto& frame) noexcept {
 			frame.metadata = ++m_display_device.metadata_staging();

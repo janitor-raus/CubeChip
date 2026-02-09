@@ -51,7 +51,7 @@ protected:
 	std::array<AudioTimer, VOICE::COUNT>
 		m_audio_timers{};
 
-	void start_voice(s32 duration, s32 tone = 0) noexcept;
+	void start_voice(u32 duration, u32 tone = 0) noexcept;
 	void start_voice_at(u32 voice_index, u32 duration, u32 tone = 0) noexcept;
 
 	void mix_audio_data(VoiceGenerators processors) noexcept;
@@ -195,7 +195,6 @@ protected:
 
 	virtual void skip_instruction() noexcept;
 	/*   */ void jump_program_to(u32 next) noexcept;
-	virtual void set_display_properties(Resolution mode) = 0;
 
 	virtual void push_audio_data() = 0;
 	virtual void push_video_data() = 0;

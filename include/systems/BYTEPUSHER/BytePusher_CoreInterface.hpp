@@ -39,8 +39,8 @@ protected:
 	void copy_game_to_memory(u8* dest) noexcept;
 
 	virtual void instruction_loop() noexcept = 0;
-	virtual void push_audio_data() = 0;
-	virtual void push_video_data() = 0;
+	virtual void push_audio_data() noexcept = 0;
+	virtual void push_video_data() noexcept = 0;
 
 protected:
 	BytePusher_CoreInterface(DisplayDevice display_device) noexcept;
