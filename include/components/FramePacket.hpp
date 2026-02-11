@@ -160,7 +160,7 @@ struct FramePacket {
 			return calc_sar() * pixel_ratio;
 		}
 		constexpr auto calc_effective_framerate() const noexcept {
-			return interlaced ? (refresh_rate * 0.5f) : *refresh_rate;
+			return refresh_rate * (interlaced ? 0.5f : 1.0f);
 		}
 	};
 

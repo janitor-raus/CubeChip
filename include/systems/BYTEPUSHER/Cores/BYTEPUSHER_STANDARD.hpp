@@ -17,15 +17,15 @@ class BYTEPUSHER_STANDARD final : public BytePusher_CoreInterface {
 	static constexpr u64 c_sys_memory_size  = 16_MiB;
 	static constexpr f32 c_sys_refresh_rate = 60.0f;
 
-	static constexpr s32 c_sys_screen_W = 256;
-	static constexpr s32 c_sys_screen_H = 256;
+	static constexpr u32 c_sys_screen_W = 256;
+	static constexpr u32 c_sys_screen_H = 256;
 
 private:
-	std::array<u8, c_sys_memory_size + 8>
+	MemoryBank<c_sys_memory_size>
 		m_memory_bank{};
 
 	template<u32 T> requires (T >= 1 && T <= 3)
-		u32 readData(u32 pos) const noexcept {
+	u32 read_data(u32 pos) const noexcept {
 		if        constexpr (T == 1) {
 			return m_memory_bank[pos + 0];
 		} else if constexpr (T == 2) {

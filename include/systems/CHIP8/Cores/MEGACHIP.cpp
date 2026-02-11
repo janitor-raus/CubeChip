@@ -366,10 +366,10 @@ void MEGACHIP::skip_instruction() noexcept {
 }
 
 void MEGACHIP::scroll_display_up(u32 N) noexcept {
-	m_display_map.shift(0, -N);
+	m_display_map.shift(0, -s32(N));
 }
 void MEGACHIP::scroll_display_dn(u32 N) noexcept {
-	m_display_map.shift(0, +N);
+	m_display_map.shift(0, +s32(N));
 }
 void MEGACHIP::scroll_display_lt() noexcept {
 	m_display_map.shift(-4, 0);

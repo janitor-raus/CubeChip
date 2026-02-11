@@ -164,8 +164,8 @@ public:
 
 	// manually change the map's size (use with caution)
 	constexpr self& resize(size_type width, size_type height) noexcept {
-		m_size_x = width;
-		m_size_y = height;
+		m_size_x = axis_size(width);
+		m_size_y = axis_size(height);
 		return *this;
 	}
 
@@ -336,65 +336,65 @@ public:
 
 public:
 	constexpr reference at(size_type idx) {
-		if (idx >= size()) { throw std::out_of_range("() index out of range"); }
+		if (idx >= size()) { throw std::out_of_range("at() index out of range"); }
 		return data()[idx];
 	}
 	constexpr reference at(size_type col, size_type row) {
-		if (col >= width()) { throw std::out_of_range("() col out of range"); }
-		if (row >= height()) { throw std::out_of_range("() row out of range"); }
+		if (col >= width()) { throw std::out_of_range("at() col out of range"); }
+		if (row >= height()) { throw std::out_of_range("at() row out of range"); }
 		return data()[row * width() + col];
 	}
 
 	constexpr const_reference at(size_type idx) const {
-		if (idx >= size()) { throw std::out_of_range("() index out of range"); }
+		if (idx >= size()) { throw std::out_of_range("at() index out of range"); }
 		return data()[idx];
 	}
 	constexpr const_reference at(size_type col, size_type row) const {
-		if (col >= width()) { throw std::out_of_range("() col out of range"); }
-		if (row >= height()) { throw std::out_of_range("() row out of range"); }
+		if (col >= width()) { throw std::out_of_range("at() col out of range"); }
+		if (row >= height()) { throw std::out_of_range("at() row out of range"); }
 		return data()[row * width() + col];
 	}
 
 	constexpr reference operator()(size_type idx) {
-		assert(idx < size() && __func__ "() index out of bounds");
+		assert(idx < size() && "operator() index out of bounds");
 		return data()[idx];
 	}
 	constexpr reference operator[](size_type idx) {
-		assert(idx < size() && __func__ "() index out of bounds");
+		assert(idx < size() && "operator[] index out of bounds");
 		return data()[idx];
 	}
 
 	constexpr const_reference operator()(size_type idx) const {
-		assert(idx < size() && __func__ "() index out of bounds");
+		assert(idx < size() && "operator() index out of bounds");
 		return data()[idx];
 	}
 	constexpr const_reference operator[](size_type idx) const {
-		assert(idx < size() && __func__ "() index out of bounds");
+		assert(idx < size() && "operator[] index out of bounds");
 		return data()[idx];
 	}
 
 	constexpr reference operator()(size_type col, size_type row) {
-		assert(col < width() && __func__ "() col out of bounds");
-		assert(row < height() && __func__ "() row out of bounds");
+		assert(col < width() && "operator() col out of bounds");
+		assert(row < height() && "operator() row out of bounds");
 		return data()[row * width() + col];
 	}
 	#ifdef __cpp_multidimensional_subscript
 	constexpr reference operator[](size_type col, size_type row) {
-		assert(col < width() && __func__ "() col out of bounds");
-		assert(row < height() && __func__ "() row out of bounds");
+		assert(col < width() && "operator[] col out of bounds");
+		assert(row < height() && "operator[] row out of bounds");
 		return data()[row * width() + col];
 	}
 	#endif
 
 	constexpr const_reference operator()(size_type col, size_type row) const {
-		assert(col < width() && __func__ "() col out of bounds");
-		assert(row < height() && __func__ "() row out of bounds");
+		assert(col < width() && "operator() col out of bounds");
+		assert(row < height() && "operator() row out of bounds");
 		return data()[row * width() + col];
 	}
 	#ifdef __cpp_multidimensional_subscript
 	constexpr const_reference operator[](size_type col, size_type row) const {
-		assert(col < width() && __func__ "() col out of bounds");
-		assert(row < height() && __func__ "() row out of bounds");
+		assert(col < width() && "operator[] col out of bounds");
+		assert(row < height() && "operator[] row out of bounds");
 		return data()[row * width() + col];
 	}
 	#endif

@@ -262,7 +262,7 @@ void XOCHIP::push_audio_data() noexcept {
 void XOCHIP::push_video_data() noexcept {
 	std::array<u8, c_sys_screen_W * c_sys_screen_H> composite_buffer{};
 
-	const auto merge_bit_color = [&](unsigned idx) noexcept {
+	const auto merge_bit_color = [&](std::size_t idx) noexcept {
 		return m_display_map[P0](idx) << 0 |
 			   m_display_map[P1](idx) << 1 |
 			   m_display_map[P2](idx) << 2 |
