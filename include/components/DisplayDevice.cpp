@@ -74,9 +74,9 @@ private:
 				FrontendInterface::call_autohide_menubar(
 					*window_label, m_disable_menubar);
 
-				const auto px_ratio = float(metadata.get_pixel_ratio());
-				const auto margin   = float(metadata.get_inner_margin());
-				const auto min_zoom = float(metadata.get_minimum_zoom());
+				const auto px_ratio = float(metadata.pixel_ratio);
+				const auto margin   = float(metadata.inner_margin);
+				const auto min_zoom = float(metadata.minimum_zoom);
 
 				const auto cur_viewport = metadata.get_viewport();
 				const auto dar_viewport = (m_screen_rotation & 1)
@@ -85,7 +85,7 @@ private:
 					: ez::Rect(cur_viewport.x, cur_viewport.y,
 						int(cur_viewport.w * px_ratio), cur_viewport.h);
 
-				const auto border_width = metadata.get_border_width() / 2 * 2;
+				const auto border_width = metadata.border_width / 2 * 2;
 				const auto borders_vec2 = ImVec2(float(border_width), float(border_width));
 				const auto padding_vec2 = ImVec2(margin * 2, margin * 2) + borders_vec2;
 
@@ -127,7 +127,7 @@ private:
 						(display_zone - borders_area) * 0.5f));
 
 					ImGui::DrawRectFilled(borders_area,
-						margin, metadata.get_texture_tint().XBGR());
+						margin, metadata.texture_tint.XBGR());
 
 					const auto uv0 = ImVec2(
 						cur_viewport.x / float(metadata.get_base_frame().w),
@@ -142,16 +142,16 @@ private:
 						(display_zone - texture_area) * 0.5f));
 
 					ImGui::DrawRotatedImage(m_target_texture, texture_area, m_screen_rotation,
-						uv0, uv1, RGBA(0xFF, 0xFF, 0xFF, metadata.get_texture_tint().A).ABGR());
+						uv0, uv1, RGBA(0xFF, 0xFF, 0xFF, metadata.texture_tint.A).ABGR());
 				}
 
-				if (metadata.get_border_width() >= 1.0f) {
+				if (metadata.border_width >= 1.0f) {
 					ImGui::SetCursorPos(origin_point + ImGui::floor(
 						(display_zone - borders_area) * 0.5f));
 
 					ImGui::DrawRect(borders_area,
-						metadata.get_border_width(), margin,
-						metadata.get_border_color().XBGR());
+						metadata.border_width, margin,
+						metadata.border_color.XBGR());
 				}
 
 				// apply dummy just in case
@@ -260,42 +260,50 @@ private:
 	auto bind_debugger_menu() noexcept -> FrontendInterface::Hook {
 		return FrontendInterface::register_menu(*m_window_label.load(mo::relaxed),
 		{ 90, "Debug" }, [&]() noexcept {{
-			int value = m_staging_data.get_border_width();
-			if (ImGui::SliderInt("Border Width", &value, 0, 32, "%d", ImGuiSliderFlags_AlwaysClamp)) {
-				m_staging_data.set_border_width(value);
+			int value = m_staging_data.border_width;
+			if (ImGui::SliderInt("Border Width", &value, m_staging_data.border_width.min,
+				m_staging_data.border_width.max, "%d", ImGuiSliderFlags_AlwaysClamp
+			)) {
+				m_staging_data.border_width = value;
 			}
 		} {
-			int value = m_staging_data.get_inner_margin();
-			if (ImGui::SliderInt("Inner Margin", &value, 0, 32, "%d", ImGuiSliderFlags_AlwaysClamp)) {
-				m_staging_data.set_inner_margin(value);
+			int value = m_staging_data.inner_margin;
+			if (ImGui::SliderInt("Inner Margin", &value, m_staging_data.inner_margin.min,
+				m_staging_data.inner_margin.max, "%d", ImGuiSliderFlags_AlwaysClamp
+			)) {
+				m_staging_data.inner_margin = value;
 			}
 		} {
-			const auto value = m_staging_data.get_border_color();
+			const auto value = m_staging_data.border_color;
 			float color[3] = { (value.R / 255.0f), (value.G / 255.0f), (value.B / 255.0f) };
 			if (ImGui::ColorEdit3("Border Color", color)) {
-				m_staging_data.set_border_color(RGBA(
+				m_staging_data.border_color = RGBA(
 					ez::u8(color[0] * 255.0f), ez::u8(color[1] * 255.0f),
 					ez::u8(color[2] * 255.0f), ez::u8(255)
-				));
+				);
 			}
 		} {
-			const auto value = m_staging_data.get_texture_tint();
+			const auto value = m_staging_data.texture_tint;
 			float color[4] = { (value.R / 255.0f), (value.G / 255.0f), (value.B / 255.0f), (value.A / 255.0f) };
 			if (ImGui::ColorEdit4("Texture Tint", color, ImGuiColorEditFlags_AlphaPreviewHalf)) {
-				m_staging_data.set_texture_tint(RGBA(
+				m_staging_data.texture_tint = RGBA(
 					ez::u8(color[0] * 255.0f), ez::u8(color[1] * 255.0f),
 					ez::u8(color[2] * 255.0f), ez::u8(color[3] * 255.0f)
-				));
+				);
 			}
 		} {
-			int value = m_staging_data.get_minimum_zoom();
-			if (ImGui::SliderInt("Minimum Zoom", &value, 1, 16, "%d", ImGuiSliderFlags_AlwaysClamp)) {
-				m_staging_data.set_minimum_zoom(value);
+			int value = m_staging_data.minimum_zoom;
+			if (ImGui::SliderInt("Minimum Zoom", &value, m_staging_data.minimum_zoom.min,
+				m_staging_data.minimum_zoom.max, "%d", ImGuiSliderFlags_AlwaysClamp
+			)) {
+				m_staging_data.minimum_zoom = value;
 			}
 		} {
-			float value = m_staging_data.get_pixel_ratio();
-			if (ImGui::SliderFloat("Pixel Ratio", &value, 0.1f, 4.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
-				m_staging_data.set_pixel_ratio(value);
+			float value = m_staging_data.pixel_ratio;
+			if (ImGui::SliderFloat("Pixel Ratio", &value, m_staging_data.pixel_ratio.min,
+				m_staging_data.pixel_ratio.max, "%.2f", ImGuiSliderFlags_AlwaysClamp
+			)) {
+				m_staging_data.pixel_ratio = value;
 			}
 		} {
 			int value = m_integer_scaling;

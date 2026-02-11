@@ -32,10 +32,12 @@ void SCHIP_LEGACY::initialize_system() noexcept {
 
 	Quirk.await_vblank = true;
 
-	m_display_device.metadata_staging()
-		.set_minimum_zoom(4).set_inner_margin(4)
-		.set_texture_tint(s_bit_colors[0])
-		.enabled = true;
+	auto& meta = m_display_device.metadata_staging();
+
+	meta.minimum_zoom = 4;
+	meta.inner_margin = 4;
+	meta.texture_tint = s_bit_colors[0];
+	meta.enabled = true;
 }
 
 void SCHIP_LEGACY::handle_cycle_loop() noexcept

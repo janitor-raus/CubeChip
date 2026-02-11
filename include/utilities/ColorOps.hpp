@@ -34,12 +34,21 @@ struct alignas(4) RGBA {
 	using u8     = ez::u8;
 	using Packed = ez::u32;
 
-	static constexpr u8 Opaque_A = 0xFF;
-	static constexpr u8 Transparent_A = 0x0;
+	static constexpr u8 Opaque_A      = 0xFF;
+	static constexpr u8 Transparent_A = 0x00;
 
 	static constexpr Packed Transparent = 0x00000000;
-	static constexpr Packed Black = 0x000000FF;
-	static constexpr Packed White = 0xFFFFFFFF;
+	static constexpr Packed Black       = 0x000000FF;
+	static constexpr Packed White       = 0xFFFFFFFF;
+	static constexpr Packed Red         = 0xFF0000FF;
+	static constexpr Packed Green       = 0x00FF00FF;
+	static constexpr Packed Blue        = 0x0000FFFF;
+	static constexpr Packed Yellow      = 0xFFFF00FF;
+	static constexpr Packed Cyan        = 0x00FFFFFF;
+	static constexpr Packed Magenta     = 0xFF00FFFF;
+
+	static constexpr Packed min = 0x00000000;
+	static constexpr Packed max = 0xFFFFFFFF;
 
 	u8 A{}, B{}, G{}, R{};
 

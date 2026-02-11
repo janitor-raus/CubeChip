@@ -30,10 +30,12 @@ void SCHIP_MODERN::initialize_system() noexcept {
 
 	m_display_map.resize(c_sys_screen_W/2, c_sys_screen_H/2);
 
-	m_display_device.metadata_staging()
-		.set_minimum_zoom(4).set_inner_margin(4)
-		.set_texture_tint(s_bit_colors[0])
-		.enabled = true;
+	auto& meta = m_display_device.metadata_staging();
+
+	meta.minimum_zoom = 4;
+	meta.inner_margin = 4;
+	meta.texture_tint = s_bit_colors[0];
+	meta.enabled = true;
 }
 
 void SCHIP_MODERN::handle_cycle_loop() noexcept

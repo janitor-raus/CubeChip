@@ -31,10 +31,12 @@ void CHIP8X::initialize_system() noexcept {
 	// test first color rect as the original hardware did
 	m_colored_map(0, 0) = c_fore_colors[2];
 
-	m_display_device.metadata_staging()
-		.set_minimum_zoom(8).set_inner_margin(4)
-		.set_texture_tint(c_back_colors[m_background_color])
-		.enabled = true;
+	auto& meta = m_display_device.metadata_staging();
+
+	meta.minimum_zoom = 8;
+	meta.inner_margin = 4;
+	meta.texture_tint = c_back_colors[m_background_color];
+	meta.enabled = true;
 }
 
 void CHIP8X::handle_cycle_loop() noexcept
@@ -303,8 +305,8 @@ void CHIP8X::color_hires_zone(u32 X, u32 Y, u32 idx, u32 N) noexcept {
 		m_current_pc = m_stack_bank[--m_stack_head & 0xF];
 	}
 	void CHIP8X::instruction_02A0() noexcept {
-		m_display_device.metadata_staging().set_texture_tint(
-			c_back_colors[++m_background_color &= 0x3]);
+		m_display_device.metadata_staging().texture_tint
+			= c_back_colors[++m_background_color &= 0x3];
 	}
 
 	#pragma endregion

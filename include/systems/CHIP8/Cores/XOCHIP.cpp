@@ -30,10 +30,12 @@ void XOCHIP::initialize_system() noexcept {
 	m_target_cpf = c_sys_speed_lo;
 	m_bit_colors = s_bit_colors;
 
-	m_display_device.metadata_staging()
-		.set_minimum_zoom(4).set_inner_margin(4)
-		.set_texture_tint(m_bit_colors[0])
-		.enabled = true;
+	auto& meta = m_display_device.metadata_staging();
+
+	meta.minimum_zoom = 4;
+	meta.inner_margin = 4;
+	meta.texture_tint = m_bit_colors[0];
+	meta.enabled = true;
 }
 
 void XOCHIP::handle_cycle_loop() noexcept

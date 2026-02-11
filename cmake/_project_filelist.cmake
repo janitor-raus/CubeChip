@@ -66,6 +66,7 @@ set(UTILITIES_HEADERS
 	"${PROJECT_INCLUDE_DIR}/utilities/Macros.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/Map2D.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/Millis.hpp"
+	"${PROJECT_INCLUDE_DIR}/utilities/Parameter.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/PathGetters.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/SettingWrapper.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/SHA1.hpp"

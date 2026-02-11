@@ -27,9 +27,11 @@ void MEGACHIP::initialize_system() noexcept {
 
 	set_display_properties(Resolution::LO);
 
-	m_display_device.metadata_staging()
-		.set_minimum_zoom(2).set_inner_margin(4)
-		.enabled = true;
+	auto& meta = m_display_device.metadata_staging();
+
+	meta.minimum_zoom = 2;
+	meta.inner_margin = 4;
+	meta.enabled = true;
 }
 
 void MEGACHIP::handle_cycle_loop() noexcept
@@ -332,18 +334,18 @@ void MEGACHIP::push_video_data() noexcept {
 void MEGACHIP::set_display_properties(Resolution mode) noexcept {
 	use_manual_vsync(mode == Resolution::MC);
 
+	auto& meta = m_display_device.metadata_staging();
+
 	if (use_manual_vsync()) {
-		m_display_device.metadata_staging()
-			.set_viewport(c_sys_screen_W, c_sys_screen_H)
-			.set_texture_tint(RGBA::Black);
+		meta.set_viewport(c_sys_screen_W, c_sys_screen_H);
+		meta.texture_tint = RGBA::Black;
 
 		Quirk.await_vblank = false;
 		m_target_cpf = c_sys_speed_lo * 100;
 	}
 	else {
-		m_display_device.metadata_staging()
-			.set_viewport(c_sys_screen_W, c_sys_screen_W/2)
-			.set_texture_tint(c_bit_colors[0]);
+		meta.set_viewport(c_sys_screen_W, c_sys_screen_W/2);
+		meta.texture_tint = c_bit_colors[0];
 
 		if (mode == Resolution::LO) {
 			use_hires_screen(false);
@@ -581,7 +583,7 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 	}
 	void MEGACHIP::instruction_05NN(u32 NN) noexcept {
 		m_display_device.metadata_staging()
-			.rmw_texture_tint().set_A(NN & 0xFF);
+			.texture_tint.set_A(NN & 0xFF);
 	}
 	void MEGACHIP::instruction_060N(u32 N) noexcept {
 		start_audio_track(N == 0u);

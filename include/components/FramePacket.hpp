@@ -8,6 +8,7 @@
 
 #include "EzMaths.hpp"
 #include "ColorOps.hpp"
+#include "Parameter.hpp"
 #include "Aligned.hpp"
 #include "Concepts.hpp"
 
@@ -47,6 +48,8 @@ struct FramePacket {
 
 	class Metadata {
 		using self = Metadata;
+		using Counter = ez::u64;
+		using Byte    = ez::u8;
 
 	private:
 		ez::Frame base_frame;
@@ -71,94 +74,45 @@ struct FramePacket {
 			return *this;
 		}
 
-	private:
-		RGBA texture_tint = RGBA::White;
-
 	public:
-		constexpr auto  get_texture_tint() const noexcept { return texture_tint; }
-		constexpr auto& rmw_texture_tint() noexcept { return texture_tint; }
 		// The color components (RGB_) are used as the background color.
 		// The alpha component (___A) is used to fade out the texture instead.
-		constexpr self& set_texture_tint(ez::u32 color) noexcept {
-			texture_tint = color;
-			return *this;
+		RGBA texture_tint = RGBA::White;
+
+		// The color of the border drawn around the texture (if border_width > 0).
+		// The alpha component (___A) is unused.
+		RGBA border_color = default_border_color;
+
+		static constexpr RGBA default_border_color = RGBA(0x303030FF);
+
+		constexpr self& set_border_color_if(bool cond, RGBA color) noexcept {
+			border_color = cond ? color : default_border_color; return *this;
 		}
 
-	private:
-		ez::u8 texture_zoom = 1;
+		constexpr self& set_border_color_if(bool cond, RGBA color1, RGBA color2) noexcept {
+			border_color = cond ? color1 : color2; return *this;
+		}
 
-	public:
-		constexpr auto  get_minimum_zoom() const noexcept { return texture_zoom; }
 		// Forces a mininum zoom level for the texture (1-16x)
-		constexpr self& set_minimum_zoom(ez::s32 scale) noexcept {
-			texture_zoom = ez::u8(std::clamp(scale, 1, 16));
-			return *this;
-		}
+		BoundedParam<Byte(1), 1, 16> minimum_zoom;
 
-	private:
-		ez::u8 inner_margin = 0;
-
-	public:
-		constexpr auto  get_inner_margin() const noexcept { return inner_margin; }
 		// Adds inner margin between the texture and border (max: 32px)
-		constexpr self& set_inner_margin(ez::s32 width) noexcept {
-			inner_margin = ez::u8(std::clamp(width, 0, 32));
-			return *this;
-		}
+		BoundedParam<Byte(0), 0, 32> inner_margin;
 
-	public:
-		//ez::u8 debug_mode{}; // debug mode flag (signal for frontend)
+		Byte debug_flag{}; // debug mode flag (signal for frontend use)
 
 		bool interlaced{}; // signal is interlaced, framerate is halved
 		bool enabled{};    // enables the display (for systems that need it off)
 
-	private:
-		ez::u8 border_width = 4;
+		BoundedParam<Byte(4), 0, 32> border_width;
 
-	public:
-		constexpr auto  get_border_width() const noexcept { return border_width; }
-		constexpr self& set_border_width(ez::s32 width) noexcept {
-			border_width = ez::u8(std::clamp(width, 0, 32));
-			return *this;
-		}
-
-	private:
-		static constexpr RGBA default_border_color = RGBA(0x303030FF);
-		RGBA border_color = default_border_color;
-
-	public:
-		constexpr auto  get_border_color() const noexcept { return border_color; }
-		constexpr auto& rmw_border_color() noexcept { return border_color; }
-		constexpr self& set_border_color(RGBA color) noexcept {
-			border_color = color;
-			return *this;
-		}
-
-		constexpr self& set_border_color_if(bool cond, RGBA color) noexcept {
-			border_color = cond ? color : default_border_color;
-			return *this;
-		}
-
-		constexpr self& set_border_color_if(bool cond, RGBA color1, RGBA color2) noexcept {
-			border_color = cond ? color1 : color2;
-			return *this;
-		}
-
-	private:
-		ez::f32 pixel_ratio = 1.0f; // width/height ratio of a single pixel
-
-	public:
-		constexpr auto  get_pixel_ratio() const noexcept { return pixel_ratio; }
 		// Sets the texture's pixel aspect ratio (0.1..4.0)
-		constexpr self& set_pixel_ratio(ez::f32 ratio) noexcept {
-			pixel_ratio = std::clamp(ratio, 0.1f, 4.0f);
-			return *this;
-		}
+		BoundedParam<1.0f, 0.1f, 4.0f> pixel_ratio;
 
-		ez::f32 refresh_rate = 60.0f; // display refresh rate in Hz
+		// Describes the display's refresh rate in Hz, but has no effect on the actual framerate of the system.
+		BoundedParam<60.0f, 1.0f, 1000.0f> refresh_rate;
 
-
-		ez::u64 frame_count{}; // number of frames rendered
+		Counter frame_count{}; // number of frames rendered
 
 	public:
 		Metadata(ez::s32 W, ez::s32 H) noexcept
@@ -178,7 +132,7 @@ struct FramePacket {
 				);
 
 				texture_tint = other.texture_tint;
-				texture_zoom = other.texture_zoom;
+				minimum_zoom = other.minimum_zoom;
 				inner_margin = other.inner_margin;
 				interlaced   = other.interlaced;
 				enabled      = other.enabled;
@@ -195,9 +149,7 @@ struct FramePacket {
 		 * @brief Simple helper to increment frame_count by one. Primarily intended
 		 *        when copying from another source which was used to stage changes.
 		 */
-		Metadata& operator++() noexcept {
-			++frame_count; return *this;
-		}
+		Metadata& operator++() noexcept { ++frame_count; return *this; }
 
 		// Calculates Screen Aspect Ratio (as: viewport.W / viewport.H)
 		constexpr auto calc_sar() const noexcept {
@@ -208,7 +160,7 @@ struct FramePacket {
 			return calc_sar() * pixel_ratio;
 		}
 		constexpr auto calc_effective_framerate() const noexcept {
-			return interlaced ? (refresh_rate * 0.5f) : refresh_rate;
+			return interlaced ? (refresh_rate * 0.5f) : *refresh_rate;
 		}
 	};
 

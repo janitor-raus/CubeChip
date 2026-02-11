@@ -30,10 +30,12 @@ void CHIP8E::initialize_system() noexcept {
 	m_current_pc = c_sys_boot_pos;
 	m_target_cpf = c_sys_speed_hi;
 
-	m_display_device.metadata_staging()
-		.set_minimum_zoom(8).set_inner_margin(4)
-		.set_texture_tint(s_bit_colors[0])
-		.enabled = true;
+	auto& meta = m_display_device.metadata_staging();
+
+	meta.minimum_zoom = 8;
+	meta.inner_margin = 4;
+	meta.texture_tint = s_bit_colors[0];
+	meta.enabled = true;
 }
 
 void CHIP8E::handle_cycle_loop() noexcept

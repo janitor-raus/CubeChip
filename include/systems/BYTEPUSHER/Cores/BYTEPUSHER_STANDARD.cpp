@@ -22,10 +22,12 @@ void BYTEPUSHER_STANDARD::initialize_system() noexcept {
 	m_audio_device.add_audio_stream(STREAM::MAIN, u32(get_real_system_framerate() * 256));
 	m_audio_device.resume_streams();
 
-	m_display_device.metadata_staging()
-		.set_minimum_zoom(2).set_inner_margin(4)
-		.set_texture_tint(c_bit_colors[0])
-		.enabled = true;
+	auto& meta = m_display_device.metadata_staging();
+
+	meta.minimum_zoom = 2;
+	meta.inner_margin = 4;
+	meta.texture_tint = c_bit_colors[0];
+	meta.enabled = true;
 }
 
 /*==================================================================*/
