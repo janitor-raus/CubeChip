@@ -16,6 +16,9 @@
 #include "GlobalAudioBase.hpp"
 #include "HDIS_HCIS.hpp"
 #include "ThreadAffinity.hpp"
+#include "AtomSharedPtr.hpp"
+#include "SystemDescriptor.hpp"
+#include "SystemStaging.hpp"
 
 #include "FrontendHost.hpp"
 #include "SystemInterface.hpp"
@@ -26,14 +29,17 @@
 static std::vector<std::string>
 	s_pending_file_drops{};
 
-static void push_back_pending_file_drops(std::string_view filepath) noexcept {
+static void append_pending_file_drops(std::string_view filepath) noexcept {
 	if (!filepath.empty()) { s_pending_file_drops.push_back(filepath.data()); }
 }
+
+/*==================================================================*/
 
 static AtomSharedPtr<std::string>
 	s_open_file_result{};
 
-auto FrontendHost::get_open_file_dialog_result() noexcept -> OpenFileResult {
+[[nodiscard]]
+static auto get_open_file_dialog_result() noexcept {
 	return s_open_file_result.exchange(nullptr, mo::relaxed);
 }
 
@@ -44,13 +50,10 @@ void FrontendHost::set_open_file_dialog_result(std::string_view file) noexcept {
 /*==================================================================*/
 
 FrontendHost::FrontendHost() noexcept {
-	SystemInterface::hdm_passthrough(HDM);
 	BVS->set_window_title(AppName);
-	HDM->set_validator_callable(CoreRegistry::validate_game_file);
 	CoreRegistry::load_game_database();
 
 	setup_gui_callables();
-
 }
 
 void FrontendHost::SystemInstance::StopSystemThread::operator()(SystemInterface* ptr) noexcept {
@@ -81,51 +84,75 @@ auto FrontendHost::export_settings() const noexcept -> Settings {
 
 /*==================================================================*/
 
-void FrontendHost::discard_system_core(SystemID id) {
-	if (auto* system = system_with_id(id)) {
-		system->core.reset();
-		CoreRegistry::clear_eligible_cores();
+void FrontendHost::prune_terminated_systems() noexcept {
+	auto it = m_systems.begin();
+	while (it != m_systems.end()) {
+		const auto& system = it->second.core;
+
+		if (!system || system->is_awaiting_shutdown()) {
+			m_focus_mru.erase(it->first);
+			it = m_systems.erase(it);
+		} else { ++it; }
 	}
 }
 
-void FrontendHost::replace_system_core(SystemID id) {
-	if (auto* system = system_with_id(id)) {
-		system->core.reset(); // ensures previous thread quits first!
-		system->core.reset(CoreRegistry::construct_new_core()); // need a gui here to list and select cores!
-
-		if (system) {
-			BVS->raise_window(); // bring to front when we get a core!
-			toggle_system_delimiters(*system);
-			toggle_system_statistics(*system);
-			system->core->start_workers();
+void FrontendHost::find_last_focused_system() noexcept {
+	for (const auto& [id, system] : m_systems) {
+		if (system && system.core->is_currently_focused()) {
+			m_focus_mru.insert(id); return;
 		}
 	}
 }
 
+void FrontendHost::unload_system_instance(SystemID system_id) noexcept {
+	const auto target_system_id = system_id ? system_id
+		: (m_focus_mru.empty() ? 0 : m_focus_mru[0]);
+	m_systems.erase(target_system_id);
+	m_focus_mru.erase(target_system_id);
+}
+
+void FrontendHost::insert_system_instance(SystemInterface* ptr) noexcept {
+	if (!ptr) { return; }
+	BVS->raise_window(); // bring main window to front!
+
+	blog.info("Starting up '{}' ({}) system instance.",
+		ptr->get_descriptor().system_pretty_name, ptr->instance_id);
+
+	m_focus_mru.insert(ptr->instance_id);
+	auto& system = m_systems[m_focus_mru[0]];
+
+	system.core.reset(ptr);
+	toggle_system_delimiters(system);
+	toggle_system_statistics(system);
+	system.core->start_workers();
+}
+
 /*==================================================================*/
 
-void FrontendHost::load_file_from_disk(std::string_view gameFile) {
-	blog.info("Attempting to load: \"{}\"", gameFile);
-	if (HDM->load_and_validate_file(gameFile)) {
-		blog.info("File has been accepted!");
-		s_file_mru.insert(gameFile);
-		replace_system_core(0 /* XXX */);
-	} else {
-		blog.info("Path has been rejected!");
+void FrontendHost::load_file_from_disk(std::string_view file_path) {
+	if (SystemStaging::file_image.load(std::string(file_path))) {
+		if (SystemStaging::file_image.size() == 0) {
+			SystemStaging::file_image.clear();
+			blog.info("File is empty: '{}'", file_path);
+			return;
+		}
+		blog.info("File received: '{}'", file_path);
+		return;
 	}
+	blog.info("File rejected: '{}'", file_path);
+	return;
 }
 
 FrontendHost* FrontendHost::init_application(
 	std::string_view home_override, std::string_view config_name,
-	std::string_view game_file_path, bool force_portable) noexcept
-{
+	std::string_view game_file_path, bool force_portable
+) noexcept {
 	static FrontendHost* self = nullptr;
 	if (self) { return self; }
 
 	HDM = HomeDirManager::initialize(
 		home_override, config_name, force_portable, OrgName, AppName);
 	if (!HDM) { return nullptr; }
-
 
 	blog.create_log(std::to_string(thread_affinity::get_process_id()),
 		(fs::Path(HDM->get_home_path()) / "logs").string());
@@ -156,7 +183,7 @@ FrontendHost* FrontendHost::init_application(
 
 	FrontendHost::import_mru(FEH_settings.file_mru_cache);
 
-	::push_back_pending_file_drops(game_file_path);
+	::append_pending_file_drops(game_file_path);
 	thread_affinity::set_affinity(0b11ull);
 
 	static FrontendHost instance;
@@ -189,25 +216,16 @@ int FrontendHost::handle_client_events(void* event) noexcept {
 				return SDL_APP_SUCCESS;
 
 			case SDL_EVENT_DROP_FILE:
-				::push_back_pending_file_drops(sdl_event->drop.data);
+				::append_pending_file_drops(sdl_event->drop.data);
 				break;
 
 			case SDL_EVENT_WINDOW_MINIMIZED:
-				for (auto& [id, system] : m_systems) {
-					set_system_hidden_status(system, true); }
+				m_application_minimized = true;
 				break;
 
 			case SDL_EVENT_WINDOW_RESTORED:
-				for (auto& [id, system] : m_systems) {
-					set_system_hidden_status(system, false); }
+				m_application_minimized = false;
 				break;
-
-			//case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
-			//case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-			//case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
-			//case SDL_EVENT_WINDOW_RESIZED:
-			//	BVS->update_renderer_logical_presentation();
-			//	break;
 		}
 	} else {
 		switch (sdl_event->type) {
@@ -224,23 +242,24 @@ int FrontendHost::handle_client_events(void* event) noexcept {
 int FrontendHost::process_client_frame() {
 	handle_main_hotkeys();
 
+	prune_terminated_systems();
+	find_last_focused_system();
+
 	for (auto& [id, system] : m_systems) {
-		if (!system.core) { continue; }
-		if (system.core->get_window_shutdown_signal()) {
-			discard_system_core(id);
-		}
+		set_system_hidden_status(system, id == m_focus_mru[0]
+			? m_application_minimized : true);
 	}
 
-	const auto dialogResult = get_open_file_dialog_result();
-	if (dialogResult) { load_file_from_disk(*dialogResult); }
+	const auto dialog_result = ::get_open_file_dialog_result();
+	if (dialog_result) { load_file_from_disk(*dialog_result); }
 
 	else if (s_pending_file_drops.size() > 0) {
-		// we only allow a single file load a time (for now?)
+		// XXX - we only allow a single file load a time (for now?)
 		load_file_from_disk(s_pending_file_drops[0]);
 		s_pending_file_drops.clear();
 	}
 
-	return BVS->render_present([&]() {
+	return BVS->render_present([]() {
 		FrontendInterface::begin_new_frame();
 		FrontendInterface::render_frame();
 	}) ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
@@ -254,38 +273,36 @@ void FrontendHost::handle_main_hotkeys() {
 		CoreRegistry::load_game_database();
 	}
 
-	if (m_systems[0]) {
+	if (!m_focus_mru.empty()) {
+		auto& system = m_systems[m_focus_mru[0]];
+		const auto& descriptor = system.core->get_descriptor();
+
 		if (Input.are_any_held(KEY(LSHIFT), KEY(RSHIFT))
 			&& Input.is_pressed(KEY(ESCAPE))
 		) {
-			discard_system_core(0 /* XXX */);
-			blog.info("Emulator core exited manually.");
-			return;
+			blog.info("System '{}' ({}) terminated by hotkey.",
+				descriptor.system_name, m_focus_mru[0]);
+			unload_system_instance(); return;
 		}
-		if (Input.is_pressed(KEY(BACKSPACE))) {
-			replace_system_core(0 /* XXX */);
-			blog.info("Emulator core restarted manually.");
-			return;
-		}
+		//if (Input.is_pressed(KEY(BACKSPACE))) {
+		//	// XXX - need to perform manual system reset now
+		//	blog.info("Emulator core restarted manually.");
+		//	return;
+		//}
 		if (Input.is_pressed(KEY(F9))) {
-			if (auto* system = system_with_id(0 /* XXX */)) {
-				if (auto paused = system->core->try_pause_system()) {
-					blog.info("System has been {} by hotkey!",
-						*paused ? "paused" : "unpaused");
-				}
+			if (auto paused = system.core->try_pause_system()) {
+				blog.info("System '{}' ({}) {} by hotkey!",
+					descriptor.system_name, m_focus_mru[0],
+					*paused ? "paused" : "unpaused");
 			}
 		}
 		if (Input.is_pressed(KEY(F11))) {
-			if (auto* system = system_with_id(0 /* XXX */)) {
-				system->statistics = !system->statistics;
-				toggle_system_statistics(*system);
-			}
+			system.statistics = !system.statistics;
+			toggle_system_statistics(system);
 		}
 		if (Input.is_pressed(KEY(F10))) {
-			if (auto* system = system_with_id(0 /* XXX */)) {
-				system->delimiters = !system->delimiters;
-				toggle_system_delimiters(*system);
-			}
+			system.delimiters = !system.delimiters;
+			toggle_system_delimiters(system);
 		}
 	}
 }
@@ -313,5 +330,3 @@ void FrontendHost::set_system_hidden_status(SystemInstance& system, bool state) 
 		if (system.core) { system.core->sub_system_state(EmuState::HIDDEN); }
 	}
 }
-
-/*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/

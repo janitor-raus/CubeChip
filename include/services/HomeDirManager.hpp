@@ -19,34 +19,15 @@ class HomeDirManager final {
 	using Path = std::filesystem::path;
 
 	HomeDirManager(
-		std::string_view overrideHome, std::string_view configName,
-		bool forcePortable, std::string_view org, std::string_view app,
-		bool& initError
+		std::string_view home_override, std::string_view config_name,
+		bool force_portable, std::string_view org, std::string_view app,
+		bool& error_on_init
 	) noexcept;
 
 	HomeDirManager(const HomeDirManager&) = delete;
 	HomeDirManager& operator=(const HomeDirManager&) = delete;
 
-	using GameValidator = bool (*)(
-		const char* file_data,
-		const std::size_t file_size,
-		const std::string& file_exts,
-		const std::string& file_sha1
-	) noexcept;
-
-	Path m_file_path{};
-	std::string m_file_sha1{};
-
-	std::vector<char> // probably should be mmapped later..
-		m_file_data{};
-
-	std::vector<Path>
-		m_user_directories{};
-
 private:
-	static inline
-	GameValidator s_validator{};
-
 	static inline
 	std::string s_home_path{};
 
@@ -54,7 +35,7 @@ private:
 	std::string s_config_at{};
 
 private:
-	bool set_home_path(std::string_view override, bool portable,
+	bool set_home_path(std::string_view home_override, bool portable,
 		std::string_view org, std::string_view app) noexcept;
 public:
 	static const auto& get_home_path() noexcept { return s_home_path; }
@@ -86,23 +67,9 @@ private:
 
 public:
 	static HomeDirManager* initialize(
-		std::string_view overrideHome, std::string_view configName,
-		bool forcePortable, std::string_view org, std::string_view app
+		std::string_view home_override, std::string_view config_name,
+		bool force_portable, std::string_view org, std::string_view app
 	) noexcept;
-
-	// returns path pointer to added directory, or nullptr on failure
-	auto add_user_directory(const Path& sub, const Path& sys = Path{}) noexcept -> const Path*;
-
-	const auto& get_loaded_file_path() const noexcept { return m_file_path; }
-	/***/ auto  get_loaded_file_span() const noexcept { return std::span(m_file_data); }
-	/***/ auto  get_loaded_file_data() const noexcept { return m_file_data.data(); }
-	/***/ auto  get_loaded_file_size() const noexcept { return m_file_data.size(); }
-	const auto& get_loaded_file_sha1() const noexcept { return m_file_sha1; }
-
-	void set_validator_callable(GameValidator func) noexcept { s_validator = std::move(func); }
-
-	void clear_cached_file_data() noexcept;
-	bool load_and_validate_file(const Path& gamePath) noexcept;
 };
 
 	#pragma endregion

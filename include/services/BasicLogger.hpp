@@ -81,17 +81,23 @@ struct LogEntry {
 	std::string as_string() const noexcept;
 };
 
+/*==================================================================*/
+
+[[nodiscard]] std::uint32_t get_source_index(std::string_view src_name) noexcept;
+[[nodiscard]] std::string   get_source_name(std::uint32_t src_id) noexcept;
+
 class ScopedLogSource {
-	std::uint32_t m_previous_source{};
+	std::uint32_t m_prev_source_id{};
 
 public:
-	ScopedLogSource(const std::string& src_name) noexcept;
+	template <typename... Args>
+	ScopedLogSource(fmt::format_string<Args...> fmt, Args&&... args) noexcept try
+		: ScopedLogSource(fmt::format(fmt, std::forward<Args>(args)...)) {}
+	catch (...) { m_prev_source_id = 0; }
 
+	ScopedLogSource(std::string_view src_name) noexcept;
 	~ScopedLogSource() noexcept;
 };
-
-[[nodiscard]] std::uint32_t get_source_index(const std::string& src_name) noexcept;
-[[nodiscard]] std::string   get_source_name(std::uint32_t src_id) noexcept;
 
 /*==================================================================*/
 	#pragma region BasicLogger Singleton Class

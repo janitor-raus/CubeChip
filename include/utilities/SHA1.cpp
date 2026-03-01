@@ -222,11 +222,15 @@ std::string SHA1::final() {
 	return result.str();
 }
 
-std::string SHA1::from_file(const std::filesystem::path& filePath) {
-	std::ifstream stream(filePath, std::ios::binary);
+std::string SHA1::from_file(std::string file_path) {
+	std::ifstream stream(file_path, std::ios::binary);
 	SHA1 checksum;
 	checksum.update(stream);
 	return checksum.final();
+}
+
+std::string SHA1::from_span(std::span<const char> file_span) {
+    return from_data(file_span.data(), file_span.size());
 }
 
 std::string SHA1::from_data(const char* data, std::size_t size) {

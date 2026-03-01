@@ -11,6 +11,9 @@
 #define ENABLE_SCHIP_MODERN
 #if defined(ENABLE_CHIP8_SYSTEM) && defined(ENABLE_SCHIP_MODERN)
 
+#include "SystemDescriptor.hpp"
+#include "Map2D.hpp"
+
 /*==================================================================*/
 
 class SCHIP_MODERN final : public Chip8_CoreInterface {
@@ -25,12 +28,30 @@ class SCHIP_MODERN final : public Chip8_CoreInterface {
 	static constexpr u32 c_sys_speed_hi = 45;
 	static constexpr u32 c_sys_speed_lo = 30;
 
+	static constexpr std::string_view c_supported_extensions[] = { ".ch8", ".sc8" };
+
+	static constexpr const char* validate_program(std::span<const char> file) noexcept {
+		return Family::validate_program(file, c_game_load_pos, c_sys_memory_size);
+	}
+
+public:
+	static constexpr SystemDescriptor descriptor = {
+		0, Family::family_pretty_name, Family::family_name, Family::family_desc,
+		"SUPERCHIP (MODERN)", "schip_modern", "SUPERCHIP core based on modern xochip specs.",
+		c_supported_extensions, validate_program
+	};
+
+	const SystemDescriptor& get_descriptor() const noexcept override {
+		return descriptor;
+	}
+
 /*==================================================================*/
 
 	MemoryBank<c_sys_memory_size>
 		m_memory_bank{};
 
-	u8 m_display_buffer[c_sys_screen_W * c_sys_screen_H]{};
+	std::array<u8, c_sys_screen_W * c_sys_screen_H>
+		m_display_buffer{};
 
 	Map2D<u8> m_display_map;
 
@@ -38,17 +59,9 @@ class SCHIP_MODERN final : public Chip8_CoreInterface {
 
 public:
 	SCHIP_MODERN() noexcept
-		: Chip8_CoreInterface(DisplayDevice(c_sys_screen_W, c_sys_screen_H, "SCHIP MODERN"))
-		, m_display_map(m_display_buffer, c_sys_screen_W / 2, c_sys_screen_H / 2)
+		: Chip8_CoreInterface(c_sys_screen_W, c_sys_screen_H, descriptor.system_pretty_name)
+		, m_display_map(m_display_buffer, c_sys_screen_W/2, c_sys_screen_H/2)
 	{}
-
-	static constexpr bool validate_program(
-		const char* fileData,
-		const size_type fileSize
-	) noexcept {
-		if (!fileData || !fileSize) { return false; }
-		return fileSize + c_game_load_pos <= c_sys_memory_size;
-	}
 
 private:
 	void initialize_system() noexcept override;

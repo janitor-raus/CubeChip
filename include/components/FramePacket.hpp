@@ -6,6 +6,7 @@
 
 #pragma once
 
+
 #include "EzMaths.hpp"
 #include "ColorOps.hpp"
 #include "Parameter.hpp"
@@ -48,13 +49,13 @@ struct FramePacket {
 
 	class Metadata {
 		using self = Metadata;
-		using Counter = ez::u64;
-		using Byte    = ez::u8;
+		using Counter = u64;
+		using Byte    = u8;
 
 	private:
 		ez::Frame base_frame;
 
-		constexpr auto make_base_frame(ez::s32 w, ez::s32 h) const noexcept {
+		constexpr auto make_base_frame(s32 w, s32 h) const noexcept {
 			return ez::Frame(std::clamp(w, 1, 8192), std::clamp(h, 1, 8192));
 		}
 
@@ -66,7 +67,7 @@ struct FramePacket {
 
 	public:
 		constexpr auto  get_viewport() const noexcept { return viewport_rect; }
-		constexpr self& set_viewport(ez::s32 w, ez::s32 h, ez::s32 x = 0, ez::s32 y = 0) noexcept {
+		constexpr self& set_viewport(s32 w, s32 h, s32 x = 0, s32 y = 0) noexcept {
 			viewport_rect.x = std::clamp(x, 0, base_frame.w - 1);
 			viewport_rect.y = std::clamp(y, 0, base_frame.h - 1);
 			viewport_rect.w = std::clamp(w, 1, base_frame.w - viewport_rect.x);
@@ -115,7 +116,7 @@ struct FramePacket {
 		Counter frame_count{}; // number of frames rendered
 
 	public:
-		Metadata(ez::s32 W, ez::s32 H) noexcept
+		Metadata(s32 W, s32 H) noexcept
 			: base_frame(make_base_frame(W, H))
 			, viewport_rect(0, 0, W, H)
 		{}
@@ -153,7 +154,7 @@ struct FramePacket {
 
 		// Calculates Screen Aspect Ratio (as: viewport.W / viewport.H)
 		constexpr auto calc_sar() const noexcept {
-			return ez::f32(viewport_rect.w) / ez::f32(viewport_rect.h);
+			return f32(viewport_rect.w) / f32(viewport_rect.h);
 		}
 		// Calculates Display Aspect Ratio (as: SAR * Pixel Aspect Ratio)
 		constexpr auto calc_dar() const noexcept {

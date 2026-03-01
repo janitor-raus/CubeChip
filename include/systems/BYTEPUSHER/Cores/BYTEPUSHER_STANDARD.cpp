@@ -7,15 +7,15 @@
 #include "BYTEPUSHER_STANDARD.hpp"
 #if defined(ENABLE_BYTEPUSHER_SYSTEM) && defined(ENABLE_BYTEPUSHER_STANDARD)
 
-#include "BasicVideoSpec.hpp"
-#include "CoreRegistry.hpp"
+#include "AssignCast.hpp"
+#include "CoreRegistry.inl"
 
-REGISTER_CORE(BYTEPUSHER_STANDARD, ".BytePusher")
+REGISTER_SYSTEM_CORE(BYTEPUSHER_STANDARD)
 
 /*==================================================================*/
 
 void BYTEPUSHER_STANDARD::initialize_system() noexcept {
-	copy_game_to_memory(m_memory_bank.data());
+	copy_file_image_to(m_memory_bank, 0);
 
 	set_base_system_framerate(c_sys_refresh_rate);
 

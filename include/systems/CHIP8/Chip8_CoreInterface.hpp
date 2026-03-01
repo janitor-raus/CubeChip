@@ -11,19 +11,38 @@
 
 #include "../SystemInterface.hpp"
 
+#include "AssignCast.hpp"
+#include "AudioDevice.hpp"
+#include "Voice.hpp"
+#include "DisplayDevice.hpp"
+
 /*==================================================================*/
 
 class Chip8_CoreInterface : public SystemInterface {
 
 protected:
+	static constexpr std::string_view family_pretty_name = "CHIP-8";
+	static constexpr std::string_view family_name = "chip8";
+	static constexpr std::string_view family_desc = "CHIP-8 family line.";
+	using Family = Chip8_CoreInterface;
+
+	static constexpr const char* validate_program(
+		std::span<const char> file,
+		std::size_t load_position, std::size_t memory_size
+	) noexcept {
+		if (file.empty()) { return "empty file"; }
+		return (file.size() + load_position <= memory_size)
+			? nullptr : "file too large";
+	}
+
 	enum STREAM : u32 { MAIN };
 	enum VOICE : u32 {
 		ID_0, ID_1, ID_2, ID_3, COUNT,
 		BUZZER = ID_3, UNIQUE = ID_0,
 	};
 
-	static inline std::string s_permaregs_path{};
-	static inline std::string s_savestate_path{};
+	std::string m_permaregs_path{};
+	std::string m_savestate_path{};
 	static constexpr f32 c_tonal_offset = 160.0f;
 
 	struct TriBCD final {
@@ -184,8 +203,7 @@ protected:
 	void set_permaregs(u32 X) noexcept;
 	void get_permaregs(u32 X) noexcept;
 
-	void copy_game_to_memory(void* dest) noexcept;
-	void copy_font_to_memory(void* dest, size_type size) noexcept;
+	void copy_font_data_to(std::span<u8> dest, std::size_t size) noexcept;
 
 	/*   */ void handle_pre_work_interrupts() noexcept;
 	/*   */ void handle_post_work_interrupts() noexcept;
@@ -208,7 +226,9 @@ protected:
 	}
 
 protected:
-	Chip8_CoreInterface(DisplayDevice display_device) noexcept;
+	Chip8_CoreInterface(
+		std::size_t W, std::size_t H, std::string_view system_name
+	) noexcept;
 
 public:
 	void main_system_loop() override final;
@@ -218,9 +238,6 @@ public:
 /*==================================================================*/
 
 protected:
-	static constexpr auto c_small_font_offset = 0x00;
-	static constexpr auto c_large_font_offset = 0x50;
-
 	static constexpr std::array<u8, 240> c_fonts_data = {
 		0x60, 0xA0, 0xA0, 0xA0, 0xC0, // 0
 		0x40, 0xC0, 0x40, 0x40, 0xE0, // 1
@@ -258,6 +275,9 @@ protected:
 		0xFE, 0x66, 0x62, 0x64, 0x7C, 0x64, 0x60, 0x60, 0xF0, 0x00, // F
 	};
 	static inline std::array<u8, 240> s_fonts_data = c_fonts_data;
+
+	static constexpr auto c_small_font_offset = 0x00;
+	static constexpr auto c_large_font_offset = c_small_font_offset + 0x50;
 
 	static constexpr std::array<RGBA, 16> c_bit_colors = { // 0-1 monochrome, 0-15 palette color
 		0x181C20FF, 0xE4DCD4FF, 0x8C8884FF, 0x403C38FF,

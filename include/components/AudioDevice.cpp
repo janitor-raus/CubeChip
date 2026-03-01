@@ -26,8 +26,8 @@ static float calculate_gain(float stream_gain) noexcept {
 
 bool AudioDevice::add_audio_stream(
 	unsigned streamID, unsigned frequency,
-	unsigned channels, unsigned device)
-{
+	unsigned channels, unsigned device
+) {
 	SDL_AudioSpec spec{ SDL_AUDIO_F32, signed(channels), signed(frequency) };
 
 	auto* ptr = SDL_OpenAudioDeviceStream(
@@ -83,8 +83,8 @@ auto AudioDevice::Stream::get_spec() const noexcept -> SDL_AudioSpec {
 }
 
 bool AudioDevice::Stream::is_paused() const noexcept {
-	const auto deviceID = SDL_GetAudioStreamDevice(m_ptr);
-	return deviceID ? SDL_AudioDevicePaused(deviceID) : true;
+	const auto device_id = SDL_GetAudioStreamDevice(m_ptr);
+	return device_id ? SDL_AudioDevicePaused(device_id) : true;
 }
 
 bool AudioDevice::Stream::is_playback() const noexcept {
@@ -128,8 +128,8 @@ void AudioDevice::Stream::add_gain(float add_gain) noexcept {
 }
 
 void AudioDevice::Stream::push_raw_audio_data(void* sample_data,
-	std::size_t buffer_size, std::size_t sample_size) const
-{
+	std::size_t buffer_size, std::size_t sample_size
+) const {
 	if (is_paused() || buffer_size == 0u) { return; }
 
 	SDL_SetAudioDeviceGain(SDL_GetAudioStreamDevice(m_ptr), ::calculate_gain(get_gain()));

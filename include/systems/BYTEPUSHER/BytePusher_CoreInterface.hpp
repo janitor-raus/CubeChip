@@ -11,11 +11,19 @@
 
 #include "../SystemInterface.hpp"
 
+#include "AudioDevice.hpp"
+#include "DisplayDevice.hpp"
+
 /*==================================================================*/
 
 class BytePusher_CoreInterface : public SystemInterface {
 
 protected:
+	static constexpr std::string_view family_pretty_name = "BytePusher";
+	static constexpr std::string_view family_name = "bytepusher";
+	static constexpr std::string_view family_desc = "BytePusher family line.";
+	using Family = BytePusher_CoreInterface;
+
 	static inline std::string s_savestate_path{};
 
 	enum STREAM { MAIN };
@@ -36,14 +44,14 @@ protected:
 		m_custom_binds.assign(std::begin(binds), std::end(binds));
 	}
 
-	void copy_game_to_memory(u8* dest) noexcept;
-
 	virtual void instruction_loop() noexcept = 0;
 	virtual void push_audio_data() noexcept = 0;
 	virtual void push_video_data() noexcept = 0;
 
 protected:
-	BytePusher_CoreInterface(DisplayDevice display_device) noexcept;
+	BytePusher_CoreInterface(
+		std::size_t W, std::size_t H, std::string_view system_name
+	) noexcept;
 
 public:
 	void main_system_loop() override;

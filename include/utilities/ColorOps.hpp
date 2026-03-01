@@ -31,8 +31,8 @@ inline CONSTEXPR_MATH RGBA  to_RGBA (OKLCH in) noexcept;
 /*==================================================================*/
 
 struct alignas(4) RGBA {
-	using u8     = ez::u8;
-	using Packed = ez::u32;
+	using u8     = u8;
+	using Packed = u32;
 
 	static constexpr u8 Opaque_A      = 0xFF;
 	static constexpr u8 Transparent_A = 0x00;
@@ -292,10 +292,10 @@ constexpr RGBA operator""_rgb(unsigned long long value) noexcept
 /*==================================================================*/
 
 struct alignas(4) HSV {
-	using Type_H = ez::s16;
-	using Type_S = ez::u8;
+	using Type_H = s16;
+	using Type_S = u8;
 	using Type_V = Type_S;
-	using Packed = ez::u32;
+	using Packed = u32;
 
 	static constexpr auto full_hue = Type_H(0x600u);
 	static constexpr auto half_hue = Type_H(full_hue >> 1);
@@ -327,7 +327,7 @@ struct alignas(4) HSV {
 /*==================================================================*/
 
 struct OKLAB {
-	using Type_F = ez::f32;
+	using Type_F = f32;
 
 	Type_F L{}, A{}, B{};
 
@@ -368,8 +368,8 @@ struct OKLCH {
 	{}
 
 	static constexpr OKLCH lerp(OKLCH x, OKLCH y, ez::Weight w) noexcept {
-		const auto delta = ez::fmod(y.H - x.H + ez::f32(std::numbers::pi * 3),
-			ez::f32(std::numbers::pi * 2)) - ez::f32(std::numbers::pi);
+		const auto delta = ez::fmod(y.H - x.H + f32(std::numbers::pi * 3),
+			f32(std::numbers::pi * 2)) - f32(std::numbers::pi);
 		return OKLCH(
 			std::lerp(x.L, y.L, w.as_fp()),
 			std::lerp(x.C, y.C, w.as_fp()),

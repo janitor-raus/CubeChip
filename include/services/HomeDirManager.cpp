@@ -6,15 +6,12 @@
 
 #include "HomeDirManager.hpp"
 
-#include "Typedefs.hpp"
-#include "SHA1.hpp"
+#include "EzMaths.hpp"
 #include "SimpleFileIO.hpp"
 #include "BasicLogger.hpp"
 #include "DefaultConfig.hpp"
 #include "PathGetters.hpp"
 #include "ExecPolicy.hpp"
-
-#include <algorithm>
 
 #include <SDL3/SDL_messagebox.h>
 
@@ -51,25 +48,26 @@ static bool is_location_writable(const char* path) noexcept {
 	#pragma region HomeDirManager Class
 
 HomeDirManager::HomeDirManager(
-	std::string_view overrideHome, std::string_view configName,
-	bool forcePortable, std::string_view org, std::string_view app,
-	bool& initError
+	std::string_view home_override, std::string_view config_name,
+	bool force_portable, std::string_view org, std::string_view app,
+	bool& error_on_init
 ) noexcept {
-	if (!set_home_path(overrideHome, forcePortable, org, app))
-		{ initError = true; return; }
+	if (!set_home_path(home_override, force_portable, org, app))
+		{
+		error_on_init = true; return; }
 
-	if (configName.empty()) { configName = "settings.toml"; }
-	s_config_at = (Path(s_home_path) / configName).string();
+	if (config_name.empty()) { config_name = "settings.toml"; }
+	s_config_at = (Path(s_home_path) / config_name).string();
 }
 
 bool HomeDirManager::set_home_path(
-	std::string_view overrideHome, bool forcePortable,
+	std::string_view home_override, bool force_portable,
 	std::string_view org, std::string_view app) noexcept
 {
-	if (!overrideHome.empty()) {
-		if (::is_location_writable(overrideHome.data())) {
+	if (!home_override.empty()) {
+		if (::is_location_writable(home_override.data())) {
 			blog.info("Home path override successful!");
-			s_home_path = overrideHome;
+			s_home_path = home_override;
 			return true;
 		} else {
 			::trigger_fatal_error("Home path override failure: cannot write to location!");
@@ -77,7 +75,7 @@ bool HomeDirManager::set_home_path(
 		}
 	}
 
-	if (forcePortable) {
+	if (force_portable) {
 		if (::is_location_writable(::get_base_path())) {
 			blog.info("Forced portable mode successful!");
 			s_home_path = ::get_base_path();
@@ -148,91 +146,12 @@ void HomeDirManager::update_map_from_config(const SettingsMap& map) const noexce
 }
 
 HomeDirManager* HomeDirManager::initialize(
-	std::string_view overridePath, std::string_view configName,
-	bool forcePortable, std::string_view org, std::string_view app
+	std::string_view home_override, std::string_view config_name,
+	bool force_portable, std::string_view org, std::string_view app
 ) noexcept {
-	static bool initError{};
-	static HomeDirManager self(overridePath, configName, forcePortable, org, app, initError);
-	return initError ? nullptr : &self;
-}
-
-auto HomeDirManager::add_user_directory(const Path& sub, const Path& sys) noexcept -> const Path* {
-	if (sub.empty()) { return nullptr; }
-
-	const auto new_dir_path = s_home_path / sys / sub;
-
-	const auto it = std::find_if(EXEC_POLICY(unseq)
-		m_user_directories.begin(), m_user_directories.end(),
-		[&](const Path& dir_entry) noexcept { return dir_entry == new_dir_path; }
-	);
-
-	if (it != m_user_directories.end()) { return &(*it); }
-
-	if (const auto dirCreated = fs::create_directories(new_dir_path)) {
-		m_user_directories.push_back(new_dir_path);
-		return &m_user_directories.back();
-	} else {
-		blog.error("Unable to create directory: \"{}\" [{}]",
-			new_dir_path.string(), dirCreated.error().message());
-		return nullptr;
-	}
-}
-
-void HomeDirManager::clear_cached_file_data() noexcept {
-	m_file_path.clear();
-	m_file_sha1.clear();
-	m_file_data.resize(0);
-}
-
-bool HomeDirManager::load_and_validate_file(const Path& gamePath) noexcept {
-	const auto fileExists = fs::is_regular_file(gamePath);
-	if (!fileExists) {
-		blog.warn("Path is ineligible: \"{}\" [{}]",
-			gamePath.string(), fileExists.error().message());
-		return false;
-	}
-	if (!fileExists.value()) {
-		blog.warn("{}: \"{}\"",
-			"Path is not a regular file", gamePath.string());
-		return false;
-	}
-
-	const auto fileSize = fs::file_size(gamePath);
-	if (!fileSize) {
-		blog.warn("Path is ineligible: \"{}\" [{}]",
-			gamePath.string(), fileExists.error().message());
-		return false;
-	}
-	if (fileSize.value() == 0) {
-		blog.warn("File must not be empty!");
-		return false;
-	}
-	if (fileSize.value() >= 32_MiB) {
-		blog.warn("File is too large!");
-		return false;
-	}
-
-	auto fileData = ::read_file_data(gamePath);
-	if (!fileData) {
-		blog.warn("Path is ineligible: \"{}\" [{}]",
-			gamePath.string(), fileData.error().message());
-		return false;
-	} else {
-		m_file_data = std::move(fileData.value());
-	}
-
-	const auto tempSHA1 = SHA1::from_data(m_file_data.data(), m_file_data.size());
-	blog.info("File SHA1: {}", tempSHA1);
-
-	if (s_validator(m_file_data.data(), m_file_data.size(),
-		gamePath.extension().string(), tempSHA1))
-	{
-		m_file_path = gamePath;
-		m_file_sha1 = tempSHA1;
-		return true;
-	} else {
-		return false;
-	}
+	static bool error_on_init{};
+	static HomeDirManager self(home_override, config_name, force_portable, org, app, error_on_init);
+	return error_on_init ? nullptr : &self;
 }
 
 	#pragma endregion

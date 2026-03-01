@@ -107,7 +107,7 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 
 		SDL_SetWindowPosition(m_main_window, window.x, window.y);
 		SDL_SetWindowSize(m_main_window, window.w, window.h);
-		SDL_SetWindowMinimumSize(m_main_window, 800, 600);
+		SDL_SetWindowMinimumSize(m_main_window, 960, 780);
 
 		m_main_renderer = SDL_CreateRenderer(m_main_window, nullptr); \
 		if (!m_main_renderer) { throw_fatal_error(__LINE__, __func__); }

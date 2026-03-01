@@ -11,6 +11,9 @@
 #define ENABLE_XOCHIP
 #if defined(ENABLE_CHIP8_SYSTEM) && defined(ENABLE_XOCHIP)
 
+#include "SystemDescriptor.hpp"
+#include "Map2D.hpp"
+
 /*==================================================================*/
 
 class XOCHIP final : public Chip8_CoreInterface {
@@ -24,6 +27,25 @@ class XOCHIP final : public Chip8_CoreInterface {
 
 	static constexpr u32 c_sys_screen_W = 128;
 	static constexpr u32 c_sys_screen_H =  64;
+
+	static constexpr std::string_view c_supported_extensions[] = { ".ch8", ".xo8" };
+
+	static constexpr const char* validate_program(std::span<const char> file) noexcept {
+		return Family::validate_program(file, c_game_load_pos, c_sys_memory_size);
+	}
+
+public:
+	static constexpr SystemDescriptor descriptor = {
+		0, Family::family_pretty_name, Family::family_name, Family::family_desc,
+		"XOCHIP", "xochip", "XOCHIP core.",
+		c_supported_extensions, validate_program,
+	};
+
+	const SystemDescriptor& get_descriptor() const noexcept override {
+		return descriptor;
+	}
+
+/*==================================================================*/
 
 private:
 	MemoryBank<c_sys_memory_size>
@@ -206,7 +228,7 @@ private:
 
 public:
 	XOCHIP() noexcept
-		: Chip8_CoreInterface(DisplayDevice(c_sys_screen_W, c_sys_screen_H, "XOCHIP"))
+		: Chip8_CoreInterface(c_sys_screen_W, c_sys_screen_H, descriptor.system_pretty_name)
 		, m_display_map{
 			Map2D(m_display_buffer[P0].data(), c_sys_screen_W/2, c_sys_screen_H/2),
 			Map2D(m_display_buffer[P1].data(), c_sys_screen_W/2, c_sys_screen_H/2),
@@ -214,14 +236,6 @@ public:
 			Map2D(m_display_buffer[P3].data(), c_sys_screen_W/2, c_sys_screen_H/2),
 		}
 	{}
-
-	static constexpr bool validate_program(
-		const char* fileData,
-		const size_type fileSize
-	) noexcept {
-		if (!fileData || !fileSize) { return false; }
-		return fileSize + c_game_load_pos <= c_sys_memory_size;
-	}
 
 private:
 	void initialize_system() noexcept override;

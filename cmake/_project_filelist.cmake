@@ -30,6 +30,7 @@ set(COMPONENTS_HEADERS
 	"${PROJECT_INCLUDE_DIR}/components/AudioFilters.hpp"
 	"${PROJECT_INCLUDE_DIR}/components/BasicInput.hpp"
 	"${PROJECT_INCLUDE_DIR}/components/DisplayDevice.hpp"
+	"${PROJECT_INCLUDE_DIR}/components/FileImage.hpp"
 	"${PROJECT_INCLUDE_DIR}/components/FrameLimiter.hpp"
 	"${PROJECT_INCLUDE_DIR}/components/FramePacket.hpp"
 	"${PROJECT_INCLUDE_DIR}/components/SlidingRingBuffer.hpp"
@@ -44,9 +45,9 @@ set(COMPONENTS_SOURCES
 	"${PROJECT_INCLUDE_DIR}/components/AudioFilters.cpp"
 	"${PROJECT_INCLUDE_DIR}/components/BasicInput.cpp"
 	"${PROJECT_INCLUDE_DIR}/components/DisplayDevice.cpp"
+	"${PROJECT_INCLUDE_DIR}/components/FileImage.cpp"
 	"${PROJECT_INCLUDE_DIR}/components/FrameLimiter.cpp"
 	"${PROJECT_INCLUDE_DIR}/components/SimpleTimer.cpp"
-	"${PROJECT_INCLUDE_DIR}/components/Well512.cpp"
 )
 source_group("Components" FILES ${COMPONENTS_HEADERS} ${COMPONENTS_SOURCES})
 
@@ -62,6 +63,7 @@ set(UTILITIES_HEADERS
 	"${PROJECT_INCLUDE_DIR}/utilities/EzMaths.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/FileItem.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/FriendlyUnique.hpp"
+	"${PROJECT_INCLUDE_DIR}/utilities/ImLabel.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/LifetimeWrapperSDL.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/Macros.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/Map2D.hpp"
@@ -71,8 +73,8 @@ set(UTILITIES_HEADERS
 	"${PROJECT_INCLUDE_DIR}/utilities/SettingWrapper.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/SHA1.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/SimpleFileIO.hpp"
+	"${PROJECT_INCLUDE_DIR}/utilities/StringJoin.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/ThreadAffinity.hpp"
-	"${PROJECT_INCLUDE_DIR}/utilities/Typedefs.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/Waveforms.hpp"
 )
 set(UTILITIES_SOURCES
@@ -107,6 +109,7 @@ source_group("Services" FILES ${SERVICES_HEADERS} ${SERVICES_SOURCES})
 set(SYSTEMS_HEADERS
 	"${PROJECT_INCLUDE_DIR}/systems/SystemInterface.hpp"
 	"${PROJECT_INCLUDE_DIR}/systems/CoreRegistry.hpp"
+	"${PROJECT_INCLUDE_DIR}/systems/CoreRegistry.inl"
 )
 set(SYSTEMS_SOURCES
 	"${PROJECT_INCLUDE_DIR}/systems/SystemInterface.cpp"

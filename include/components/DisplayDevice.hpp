@@ -6,9 +6,7 @@
 
 #pragma once
 
-#include <string>
-#include <string_view>
-
+#include "ImLabel.hpp"
 #include "FramePacket.hpp"
 #include "TripleBuffer.hpp"
 #include "FrontendInterface.hpp"
@@ -42,7 +40,7 @@ public:
 	auto metadata_staging() noexcept -> FramePacket::Metadata&;
 
 public:
-	DisplayDevice(std::size_t W, std::size_t H, const char* name = nullptr, std::size_t bpp = 4) noexcept;
+	DisplayDevice(std::size_t W, std::size_t H, ImLabel name = {}, std::size_t bpp = 4) noexcept;
 
 	~DisplayDevice() noexcept;
 
@@ -62,7 +60,8 @@ public:
 	auto get_window_label() const noexcept -> ImLabel;
 	void set_window_label(std::string_view name) noexcept;
 
-	void set_shutdown_signal(bool* signal) noexcept;
+	void set_window_state_output(bool* out) noexcept;
+	void set_window_focus_output(bool* out) noexcept;
 	void set_osd_callable(Callable callable) noexcept;
 };
 

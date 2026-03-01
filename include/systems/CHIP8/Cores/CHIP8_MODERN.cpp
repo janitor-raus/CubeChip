@@ -7,15 +7,15 @@
 #include "CHIP8_MODERN.hpp"
 #if defined(ENABLE_CHIP8_SYSTEM) && defined(ENABLE_CHIP8_MODERN)
 
-#include "CoreRegistry.hpp"
+#include "CoreRegistry.inl"
 
-REGISTER_CORE(CHIP8_MODERN, ".ch8")
+REGISTER_SYSTEM_CORE(CHIP8_MODERN)
 
 /*==================================================================*/
 
 void CHIP8_MODERN::initialize_system() noexcept {
-	copy_game_to_memory(m_memory_bank.data() + c_game_load_pos);
-	copy_font_to_memory(m_memory_bank.data(), 80);
+	copy_file_image_to(m_memory_bank, c_game_load_pos);
+	copy_font_data_to(m_memory_bank, 80);
 
 	set_base_system_framerate(c_sys_refresh_rate);
 

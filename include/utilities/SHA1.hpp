@@ -9,8 +9,10 @@
 
 #pragma once
 
+#include <cstdint>
+#include <cstddef>
 #include <string>
-#include <filesystem>
+#include <span>
 
 /*==================================================================*/
 
@@ -33,6 +35,7 @@ public:
 
 	std::string final();
 
-	static std::string from_file(const std::filesystem::path& filePath);
+	static std::string from_file(std::string file_path);
+	static std::string from_span(std::span<const char> file_span);
 	static std::string from_data(const char* data, std::size_t size);
 };

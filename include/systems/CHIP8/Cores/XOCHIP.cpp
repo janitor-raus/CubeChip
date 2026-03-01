@@ -7,17 +7,17 @@
 #include "XOCHIP.hpp"
 #if defined(ENABLE_CHIP8_SYSTEM) && defined(ENABLE_XOCHIP)
 
-#include "CoreRegistry.hpp"
+#include "CoreRegistry.inl"
 
-REGISTER_CORE(XOCHIP, ".xo8")
+REGISTER_SYSTEM_CORE(XOCHIP)
 
 /*==================================================================*/
 
 void XOCHIP::initialize_system() noexcept {
 	Quirk.wrap_sprites = true;
 
-	copy_game_to_memory(m_memory_bank.data() + c_game_load_pos);
-	copy_font_to_memory(m_memory_bank.data(), 80);
+	copy_file_image_to(m_memory_bank, c_game_load_pos);
+	copy_font_data_to(m_memory_bank, 80);
 
 	set_base_system_framerate(c_sys_refresh_rate);
 

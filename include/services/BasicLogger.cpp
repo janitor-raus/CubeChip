@@ -7,12 +7,12 @@
 #include <fmt/ostream.h>
 #include <fmt/chrono.h>
 
-#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <atomic>
 #include <utility>
 #include <fstream>
+#include <vector>
 #include <unordered_map>
 
 #include "BasicLogger.hpp"
@@ -23,16 +23,35 @@
 
 /*==================================================================*/
 
+struct StringHash {
+	using is_transparent = void;
+
+	size_t operator()(std::string_view sv) const noexcept {
+		return std::hash<std::string_view>{}(sv);
+	}
+};
+
+struct StringEq {
+	using is_transparent = void;
+
+	bool operator()(std::string_view a, std::string_view b) const noexcept {
+		return a == b;
+	}
+};
+
+/*==================================================================*/
+
 struct LogSource {
-	std::unordered_map<std::string, std::uint32_t>
+	std::unordered_map<std::string, std::uint32_t, StringHash, StringEq>
 		table{};
 
 	std::atomic<std::uint32_t>
 		count{}; // sync fence for m_names
 
-	std::mutex guard{};
+	std::mutex
+		guard{};
 
-	std::array<std::string, 251>
+	std::vector<std::string>
 		names{};
 
 public:
@@ -47,17 +66,18 @@ private:
 
 static LogSource* s_logger_sources = nullptr;
 
-std::uint32_t get_source_index(const std::string& src_name) noexcept {
+std::uint32_t get_source_index(std::string_view src_name) noexcept {
 	std::scoped_lock lock(s_logger_sources->guard);
 
 	auto it = s_logger_sources->table.find(src_name);
 	if (it != s_logger_sources->table.end()) { return it->second; }
 
-	const auto dest_index = s_logger_sources->count
-		.fetch_add(1, std::memory_order::acq_rel);
+	const auto dest_index = s_logger_sources->count.load(std::memory_order::relaxed);
 
 	s_logger_sources->table.emplace(src_name, dest_index);
-	s_logger_sources->names[dest_index] = src_name;
+	s_logger_sources->names.emplace_back(src_name);
+	s_logger_sources->count.store(dest_index + 1, std::memory_order::release);
+
 	return dest_index;
 }
 
@@ -66,16 +86,18 @@ std::string get_source_name(std::uint32_t src_id) noexcept {
 		? s_logger_sources->names[src_id] : std::string();
 }
 
-static thread_local std::uint32_t s_this_source = 0;
+static thread_local std::uint32_t s_this_source_id = 0;
 
-ScopedLogSource::ScopedLogSource(const std::string& src_name) noexcept
-	: m_previous_source(s_this_source)
+/*==================================================================*/
+
+ScopedLogSource::ScopedLogSource(std::string_view src_name) noexcept
+	: m_prev_source_id(s_this_source_id)
 {
-	s_this_source = ::get_source_index(src_name);
+	s_this_source_id = ::get_source_index(src_name);
 }
 
 ScopedLogSource::~ScopedLogSource() noexcept {
-	s_this_source = m_previous_source;
+	s_this_source_id = m_prev_source_id;
 }
 
 /*==================================================================*/
@@ -98,7 +120,6 @@ static std::string s_log_file_path{};
 static void touch_file_timestamp() noexcept {
 	(void) fs::last_write_time(s_log_file_path, fs::Time::clock::now());
 }
-
 
 /*==================================================================*/
 
@@ -282,7 +303,7 @@ auto BasicLogger::get_log_path() const noexcept -> std::string {
 }
 
 void BasicLogger::push_entry(BLOG::LEVEL level, std::string&& message) noexcept {
-	if (m_context) { m_context->buffer().push(LogEntry(level, s_this_source, std::move(message))); }
+	if (m_context) { m_context->buffer().push(LogEntry(level, s_this_source_id, std::move(message))); }
 }
 
 	#pragma endregion

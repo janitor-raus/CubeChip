@@ -17,14 +17,28 @@
 /*==================================================================*/
 
 class GAMEBOY_CLASSIC final : public GameBoy_CoreInterface {
-	static constexpr u64 c_sys_memory_size{   64_KiB };
-	static constexpr u32 cSafezoneOOB{        8 };
-	static constexpr f32 c_sys_refresh_rate{ 59.7275f };
-	static constexpr s32 cResSizeMult{        2 };
-	static constexpr s32 cScreenSizeX{      160 };
-	static constexpr s32 cScreenSizeY{      144 };
-	static constexpr s32 cCylesPerSec{  4194304 };
-	static constexpr s32 cScreenSizeT{    23040 };
+	static constexpr u64 c_sys_memory_size = 64_KiB;
+	static constexpr f32 c_sys_refresh_rate = 59.7275f;
+	static constexpr u32 cScreenSizeX =     160 };
+	static constexpr u32 cScreenSizeY =     144 };
+	static constexpr u32 cCylesPerSec = 4194304 };
+	static constexpr u32 cScreenSizeT =   23040 };
+
+	static constexpr bool validate_program(const char* file_data, std::size_t file_size) noexcept {
+		if (!file_data || !file_size) { return false; }
+		return true;
+	}
+
+public:
+	const SystemDescriptor& get_descriptor() const noexcept override {
+		static constexpr std::string_view extensions[] = { ".gb", ".gb" };
+		static constexpr SystemDescriptor descriptor = {
+			"gamboy_classic", "Gameboy core derived from the original spec.",
+			extensions, validate_program, 0
+		};
+
+		return descriptor;
+	}
 
 private:
 	void instruction_loop() noexcept override;
@@ -35,21 +49,21 @@ private:
 	public:
 
 
-	std::array<u8, c_sys_memory_size> mMemoryBanks{};
+	MemoryBank<c_sys_memory_size> m_memory_bank{};
 
 		/* Memory Map */
-		std::span<u8, 0x0100> mBootRomBank{ mMemoryBanks.begin() + 0x0000, 0x0100 }; // BOOT ROM
-		std::span<u8, 0x4000> mRomBank00  { mMemoryBanks.begin() + 0x0000, 0x4000 }; // ROM BANK 0
-		std::span<u8, 0x4000> mRomBankNN  { mMemoryBanks.begin() + 0x4000, 0x4000 }; // ROM BANK N
-		std::span<u8, 0x2000> mVideoBank  { mMemoryBanks.begin() + 0x8000, 0x2000 }; // VRAM
-		std::span<u8, 0x2000> mExtBank    { mMemoryBanks.begin() + 0xA000, 0x2000 }; // EXT RAM
-		std::span<u8, 0x1000> mWorkBank0  { mMemoryBanks.begin() + 0xC000, 0x1000 }; // WRAM 0
-		std::span<u8, 0x1000> mWorkBankN  { mMemoryBanks.begin() + 0xD000, 0x1000 }; // WRAM N
-		std::span<u8, 0x1E00> mEchoBank   { mMemoryBanks.begin() + 0xE000, 0x1E00 }; // ECHO RAM (C000-DDFF)
-		std::span<u8, 0x00A0> mObjAttrBank{ mMemoryBanks.begin() + 0xFE00, 0x00A0 }; // OAM
-		//std::span<u8, 0x0060> mProhibited { mMemoryBanks.begin() + 0xFEA0, 0x0060 }; // PROHIBITED
-		std::span<u8, 0x0080> mInOutBank  { mMemoryBanks.begin() + 0xFF00, 0x0080 }; // IO REGS
-		std::span<u8, 0x007F> mHighBank   { mMemoryBanks.begin() + 0xFF80, 0x007F }; // HRAM
+		std::span<u8, 0x0100> mBootRomBank{ m_memory_bank.begin() + 0x0000, 0x0100 }; // BOOT ROM
+		std::span<u8, 0x4000> mRomBank00  { m_memory_bank.begin() + 0x0000, 0x4000 }; // ROM BANK 0
+		std::span<u8, 0x4000> mRomBankNN  { m_memory_bank.begin() + 0x4000, 0x4000 }; // ROM BANK N
+		std::span<u8, 0x2000> mVideoBank  { m_memory_bank.begin() + 0x8000, 0x2000 }; // VRAM
+		std::span<u8, 0x2000> mExtBank    { m_memory_bank.begin() + 0xA000, 0x2000 }; // EXT RAM
+		std::span<u8, 0x1000> mWorkBank0  { m_memory_bank.begin() + 0xC000, 0x1000 }; // WRAM 0
+		std::span<u8, 0x1000> mWorkBankN  { m_memory_bank.begin() + 0xD000, 0x1000 }; // WRAM N
+		std::span<u8, 0x1E00> mEchoBank   { m_memory_bank.begin() + 0xE000, 0x1E00 }; // ECHO RAM (C000-DDFF)
+		std::span<u8, 0x00A0> mObjAttrBank{ m_memory_bank.begin() + 0xFE00, 0x00A0 }; // OAM
+		//std::span<u8, 0x0060> mProhibited { m_memory_bank.begin() + 0xFEA0, 0x0060 }; // PROHIBITED
+		std::span<u8, 0x0080> mInOutBank  { m_memory_bank.begin() + 0xFF00, 0x0080 }; // IO REGS
+		std::span<u8, 0x007F> mHighBank   { m_memory_bank.begin() + 0xFF80, 0x007F }; // HRAM
 
 		/* Video Bank 0 Tile Map */
 		std::span<u8, 0x0800> mVideoTileMap0{ mVideoBank.begin() + 0x0000, 0x0800 };
@@ -138,7 +152,7 @@ private:
 		u8& mPCM12{ mInOutBank[0x76] }; // Audio digital out 1 & 2
 		u8& mPCM34{ mInOutBank[0x77] }; // Audio digital out 3 & 4
 
-		u8& mIE   { mMemoryBanks[0xFFFF] }; // Interrupt enable
+		u8& mIE   { m_memory_bank[0xFFFF] }; // Interrupt enable
 	} mMMU;
 
 	u8 mInputControl{};

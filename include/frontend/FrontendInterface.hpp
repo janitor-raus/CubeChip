@@ -11,100 +11,10 @@
 #include <mutex>
 #include <vector>
 #include <utility>
-#include <string>
 #include <memory>
 #include <functional>
 
-/*==================================================================*/
-
-/**
- * @brief Utility class for handling ImGui labels with optional tags.
- *
- * ImGui uses '##' as a separator between the visible label and an internal
- * identifier tag. This class encapsulates that functionality, allowing easy
- * manipulation of both the label and tag components.
- */
-struct ImLabel {
-	static constexpr const char* separator = "##";
-
-	std::string value;
-
-	ImLabel() noexcept = default;
-	ImLabel(std::string v)      noexcept : value(std::move(v)) {}
-	ImLabel(std::string_view v) noexcept : value(v) {}
-	ImLabel(const char* v)      noexcept : value(v) {}
-
-	/*==================================================================*/
-
-	operator std::string_view() const noexcept { return value; }
-	operator const char*() const noexcept { return value.c_str(); }
-
-	/***/ std::string* operator->()       noexcept { return &value; }
-	const std::string* operator->() const noexcept { return &value; }
-
-	bool operator==(const ImLabel& other) const noexcept {
-		return value == other.value;
-	}
-
-	/*==================================================================*/
-
-	bool has_id() const noexcept {
-		return value.find(separator) != std::string::npos;
-	}
-
-	std::string get_name() const noexcept {
-		const auto pos = value.find(separator);
-		return (pos == std::string::npos) ? value
-			: std::string(value.data(), pos);
-	}
-
-	std::string get_id() const noexcept {
-		const auto pos = value.find(separator);
-		return (pos == std::string::npos) ? std::string()
-			: std::string(value.data() + pos);
-	}
-
-	std::string get_id_or_label() const noexcept {
-		const auto pos = value.find(separator);
-		return (pos == std::string::npos) ? value
-			: std::string(value.data() + pos);
-	}
-
-	/*==================================================================*/
-
-	void set_name(std::string_view new_name) noexcept {
-		if (has_id()) {
-			value = std::string(new_name) + separator + get_id();
-		} else {
-			value = std::string(new_name);
-		}
-	}
-
-	void set_id(std::string_view new_id) noexcept {
-		if (new_id.empty()) {
-			value = get_name();
-		} else {
-			value = get_name() + separator + std::string(new_id);
-		}
-	}
-
-	void set_label(std::string_view new_name, std::string_view new_id) noexcept {
-		if (new_id.empty()) {
-			value = std::string(new_name);
-		} else {
-			value = std::string(new_name) + separator + std::string(new_id);
-		}
-	}
-};
-
-namespace std {
-	template<>
-	struct hash<ImLabel> {
-		std::size_t operator()(const ImLabel& label) const noexcept {
-			return std::hash<std::string>{}(label.value);
-		}
-	};
-}
+#include "ImLabel.hpp"
 
 /*==================================================================*/
 
@@ -155,7 +65,7 @@ private:
 	};
 
 	static inline std::unique_ptr
-		<RegistryAggregate> s_hooks = nullptr;
+		<RegistryAggregate> s_gui_hooks = nullptr;
 
 public:
 	/**
@@ -169,12 +79,12 @@ public:
 	static Hook register_window(Fn&& fn) noexcept {
 		auto shared_ptr = std::make_shared<Func>(std::forward<Fn>(fn));
 
-		if (s_hooks->windows.registry_lock.try_lock()) { // may fail spuriously (fine)
-			s_hooks->windows.registry.buffer.push_back(shared_ptr);
-			s_hooks->windows.registry_lock.unlock();
+		if (s_gui_hooks->windows.registry_lock.try_lock()) { // may fail spuriously (fine)
+			s_gui_hooks->windows.registry.buffer.push_back(shared_ptr);
+			s_gui_hooks->windows.registry_lock.unlock();
 		} else {
-			std::scoped_lock lock(s_hooks->windows.overflow_lock); // must wait to acquire
-			s_hooks->windows.overflow.buffer.push_back(shared_ptr);
+			std::scoped_lock lock(s_gui_hooks->windows.overflow_lock); // must wait to acquire
+			s_gui_hooks->windows.overflow.buffer.push_back(shared_ptr);
 		}
 
 		return shared_ptr;
@@ -189,13 +99,13 @@ public:
 	static Hook register_menu(const LabelKey& window_tag, const OrderKey& menu_title, Fn&& fn) noexcept {
 		auto shared_ptr = std::make_shared<Func>(std::forward<Fn>(fn));
 
-		if (s_hooks->menus.registry_lock.try_lock()) { // may fail spuriously (fine)
-			s_hooks->menus.registry[window_tag.get_id_or_label()] \
+		if (s_gui_hooks->menus.registry_lock.try_lock()) { // may fail spuriously (fine)
+			s_gui_hooks->menus.registry[window_tag.get_id_or_label()] \
 				[menu_title].buffer.push_back(shared_ptr);
-			s_hooks->menus.registry_lock.unlock();
+			s_gui_hooks->menus.registry_lock.unlock();
 		} else {
-			std::scoped_lock lock(s_hooks->menus.overflow_lock); // must wait to acquire
-			s_hooks->menus.overflow[window_tag.get_id_or_label()] \
+			std::scoped_lock lock(s_gui_hooks->menus.overflow_lock); // must wait to acquire
+			s_gui_hooks->menus.overflow[window_tag.get_id_or_label()] \
 				[menu_title].buffer.push_back(shared_ptr);
 		}
 
@@ -217,7 +127,7 @@ private:
 	static void invoke_registered_menus(const LabelKey& tag) noexcept;
 
 public:
-	static void init_context(const char* home_dir);
+	static void init_context(std::string_view home_dir);
 	static void quit_context();
 
 	static void init_video(SDL_Window*, SDL_Renderer*);

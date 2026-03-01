@@ -4,27 +4,35 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "BasicInput.hpp"
-#include "HomeDirManager.hpp"
-
 #include "BytePusher_CoreInterface.hpp"
 
 #ifdef ENABLE_BYTEPUSHER_SYSTEM
 
+#include "BasicInput.hpp"
+#include "SimpleFileIO.hpp"
+
 /*==================================================================*/
 
-BytePusher_CoreInterface::BytePusher_CoreInterface(DisplayDevice display_device) noexcept
-	: m_display_device(std::move(display_device))
+BytePusher_CoreInterface::BytePusher_CoreInterface(
+	std::size_t W, std::size_t H, std::string_view system_name
+) noexcept
+	: m_display_device(W, H, { system_name, make_system_id(instance_id, family_name) })
 {
-	if (auto* path = HDM->add_user_directory("savestate", "BYTEPUSHER")) {
-		s_savestate_path = (*path / HDM->get_loaded_file_sha1()).string();
+	if (calc_file_image_sha1()) {
+		if (auto* path = add_system_path("savestate", family_name)) {
+			s_savestate_path = (fs::Path(*path) / m_file_sha1_hash).string();
+		} else {
+			blog.error("Unable to create savestate directory for system '{}', "
+				"savestates will be unavailable!", family_pretty_name);
+		}
 	}
 
 	m_display_device.set_osd_callable([&]() {
 		if (!has_system_state(EmuState::STATS)) { return; }
 		osd::simple_text_overlay(copy_statistics_string());
 	});
-	m_display_device.set_shutdown_signal(&m_is_system_alive);
+	m_display_device.set_window_state_output(&m_render_window_docker);
+	m_display_device.set_window_focus_output(&m_is_currently_focused);
 
 	load_preset_binds();
 }
@@ -34,8 +42,8 @@ BytePusher_CoreInterface::BytePusher_CoreInterface(DisplayDevice display_device)
 void BytePusher_CoreInterface::main_system_loop() {
 	instruction_loop();
 	push_audio_data();
-	create_statistics_data();
 	push_video_data();
+	create_statistics_data();
 }
 
 void BytePusher_CoreInterface::load_preset_binds() noexcept {
@@ -61,11 +69,6 @@ u32  BytePusher_CoreInterface::get_key_states() noexcept {
 	}
 
 	return key_states;
-}
-
-void BytePusher_CoreInterface::copy_game_to_memory(u8* dest) noexcept {
-	std::copy_n(EXEC_POLICY(unseq)
-		HDM->get_loaded_file_data(), HDM->get_loaded_file_size(), dest);
 }
 
 #endif

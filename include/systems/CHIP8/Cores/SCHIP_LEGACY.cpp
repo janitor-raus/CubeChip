@@ -7,18 +7,18 @@
 #include "SCHIP_LEGACY.hpp"
 #if defined(ENABLE_CHIP8_SYSTEM) && defined(ENABLE_SCHIP_LEGACY)
 
-#include "CoreRegistry.hpp"
+#include "CoreRegistry.inl"
 
-REGISTER_CORE(SCHIP_LEGACY, ".sc8")
+REGISTER_SYSTEM_CORE(SCHIP_LEGACY)
 
 /*==================================================================*/
 
 void SCHIP_LEGACY::initialize_system() noexcept {
 	::generate_n(m_memory_bank, 0, c_sys_memory_size,
-		[&]() noexcept { return m_rng->next<u8>(); });
+		[&]() noexcept { return u8(m_rng->next()); });
 
-	copy_game_to_memory(m_memory_bank.data() + c_game_load_pos);
-	copy_font_to_memory(m_memory_bank.data(), 180);
+	copy_file_image_to(m_memory_bank, c_game_load_pos);
+	copy_font_data_to(m_memory_bank, 180);
 
 	set_base_system_framerate(c_sys_refresh_rate);
 

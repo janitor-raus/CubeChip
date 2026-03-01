@@ -7,16 +7,15 @@
 #include "SCHIP_MODERN.hpp"
 #if defined(ENABLE_CHIP8_SYSTEM) && defined(ENABLE_SCHIP_MODERN)
 
-#include "BasicVideoSpec.hpp"
-#include "CoreRegistry.hpp"
+#include "CoreRegistry.inl"
 
-REGISTER_CORE(SCHIP_MODERN, ".sc8")
+REGISTER_SYSTEM_CORE(SCHIP_MODERN)
 
 /*==================================================================*/
 
 void SCHIP_MODERN::initialize_system() noexcept {
-	copy_game_to_memory(m_memory_bank.data() + c_game_load_pos);
-	copy_font_to_memory(m_memory_bank.data(), 240);
+	copy_file_image_to(m_memory_bank, c_game_load_pos);
+	copy_font_data_to(m_memory_bank, 240);
 
 	set_base_system_framerate(c_sys_refresh_rate);
 

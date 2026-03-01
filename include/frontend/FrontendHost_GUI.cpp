@@ -13,20 +13,27 @@
 #include "BasicVideoSpec.hpp"
 #include "GlobalAudioBase.hpp"
 #include "DefaultConfig.hpp"
+#include "SystemDescriptor.hpp"
+#include "SystemStaging.hpp"
+#include "CoreRegistry.hpp"
 #include "BasicLogger.hpp"
 #include "Millis.hpp"
 #include "ColorOps.hpp"
 #include "Thread.hpp"
+#include "SHA1.hpp"
 
 #include <imgui.h>
 #include <ranges>
+#include <filesystem>
 
 /*==================================================================*/
 
 void FrontendHost::setup_gui_callables() noexcept {
+	using namespace ImGui;
+
 	static auto s_menu_file__open_file = FrontendInterface::register_menu("",
 	{ 0, "File" }, [&]() noexcept {
-		if (ImGui::MenuItem("Open File...")) {
+		if (MenuItem("Open File...")) {
 			SDL_ShowOpenFileDialog([](void*, const char* const* file_list, int) noexcept {
 				if (file_list && file_list[0]) { set_open_file_dialog_result(file_list[0]); }
 			}, nullptr, BVS->get_main_window(), nullptr, 0, nullptr, false);
@@ -38,8 +45,8 @@ void FrontendHost::setup_gui_callables() noexcept {
 		static std::atomic<bool> s_opening_url{};
 		static auto s_home_url = "file:///" + HomeDirManager::get_home_path();
 
-		ImGui::BeginDisabled(s_opening_url.load(mo::acquire));
-		if (ImGui::MenuItem("Open Data Folder...", nullptr, nullptr, !s_opening_url.load(mo::acquire))) {
+		BeginDisabled(s_opening_url.load(mo::acquire));
+		if (MenuItem("Open Data Folder...", nullptr, nullptr, !s_opening_url.load(mo::acquire))) {
 			s_opening_url.store(true, mo::release);
 
 			Thread([]() noexcept {
@@ -49,15 +56,15 @@ void FrontendHost::setup_gui_callables() noexcept {
 				s_opening_url.store(false, mo::release);
 			}).detach();
 		}
-		ImGui::EndDisabled();
+		EndDisabled();
 	});
 
 	static auto s_menu_file__recent_files = FrontendInterface::register_menu("",
 	{ 0, "File" }, [&]() noexcept {
 		if (!s_file_mru.size()) { return; }
-		ImGui::Separator(1.0f);
-		ImGui::TextUnformatted("Recently opened:");
-		ImGui::DummyY(2.0f);
+		Separator(1.0f);
+		TextUnformatted("Recently opened:");
+		DummyY(2.0f);
 
 		if (FrontendInterface::was_menu_clicked()) {
 			for (auto& e : s_file_mru.span()) { e.exists(); }
@@ -66,7 +73,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 		bool clicked = FrontendInterface::was_menu_clicked();
 
 		for (auto& entry : s_file_mru.span()) {
-			if (ImGui::MenuItem(("• " + entry->filename().string()).c_str(),
+			if (MenuItem(("• " + entry->filename().string()).c_str(),
 				nullptr, nullptr, clicked ? entry.exists() : entry))
 			{
 				load_file_from_disk(entry->string());
@@ -77,7 +84,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 	static bool s_show_window_demo{};
 	static auto s_menu_debug__imgui_demo = FrontendInterface::register_menu("",
 	{ 10, "Debug" }, [&]() noexcept {
-		if (ImGui::MenuItem("ImGUI Demo...", nullptr, s_show_window_demo)) {
+		if (MenuItem("ImGUI Demo...", nullptr, s_show_window_demo)) {
 			s_show_window_demo = !s_show_window_demo;
 		}
 	});
@@ -85,39 +92,39 @@ void FrontendHost::setup_gui_callables() noexcept {
 	static bool s_show_window_logger{};
 	static auto s_menu_debug__show_logs = FrontendInterface::register_menu("",
 	{ 10, "Debug" }, [&]() noexcept {
-		if (ImGui::MenuItem("Show Logs...", nullptr, s_show_window_logger)) {
+		if (MenuItem("Show Logs...", nullptr, s_show_window_logger)) {
 			s_show_window_logger = !s_show_window_logger;
 		}
 	});
 
 	static auto s_menu_debug__about_app = FrontendInterface::register_menu("",
 	{ 10, "Debug" }, [&]() noexcept {
-		if (ImGui::BeginMenu("About...")) {
-			ImGui::PushFont(nullptr, 21.0f);
-			ImGui::TextUnformatted(AppName);
+		if (BeginMenu("About...")) {
+			PushFont(nullptr, 21.0f);
+			TextUnformatted(AppName);
 		#if !defined(NDEBUG) || defined(DEBUG)
-			ImGui::SameLine();
-			ImGui::TextUnformatted(" [DEBUG]");
+			SameLine();
+			TextUnformatted(" [DEBUG]");
 		#endif
-			ImGui::PopFont();
+			PopFont();
 
-			ImGui::Separator(2.0f);
+			Separator(2.0f);
 
-			ImGui::TextUnformatted("Version: ");
-			ImGui::SameLine();
-			ImGui::TextUnformatted(AppVer.with_hash);
+			TextUnformatted("Version: ");
+			SameLine();
+			TextUnformatted(AppVer.with_hash);
 
-			ImGui::DummyY(1.0f);
+			DummyY(1.0f);
 
-			ImGui::TextLinkOpenURL("License",
+			TextLinkOpenURL("License",
 				"https://github.com/janitor-raus/CubeChip/blob/master/LICENSE.txt");
-			ImGui::SameLine();
-			ImGui::TextUnformatted("|");
-			ImGui::SameLine();
-			ImGui::TextLinkOpenURL("GitHub",
+			SameLine();
+			TextUnformatted("|");
+			SameLine();
+			TextLinkOpenURL("GitHub",
 				"https://github.com/janitor-raus/CubeChip");
 
-			ImGui::EndMenu();
+			EndMenu();
 		}
 	});
 
@@ -127,10 +134,10 @@ void FrontendHost::setup_gui_callables() noexcept {
 		static bool s_click_active{};
 
 		if (!s_click_active) { s_scale_factor = int(FrontendInterface::get_ui_zoom_scaling() * 100); }
-		ImGui::SliderInt("UI Zoom Scale", &s_scale_factor, 100, 200, "%d%%");
+		SliderInt("UI Zoom Scale", &s_scale_factor, 100, 200, "%d%%");
 
-		s_click_active = ImGui::IsItemActive();
-		if (ImGui::IsItemDeactivatedAfterEdit()) {
+		s_click_active = IsItemActive();
+		if (IsItemDeactivatedAfterEdit()) {
 			FrontendInterface::set_ui_zoom_scaling(s_scale_factor * 0.01f);
 		}
 	});
@@ -141,10 +148,10 @@ void FrontendHost::setup_gui_callables() noexcept {
 		static bool s_click_active{};
 
 		if (!s_click_active) { s_scale_factor = int(FrontendInterface::get_ui_text_scaling() * 100); }
-		ImGui::SliderInt("UI Text Scale", &s_scale_factor, 100, 200, "%d%%");
+		SliderInt("UI Text Scale", &s_scale_factor, 100, 200, "%d%%");
 
-		s_click_active = ImGui::IsItemActive();
-		if (ImGui::IsItemDeactivatedAfterEdit()) {
+		s_click_active = IsItemActive();
+		if (IsItemDeactivatedAfterEdit()) {
 			FrontendInterface::set_ui_text_scaling(s_scale_factor * 0.01f);
 		}
 	});
@@ -152,14 +159,14 @@ void FrontendHost::setup_gui_callables() noexcept {
 	static auto s_menu_settings__master_vol = FrontendInterface::register_menu("",
 	{ 20, "Settings" }, [&]() noexcept {
 		auto global_gain = int(GAB->get_global_gain() * 100);
-		if (ImGui::SliderInt("Master Volume", &global_gain, 0, 100, "%d%%"))
+		if (SliderInt("Master Volume", &global_gain, 0, 100, "%d%%"))
 			{ GAB->set_glogal_gain(global_gain * 0.01f); }
 	});
 
 	static auto s_window_none__imgui_demo = FrontendInterface::register_window(
 	[&]() noexcept {
 		if (!s_show_window_demo) { return; }
-		ImGui::ShowDemoWindow(&s_show_window_demo);
+		ShowDemoWindow(&s_show_window_demo);
 	});
 
 	static auto s_window_none__log_viewer = FrontendInterface::register_window(
@@ -172,26 +179,26 @@ void FrontendHost::setup_gui_callables() noexcept {
 
 		static std::atomic<bool> s_opening_log{};
 
-		if (ImGui::Begin("Log Viewer##log_viewer", &s_show_window_logger,
+		if (Begin("Log Viewer##log_viewer", &s_show_window_logger,
 			ImGuiWindowFlags_NoCollapse
 		)) {
-			ImGui::BeginDisabled(s_is_bottomed);
-			if (ImGui::Button("Scroll to bottom")) { s_goto_bottom = true; }
-			ImGui::EndDisabled();
+			BeginDisabled(s_is_bottomed);
+			if (Button("Scroll to bottom")) { s_goto_bottom = true; }
+			EndDisabled();
 
-			ImGui::SameLine();
-			ImGui::Checkbox("Auto-scroll", &s_auto_scroll);
-			ImGui::SameLine();
+			SameLine();
+			Checkbox("Auto-scroll", &s_auto_scroll);
+			SameLine();
 
 			constexpr static const char* s_open_log_file_label = "Open log file...";
-			const float right_width = ImGui::CalcTextSize(s_open_log_file_label).x
-				+ ImGui::GetStyle().FramePadding.x * 2;
+			const float right_width = CalcTextSize(s_open_log_file_label).x
+				+ GetStyle().FramePadding.x * 2;
 
-			ImGui::AddCursorPosX(ImGui::GetContentRegionAvail().x - right_width);
+			AddCursorPosX(GetContentRegionAvail().x - right_width);
 
 			auto current_log_path = blog.get_log_path();
-			ImGui::BeginDisabled(s_opening_log.load(mo::acquire) || current_log_path.empty());
-			if (ImGui::Button(s_open_log_file_label)) {
+			BeginDisabled(s_opening_log.load(mo::acquire) || current_log_path.empty());
+			if (Button(s_open_log_file_label)) {
 				s_opening_log.store(true, mo::release);
 
 				Thread([log_path_copy = std::move(current_log_path)]() noexcept {
@@ -201,26 +208,26 @@ void FrontendHost::setup_gui_callables() noexcept {
 					s_opening_log.store(false, mo::release);
 				}).detach();
 			}
-			ImGui::EndDisabled();
+			EndDisabled();
 
-			ImGui::DummyY(1.0f);
+			DummyY(1.0f);
 
-			if (ImGui::BeginTable("LogTable", 6, ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_RowBg
+			if (BeginTable("LogTable", 6, ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_RowBg
 				| ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY
 			)) {
-				ImGui::TableSetupScrollFreeze(1, 1);
-				ImGui::TableSetupColumn("#",        ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_PreferSortAscending);
-				ImGui::TableSetupColumn("tID",      ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort);
-				ImGui::TableSetupColumn("Time",     ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort);
-				ImGui::TableSetupColumn("Source",   ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort);
-				ImGui::TableSetupColumn("Severity", ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort);
-				ImGui::TableSetupColumn("Message",  ImGuiTableColumnFlags_NoSort);
-				ImGui::TableHeadersRow();
+				TableSetupScrollFreeze(1, 1);
+				TableSetupColumn("#",        ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_PreferSortAscending);
+				TableSetupColumn("tID",      ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort);
+				TableSetupColumn("Time",     ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort);
+				TableSetupColumn("Source",   ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort);
+				TableSetupColumn("Severity", ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort);
+				TableSetupColumn("Message",  ImGuiTableColumnFlags_NoSort);
+				TableHeadersRow();
 
 				const auto snapshot = blog->snapshot(0).fast();
 				static bool s_sort_descending{};
 
-				if (auto* sort = ImGui::TableGetSortSpecs()) {
+				if (auto* sort = TableGetSortSpecs()) {
 					if (sort->SpecsCount > 0 && sort->SpecsDirty) {
 						s_sort_descending = sort->Specs[0].SortDirection
 							== ImGuiSortDirection_Descending;
@@ -228,27 +235,27 @@ void FrontendHost::setup_gui_callables() noexcept {
 				}
 
 				static auto renderTable = [](auto& entry) {
-					ImGui::TableNextRow();
+					TableNextRow();
 
-					ImGui::TableSetColumnIndex(0);
-					ImGui::Text("%u", entry.index);
+					TableSetColumnIndex(0);
+					Text("%u", entry.index);
 
-					ImGui::TableSetColumnIndex(1);
-					ImGui::Text("%u", entry.thread);
+					TableSetColumnIndex(1);
+					Text("%u", entry.thread);
 
-					ImGui::TableSetColumnIndex(2);
-					ImGui::TextUnformatted(NanoTime(entry.time)
+					TableSetColumnIndex(2);
+					TextUnformatted(NanoTime(entry.time)
 						.format_as_timer().c_str());
 
-					ImGui::TableSetColumnIndex(3);
-					ImGui::TextUnformatted(::get_source_name(entry.source).c_str());
+					TableSetColumnIndex(3);
+					TextUnformatted(::get_source_name(entry.source).c_str());
 
-					ImGui::TableSetColumnIndex(4);
-					ImGui::TextUnformatted(BLOG(entry.level).as_string(),
+					TableSetColumnIndex(4);
+					TextUnformatted(BLOG(entry.level).as_string(),
 						RGBA(BLOG(entry.level).as_color()).XBGR());
 
-					ImGui::TableSetColumnIndex(5);
-					ImGui::TextUnformatted(entry.message.c_str());
+					TableSetColumnIndex(5);
+					TextUnformatted(entry.message.c_str());
 				};
 
 				if (s_sort_descending) {
@@ -258,16 +265,267 @@ void FrontendHost::setup_gui_callables() noexcept {
 					for (auto& entry : snapshot) { renderTable(entry); }
 				}
 
-				s_is_bottomed = ImGui::GetScrollY() >= ImGui::GetScrollMaxY();
+				s_is_bottomed = GetScrollY() >= GetScrollMaxY();
 
 				if (s_goto_bottom || (s_auto_scroll && s_is_bottomed)) {
 					s_is_bottomed = true; s_goto_bottom = false;
-					ImGui::SetScrollHereY(1.0f);
+					SetScrollHereY(1.0f);
 				}
 
-				ImGui::EndTable();
+				EndTable();
 			}
 		}
-		ImGui::End();
+		End();
+	});
+
+	static auto s_window_none__load_image = FrontendInterface::register_window(
+	[&]() noexcept {
+		if (!SystemStaging::file_image.valid()) { return; }
+
+		struct CandidateSystem {
+			using Hook = CoreRegistry::LiveHook;
+			Hook  system_hook{};
+			const char* error_message{};
+
+			CandidateSystem(const Hook& entry, std::span<const char> file) noexcept
+				: system_hook(entry)
+				, error_message(entry->descriptor->validate_program(file))
+			{}
+
+			auto& get_descriptor() const noexcept { return system_hook->descriptor; }
+			bool  eligible() const noexcept { return error_message == nullptr; }
+		};
+
+		struct FamilyGroup {
+			std::size_t total_eligible{};
+			std::string_view family_name{};
+			std::vector<CandidateSystem> systems;
+
+			FamilyGroup(std::string_view name) noexcept
+				: family_name(name) {}
+		};
+
+		static bool s_render_modal_window = false;
+		static bool s_replace_last_system = false;
+
+		static RGBA s_highlight_color = 0xF5A30CFF;
+
+		static std::vector<FamilyGroup> s_families{};
+		static std::size_t s_extension_match_count{};
+		static const CandidateSystem* s_chosen_candidate{};
+		static std::filesystem::path s_file_image{};
+
+		const auto s_close_modal_window = [&]() noexcept {
+			SystemStaging::clear();
+			CloseCurrentPopup();
+			s_render_modal_window = false;
+		};
+
+		if (!s_render_modal_window) {
+			s_render_modal_window = true;
+			OpenPopup("FileImageModal");
+
+			s_families.clear();
+			s_extension_match_count = 0u;
+			s_chosen_candidate = nullptr;
+			s_file_image = SystemStaging::file_image.path();
+
+			for (FamilyGroup* current_group = nullptr;
+				auto& hook : CoreRegistry::get_candidate_core_span()
+			) {
+				if (!current_group || current_group->family_name
+					!= hook->descriptor->family_pretty_name
+				) {
+					s_families.emplace_back(hook->descriptor->family_pretty_name);
+					current_group = &s_families.back();
+				}
+				current_group->systems.emplace_back(hook, SystemStaging::file_image.span());
+			}
+
+			for (auto& group : s_families) {
+				std::stable_partition(group.systems.begin(), group.systems.end(),
+					[](const auto& candidate) { return candidate.eligible(); });
+
+				for (const auto& candidate : group.systems) {
+					if (candidate.eligible()) {
+						++group.total_eligible;
+
+						const auto& exts = candidate.get_descriptor()->known_extensions;
+
+						if (std::any_of(exts.begin(), exts.end(), [&](const auto& ext) noexcept {
+							return ext == s_file_image.extension();
+						})) {
+							s_chosen_candidate = &candidate;
+							++s_extension_match_count;
+						}
+					}
+				}
+			}
+		}
+
+		const auto center = GetMainViewport()->GetCenter();
+		SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+
+		if (BeginPopupModal("FileImageModal", nullptr, ImGuiWindowFlags_NoMove
+			| ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize
+			| ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking
+			| ImGuiWindowFlags_AlwaysAutoResize
+		)) {
+			// filename title segment
+			{
+				PushFont(nullptr, 26.0f);
+				const auto file_name = s_file_image.filename().string();
+				const auto text_width = CalcTextSize(file_name.c_str()).x;
+				AddCursorPosX((GetContentRegionAvail().x - text_width) * 0.5f);
+				TextUnformatted(file_name.c_str(), s_highlight_color.ABGR());
+				PopFont();
+			}
+
+			Separator(2.0f);
+			Checkbox("Replace last system instance?", &s_replace_last_system);
+			SameLine();
+			Dummy(ImVec2());
+			DummyY(1.0f);
+
+			{
+				const auto scroll_size = ImVec2(
+					GetContentRegionAvail().x, 420.0f
+					* FrontendInterface::get_ui_zoom_scaling()
+					* FrontendInterface::get_ui_text_scaling());
+				BeginChild("##candidate_scroll_region", scroll_size, true);
+
+				const auto button_bg_size = ImVec2(
+					GetContentRegionAvail().x, 56.0f
+						* FrontendInterface::get_ui_zoom_scaling()
+						* FrontendInterface::get_ui_text_scaling());
+				const auto button_fg_size = ImVec2(
+					button_bg_size.x - GetStyle().FrameRounding,
+					button_bg_size.y - GetStyle().FrameRounding
+				);
+
+				for (auto& group : s_families) {
+					// Family name segment
+					{
+						DummyY(2.0f);
+						PushFont(nullptr, 24.0f);
+						const auto family_name = group.family_name.data();
+						const auto text_width = CalcTextSize(family_name).x;
+						AddCursorPosX((button_bg_size.x - text_width) * 0.5f);
+						TextUnformatted(family_name);
+						PopFont();
+					}
+					// Eligibility count segment
+					{
+						PushFont(nullptr, 16.0f);
+						const auto eligibility_counter = fmt::format("({}/{})",
+							group.total_eligible, group.systems.size());
+						const auto text_width = CalcTextSize(eligibility_counter.c_str()).x;
+						AddCursorPosX((button_bg_size.x - text_width) * 0.5f);
+						AddCursorPosY(GetTextLineHeight() * -0.3f);
+						BeginDisabled();
+						TextUnformatted(eligibility_counter.c_str());
+						EndDisabled();
+						PopFont();
+					}
+
+					DummyY(1.0f);
+
+					for (auto& candidate : group.systems) {
+						PushID(candidate.system_hook.get());
+
+						if (ButtonContainer("##btn", button_bg_size,
+						[&]() noexcept {
+							if (!candidate.eligible()) {
+								PushStyleColor(ImGuiCol_Text,
+									GetColorU32(ImGuiCol_TextDisabled));
+							}
+
+							// System name segment
+							{
+								const auto system_name = candidate.get_descriptor()
+									->system_pretty_name.data();
+
+								PushFont(nullptr, 22.0f);
+								const auto text_width = CalcTextSize(system_name).x;
+								AddCursorPosX((button_fg_size.x - text_width) * 0.5f);
+								TextUnformatted(system_name);
+								PopFont();
+							}
+
+							// Undernote segment
+							if (candidate.error_message) {
+								const auto text_width = CalcTextSize(candidate.error_message).x;
+								AddCursorPosX((button_fg_size.x - text_width) * 0.5f);
+								AddCursorPosY(GetTextLineHeight() * -0.2f);
+								TextWrapped("%s", candidate.error_message);
+							}
+
+							if (!candidate.eligible()) {
+								PopStyleColor();
+							}
+						},
+						[&]() noexcept {
+							if (s_chosen_candidate == &candidate && s_extension_match_count == 1) {
+								AddCursorPos(ImVec2(button_bg_size.y * 0.1f, button_bg_size.y * 0.025f));
+								PushFont(nullptr, 50.0f);
+								TextUnformatted("*", s_highlight_color.ABGR());
+								PopFont();
+							}
+						},
+						false)) {
+							s_file_mru.insert(SystemStaging::file_image.path());
+
+							if (auto* system = candidate.system_hook->construct_core()) {
+								if (s_replace_last_system) { unload_system_instance(); }
+								insert_system_instance(system); s_close_modal_window();
+							} else {
+								blog.warn("Failed to construct instance for candidate system '{}'",
+									candidate.get_descriptor()->system_pretty_name);
+							}
+						}
+
+						PopID();
+					}
+				}
+
+				EndChild();
+			}
+
+			DummyY(1.0f);
+			const auto button_width = (GetContentRegionAvail().x
+				- GetStyle().ItemSpacing.x) / 2.0f;
+
+			if (Button("Calc SHA1", ImVec2(button_width, 0.0f))) {
+				SystemStaging::sha1_hash = SHA1::from_span(SystemStaging::file_image);
+				blog.info("SHA1: {}", SystemStaging::sha1_hash);
+
+				// XXX - later set up CoreRegistry to utilize the hash to attempt
+				//       autoloading the appropriate system core matching the hash
+			}
+			SameLine();
+			if (Button("Cancel", ImVec2(button_width, 0.0f))) {
+				s_close_modal_window();
+			}
+
+
+			if (IsKeyPressed(ImGuiKey_Escape)) {
+				s_close_modal_window();
+			} else {
+				const auto pos  = GetWindowPos();
+				const auto size = GetWindowSize();
+				if (IsMouseClicked(ImGuiMouseButton_Left) &&
+					!IsMouseHoveringRect(pos, pos + size))
+				{
+					s_close_modal_window();
+				}
+			}
+
+			EndPopup();
+		}
+
+		if (!s_render_modal_window) {
+			// Clear system staging data after modal is closed
+			SystemStaging::clear();
+		}
 	});
 }

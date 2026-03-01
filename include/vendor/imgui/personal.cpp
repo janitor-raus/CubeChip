@@ -7,6 +7,7 @@
 #include "personal.hpp"
 
 #include "imgui.h"
+#include "imgui_internal.h"
 
 #include <cmath>
 #include <algorithm>
@@ -66,53 +67,53 @@ namespace ImGui {
 	}
 
 	void AddCursorPos(const ImVec2& delta) noexcept {
-		ImGui::SetCursorPos(ImGui::GetCursorPos() + delta);
+		SetCursorPos(GetCursorPos() + delta);
 	}
 
 	void AddCursorPosX(float delta) noexcept {
-		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + delta);
+		SetCursorPosX(GetCursorPosX() + delta);
 	}
 
 	void AddCursorPosY(float delta) noexcept {
-		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + delta);
+		SetCursorPosY(GetCursorPosY() + delta);
 	}
 
 	ImVec2 GetWindowDecoSize() noexcept {
-		const auto& style = ImGui::GetStyle();
+		const auto& style = GetStyle();
 
 		return ImVec2(style.WindowPadding.x * 2.0f, style.WindowPadding.y * 2.0f
-			+ ImGui::GetFontSize() + style.FramePadding.y * 2.0f);
+			+ GetFontSize() + style.FramePadding.y * 2.0f);
 	}
 
 	void Dummy(float mult_w, float mult_h) noexcept {
 		const auto mult_vec2 = ImVec2(mult_w, mult_h);
-		ImGui::Dummy(ImGui::GetStyle().WindowPadding * mult_vec2);
+		Dummy(GetStyle().FramePadding * mult_vec2);
 	}
 
 	void DummyX(float mult) noexcept {
-		ImGui::Dummy(ImVec2(mult * ImGui::GetStyle().WindowPadding.x, 0.0f));
+		Dummy(ImVec2(mult * GetStyle().FramePadding.x, 0.0f));
 	}
 
 	void DummyY(float mult) noexcept {
-		ImGui::Dummy(ImVec2(0.0f, mult * ImGui::GetStyle().WindowPadding.y));
+		Dummy(ImVec2(0.0f, mult * GetStyle().FramePadding.y));
 	}
 
 	void Separator(float mult) noexcept {
-		ImGui::DummyY(mult * 0.5f);
-		ImGui::Separator();
-		ImGui::DummyY(mult * 0.5f);
+		DummyY(mult * 0.5f);
+		Separator();
+		DummyY(mult * 0.5f);
 	}
 
 	void SetNextWindowMinClientSize(const ImVec2& min) noexcept {
-		ImGui::SetNextWindowSizeConstraints(min + ImGui::GetWindowDecoSize(), ImVec2(FLT_MAX, FLT_MAX));
+		SetNextWindowSizeConstraints(min + GetWindowDecoSize(), ImVec2(FLT_MAX, FLT_MAX));
 	}
 
 	void DockNextWindowTo(unsigned dock_id, bool first_use) noexcept {
-		ImGui::SetNextWindowDockID(dock_id, first_use
+		SetNextWindowDockID(dock_id, first_use
 			? ImGuiCond_FirstUseEver : ImGuiCond_Always);
 	}
 
-	void writeText(
+	void WriteText(
 		const char* textString, unsigned textColor,
 		Vec2 textAlign, Vec2 textPadding
 	) noexcept {
@@ -124,7 +125,7 @@ namespace ImGui {
 		TextUnformatted(textString, textColor);
 	}
 
-	void writeShadowedText(
+	void WriteShadowedText(
 		const char* textString, unsigned textColor,
 		Vec2 textAlign, Vec2 textPadding, Vec2 shadowDist
 	) noexcept {
@@ -146,7 +147,7 @@ namespace ImGui {
 	) noexcept {
 		if (!texture) { return; }
 
-		const ImVec2 TL = ImGui::GetCursorScreenPos();
+		const ImVec2 TL = GetCursorScreenPos();
 		const ImVec2 TR = { TL.x + dims.x, TL.y          };
 		const ImVec2 BR = { TL.x + dims.x, TL.y + dims.y };
 		const ImVec2 BL = { TL.x,          TL.y + dims.y };
@@ -166,23 +167,103 @@ namespace ImGui {
 		};
 		const auto& m = rotLUT[rotation & 3];
 
-		ImGui::GetWindowDrawList()->AddImageQuad(
+		GetWindowDrawList()->AddImageQuad(
 			reinterpret_cast<ImTextureID>(texture), TL, TR, BR, BL,
 			uvs[m[0]], uvs[m[1]], uvs[m[2]], uvs[m[3]], tint
 		);
 	}
 
 	void DrawRect(const ImVec2& dims, float width, float round, unsigned color) noexcept {
-		const auto origin = ImGui::GetCursorScreenPos();
+		const auto origin = GetCursorScreenPos();
 
-		ImGui::GetWindowDrawList()->AddRect(origin, origin + dims,
+		GetWindowDrawList()->AddRect(origin, origin + dims,
 			color, round, ImDrawFlags_RoundCornersAll, width);
 	}
 
 	void DrawRectFilled(const ImVec2& dims, float round, unsigned color) noexcept {
-		const auto origin = ImGui::GetCursorScreenPos();
+		const auto origin = GetCursorScreenPos();
 
-		ImGui::GetWindowDrawList()->AddRectFilled(origin, origin + dims,
+		GetWindowDrawList()->AddRectFilled(origin, origin + dims,
 			color, round, ImDrawFlags_RoundCornersAll);
+	}
+
+	void Draw5pStarFilled(
+		const ImVec2& center, float radius,
+		unsigned color
+	) noexcept {
+		constexpr auto n_points = 5u;
+		constexpr auto n_verts = n_points * 2;
+		ImVec2 verts[n_verts];
+
+		auto inner_radius = radius * 0.5f;
+		auto angle = -IM_PI / 2.0f; // start at top
+		auto step = IM_PI / n_points;
+
+		for (auto i = 0; i < n_verts; ++i) {
+			auto r = (i % 2 == 0) ? radius : inner_radius;
+			verts[i] = ImVec2(
+				center.x + std::cos(angle) * r,
+				center.y + std::sin(angle) * r
+			);
+			angle += step;
+		}
+
+		GetWindowDrawList()->AddConvexPolyFilled(verts, n_verts, color);
+	}
+
+	bool ButtonContainer(
+		const char* id, const ImVec2& size,
+		const std::function<void()>& foreground_children,
+		const std::function<void()>& background_children,
+		bool selected
+	) noexcept {
+		const auto& style = GetStyle();
+
+		const bool pressed = InvisibleButton(id, size);
+		const bool hovered = IsItemHovered();
+		const bool active  = IsItemActive();
+		const auto item_id = GetItemID();
+
+		const auto button_TL = GetItemRectMin();
+		const auto button_BR = GetItemRectMax();
+
+		RenderFrame(button_TL, button_BR, GetColorU32(
+			active   ? ImGuiCol_ButtonActive  :
+			hovered  ? ImGuiCol_ButtonHovered :
+			selected ? ImGuiCol_Header        : ImGuiCol_Button
+		), style.FrameBorderSize >= 1.0f, style.FrameRounding);
+
+		RenderNavCursor(ImRect(button_TL, button_BR), item_id);
+
+		const auto backup_cursor = GetCursorScreenPos();
+
+		SetCursorScreenPos(button_TL);
+
+		PushClipRect(button_TL, button_BR, true);
+		BeginGroup();
+		PushItemFlag(ImGuiItemFlags_Disabled, true);
+		background_children();
+		PopItemFlag();
+		EndGroup();
+		PopClipRect();
+
+		const auto content_TL = button_TL + style.FramePadding;
+		const auto content_BR = button_BR - style.FramePadding;
+
+		SetCursorScreenPos(content_TL);
+
+		PushClipRect(content_TL, content_BR, true);
+		BeginGroup();
+		foreground_children();
+		EndGroup();
+		PopClipRect();
+
+		SetCursorScreenPos(backup_cursor);
+
+		// reassure imgui our layout is correct
+		// since we restored the cursor position
+		ItemSize(ImVec2());
+
+		return pressed;
 	}
 }

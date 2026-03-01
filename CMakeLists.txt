@@ -35,6 +35,7 @@ include("cmake/atomic_queue.cmake")
 include("cmake/tl-expected.cmake")
 include("cmake/cxxopts.cmake")
 include("cmake/fmt.cmake")
+include("cmake/mio.cmake")
 include("cmake/tomlplusplus.cmake")
 include("cmake/nlohmann-json.cmake")
 include("cmake/sdl3.cmake")
@@ -85,6 +86,7 @@ target_link_libraries(
 	cxxopts::cxxopts
 	tl::expected
 	fmt::fmt
+	mio::mio
 	imgui
 )
 

@@ -11,6 +11,8 @@
 #define ENABLE_BYTEPUSHER_STANDARD
 #if defined(ENABLE_BYTEPUSHER_SYSTEM) && defined(ENABLE_BYTEPUSHER_STANDARD)
 
+#include "SystemDescriptor.hpp"
+
 /*==================================================================*/
 
 class BYTEPUSHER_STANDARD final : public BytePusher_CoreInterface {
@@ -19,6 +21,27 @@ class BYTEPUSHER_STANDARD final : public BytePusher_CoreInterface {
 
 	static constexpr u32 c_sys_screen_W = 256;
 	static constexpr u32 c_sys_screen_H = 256;
+
+	static constexpr std::string_view c_supported_extensions[] = { ".BytePusher", ".bp" };
+
+	static constexpr const char* validate_program(std::span<const char> file) noexcept {
+		if (file.empty()) { return "empty file"; }
+		return (file.size() <= c_sys_memory_size)
+			? nullptr : "file too large";
+	}
+
+public:
+	static constexpr SystemDescriptor descriptor = {
+		0, Family::family_pretty_name, Family::family_name, Family::family_desc,
+		"BytePusher", "bytepusher_standard", "BytePusher based on the original spec.",
+		c_supported_extensions, validate_program
+	};
+
+	const SystemDescriptor& get_descriptor() const noexcept override {
+		return descriptor;
+	}
+
+/*==================================================================*/
 
 private:
 	MemoryBank<c_sys_memory_size>
@@ -44,16 +67,8 @@ private:
 
 public:
 	BYTEPUSHER_STANDARD() noexcept
-		: BytePusher_CoreInterface(DisplayDevice(c_sys_screen_W, c_sys_screen_H, "BytePusher Standard"))
+		: BytePusher_CoreInterface(c_sys_screen_W, c_sys_screen_H, descriptor.system_pretty_name)
 	{}
-
-	static constexpr bool validate_program(
-		const char* fileData,
-		const size_type fileSize
-	) noexcept {
-		if (!fileData || !fileSize) { return false; }
-		return fileSize <= c_sys_memory_size;
-	}
 
 private:
 	void initialize_system() noexcept override;

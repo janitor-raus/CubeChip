@@ -13,7 +13,6 @@
 #include "SimpleMRU.hpp"
 #include "FileItem.hpp"
 #include "SettingWrapper.hpp"
-#include "AtomSharedPtr.hpp"
 
 /*==================================================================*/
 
@@ -93,27 +92,22 @@ class FrontendHost final {
 	FrontendHost(const FrontendHost&) = delete;
 	FrontendHost& operator=(const FrontendHost&) = delete;
 
-
-	using OpenFileResult = std::shared_ptr<std::string>;
-
-	[[nodiscard]]
-	static auto get_open_file_dialog_result() noexcept -> OpenFileResult;
 	static void set_open_file_dialog_result(std::string_view file) noexcept;
 
 	static constexpr std::size_t s_mru_limit = 10;
-	static inline SimpleMRU<FileItem, s_mru_limit> s_file_mru;
+	static inline SimpleMRU<FileItem> s_file_mru;
 
 	static void import_mru(std::string* src) noexcept {
 		for (std::size_t i = 0; i < s_mru_limit; ++i) {
 			s_file_mru.insert(src[s_mru_limit - 1 - i]); }
 	}
 
-	static void export_mru(std::string* src) noexcept {
+	static void export_mru(std::string* dst) noexcept {
 		for (std::size_t i = 0; i < s_mru_limit; ++i) {
-			src[i] = s_file_mru[i]->string(); }
+			dst[i] = s_file_mru[i]->string(); }
 	}
 
-	/*==================================================================*/
+/*==================================================================*/
 
 private:
 	class SystemInstance final {
@@ -137,17 +131,21 @@ private:
 
 	SystemMap m_systems{};
 
-	SystemInstance* system_with_id(const SystemID& key) noexcept {
-		auto sys_ptr = m_systems.find(key);
-		return (sys_ptr != m_systems.end())
-			? &sys_ptr->second : nullptr;
-	}
+	SimpleMRU<SystemID> m_focus_mru{};
+
+	void prune_terminated_systems() noexcept;
+	void find_last_focused_system() noexcept;
+
+	void unload_system_instance(SystemID system_id = 0) noexcept;
+	void insert_system_instance(SystemInterface* system) noexcept;
 
 	void toggle_system_delimiters(SystemInstance& system) noexcept;
 	void toggle_system_statistics(SystemInstance& system) noexcept;
+
+	bool m_application_minimized{};
 	void set_system_hidden_status(SystemInstance& system, bool state) noexcept;
 
-	/*==================================================================*/
+/*==================================================================*/
 
 public:
 	static inline HomeDirManager*  HDM{};
@@ -167,15 +165,12 @@ public:
 private:
 	auto export_settings() const noexcept -> Settings;
 
-	/*==================================================================*/
+/*==================================================================*/
 
 private:
-	void load_file_from_disk(std::string_view game_file_path);
+	void load_file_from_disk(std::string_view file_path);
 	void handle_main_hotkeys();
 	void setup_gui_callables() noexcept;
-
-	void discard_system_core(SystemID id);
-	void replace_system_core(SystemID id);
 
 /*==================================================================*/
 
@@ -189,5 +184,3 @@ public:
 	int handle_client_events(void* event) noexcept;
 	int process_client_frame();
 };
-
-/*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/

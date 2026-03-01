@@ -8,6 +8,8 @@
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 
+#include <functional>
+
 /*==================================================================*/
 
 struct ImVec2;
@@ -63,14 +65,14 @@ namespace ImGui {
 
 	void DockNextWindowTo(unsigned dock_id, bool first_use = false) noexcept;
 
-	void writeText(
+	void WriteText(
 		const char* textString,
 		unsigned textColor   = 0xFFFFFFFF,
 		Vec2 textAlign   = Vec2{ 0.5f, 0.5f },
 		Vec2 textPadding = Vec2{ 6.0f, 6.0f }
 	) noexcept;
 
-	void writeShadowedText(
+	void WriteShadowedText(
 		const char* textString,
 		unsigned textColor   = 0xFFFFFFFF,
 		Vec2 textAlign   = Vec2{ 0.5f, 0.5f },
@@ -93,5 +95,17 @@ namespace ImGui {
 	void DrawRectFilled(
 		const ImVec2& dims, float round,
 		unsigned color = 0xFFFFFFFF
+	) noexcept;
+
+	void Draw5pStarFilled(
+		const ImVec2& center, float radius,
+		unsigned color = 0xFFFFFFFF
+	) noexcept;
+
+	bool ButtonContainer(
+		const char* id, const ImVec2& size,
+		const std::function<void()>& foreground_children,
+		const std::function<void()>& background_children,
+		bool selected = false
 	) noexcept;
 }

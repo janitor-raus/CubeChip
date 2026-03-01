@@ -92,6 +92,8 @@ template <typename Container>
 SpanIterator(Container&) -> SpanIterator<std::remove_pointer_t<decltype(
 		std::data(std::declval<Container&>()))>>;
 
+/*==================================================================*/
+
 template <typename T>
 class Map2D final {
 	using self = Map2D;
@@ -150,16 +152,24 @@ public:
 /*==================================================================*/
 
 	constexpr Map2D() noexcept = default;
-	constexpr Map2D(pointer ptr, size_type cols = 1, size_type rows = 1)
+	constexpr Map2D(pointer ptr, size_type cols = 1, size_type rows = 1) noexcept
 		: m_data(ptr)
 		, m_size_x(axis_size(cols))
 		, m_size_y(axis_size(rows))
+	{}
+	constexpr Map2D(std::span<T> span, size_type cols = 1, size_type rows = 1) noexcept
+		: Map2D(span.data(), cols, rows)
 	{}
 
 	// manually change the map's data pointer (use with caution)
 	constexpr self& reseat(pointer data) noexcept {
 		m_data = data;
 		return *this;
+	}
+
+	// manually change the map's data pointer (use with caution)
+	constexpr self& reseat(std::span<T> span) noexcept {
+		return reseat(span.data());
 	}
 
 	// manually change the map's size (use with caution)

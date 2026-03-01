@@ -4,36 +4,48 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "HomeDirManager.hpp"
-#include "BasicLogger.hpp"
-#include "SimpleFileIO.hpp"
-
 #include "Chip8_CoreInterface.hpp"
 
 #ifdef ENABLE_CHIP8_SYSTEM
 
+#include "BasicLogger.hpp"
+#include "SimpleFileIO.hpp"
+#include "Millis.hpp"
+
 /*==================================================================*/
 
-Chip8_CoreInterface::Chip8_CoreInterface(DisplayDevice display_device) noexcept
-	: m_display_device(std::move(display_device))
+Chip8_CoreInterface::Chip8_CoreInterface(
+	std::size_t W, std::size_t H, std::string_view system_name
+) noexcept
+	: m_display_device(W, H, { system_name, make_system_id(instance_id, family_name) })
 {
-	if (auto* path = HDM->add_user_directory("savestate", "CHIP8")) {
-		s_savestate_path = (*path / HDM->get_loaded_file_sha1()).string();
-	}
+	if (calc_file_image_sha1()) {
+		if (auto* path = add_system_path("savestate", family_name)) {
+			m_savestate_path = (fs::Path(*path) / m_file_sha1_hash).string();
+		} else {
+			blog.error("Unable to create savestate directory for system '{}', "
+				"savestates will be unavailable!", family_pretty_name);
+		}
 
-	if (auto* path = HDM->add_user_directory("permaRegs", "CHIP8")) {
-		s_permaregs_path = (*path / HDM->get_loaded_file_sha1()).string();
+		if (auto* path = add_system_path("permaregs", family_name)) {
+			m_permaregs_path = (fs::Path(*path) / m_file_sha1_hash).string();
+		} else {
+			blog.warn("Unable to create permaregs directory for system '{}', "
+				"permanent register storage will be unavailable!", family_pretty_name);
+		}
 	}
 
 	m_display_device.set_osd_callable([&]() {
 		if (m_interrupt == Interrupt::INPUT) {
-			osd::key_press_indicator(WaveForms::pulse_t(500, u32(Millis::now())).as_unipolar());
+			osd::key_press_indicator(WaveForms::pulse_t(
+				500, u32(Millis::now())).as_unipolar());
 		}
 		if (has_system_state(EmuState::STATS)) {
 			osd::simple_text_overlay(copy_statistics_string());
 		}
 	});
-	m_display_device.set_shutdown_signal(&m_is_system_alive);
+	m_display_device.set_window_state_output(&m_render_window_docker);
+	m_display_device.set_window_focus_output(&m_is_currently_focused);
 
 	m_audio_device.add_audio_stream(STREAM::MAIN, 48'000);
 	m_audio_device.resume_streams();
@@ -71,7 +83,7 @@ void Chip8_CoreInterface::load_preset_binds() noexcept {
 	load_custom_binds(std::span(default_key_mappings));
 }
 
-bool Chip8_CoreInterface::catch_key_press(u8* keyReg) noexcept {
+bool Chip8_CoreInterface::catch_key_press(u8* key_reg) noexcept {
 	if (!m_custom_binds.size()) { return false; }
 
 	if (m_elapsed_frames >= m_tick_last + m_tick_span)
@@ -86,18 +98,18 @@ bool Chip8_CoreInterface::catch_key_press(u8* keyReg) noexcept {
 		m_tick_last  = m_elapsed_frames;
 		m_tick_span  = valid_keys != m_keys_loop ? 20 : 5;
 		m_keys_loop  = valid_keys & ~(valid_keys - 1);
-		::assign_cast(*keyReg, std::countr_zero(m_keys_loop));
+		::assign_cast(*key_reg, std::countr_zero(m_keys_loop));
 		//m_key_pitch = m_keys_loop ? std::min(m_key_pitch + 8, 80u) : 0;
 	}
 	return press_keys;
 }
 
-bool Chip8_CoreInterface::is_key_held_P1(u32 keyIndex) const noexcept {
-	return m_keys_this & ~m_keys_hide & 0x01 << (keyIndex & 0xF);
+bool Chip8_CoreInterface::is_key_held_P1(u32 key_index) const noexcept {
+	return m_keys_this & ~m_keys_hide & (0x01 << (key_index & 0xF));
 }
 
-bool Chip8_CoreInterface::is_key_held_P2(u32 keyIndex) const noexcept {
-	return m_keys_this & ~m_keys_hide & 0x10 << (keyIndex & 0xF);
+bool Chip8_CoreInterface::is_key_held_P2(u32 key_index) const noexcept {
+	return m_keys_this & ~m_keys_hide & (0x10 << (key_index & 0xF));
 }
 
 /*==================================================================*/
@@ -187,8 +199,8 @@ void Chip8_CoreInterface::main_system_loop() {
 	handle_post_work_interrupts();
 
 	push_audio_data();
-	create_statistics_data();
 	push_video_data();
+	create_statistics_data();
 }
 
 void Chip8_CoreInterface::append_statistics_data() noexcept {
@@ -271,7 +283,7 @@ void Chip8_CoreInterface::trigger_interrupt(Interrupt type, bool cond) noexcept 
 static bool has_regular_file(std::string_view file_path) noexcept {
 	const auto is_regular = fs::is_regular_file(file_path);
 	if (!is_regular) {
-		blog.debug("\"{}\" [{}]", file_path, is_regular.error().message());
+		blog.debug("'{}': {}", file_path, is_regular.error().message());
 		return false;
 	}
 	return is_regular.value();
@@ -281,58 +293,55 @@ static bool make_permaregs_file(std::string_view file_path) noexcept {
 	static constexpr char data_padding[16]{};
 	const auto is_created = ::write_file_data(file_path, data_padding);
 	if (!is_created) {
-		blog.error("\"{}\" [{}]", file_path, is_created.error().message());
+		blog.error("'{}': {}", file_path, is_created.error().message());
 	}
 	return is_created.value();
 }
 
 void Chip8_CoreInterface::set_file_permaregs(u32 X) noexcept {
-	auto write_status = ::write_file_data(s_permaregs_path, m_registers_V, X);
+	auto write_status = ::write_file_data(m_permaregs_path, m_registers_V, X);
 	if (!write_status) {
-		blog.error("File IO error: \"{}\" [{}]",
-			s_permaregs_path, write_status.error().message());
+		blog.error("File IO error '{}': {}",
+			m_permaregs_path, write_status.error().message());
 	}
 }
 
 void Chip8_CoreInterface::get_file_permaregs(u32 X) noexcept {
 	::assign_cast_min(X, s_permaregs_V.size());
-	auto read_status = ::read_file_data(s_permaregs_path, X);
+	auto read_status = ::read_file_data(m_permaregs_path, X);
 	if (!read_status) {
-		blog.error("File IO error: \"{}\" [{}]",
-			s_permaregs_path, read_status.error().message());
+		blog.error("File IO error: '{}': {}",
+			m_permaregs_path, read_status.error().message());
 	} else {
 		std::copy_n(read_status.value().begin(), X, s_permaregs_V.begin());
 	}
 }
 
 void Chip8_CoreInterface::set_permaregs(u32 X) noexcept {
-	if (!s_permaregs_path.empty()) {
-		if (has_regular_file(s_permaregs_path)) { set_file_permaregs(X); }
-		else { s_permaregs_path.clear(); }
+	if (!m_permaregs_path.empty()) {
+		if (has_regular_file(m_permaregs_path)) { set_file_permaregs(X); }
+		else { m_permaregs_path.clear(); }
 	}
 	std::copy_n(m_registers_V.begin(), X, s_permaregs_V.begin());
 }
 
 void Chip8_CoreInterface::get_permaregs(u32 X) noexcept {
-	if (!s_permaregs_path.empty()) {
-		if (!has_regular_file(s_permaregs_path)) {
-			if (!make_permaregs_file(s_permaregs_path)) { s_permaregs_path.clear(); }
+	if (!m_permaregs_path.empty()) {
+		if (!has_regular_file(m_permaregs_path)) {
+			if (!make_permaregs_file(m_permaregs_path)) { m_permaregs_path.clear(); }
 		}
 
-		if (has_regular_file(s_permaregs_path)) { get_file_permaregs(X); }
-		else { s_permaregs_path.clear(); }
+		if (has_regular_file(m_permaregs_path)) { get_file_permaregs(X); }
+		else { m_permaregs_path.clear(); }
 	}
 	std::copy_n(s_permaregs_V.begin(), X, m_registers_V.begin());
 }
 
 /*==================================================================*/
 
-void Chip8_CoreInterface::copy_game_to_memory(void* dest) noexcept {
-	std::memcpy(dest, HDM->get_loaded_file_data(), HDM->get_loaded_file_size());
-}
-
-void Chip8_CoreInterface::copy_font_to_memory(void* dest, size_type size) noexcept {
-	std::memcpy(dest, std::data(s_fonts_data), size);
+void Chip8_CoreInterface::copy_font_data_to(std::span<u8> dest, std::size_t size) noexcept {
+	std::memcpy(dest.data() + c_small_font_offset, s_fonts_data.data(),
+		std::min(size, s_fonts_data.size() - c_small_font_offset));
 }
 
 /*==================================================================*/

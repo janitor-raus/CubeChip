@@ -46,9 +46,9 @@ private:
 
 public:
 	static auto* initialize(const Settings& settings) noexcept {
-		static bool sInitSuccess = true;
-		static BasicVideoSpec self(settings, sInitSuccess);
-		return sInitSuccess ? &self : nullptr;
+		static bool s_init_success = true;
+		static BasicVideoSpec self(settings, s_init_success);
+		return s_init_success ? &self : nullptr;
 	}
 
 /*==================================================================*/

@@ -20,8 +20,6 @@ static SDL_Renderer* s_current_renderer{};
 static ImFont* s_main_font{};
 static ImGuiID s_main_dock_id{};
 
-static ImGuiStyle s_default_style;
-
 static float s_zoom_scaling = 1.0f;
 static float s_text_scaling = 1.0f;
 
@@ -29,157 +27,9 @@ static bool  s_pending_style_changes = true;
 
 /*==================================================================*/
 
-bool FrontendInterface::merge_overflowing_windows() noexcept {
-	std::scoped_lock lock(s_hooks->windows.overflow_lock);
+static ImGuiStyle s_default_style;
 
-	auto& src_windows = s_hooks->windows.overflow.buffer;
-	if (src_windows.empty()) { return false; }
-
-	auto& dst_windows = s_hooks->windows.registry.buffer;
-
-	blog.debug("{} overflow windows found.", src_windows.size());
-
-	dst_windows.insert(dst_windows.end(),
-		std::make_move_iterator(src_windows.begin()),
-		std::make_move_iterator(src_windows.end())
-	);
-	src_windows.clear();
-
-	return true;
-}
-
-void FrontendInterface::invoke_registered_windows() noexcept {
-	std::scoped_lock lock(s_hooks->windows.registry_lock);
-
-	auto& windows = s_hooks->windows.registry;
-
-	do {
-		while (windows.offset < windows.buffer.size()) {
-			if (auto shared_ptr = windows.buffer[windows.offset].lock()) {
-				(*shared_ptr)(); ++windows.offset;
-			} else {
-				windows.buffer.erase(windows.buffer.begin() + windows.offset);
-			}
-		}
-	} while (merge_overflowing_windows());
-
-	windows.offset = 0;
-}
-
-bool FrontendInterface::merge_overflowing_menus(const LabelKey& window_key) noexcept {
-	std::scoped_lock lock(s_hooks->menus.overflow_lock);
-
-	auto& src_window = s_hooks->menus.overflow[window_key.get_id_or_label()];
-	if (src_window.empty()) { return false; }
-
-	unsigned migration_count = 0;
-	for (auto& [menu_key, src_hooks] : src_window) {
-		if (src_hooks.buffer.empty()) { continue; }
-		auto& dst_hooks = s_hooks->menus.registry[window_key.get_id_or_label()][menu_key];
-
-		blog.debug("{} overflow hooks for menu \"{}\" found.",
-			src_hooks.buffer.size(), menu_key.second.c_str());
-
-		dst_hooks.buffer.insert(dst_hooks.buffer.end(),
-			std::make_move_iterator(src_hooks.buffer.begin()),
-			std::make_move_iterator(src_hooks.buffer.end())
-		);
-		src_hooks.buffer.clear();
-		++migration_count;
-	}
-
-	return !!migration_count;
-}
-
-void FrontendInterface::invoke_registered_menus(const LabelKey& window_key) noexcept {
-	std::scoped_lock lock(s_hooks->menus.registry_lock);
-
-	merge_overflowing_menus(window_key); // unconditional first merge
-	auto window = s_hooks->menus.registry.find(window_key.get_id_or_label());
-	if (window == s_hooks->menus.registry.end()) { return; }
-
-	do {
-		// iterate over all registered menu tabs for this window
-		for (auto& [menu_key, hooks] : window->second) {
-			if (hooks.buffer.empty()) { continue; }
-
-			// clean-up pass before we enter BeginMenu tabs
-			hooks.buffer.erase(std::remove_if(
-					hooks.buffer.begin(), hooks.buffer.end(),
-					[](auto& w) noexcept { return w.expired(); }
-			), hooks.buffer.end());
-
-			if (ImGui::BeginMenu(menu_key.second.c_str())) {
-				hooks.first_hit = !std::exchange(hooks.has_focus, true);
-				s_active_menu = &hooks;
-
-				// invoke all registered hooks for this menu tabs
-				while (hooks.offset < hooks.buffer.size()) {
-					// if the weak_ptr is expired, erase it, otherwise invoke it
-					if (auto shared_ptr = hooks.buffer[hooks.offset].lock()) {
-						(*shared_ptr)(); ++hooks.offset;
-					} else {
-						hooks.buffer.erase(hooks.buffer.begin() + hooks.offset);
-					}
-				}
-
-				ImGui::EndMenu();
-			} else {
-				s_active_menu = nullptr;
-				hooks.has_focus = false;
-				continue;
-			}
-		}
-	} while (merge_overflowing_menus(window_key));
-
-	for (auto& [_, hooks] : window->second)
-		{ hooks.offset = 0; } // reset for next frame
-}
-
-/*==================================================================*/
-
-SDL_Renderer* FrontendInterface::get_current_renderer()  noexcept { return s_current_renderer; }
-unsigned      FrontendInterface::get_main_dockspace_id() noexcept { return s_main_dock_id; }
-
-void FrontendInterface::set_ui_zoom_scaling(float scale) noexcept {
-	s_zoom_scaling = std::clamp(scale, 1.0f, 4.0f);
-	s_pending_style_changes = true;
-}
-
-float FrontendInterface::get_ui_zoom_scaling() noexcept {
-	return s_zoom_scaling;
-}
-
-void FrontendInterface::set_ui_text_scaling(float scale) noexcept {
-	s_text_scaling = std::clamp(scale, 0.5f, 2.0f);
-	s_pending_style_changes = true;
-}
-
-float FrontendInterface::get_ui_text_scaling() noexcept {
-	return s_text_scaling;
-}
-
-/*==================================================================*/
-
-void FrontendInterface::init_context(const char* home_dir) {
-	static auto ini_path = home_dir ? std::string(home_dir) + "imgui.ini" : std::string();
-	static auto log_path = home_dir ? std::string(home_dir) + "imgui.log" : std::string();
-
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	auto& io = ImGui::GetIO();
-
-	io.IniFilename = home_dir ? ini_path.c_str() : nullptr;
-	io.LogFilename = home_dir ? log_path.c_str() : nullptr;
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-
-	io.ConfigDpiScaleFonts = true;
-	io.ConfigDpiScaleViewports = true;
-
-	s_hooks = std::make_unique<RegistryAggregate>();
-
+static constexpr void setup_default_theme() noexcept {
 	s_default_style.WindowPadding     = ImVec2(6.0f, 6.0f);
 	s_default_style.FramePadding      = ImVec2(8.0f, 4.0f);
 	s_default_style.ItemSpacing       = ImVec2(8.0f, 2.0f);
@@ -291,9 +141,166 @@ void FrontendInterface::init_context(const char* home_dir) {
 	colors[ImGuiCol_NavCursor]              = ImVec4(0.77f, 0.50f, 1.00f, 0.75f);
 	colors[ImGuiCol_NavWindowingHighlight]  = ImVec4(1.00f, 1.00f, 1.00f, 0.70f);
 	colors[ImGuiCol_NavWindowingDimBg]      = ImVec4(0.80f, 0.80f, 0.80f, 0.20f);
-	colors[ImGuiCol_ModalWindowDimBg]       = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
+	colors[ImGuiCol_ModalWindowDimBg]       = ImVec4(0.00f, 0.00f, 0.00f, 0.65f);
+}
 
-	// XXX this is where we should apply theme customizations later
+/*==================================================================*/
+
+bool FrontendInterface::merge_overflowing_windows() noexcept {
+	std::scoped_lock lock(s_gui_hooks->windows.overflow_lock);
+
+	auto& src_windows = s_gui_hooks->windows.overflow.buffer;
+	if (src_windows.empty()) { return false; }
+
+	auto& dst_windows = s_gui_hooks->windows.registry.buffer;
+
+	blog.debug("{} overflow windows found.", src_windows.size());
+
+	dst_windows.insert(dst_windows.end(),
+		std::make_move_iterator(src_windows.begin()),
+		std::make_move_iterator(src_windows.end())
+	);
+	src_windows.clear();
+
+	return true;
+}
+
+void FrontendInterface::invoke_registered_windows() noexcept {
+	std::scoped_lock lock(s_gui_hooks->windows.registry_lock);
+
+	auto& windows = s_gui_hooks->windows.registry;
+
+	do {
+		while (windows.offset < windows.buffer.size()) {
+			if (auto shared_ptr = windows.buffer[windows.offset].lock()) {
+				(*shared_ptr)(); ++windows.offset;
+			} else {
+				windows.buffer.erase(windows.buffer.begin() + windows.offset);
+			}
+		}
+	} while (merge_overflowing_windows());
+
+	windows.offset = 0;
+}
+
+bool FrontendInterface::merge_overflowing_menus(const LabelKey& window_key) noexcept {
+	std::scoped_lock lock(s_gui_hooks->menus.overflow_lock);
+
+	auto& src_window = s_gui_hooks->menus.overflow[window_key.get_id_or_label()];
+	if (src_window.empty()) { return false; }
+
+	unsigned migration_count = 0;
+	for (auto& [menu_key, src_hooks] : src_window) {
+		if (src_hooks.buffer.empty()) { continue; }
+		auto& dst_hooks = s_gui_hooks->menus.registry[window_key.get_id_or_label()][menu_key];
+
+		blog.debug("{} overflow hooks for menu \"{}\" found.",
+			src_hooks.buffer.size(), menu_key.second.c_str());
+
+		dst_hooks.buffer.insert(dst_hooks.buffer.end(),
+			std::make_move_iterator(src_hooks.buffer.begin()),
+			std::make_move_iterator(src_hooks.buffer.end())
+		);
+		src_hooks.buffer.clear();
+		++migration_count;
+	}
+
+	return !!migration_count;
+}
+
+void FrontendInterface::invoke_registered_menus(const LabelKey& window_key) noexcept {
+	std::scoped_lock lock(s_gui_hooks->menus.registry_lock);
+
+	merge_overflowing_menus(window_key); // unconditional first merge
+	auto window = s_gui_hooks->menus.registry.find(window_key.get_id_or_label());
+	if (window == s_gui_hooks->menus.registry.end()) { return; }
+
+	do {
+		// iterate over all registered menu tabs for this window
+		for (auto& [menu_key, hooks] : window->second) {
+			if (hooks.buffer.empty()) { continue; }
+
+			// clean-up pass before we enter BeginMenu tabs
+			hooks.buffer.erase(std::remove_if(
+					hooks.buffer.begin(), hooks.buffer.end(),
+					[](auto& w) noexcept { return w.expired(); }
+			), hooks.buffer.end());
+
+			if (ImGui::BeginMenu(menu_key.second.c_str())) {
+				hooks.first_hit = !std::exchange(hooks.has_focus, true);
+				s_active_menu = &hooks;
+
+				// invoke all registered hooks for this menu tabs
+				while (hooks.offset < hooks.buffer.size()) {
+					// if the weak_ptr is expired, erase it, otherwise invoke it
+					if (auto shared_ptr = hooks.buffer[hooks.offset].lock()) {
+						(*shared_ptr)(); ++hooks.offset;
+					} else {
+						hooks.buffer.erase(hooks.buffer.begin() + hooks.offset);
+					}
+				}
+
+				ImGui::EndMenu();
+			} else {
+				s_active_menu = nullptr;
+				hooks.has_focus = false;
+				continue;
+			}
+		}
+	} while (merge_overflowing_menus(window_key));
+
+	for (auto& [_, hooks] : window->second)
+		{ hooks.offset = 0; } // reset for next frame
+}
+
+/*==================================================================*/
+
+SDL_Renderer* FrontendInterface::get_current_renderer()  noexcept { return s_current_renderer; }
+unsigned      FrontendInterface::get_main_dockspace_id() noexcept { return s_main_dock_id; }
+
+void FrontendInterface::set_ui_zoom_scaling(float scale) noexcept {
+	s_zoom_scaling = std::clamp(scale, 1.0f, 4.0f);
+	s_pending_style_changes = true;
+}
+
+float FrontendInterface::get_ui_zoom_scaling() noexcept {
+	return s_zoom_scaling;
+}
+
+void FrontendInterface::set_ui_text_scaling(float scale) noexcept {
+	s_text_scaling = std::clamp(scale, 0.5f, 2.0f);
+	s_pending_style_changes = true;
+}
+
+float FrontendInterface::get_ui_text_scaling() noexcept {
+	return s_text_scaling;
+}
+
+/*==================================================================*/
+
+void FrontendInterface::init_context(std::string_view home_dir) {
+	static auto s_ini_path = ::join(home_dir, "imgui.ini");
+	static auto s_log_path = ::join(home_dir, "imgui.log");
+
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	auto& io = ImGui::GetIO();
+
+	io.IniFilename = home_dir.empty() ? s_ini_path.c_str() : nullptr;
+	io.LogFilename = home_dir.empty() ? s_log_path.c_str() : nullptr;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+	io.ConfigDpiScaleFonts = true;
+	io.ConfigDpiScaleViewports = true;
+
+	s_gui_hooks = std::make_unique<RegistryAggregate>();
+
+	::setup_default_theme();
+
+	// XXX we should perform font merging here if we want to support icons in the future,
+	//     but for now we just have a single main font which is saaaaaad.
 
 	s_main_font = io.Fonts->AddFontFromMemoryCompressedTTF(
 		FontData::Roboto_Mono, std::size(FontData::Roboto_Mono), 18.0f);

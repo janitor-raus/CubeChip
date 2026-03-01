@@ -6,37 +6,30 @@
 
 #pragma once
 
-#include <cstddef>
-#include <concepts>
-
 /*==================================================================*/
 
-class Well512 {
-
-public:
+struct Well512 {
+	using seed_type   = unsigned long long;
 	using result_type = unsigned;
-
-private:
-	result_type m_state[16];
-	result_type m_index{};
 
 public:
 	static constexpr result_type min() noexcept { return 0x00000000; }
 	static constexpr result_type max() noexcept { return 0xFFFFFFFF; }
 
-	Well512() noexcept; // automatic seeding based on chrono
-
-	template <typename T, std::size_t N>
-		requires (std::is_convertible_v<T, result_type> && N >= 16)
-	constexpr Well512(T(&seeds)[N]) noexcept {
-		for (auto i = 0; i < 16; ++i) {
-			m_state[i] = result_type(seeds[i]);
+	constexpr Well512(seed_type seed) noexcept {
+		for (auto& state : m_state) {
+			state = result_type(seed = splitmix64(seed));
 		}
 	}
 
-	template <typename T = result_type>
-		requires (std::is_convertible_v<T, result_type>)
-	constexpr T next() noexcept {
+	static constexpr seed_type splitmix64(seed_type seed) noexcept {
+		auto z = (seed += seed_type(0x9E3779B97F4A7C15));
+		z = (z ^ (z >> 30)) * seed_type(0xBF58476D1CE4E5B9);
+		z = (z ^ (z >> 27)) * seed_type(0x94D049BB133111EB);
+		return z ^ (z >> 31);
+	}
+
+	constexpr result_type next() noexcept {
 		result_type a, b, c, d;
 
 		a = m_state[m_index];
@@ -49,9 +42,12 @@ public:
 		m_index = (m_index + 15) & 0xF;
 		a = m_state[m_index];
 		m_state[m_index] = a ^ b ^ d ^ a << 2 ^ b << 18 ^ c << 28;
-		return T(m_state[m_index]);
+		return m_state[m_index];
 	}
 
-	constexpr operator result_type()
-		noexcept { return next(); }
+	constexpr operator result_type() noexcept { return next(); }
+
+private:
+	result_type m_state[16];
+	result_type m_index{};
 };

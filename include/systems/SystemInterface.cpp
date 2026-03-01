@@ -4,13 +4,32 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
+#include "HomeDirManager.hpp"
 #include "ThreadAffinity.hpp"
 #include "FrameLimiter.hpp"
-#include "BasicLogger.hpp"
+#include "StringJoin.hpp"
+#include "SimpleFileIO.hpp"
+#include "Millis.hpp"
+#include "SHA1.hpp"
 
 #include "SystemInterface.hpp"
+#include "SystemDescriptor.hpp"
+#include "SystemStaging.hpp"
 
 /*==================================================================*/
+
+SystemInterface::SystemInterface() noexcept
+	: instance_id([]() noexcept {
+		static std::atomic<u32> instance_counter = 1u;
+		return instance_counter.fetch_add(1, mo::relaxed);
+	}())
+	, m_statistics_data(std::make_shared<std::string>())
+	, m_file_image(std::move(SystemStaging::file_image))
+	, m_rng(std::make_unique<Well512>(Millis::initial()))
+	, m_input(std::make_unique<BasicKeyboard>())
+{
+	m_statistics_work_buffer.reserve(1_KiB);
+}
 
 void SystemInterface::start_workers() noexcept {
 	if (!m_system_thread.joinable()) {
@@ -18,6 +37,7 @@ void SystemInterface::start_workers() noexcept {
 		m_system_thread = Thread([&](StopToken token) noexcept {
 			SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 			thread_affinity::set_affinity(~0b11ull);
+			ScopedLogSource s(get_system_id());
 
 			do {
 				await_next_frame(false);
@@ -64,12 +84,61 @@ void SystemInterface::stop_workers() noexcept {
 	}
 }
 
-SystemInterface::SystemInterface() noexcept
-	: m_statistics_data(std::make_shared<std::string>())
-	, m_rng(std::make_unique<Well512>())
-	, m_input(std::make_unique<BasicKeyboard>())
-{
-	m_statistics_work_buffer.reserve(1_KiB);
+/*==================================================================*/
+
+std::string SystemInterface::make_system_id(u32 id, std::string_view family_name) noexcept {
+	return ::join_with(".", std::to_string(id), family_name);
+}
+
+std::string SystemInterface::get_system_id() const noexcept {
+	return make_system_id(instance_id, get_descriptor().family_name);
+}
+
+/*==================================================================*/
+
+void SystemInterface::copy_file_image_to(std::span<u8> dest, std::size_t offset) noexcept {
+	std::memcpy(dest.data() + offset, m_file_image.data(),
+		std::min(m_file_image.size(), dest.size() - offset));
+}
+
+bool SystemInterface::calc_file_image_sha1() noexcept {
+	if (!SystemStaging::sha1_hash.empty()) {
+		m_file_sha1_hash = SystemStaging::sha1_hash;
+		return true;
+	} else {
+		if (m_file_image.valid()) {
+			m_file_sha1_hash = SHA1::from_span(m_file_image);
+			blog.info("SHA1: {}", m_file_sha1_hash);
+			return true;
+		} else {
+			blog.error("Unable to compute SHA1, file '{}' is inaccessible!",
+				m_file_image.path());
+			return false;
+		}
+	}
+}
+
+auto SystemInterface::add_system_path(
+	std::string_view dir_name,
+	std::string_view family_name
+) noexcept -> const std::string* {
+	if (dir_name.empty()) { return nullptr; }
+
+	const auto new_dir_path = fs::Path(HomeDirManager \
+		::get_home_path()) / family_name / dir_name;
+
+	const auto it = std::find(m_system_paths.begin(),
+		m_system_paths.end(), new_dir_path);
+
+	if (it != m_system_paths.end()) { return &(*it); }
+
+	if (const auto dir_created = fs::create_directories(new_dir_path)) {
+		return &m_system_paths.emplace_back(new_dir_path.string());
+	} else {
+		blog.error("Unable to create directory '{}': {}",
+			new_dir_path.string(), dir_created.error().message());
+		return nullptr;
+	}
 }
 
 /*==================================================================*/
@@ -88,6 +157,8 @@ void SystemInterface::set_base_system_framerate(f32 value) noexcept
 
 void SystemInterface::set_framerate_multiplier(f32 value) noexcept
 	{ m_framerate_multiplier.store(std::clamp(value, 0.10f, 10.00f), mo::relaxed); }
+
+/*==================================================================*/
 
 void SystemInterface::append_statistics_data() noexcept {
 	const auto framerate = get_real_system_framerate();

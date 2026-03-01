@@ -8,30 +8,22 @@
 
 #include <optional>
 #include <utility>
-#include <vector>
 #include <array>
 #include <span>
 #include <bit>
 
-#include "Typedefs.hpp"
-#include "Concepts.hpp"
+#include "EzMaths.hpp"
 #include "AtomSharedPtr.hpp"
-#include "ExecPolicy.hpp"
+#include "HDIS_HCIS.hpp"
 #include "Thread.hpp"
-#include "Millis.hpp"
-#include "BasicLogger.hpp"
 
-#include "AssignCast.hpp"
+#include "BasicLogger.hpp"
 #include "ArrayOps.hpp"
-#include "Map2D.hpp"
-#include "AudioDevice.hpp"
-#include "Voice.hpp"
 #include "SimpleTimer.hpp"
 #include "BasicInput.hpp"
 #include "Well512.hpp"
-#include "DisplayDevice.hpp"
 
-#include "CoreRegistry.hpp"
+#include "FileImage.hpp"
 
 #include <SDL3/SDL_scancode.h>
 
@@ -59,6 +51,7 @@ struct SimpleKeyMapping {
 };
 
 class HomeDirManager;
+struct SystemDescriptor;
 
 /*==================================================================*/
 
@@ -72,8 +65,8 @@ class alignas(HDIS) SystemInterface {
 	std::atomic<bool> m_next_frame_flag{};
 	std::atomic<bool> m_stop_frame_flag{};
 
-protected:
-	bool m_is_system_alive = true;
+public:
+	const u32 instance_id;
 
 protected:
 	SimpleTimer m_timer{};
@@ -84,14 +77,24 @@ private:
 		m_statistics_data{};
 
 protected:
-	static inline HomeDirManager* HDM{};
-
 	std::unique_ptr<Well512>       m_rng;
 	std::unique_ptr<BasicKeyboard> m_input;
+
+protected:
+	SystemInterface() noexcept;
+
+public:
+	virtual ~SystemInterface() noexcept = default;
 
 public:
 	void start_workers() noexcept;
 	void stop_workers() noexcept;
+
+	virtual const SystemDescriptor& get_descriptor() const noexcept = 0;
+	static std::string make_system_id(u32 id, std::string_view family_name) noexcept;
+
+public:
+	std::string get_system_id() const noexcept;
 
 protected:
 	std::atomic<f32> m_base_system_framerate{};
@@ -101,14 +104,30 @@ protected:
 	u32 m_elapsed_frames{};
 
 protected:
-	SystemInterface() noexcept;
+	bool m_render_window_docker = true;
+	bool m_is_currently_focused = true;
 
 public:
-	virtual ~SystemInterface() noexcept = default;
+	bool is_awaiting_shutdown() const noexcept { return !m_render_window_docker; }
+	bool is_currently_focused() const noexcept { return  m_is_currently_focused; }
+
+private:
+	const void* _padding_1{};
+
+protected:
+	FileImage m_file_image{};
+	void copy_file_image_to(std::span<u8> dest, std::size_t offset) noexcept;
+
+	std::string m_file_sha1_hash{};
+	bool calc_file_image_sha1() noexcept;
+
+	std::vector<std::string> m_system_paths{};
+	auto add_system_path(
+		std::string_view dir_name,
+		std::string_view family_name
+	) noexcept -> const std::string*;
 
 public:
-	static void hdm_passthrough(HomeDirManager* const pHDM) noexcept { HDM = pHDM; }
-
 	// Adds a State to the System, returns previous value of State.
 	auto add_system_state(EmuState state) noexcept { return m_system_state.fetch_or ( state, mo::acq_rel) & state; }
 	// Removes a State from the System, returns previous value of State.
@@ -133,8 +152,6 @@ public:
 		return !xor_system_state(EmuState::PAUSED);
 	}
 
-	bool get_window_shutdown_signal() const noexcept { return !m_is_system_alive; }
-
 protected:
 	void set_base_system_framerate(f32 value) noexcept;
 public:
@@ -142,7 +159,7 @@ public:
 
 public:
 	f32  get_base_system_framerate() const noexcept;
-	f32  get_framerate_multiplier() const noexcept;
+	f32  get_framerate_multiplier()  const noexcept;
 	f32  get_real_system_framerate() const noexcept;
 
 protected:
@@ -168,7 +185,7 @@ protected:
 	void format_statistics_data(std::string&& message, Args&&... args) noexcept {
 		try {
 			fmt::vformat_to(std::back_inserter(m_statistics_work_buffer),
-				message, fmt::make_format_args(args...));
+				std::move(message), fmt::make_format_args(args...));
 		} catch (...) { /* ignore */ }
 	}
 

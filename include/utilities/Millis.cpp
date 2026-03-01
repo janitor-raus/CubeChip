@@ -11,42 +11,55 @@
 
 /*==================================================================*/
 
-static const auto sInitialApplicationTimestamp
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386) || defined(_M_IX86)
+	#include <immintrin.h>
+	#define cpu_relax() _mm_pause()
+#elif defined(__aarch64__) || defined(__arm__)
+	#define cpu_relax() asm volatile("yield")
+#elif defined(__riscv) && defined(__riscv_zihintpause)
+	#define cpu_relax() asm volatile("pause")
+#else
+	#define cpu_relax() ((void)0)
+#endif
+
+/*==================================================================*/
+
+static const auto s_initial_app_timestamp
 	= std::chrono::steady_clock::now();
 
-static const auto sInitialApplicationTimestampWall
+static const auto s_initial_app_timestamp_wall
 	= std::chrono::system_clock::now();
 
 /*==================================================================*/
 
 long long Millis::initial() noexcept {
 	return std::chrono::duration_cast<std::chrono::nanoseconds> \
-		(sInitialApplicationTimestamp.time_since_epoch()).count();
+		(s_initial_app_timestamp.time_since_epoch()).count();
 }
 
 long long Millis::initial_wall() noexcept {
 	return std::chrono::duration_cast<std::chrono::nanoseconds> \
-		(sInitialApplicationTimestampWall.time_since_epoch()).count();
+		(s_initial_app_timestamp_wall.time_since_epoch()).count();
 }
 
 long long Millis::now() noexcept {
 	return std::chrono::duration_cast<std::chrono::milliseconds> \
-		(std::chrono::steady_clock::now() - sInitialApplicationTimestamp).count();
+		(std::chrono::steady_clock::now() - s_initial_app_timestamp).count();
 }
 
 long long Millis::raw() noexcept {
 	return std::chrono::duration_cast<std::chrono::nanoseconds> \
-		(std::chrono::steady_clock::now() - sInitialApplicationTimestamp).count();
+		(std::chrono::steady_clock::now() - s_initial_app_timestamp).count();
 }
 
 long long Millis::now_wall() noexcept {
 	return std::chrono::duration_cast<std::chrono::milliseconds> \
-		(std::chrono::system_clock::now() - sInitialApplicationTimestampWall).count();
+		(std::chrono::system_clock::now() - s_initial_app_timestamp_wall).count();
 }
 
 long long Millis::raw_wall() noexcept {
 	return std::chrono::duration_cast<std::chrono::nanoseconds> \
-		(std::chrono::system_clock::now() - sInitialApplicationTimestampWall).count();
+		(std::chrono::system_clock::now() - s_initial_app_timestamp_wall).count();
 }
 
 long long Millis::since(long long past_millis) noexcept {
@@ -71,10 +84,13 @@ void Millis::sleeplock_for(double millis) noexcept {
 		const auto cur_time = steady_clock::now();
 		if (cur_time >= target) { return; }
 
-		if (target - cur_time >= microseconds(2300)) // avg sleep duration 99.5% < 2.3ms
-			{ std::this_thread::sleep_for(milliseconds(1)); }
-		else
-			{ std::this_thread::yield(); }
+		// avg 1ms sleep duration is 99.5% below 2.3ms
+		if (target - cur_time >= microseconds(2300)) {
+			std::this_thread::sleep_for(milliseconds(1));
+		} else {
+			for (auto i = 0; ++i <= 128;) { cpu_relax(); }
+			std::this_thread::yield();
+		}
 	}
 }
 
@@ -93,7 +109,6 @@ std::string NanoTime::format_as_timer() const noexcept {
 
 std::string NanoTime::format_as_datetime(const char* fmt_string) const noexcept {
 	using namespace std::chrono;
-	using system_duration = system_clock::duration;
 
 	std::tm local_tm;
 	auto timestamp = system_clock::to_time_t(system_clock::time_point(
