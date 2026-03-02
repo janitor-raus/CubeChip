@@ -91,9 +91,12 @@ class ScopedLogSource {
 
 public:
 	template <typename... Args>
-	ScopedLogSource(fmt::format_string<Args...> fmt, Args&&... args) noexcept try
-		: ScopedLogSource(fmt::format(fmt, std::forward<Args>(args)...)) {}
-	catch (...) { m_prev_source_id = 0; }
+	ScopedLogSource(fmt::format_string<Args...> fmt, Args&&... args) noexcept
+		: ScopedLogSource([&]() {
+			try { return fmt::format(fmt, std::forward<Args>(args)...); }
+			catch (...) { return ""; }
+		}())
+	{}
 
 	ScopedLogSource(std::string_view src_name) noexcept;
 	~ScopedLogSource() noexcept;

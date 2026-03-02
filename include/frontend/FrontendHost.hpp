@@ -95,16 +95,20 @@ class FrontendHost final {
 	static void set_open_file_dialog_result(std::string_view file) noexcept;
 
 	static constexpr std::size_t s_mru_limit = 10;
-	static inline SimpleMRU<FileItem> s_file_mru;
+	static inline SimpleMRU<FileItem> s_file_mru = s_mru_limit;
 
 	static void import_mru(std::string* src) noexcept {
 		for (std::size_t i = 0; i < s_mru_limit; ++i) {
-			s_file_mru.insert(src[s_mru_limit - 1 - i]); }
+			auto& entry = src[s_mru_limit - 1 - i];
+			if (entry.empty()) { continue; }
+			s_file_mru.insert(std::move(entry));
+		}
 	}
 
 	static void export_mru(std::string* dst) noexcept {
-		for (std::size_t i = 0; i < s_mru_limit; ++i) {
-			dst[i] = s_file_mru[i]->string(); }
+		for (std::size_t i = 0; i < s_file_mru.size(); ++i) {
+			dst[i] = s_file_mru[i]->string();
+		}
 	}
 
 /*==================================================================*/
@@ -131,7 +135,7 @@ private:
 
 	SystemMap m_systems{};
 
-	SimpleMRU<SystemID> m_focus_mru{};
+	SimpleMRU<SystemID> m_focus_mru = 0;
 
 	void prune_terminated_systems() noexcept;
 	void find_last_focused_system() noexcept;

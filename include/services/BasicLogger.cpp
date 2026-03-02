@@ -67,6 +67,7 @@ private:
 static LogSource* s_logger_sources = nullptr;
 
 std::uint32_t get_source_index(std::string_view src_name) noexcept {
+	if (src_name.empty()) { return 0; }
 	std::scoped_lock lock(s_logger_sources->guard);
 
 	auto it = s_logger_sources->table.find(src_name);

@@ -343,7 +343,7 @@ DisplayDevice::DisplayDevice(std::size_t W, std::size_t H, ImLabel name, std::si
 	: m_context(std::make_unique<DisplayContext>(
 		std::clamp(W, std::size_t(1), std::size_t(8192)),
 		std::clamp(H, std::size_t(1), std::size_t(8192)),
-		std::move(name->empty() ? ImLabel("Unnamed Display") : name),
+		name->empty() ? ImLabel("Unnamed Display") : std::move(name),
 		std::clamp(bpp, std::size_t(1), std::size_t(6))
 	))
 {}

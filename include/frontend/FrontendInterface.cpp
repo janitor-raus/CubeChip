@@ -29,7 +29,7 @@ static bool  s_pending_style_changes = true;
 
 static ImGuiStyle s_default_style;
 
-static constexpr void setup_default_theme() noexcept {
+static void setup_default_theme() noexcept {
 	s_default_style.WindowPadding     = ImVec2(6.0f, 6.0f);
 	s_default_style.FramePadding      = ImVec2(8.0f, 4.0f);
 	s_default_style.ItemSpacing       = ImVec2(8.0f, 2.0f);
@@ -286,8 +286,8 @@ void FrontendInterface::init_context(std::string_view home_dir) {
 	ImGui::CreateContext();
 	auto& io = ImGui::GetIO();
 
-	io.IniFilename = home_dir.empty() ? s_ini_path.c_str() : nullptr;
-	io.LogFilename = home_dir.empty() ? s_log_path.c_str() : nullptr;
+	io.IniFilename = home_dir.empty() ? nullptr : s_ini_path.c_str();
+	io.LogFilename = home_dir.empty() ? nullptr : s_log_path.c_str();
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;

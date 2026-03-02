@@ -369,7 +369,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 		if (BeginPopupModal("FileImageModal", nullptr, ImGuiWindowFlags_NoMove
 			| ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize
 			| ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking
-			| ImGuiWindowFlags_AlwaysAutoResize
+			| ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize
 		)) {
 			// filename title segment
 			{

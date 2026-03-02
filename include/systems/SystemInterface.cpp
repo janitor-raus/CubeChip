@@ -24,9 +24,9 @@ SystemInterface::SystemInterface() noexcept
 		return instance_counter.fetch_add(1, mo::relaxed);
 	}())
 	, m_statistics_data(std::make_shared<std::string>())
-	, m_file_image(std::move(SystemStaging::file_image))
 	, m_rng(std::make_unique<Well512>(Millis::initial()))
 	, m_input(std::make_unique<BasicKeyboard>())
+	, m_file_image(std::move(SystemStaging::file_image))
 {
 	m_statistics_work_buffer.reserve(1_KiB);
 }

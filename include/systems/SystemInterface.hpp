@@ -112,6 +112,7 @@ public:
 	bool is_currently_focused() const noexcept { return  m_is_currently_focused; }
 
 private:
+	[[maybe_unused]]
 	const void* _padding_1{};
 
 protected:
