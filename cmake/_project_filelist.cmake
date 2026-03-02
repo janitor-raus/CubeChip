@@ -108,6 +108,8 @@ source_group("Services" FILES ${SERVICES_HEADERS} ${SERVICES_SOURCES})
 
 set(SYSTEMS_HEADERS
 	"${PROJECT_INCLUDE_DIR}/systems/SystemInterface.hpp"
+	"${PROJECT_INCLUDE_DIR}/systems/SystemDescriptor.hpp"
+	"${PROJECT_INCLUDE_DIR}/systems/SystemStaging.hpp"
 	"${PROJECT_INCLUDE_DIR}/systems/CoreRegistry.hpp"
 	"${PROJECT_INCLUDE_DIR}/systems/CoreRegistry.inl"
 )
