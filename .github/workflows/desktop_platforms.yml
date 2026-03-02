@@ -29,7 +29,7 @@ jobs:
 
       - name: Install Misc Packages (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt install -y libx11-dev libxext-dev libgl1 libglx-mesa0 mesa-common-dev
+        run: sudo apt-get update && sudo apt install -y libx11-dev libxext-dev libxcursor-dev libgl1 libglx-mesa0 mesa-common-dev
 
       - name: Ccache for Github Actions
         uses: hendrikmuhs/ccache-action@v1.2.18

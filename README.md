@@ -2,13 +2,13 @@
 
 A multi-system emulator written in C++20 and utilizing SDL3 that started as an effort to learn the language. Aiming to be as accurate as possible from an HLE standpoint, while also aiming to be fairly fast on its feet, at least as far as pure interpreters go. Input, audio and video are handled through SDL3, with the interface being (slowly) fleshed out with ImGUI. There's loads of work to be done, and there's always something to refactor to be more flexible, robust, or faster.
 
-This project simultaneously stands in as an experiment bed for all sorts of different little libraries, interfaces and abstractions I write for myself. As a result, much of the source code in the Assistants folder can run solo or with minimal other required includes, increasing their potential of use in other projects of mine in the future (or others). Some stuff will be deprecated as demands change, or knowledge accumulates toward better solutions.
+This project simultaneously stands in as an experiment bed for all sorts of different little libraries, interfaces and abstractions I write for myself. As a result, much of the source code in the Components/Utilities folders can run solo or with minimal other required includes, increasing their potential of use in other projects of mine in the future (or others). Some stuff will be deprecated as demands change, or knowledge accumulates toward better solutions.
 
 ## Supported Systems
 
 ### BytePusher
 
-Merely there for the sake of it being there, but useful as a test bed of changes.
+Merely there for the sake of it being there, and also because it's one of the few systems with such constrained runtime requirements that helped expose certain shortcomings of my existing library designs.
 
 ### GameBoy
 
@@ -30,11 +30,11 @@ Currently supports the following major variants:
 
 The following platform extensions/mods are available:
 
-- HIRES MPD [^5] (currently disabled)
-- CHIP-8E [^6] (currently disabled)
+- HIRES MPD [^5] (currently not re-implemented)
+- CHIP-8E [^6]
 - CHIP-8X [^7]
-- HWCHIP64 [^8] (currently disabled)
-- GIGACHIP [^9] (currently disabled)
+- HWCHIP64 [^8] (currently not re-implemented)
+- SUPERCHIP-8X [^9] (currently not re-implemented)
 
 Some extension combinations aren't possible, see footnotes for now. Due to major refactoring of the codebase, many variants are currently unimplemented, their code unported and in temporary limbo.
 
@@ -42,7 +42,7 @@ Some extension combinations aren't possible, see footnotes for now. Due to major
 [^6]: Exclusive mod to CHIP-8 and SUPERCHIP. Does not work with HIRES MPD. Mutually exclusive with CHIP-8X.
 [^7]: Exclusive mod to CHIP-8 and SUPERCHIP. Works with HIRES MPD. Mutually exclusive with CHIP-8E.
 [^8]: Extension to XOCHIP, mutually exclusive with all aforementioned extensions. Designed by [@NinjaWeedle](https://github.com/NinjaWeedle/HyperWaveCHIP-64/tree/master).
-[^9]: Derivative of MEGACHIP, though incompatible with it. Offers tons of new texture render features. (WIP). Own design.
+[^9]: Fantasy extension to SUPERCHIP, combination with CHIP-8X. Designed by me as a fun experiment of a what-if.
 
 ## Planned Features
 
@@ -58,9 +58,9 @@ Some extension combinations aren't possible, see footnotes for now. Due to major
 - [x] Allow fetching and displaying rudimentary OSD statistics on a per-system basis.
 - [x] Implement File Picker dialog for when drag-n-drop doesn't work, for some reason.
 - [x] Refactor cmake build script for smarter generation and cached vendoring of fetched third party libraries.
-- [ ] Allow choosing desired core to boot when loading a program file that is eligible with multiple specialized cores.
+- [x] Allow choosing desired core to boot when loading a program file that is eligible with multiple specialized cores.
 - [ ] Implement stepping controls for debugging, initially limited to simple full-frame and per-instruction stepping.
-- [ ] Implement (initially) a slot-in ImGUI interface where custom ImGUI code can be pointer'd to to execute, and defined elsewhere as desired.
+- [x] Implement (initially) a slot-in ImGUI interface where custom ImGUI code can be pointer'd to to execute, and defined elsewhere as desired.
 - [ ] By extension, a configuration ImGUI layer for each system, optionally expandable by each specialized core.
 - [ ] Figure out a good way to serialize, version, and differentiate the full state of different cores for savestate support.
 - [ ] Implement an abstraction layer to allow core-driven copying of state data and ImGUI presentation layer that (initially) the frontend will passively read from as a means of displaying debug information, among other things.
