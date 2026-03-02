@@ -135,7 +135,7 @@ private:
 
 	SystemMap m_systems{};
 
-	SimpleMRU<SystemID> m_focus_mru = 0;
+	SimpleMRU<SystemID> m_focus_mru;
 
 	void prune_terminated_systems() noexcept;
 	void find_last_focused_system() noexcept;

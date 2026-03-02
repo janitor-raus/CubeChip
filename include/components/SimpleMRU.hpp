@@ -42,7 +42,7 @@ public:
 
 /*==================================================================*/
 
-	SimpleMRU(std::size_t limit) {
+	SimpleMRU(std::size_t limit = 0) {
 		set_limit(limit);
 	}
 
