@@ -31,7 +31,6 @@ inline CONSTEXPR_MATH RGBA  to_RGBA (OKLCH in) noexcept;
 /*==================================================================*/
 
 struct alignas(4) RGBA {
-	using u8     = u8;
 	using Packed = u32;
 
 	static constexpr u8 Opaque_A      = 0xFF;
@@ -414,9 +413,9 @@ inline constexpr RGBA to_RGBA(HSV in) noexcept {
 
 	const auto hueV = in.H & 0xFF;
 
-	const auto valP = RGBA::u8((in.V * (0x00FF - in.S)                  + 0x007F) / 0x00FF);
-	const auto valQ = RGBA::u8((in.V * (0xFF00 - in.S *          hueV)  + 0x7FFF) / 0xFF00);
-	const auto valT = RGBA::u8((in.V * (0xFF00 - in.S * (0x100 - hueV)) + 0x7FFF) / 0xFF00);
+	const auto valP = u8((in.V * (0x00FF - in.S)                  + 0x007F) / 0x00FF);
+	const auto valQ = u8((in.V * (0xFF00 - in.S *          hueV)  + 0x7FFF) / 0xFF00);
+	const auto valT = u8((in.V * (0xFF00 - in.S * (0x100 - hueV)) + 0x7FFF) / 0xFF00);
 
 	switch (in.H >> 8) {
 		case 0:  return RGBA(in.V, valT, valP);
@@ -467,9 +466,9 @@ inline CONSTEXPR_MATH RGBA to_RGBA(OKLAB in) noexcept {
 	const auto B = -0.00439f * L - 0.70342f * M + 1.70758f * S;
 
 	return RGBA(
-		RGBA::u8(ez::round(255.0f * OKLAB::gamma_inv(R))),
-		RGBA::u8(ez::round(255.0f * OKLAB::gamma_inv(G))),
-		RGBA::u8(ez::round(255.0f * OKLAB::gamma_inv(B)))
+		u8(ez::round(255.0f * OKLAB::gamma_inv(R))),
+		u8(ez::round(255.0f * OKLAB::gamma_inv(G))),
+		u8(ez::round(255.0f * OKLAB::gamma_inv(B)))
 	);
 }
 
