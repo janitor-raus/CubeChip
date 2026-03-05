@@ -81,8 +81,9 @@ private:
 					*window_label, m_disable_menubar);
 
 				const auto px_ratio = float(metadata.pixel_ratio);
-				const auto margin   = float(metadata.inner_margin);
 				const auto min_zoom = float(metadata.minimum_zoom);
+				const auto margin   = float(metadata.inner_margin);
+				const auto rounding = ImGui::GetStyle().WindowRounding * 2.0f;
 
 				const auto cur_viewport = metadata.get_viewport();
 				const auto dar_viewport = (m_screen_rotation & 1)
@@ -133,7 +134,7 @@ private:
 						(display_zone - borders_area) * 0.5f));
 
 					ImGui::DrawRectFilled(borders_area,
-						margin, metadata.texture_tint.XBGR());
+						rounding, metadata.texture_tint.XBGR());
 
 					const auto uv0 = ImVec2(
 						cur_viewport.x / float(metadata.get_base_frame().w),
@@ -156,7 +157,7 @@ private:
 						(display_zone - borders_area) * 0.5f));
 
 					ImGui::DrawRect(borders_area,
-						metadata.border_width, margin,
+						metadata.border_width, rounding,
 						metadata.border_color.XBGR());
 				}
 
@@ -232,6 +233,9 @@ private:
 
 			if (ImGui::Begin(*window_label, m_window_state_out, window_flags)) {
 				if (!m_fullscreen_mode) { s_window_contents(); }
+			} else {
+				if (m_window_focus_out) { *m_window_focus_out = false; }
+				m_fullscreen_mode = false;
 			}
 			ImGui::End();
 
