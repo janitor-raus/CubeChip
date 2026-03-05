@@ -62,8 +62,11 @@ auto CoreRegistry::register_new_system_core()
 		return {};
 	}
 
-	const auto hook = std::make_shared<const RegistryEntry>([]() noexcept
-		{ return construct_core_instance<Core>(); }, &Core::descriptor);
+	const auto hook = std::make_shared<const RegistryEntry>(
+		[]() noexcept { return construct_core_instance<Core>(); },\
+		&Core::descriptor
+	);
+
 	insert_new_registration(hook);
 	return hook;
 }

@@ -47,10 +47,10 @@ class alignas(HDIS) SlidingRingBuffer {
 
 	using self = SlidingRingBuffer;
 
-	alignas(HDIS) AtomSharedPtr<T> mBuffer[N]{};
-	alignas(HDIS) std::atomic<std::size_t> mPushHead{};
-	alignas(HDIS) std::atomic<std::size_t> mReadHead{};
-	alignas(HDIS) mutable std::shared_mutex mGuard;
+	alignas(HDIS) AtomSharedPtr<T> m_buffer[N]{};
+	alignas(HDIS) std::atomic<std::size_t> m_push_head{};
+	alignas(HDIS) std::atomic<std::size_t> m_read_head{};
+	alignas(HDIS) mutable std::shared_mutex m_guard;
 
 public:
 	SlidingRingBuffer() noexcept { clear_buffer(); }
@@ -62,20 +62,20 @@ public:
 	self& operator=(const self&)  = delete;
 
 	constexpr auto size() const noexcept { return N; }
-	constexpr auto head() const noexcept { return mReadHead.load(mo::acquire); }
+	constexpr auto head() const noexcept { return m_read_head.load(mo::acquire); }
 
 private:
 	void push_(std::size_t index, std::shared_ptr<T>&& ptr) noexcept {
-		std::shared_lock lock(mGuard);
-		mBuffer[index & (N - 1)].store(std::move(ptr), mo::release);
+		std::shared_lock lock(m_guard);
+		m_buffer[index & (N - 1)].store(std::move(ptr), mo::release);
 
 		auto expected = head();
-		while (expected < index && !mReadHead.compare_exchange_weak \
+		while (expected < index && !m_read_head.compare_exchange_weak \
 			(expected, index, mo::acq_rel, mo::acquire)) {}
 	}
 
 	T at_(std::size_t index) const noexcept
-		{ return *mBuffer[index & (N - 1)].load(mo::acquire); }
+		{ return *m_buffer[index & (N - 1)].load(mo::acquire); }
 
 	T at_(std::size_t index, std::size_t head) const noexcept
 		{ return at_(head + N - index); }
@@ -87,7 +87,7 @@ private:
 
 		friend class SlidingRingBuffer;
 		ProxySnap_Count(const self& buf, std::size_t count) noexcept
-			: buf{ buf }, count{ count } {}
+			: buf(buf), count(count) {}
 
 		auto snapshot() const noexcept {
 			const auto head = buf.head();
@@ -99,8 +99,9 @@ private:
 			std::vector<T> output;
 			output.reserve(size);
 
-			for (std::size_t i = 0; i < size; ++i)
-				{ output.push_back(buf.at_(size - 1 - i, head)); }
+			for (std::size_t i = 0; i < size; ++i) {
+				output.push_back(buf.at_(size - 1 - i, head));
+			}
 
 			return output;
 		}
@@ -117,7 +118,7 @@ private:
 		}
 
 		[[nodiscard]] auto safe() const noexcept {
-			std::scoped_lock lock(buf.mGuard);
+			std::scoped_lock lock(buf.m_guard);
 			return snapshot();
 		}
 	};
@@ -141,8 +142,9 @@ private:
 			std::vector<T> output;
 			output.reserve(size);
 
-			for (std::size_t i = 0; i < size; ++i)
-				{ output.push_back(buf.at_(begin + i)); }
+			for (std::size_t i = 0; i < size; ++i) {
+				output.push_back(buf.at_(begin + i));
+			}
 
 			return output;
 		}
@@ -158,7 +160,7 @@ private:
 		}
 
 		[[nodiscard]] auto safe() const noexcept {
-			std::scoped_lock lock(buf.mGuard);
+			std::scoped_lock lock(buf.m_guard);
 			return snapshot();
 		}
 	};
@@ -169,12 +171,13 @@ public:
 	 * @note This method is thread-safe, but cannot run concurrently with push() or safe_snapshot_*() calls.
 	 */
 	void clear_buffer() noexcept {
-		std::scoped_lock lock(mGuard);
-		const static auto sDefaultT
+		std::scoped_lock lock(m_guard);
+		const static auto s_empty_default
 			= std::make_shared<T>();
 
-		for (auto& entry : mBuffer)
-			{ entry.store(sDefaultT, mo::relaxed); }
+		for (auto& entry : m_buffer) {
+			entry.store(s_empty_default, mo::relaxed);
+		}
 	}
 
 	/**
@@ -188,7 +191,7 @@ public:
 		static_assert(std::is_convertible_v<U, T>,
 			"Pushed value is not convertible to buffer type.");
 
-		push_(mPushHead.fetch_add(1, mo::acq_rel),
+		push_(m_push_head.fetch_add(1, mo::acq_rel),
 			std::make_shared<T>(std::forward<U>(value)));
 	}
 

@@ -69,23 +69,23 @@ class TripleBuffer {
 
 
 private:
-	static constexpr std::uintptr_t sNewDataFlag = 1ull;
+	static constexpr std::uintptr_t s_dirty_flag = 1ull;
 
-	static_assert((alignof(Buffer) & sNewDataFlag) == 0,
+	static_assert((alignof(Buffer) & s_dirty_flag) == 0,
 		"TripleBuffer: Buffer alignment must permit pointer tagging (LSB == 0).");
 
 	constexpr bool getFlag(Buffer* ptr) const noexcept {
-		return reinterpret_cast<std::uintptr_t>(ptr) & sNewDataFlag;
+		return reinterpret_cast<std::uintptr_t>(ptr) & s_dirty_flag;
 	}
 
 	constexpr Buffer* addFlag(Buffer* ptr) const noexcept {
 		auto new_ptr = reinterpret_cast<std::uintptr_t>(ptr);
-		return reinterpret_cast<Buffer*>(new_ptr | sNewDataFlag);
+		return reinterpret_cast<Buffer*>(new_ptr | s_dirty_flag);
 	}
 
 	constexpr Buffer* subFlag(Buffer* ptr) const noexcept {
 		auto new_ptr = reinterpret_cast<std::uintptr_t>(ptr);
-		return reinterpret_cast<Buffer*>(new_ptr & ~sNewDataFlag);
+		return reinterpret_cast<Buffer*>(new_ptr & ~s_dirty_flag);
 	}
 
 
