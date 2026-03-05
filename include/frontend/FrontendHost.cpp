@@ -87,19 +87,25 @@ auto FrontendHost::export_settings() const noexcept -> Settings {
 void FrontendHost::prune_terminated_systems() noexcept {
 	auto it = m_systems.begin();
 	while (it != m_systems.end()) {
-		const auto& system = it->second.core;
+		const auto& [id, system] = *it;
 
 		if (!system || system->is_awaiting_shutdown()) {
-			m_focus_mru.erase(it->first);
+			blog.info("System instance {} terminated, unloading...", id);
+			m_focus_mru.erase(id);
 			it = m_systems.erase(it);
 		} else { ++it; }
 	}
 }
 
 void FrontendHost::find_last_focused_system() noexcept {
-	for (const auto& [id, system] : m_systems) {
-		if (system && system.core->is_currently_focused()) {
-			m_focus_mru.insert(id); return;
+	if (!std::exchange(m_suppress_auto_refocus, false)) {
+		for (const auto& id : *m_focus_mru) {
+			if (m_focus_mru[0] == id) { continue; }
+
+			if (m_systems[id]->is_currently_focused()) {
+				blog.debug("Focused system instance is now {}.", id);
+				m_focus_mru.insert(id); return;
+			}
 		}
 	}
 }
@@ -118,13 +124,13 @@ void FrontendHost::insert_system_instance(SystemInterface* ptr) noexcept {
 	blog.info("Starting up '{}' ({}) system instance.",
 		ptr->get_descriptor().system_pretty_name, ptr->instance_id);
 
+	m_suppress_auto_refocus = true;
 	m_focus_mru.insert(ptr->instance_id);
+	blog.debug("Forcing focus to newly inserted system instance with ID {}.", ptr->instance_id);
 	auto& system = m_systems[m_focus_mru[0]];
 
 	system.core.reset(ptr);
-	toggle_system_delimiters(system);
-	toggle_system_statistics(system);
-	system.core->start_workers();
+	system->start_workers();
 }
 
 /*==================================================================*/
@@ -194,7 +200,7 @@ void FrontendHost::quit_application() noexcept {
 	FrontendInterface::quit_video();
 	FrontendInterface::quit_context();
 
-	for (auto& [id, system] : m_systems) { system.core.reset(); }
+	m_systems.clear(); // terminate all systems before quitting
 
 	HDM->write_app_config_file(
 		GAB->export_settings().map(),
@@ -275,7 +281,7 @@ void FrontendHost::handle_main_hotkeys() {
 
 	if (!m_focus_mru.empty()) {
 		auto& system = m_systems[m_focus_mru[0]];
-		const auto& descriptor = system.core->get_descriptor();
+		const auto& descriptor = system->get_descriptor();
 
 		if (Input.are_any_held(KEY(LSHIFT), KEY(RSHIFT))
 			&& Input.is_pressed(KEY(ESCAPE))
@@ -290,7 +296,7 @@ void FrontendHost::handle_main_hotkeys() {
 		//	return;
 		//}
 		if (Input.is_pressed(KEY(F9))) {
-			if (auto paused = system.core->try_pause_system()) {
+			if (auto paused = system->try_pause_system()) {
 				blog.info("System '{}' ({}) {} by hotkey!",
 					descriptor.system_name, m_focus_mru[0],
 					*paused ? "paused" : "unpaused");
@@ -309,24 +315,24 @@ void FrontendHost::handle_main_hotkeys() {
 
 void FrontendHost::toggle_system_delimiters(SystemInstance& system) noexcept {
 	if (system.delimiters) {
-		if (system.core) { system.core->add_system_state(EmuState::BENCH); }
+		if (system) { system->add_system_state(EmuState::BENCH); }
 	} else {
-		if (system.core) { system.core->sub_system_state(EmuState::BENCH); }
+		if (system) { system->sub_system_state(EmuState::BENCH); }
 	}
 }
 
 void FrontendHost::toggle_system_statistics(SystemInstance& system) noexcept {
 	if (system.statistics) {
-		if (system.core) { system.core->add_system_state(EmuState::STATS); }
+		if (system) { system->add_system_state(EmuState::STATS); }
 	} else {
-		if (system.core) { system.core->sub_system_state(EmuState::STATS); }
+		if (system) { system->sub_system_state(EmuState::STATS); }
 	}
 }
 
 void FrontendHost::set_system_hidden_status(SystemInstance& system, bool state) noexcept {
 	if (state) {
-		if (system.core) { system.core->add_system_state(EmuState::HIDDEN); }
+		if (system) { system->add_system_state(EmuState::HIDDEN); }
 	} else {
-		if (system.core) { system.core->sub_system_state(EmuState::HIDDEN); }
+		if (system) { system->sub_system_state(EmuState::HIDDEN); }
 	}
 }

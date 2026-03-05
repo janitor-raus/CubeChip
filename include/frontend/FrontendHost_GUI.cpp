@@ -479,7 +479,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 								if (s_replace_last_system) { unload_system_instance(); }
 								insert_system_instance(system); s_close_modal_window();
 							} else {
-								blog.warn("Failed to construct instance for candidate system '{}'",
+								blog.error("Failed to construct instance for candidate system '{}'",
 									candidate.get_descriptor()->system_pretty_name);
 							}
 						}

@@ -116,11 +116,11 @@ private:
 	const void* _padding_1{};
 
 protected:
-	FileImage m_file_image{};
-	void copy_file_image_to(std::span<u8> dest, std::size_t offset) noexcept;
-
 	std::string m_file_sha1_hash{};
 	bool calc_file_image_sha1() noexcept;
+
+	FileImage m_file_image{};
+	void copy_file_image_to(std::span<u8> dest, std::size_t offset) noexcept;
 
 	std::vector<std::string> m_system_paths{};
 	auto add_system_path(

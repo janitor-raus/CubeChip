@@ -154,7 +154,7 @@ bool FrontendInterface::merge_overflowing_windows() noexcept {
 
 	auto& dst_windows = s_gui_hooks->windows.registry.buffer;
 
-	blog.debug("{} overflow windows found.", src_windows.size());
+	blog.debug("Merging {} late general callables.", src_windows.size());
 
 	dst_windows.insert(dst_windows.end(),
 		std::make_move_iterator(src_windows.begin()),
@@ -194,7 +194,7 @@ bool FrontendInterface::merge_overflowing_menus(const LabelKey& window_key) noex
 		if (src_hooks.buffer.empty()) { continue; }
 		auto& dst_hooks = s_gui_hooks->menus.registry[window_key.get_id_or_label()][menu_key];
 
-		blog.debug("{} overflow hooks for menu \"{}\" found.",
+		blog.debug("Merging {} late '{}' menu callables.",
 			src_hooks.buffer.size(), menu_key.second.c_str());
 
 		dst_hooks.buffer.insert(dst_hooks.buffer.end(),
@@ -222,8 +222,8 @@ void FrontendInterface::invoke_registered_menus(const LabelKey& window_key) noex
 
 			// clean-up pass before we enter BeginMenu tabs
 			hooks.buffer.erase(std::remove_if(
-					hooks.buffer.begin(), hooks.buffer.end(),
-					[](auto& w) noexcept { return w.expired(); }
+				hooks.buffer.begin(), hooks.buffer.end(),
+				[](auto& w) noexcept { return w.expired(); }
 			), hooks.buffer.end());
 
 			if (ImGui::BeginMenu(menu_key.second.c_str())) {

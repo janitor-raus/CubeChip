@@ -96,11 +96,6 @@ std::string SystemInterface::get_system_id() const noexcept {
 
 /*==================================================================*/
 
-void SystemInterface::copy_file_image_to(std::span<u8> dest, std::size_t offset) noexcept {
-	std::memcpy(dest.data() + offset, m_file_image.data(),
-		std::min(m_file_image.size(), dest.size() - offset));
-}
-
 bool SystemInterface::calc_file_image_sha1() noexcept {
 	if (!SystemStaging::sha1_hash.empty()) {
 		m_file_sha1_hash = SystemStaging::sha1_hash;
@@ -116,6 +111,11 @@ bool SystemInterface::calc_file_image_sha1() noexcept {
 			return false;
 		}
 	}
+}
+
+void SystemInterface::copy_file_image_to(std::span<u8> dest, std::size_t offset) noexcept {
+	std::memcpy(dest.data() + offset, m_file_image.data(),
+		std::min(m_file_image.size(), dest.size() - offset));
 }
 
 auto SystemInterface::add_system_path(

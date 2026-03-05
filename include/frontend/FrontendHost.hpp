@@ -143,6 +143,7 @@ private:
 	void prune_terminated_systems() noexcept;
 	void find_last_focused_system() noexcept;
 
+	bool m_suppress_auto_refocus{};
 	void unload_system_instance(SystemID system_id = 0) noexcept;
 	void insert_system_instance(SystemInterface* system) noexcept;
 
