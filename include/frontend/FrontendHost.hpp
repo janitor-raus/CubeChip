@@ -124,8 +124,11 @@ private:
 	public:
 		SystemCore core;
 
-		static inline bool delimiters{};
-		static inline bool statistics{};
+		bool delimiters{};
+		bool statistics{};
+
+		/***/ auto* operator->()       noexcept { return core.get(); }
+		const auto* operator->() const noexcept { return core.get(); }
 
 		operator bool() const noexcept { return bool(core); }
 	};
