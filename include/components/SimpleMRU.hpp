@@ -40,6 +40,9 @@ public:
 	operator std::span<      T>()       noexcept { return span(); }
 	operator std::span<const T>() const noexcept { return span(); }
 
+	/***/ auto& operator*()       noexcept { return m_items; }
+	const auto& operator*() const noexcept { return m_items; }
+
 /*==================================================================*/
 
 	SimpleMRU(std::size_t limit = 0) {
