@@ -76,5 +76,5 @@ template <typename... T> requires (
 )
 static constexpr void join_into(std::string& src, const T&... parts) noexcept {
 	src.reserve((view_size(parts) + ...) + src.size());
-	(src.append(view_data(parts)), ...);
+	(src.append(view_data(parts), view_size(parts)), ...);
 }
