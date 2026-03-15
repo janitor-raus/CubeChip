@@ -23,7 +23,7 @@ public:
 	}
 
 	static constexpr seed_type splitmix64(seed_type seed) noexcept {
-		auto z = (seed += seed_type(0x9E3779B97F4A7C15));
+		auto z = (seed + seed_type(0x9E3779B97F4A7C15));
 		z = (z ^ (z >> 30)) * seed_type(0xBF58476D1CE4E5B9);
 		z = (z ^ (z >> 27)) * seed_type(0x94D049BB133111EB);
 		return z ^ (z >> 31);

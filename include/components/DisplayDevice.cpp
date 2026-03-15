@@ -5,6 +5,7 @@
 */
 
 #include "DisplayDevice.hpp"
+#include "FrontendInterface.hpp"
 #include "LifetimeWrapperSDL.hpp"
 #include "AtomSharedPtr.hpp"
 #include "BasicVideoSpec.hpp"
@@ -18,6 +19,7 @@
 
 struct DisplayDevice::DisplayContext {
 	using Callable = DisplayDevice::Callable;
+	using LiveHook = FrontendInterface::LiveHook;
 
 	AtomSharedPtr<ImLabel>   m_window_label;
 	AtomSharedPtr<Callable>  m_osd_callable;
@@ -26,35 +28,56 @@ struct DisplayDevice::DisplayContext {
 	DisplayDevice::Swapchain m_swapchain;
 	FramePacket::Metadata    m_staging_data;
 
-	FrontendInterface::Hook  m_settings_menu_hook;
-	FrontendInterface::Hook  m_debugger_menu_hook;
-	FrontendInterface::Hook  m_render_window_hook;
+	LiveHook m_settings_menu_hook;
+	LiveHook m_debugger_menu_hook;
+	LiveHook m_render_window_hook;
 
 	ez::Frame m_old_target_size{};
 
 	bool* m_window_state_out = nullptr; // wire pointer to detect window closure
 	bool* m_window_focus_out = nullptr; // write pointer to detect window focus
+
 	bool  m_disable_menubar = true;
 	bool  m_view_debug_menu = false;
 	bool  m_fullscreen_mode = false;
+
+	const bool c_save_settings = true;
 
 	int   m_screen_rotation{};
 	bool  m_integer_scaling{};
 	bool  m_utilize_shaders{};
 
-	DisplayContext(std::size_t W, std::size_t H, ImLabel name, std::size_t bpp) noexcept
-		: m_window_label(std::make_shared<ImLabel>(std::move(name)))
+private:
+	auto make_sanitized_label(ImLabel&& name) const noexcept {
+		return std::make_shared<ImLabel>(!name->empty()
+			? std::move(name) : ImLabel("", std::to_string(ImGui::GetID(this)))
+		);
+	}
+
+public:
+	DisplayContext(std::size_t W, std::size_t H, bool save_settings, ImLabel name) noexcept
+		: m_window_label(make_sanitized_label(std::move(name)))
 		, m_osd_callable(nullptr)
 		, m_stream_texture(BasicVideoSpec::create_stream_texture(RENDERER, int(W), int(H)))
-		, m_swapchain(bpp, int(W), int(H))
+		, m_swapchain(int(W), int(H))
 		, m_staging_data(int(W), int(H))
 		, m_settings_menu_hook(bind_settings_menu())
 		, m_debugger_menu_hook(nullptr)
 		, m_render_window_hook(FrontendInterface::register_window([&]() noexcept { render_window(); }))
+		, c_save_settings(save_settings)
 	{
 		if (m_staging_data.get_base_frame().area() != (W * H)) {
 			blog.warn("Display W/H out of size bounds, clamping!");
 		}
+	}
+
+	auto get_window_label() const noexcept {
+		return m_window_label.load(std::memory_order::relaxed);
+	}
+
+	void set_window_label(ImLabel&& name) noexcept {
+		m_window_label.store(make_sanitized_label(std::move(name)),
+			std::memory_order::relaxed);
 	}
 
 private:
@@ -66,15 +89,17 @@ private:
 			BasicVideoSpec::write_stream_texture(RENDERER,
 				m_stream_texture, frame.buffer.data());
 
-			const auto window_label = m_window_label.load(mo::relaxed);
-			const auto window_flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings
+			const auto window_label = get_window_label();
+			const auto window_flags = ImGuiWindowFlags_NoCollapse
 				| ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
-				| (m_disable_menubar ? ImGuiWindowFlags_None : ImGuiWindowFlags_MenuBar);
+				| (m_disable_menubar ? ImGuiWindowFlags_None : ImGuiWindowFlags_MenuBar)
+				| (c_save_settings ? ImGuiWindowFlags_None : ImGuiWindowFlags_NoSavedSettings)
+				| (window_label->has_name() ? ImGuiWindowFlags_None : ImGuiWindowFlags_NoTitleBar);
 
 			const auto s_window_contents = [&]() noexcept {
 				if (m_window_focus_out) {
-					*m_window_focus_out = ImGui::IsWindowFocused
-					(ImGuiFocusedFlags_RootAndChildWindows);
+					*m_window_focus_out |= ImGui::IsWindowFocused(
+						ImGuiFocusedFlags_RootAndChildWindows);
 				}
 
 				FrontendInterface::call_autohide_menubar(
@@ -166,7 +191,7 @@ private:
 				ImGui::Dummy(display_zone);
 				ImGui::SetCursorPos(origin_point);
 
-				auto osd_callable = m_osd_callable.load(mo::relaxed);
+				auto osd_callable = m_osd_callable.load(std::memory_order::relaxed);
 				if (osd_callable) { (*osd_callable)(); }
 
 				// toggle fullscreen mode on double-click
@@ -226,15 +251,12 @@ private:
 				#endif
 			};
 
-			ImGui::DockNextWindowTo(FrontendInterface::get_main_dockspace_id(), true);
-			ImGui::SetNextWindowMinClientSize(ImVec2(float(480), float(360)));
-			//ImGui::SetNextWindowMinClientSize(ImVec2(float(dar_viewport.w), float(dar_viewport.h))
-			//	* min_zoom + padding_vec2 + borders_vec2); // old constraint
+			//ImGui::DockNextWindowTo(FrontendInterface::get_main_dockspace_id(), true);
+			ImGui::SetNextWindowMinClientSize(ImVec2(480.0f, 360.0f));
 
 			if (ImGui::Begin(*window_label, m_window_state_out, window_flags)) {
 				if (!m_fullscreen_mode) { s_window_contents(); }
 			} else {
-				if (m_window_focus_out) { *m_window_focus_out = false; }
 				m_fullscreen_mode = false;
 			}
 			ImGui::End();
@@ -253,8 +275,8 @@ private:
 		});
 	}
 
-	auto bind_settings_menu() noexcept -> FrontendInterface::Hook {
-		return FrontendInterface::register_menu(*m_window_label.load(mo::relaxed),
+	auto bind_settings_menu() noexcept -> LiveHook {
+		return FrontendInterface::register_menu(*get_window_label(),
 		{ 89, "Settings" }, [&]() noexcept {{
 			ImGui::Separator(2.0f);
 			if (ImGui::Checkbox("Enable Debug Menu?", &m_view_debug_menu)) {
@@ -267,8 +289,8 @@ private:
 		}});
 	}
 
-	auto bind_debugger_menu() noexcept -> FrontendInterface::Hook {
-		return FrontendInterface::register_menu(*m_window_label.load(mo::relaxed),
+	auto bind_debugger_menu() noexcept -> LiveHook {
+		return FrontendInterface::register_menu(*get_window_label(),
 		{ 90, "Debug" }, [&]() noexcept {{
 			int value = m_staging_data.border_width;
 			if (ImGui::SliderInt("Border Width", &value, m_staging_data.border_width.min,
@@ -343,12 +365,14 @@ private:
 
 /*==================================================================*/
 
-DisplayDevice::DisplayDevice(std::size_t W, std::size_t H, ImLabel name, std::size_t bpp) noexcept
+DisplayDevice::DisplayDevice(
+	std::size_t W, std::size_t H,
+	bool save_settings, ImLabel name
+) noexcept
 	: m_context(std::make_unique<DisplayContext>(
-		std::clamp(W, std::size_t(1), std::size_t(8192)),
-		std::clamp(H, std::size_t(1), std::size_t(8192)),
-		name->empty() ? ImLabel("Unnamed Display") : std::move(name),
-		std::clamp(bpp, std::size_t(1), std::size_t(6))
+		std::clamp<std::size_t>(W, 1u, 8192u),
+		std::clamp<std::size_t>(H, 1u, 8192u),
+		save_settings, std::move(name) // yes, we pass as-is
 	))
 {}
 
@@ -393,11 +417,11 @@ void DisplayDevice::set_utilize_shaders(bool enable) noexcept {
 }
 
 auto DisplayDevice::get_window_label() const noexcept -> ImLabel {
-	return *m_context->m_window_label.load(mo::relaxed);
+	return *m_context->get_window_label();
 }
 
 void DisplayDevice::set_window_label(std::string_view name) noexcept {
-	m_context->m_window_label.store(std::make_shared<ImLabel>(name), mo::relaxed);
+	m_context->set_window_label(name);
 }
 
 void DisplayDevice::set_window_state_output(bool* out) noexcept {
@@ -409,7 +433,8 @@ void DisplayDevice::set_window_focus_output(bool* out) noexcept {
 }
 
 void DisplayDevice::set_osd_callable(Callable callable) noexcept {
-	m_context->m_osd_callable.store(std::make_shared<Callable>(std::move(callable)), mo::relaxed);
+	m_context->m_osd_callable.store(std::make_shared<Callable>
+		(std::move(callable)), std::memory_order::relaxed);
 }
 
 /*==================================================================*/

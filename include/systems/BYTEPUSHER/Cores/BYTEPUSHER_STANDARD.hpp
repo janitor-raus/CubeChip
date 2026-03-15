@@ -67,7 +67,7 @@ private:
 
 public:
 	BYTEPUSHER_STANDARD() noexcept
-		: BytePusher_CoreInterface(c_sys_screen_W, c_sys_screen_H, descriptor.system_pretty_name)
+		: BytePusher_CoreInterface(c_sys_screen_W, c_sys_screen_H)
 	{}
 
 private:

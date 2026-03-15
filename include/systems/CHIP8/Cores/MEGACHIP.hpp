@@ -121,7 +121,7 @@ public:
 
 public:
 	MEGACHIP() noexcept
-		: Chip8_CoreInterface(c_sys_screen_W, c_sys_screen_H, descriptor.system_pretty_name)
+		: Chip8_CoreInterface(c_sys_screen_W, c_sys_screen_H)
 		, m_display_map(m_display_buffer, c_sys_screen_W/2, c_sys_screen_H/3)
 		, m_old_render_map(m_old_render_buffer, c_sys_screen_W, c_sys_screen_H)
 		, m_background_map(m_background_buffer, c_sys_screen_W, c_sys_screen_H)

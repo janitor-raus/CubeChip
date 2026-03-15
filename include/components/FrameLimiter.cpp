@@ -9,103 +9,92 @@
 #include <algorithm>
 
 #include "FrameLimiter.hpp"
+#include "RelaxCPU.hpp"
 
 /*==================================================================*/
 
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386) || defined(_M_IX86)
-	#include <immintrin.h>
-	#define cpu_relax() _mm_pause()
-#elif defined(__aarch64__) || defined(__arm__)
-	#define cpu_relax() asm volatile("yield")
-#elif defined(__riscv) && defined(__riscv_zihintpause)
-	#define cpu_relax() asm volatile("pause")
-#else
-	#define cpu_relax() ((void)0)
-#endif
-
-/*==================================================================*/
-
-static constexpr auto millis = std::chrono::milliseconds(1);
+static constexpr auto c_millis = std::chrono::milliseconds(1);
 
 // 99.5% of 1ms sleeps measure below this value
-static constexpr auto spin_threshold = 2.3f;
+static constexpr auto c_spin_threshold = 2.3f;
 
 static auto current_time() noexcept { return std::chrono::steady_clock::now(); }
 
 /*==================================================================*/
 
-void FrameLimiter::setLimiterProperties(float framerate) noexcept
-	{ targetFramePeriod = 1000.0f / std::clamp(framerate, 0.5f, 10000.0f); }
+void FrameLimiter::set_limiter_props(float framerate) noexcept {
+	m_target_time_period = 1000.0f / std::clamp(framerate, 0.5f, 10000.0f);
+}
 
-void FrameLimiter::setLimiterProperties(float framerate, bool force_initial_frame, bool allow_missed_frames) noexcept {
-	setLimiterProperties(framerate);
-	forceInitialFrame = force_initial_frame;
-	allowMissedFrames = allow_missed_frames;
-	previousFrameSkip = false;
+void FrameLimiter::set_limiter_props(float framerate, bool force_initial_pass, bool force_skip_periods) noexcept {
+	set_limiter_props(framerate);
+	m_force_initial_pass = force_initial_pass;
+	m_force_skip_periods = force_skip_periods;
+	m_missed_last_period = false;
 }
 
 /*==================================================================*/
 
-bool FrameLimiter::isFrameReady(bool lazy) noexcept {
-	if (hasTargetPeriodElapsed()) { return true; }
+bool FrameLimiter::is_frame_ready(bool lazy) noexcept {
+	if (has_target_period_elapsed()) { return true; }
 
-	if ((lazy && targetFramePeriod >= spin_threshold) \
-		|| (getRemainderToTarget() >= spin_threshold))
+	if ((lazy && m_target_time_period >= c_spin_threshold) \
+		|| (get_period_remaining() >= c_spin_threshold))
 	{
-		std::this_thread::sleep_for(millis);
+		std::this_thread::sleep_for(c_millis);
 		return false;
 	} else {
-		for (auto i = 0; ++i <= 128;) { cpu_relax(); }
+		for (auto i = 0; ++i <= 128;) { ::cpu_relax(); }
 		std::this_thread::yield();
 		return false;
 	}
 }
 
-bool FrameLimiter::isFrameReadyNoBlock() noexcept {
-	return hasTargetPeriodElapsed();
+bool FrameLimiter::is_frame_ready_no_block() noexcept {
+	return has_target_period_elapsed();
 }
 
-auto FrameLimiter::getElapsedMillisSince() const noexcept {
+auto FrameLimiter::get_elapsed_millis_since() const noexcept {
 	return std::chrono::duration_cast<std::chrono::microseconds>
-		(current_time() - previousFrameTime).count() / 1e3f;
+		(::current_time() - m_last_period_origin).count() / 1e3f;
 }
 
-auto FrameLimiter::getElapsedMicrosSince() const noexcept {
+auto FrameLimiter::get_elapsed_micros_since() const noexcept {
 	return std::chrono::duration_cast<std::chrono::nanoseconds>
-		(current_time() - previousFrameTime).count() / 1e3f;
+		(::current_time() - m_last_period_origin).count() / 1e3f;
 }
 
 /*==================================================================*/
 
-bool FrameLimiter::hasTargetPeriodElapsed() noexcept {
-	const auto currentTimePoint = current_time();
+bool FrameLimiter::has_target_period_elapsed() noexcept {
+	const auto current_time_point = ::current_time();
 
-	if (!doneFirstRunSetup) [[unlikely]] {
-		previousFrameTime = currentTimePoint;
-		doneFirstRunSetup = true;
+	if (!m_new_init_completed) [[unlikely]] {
+		m_last_period_origin = current_time_point;
+		m_new_init_completed = true;
 	}
 
-	if (forceInitialFrame) [[unlikely]] {
-		forceInitialFrame = false;
-		++validFrameCounter;
+	if (m_force_initial_pass) [[unlikely]] {
+		m_force_initial_pass = false;
+		++m_valid_period_count;
 		return true;
 	}
 
-	elapsedTimePeriod = elapsedOverTarget + std::chrono::duration
-		<float, std::milli>(currentTimePoint - previousFrameTime).count();
+	m_time_elapsed_since = m_time_yield_accrued + std::chrono::duration
+		<float, std::milli>(current_time_point - m_last_period_origin).count();
 
-	if (elapsedTimePeriod < targetFramePeriod)
+	if (m_time_elapsed_since < m_target_time_period)
 		[[likely]] { return false; }
 
-	if (allowMissedFrames) {
-		previousFrameSkip = elapsedTimePeriod >= targetFramePeriod + 0.050f;
-		elapsedOverTarget = std::fmod(elapsedTimePeriod, targetFramePeriod);
+	if (m_force_skip_periods) {
+		m_missed_last_period = m_time_elapsed_since >= m_target_time_period + 0.050f;
+		m_time_yield_accrued = std::fmod(m_time_elapsed_since, m_target_time_period);
 	} else {
 		// without frameskip, we carry over frame debt until caught up
-		elapsedOverTarget = elapsedTimePeriod - targetFramePeriod;
+		m_time_yield_accrued = m_time_elapsed_since - m_target_time_period;
 	}
 
-	previousFrameTime = currentTimePoint;
-	++validFrameCounter;
+	m_last_period_origin = current_time_point;
+	++m_valid_period_count;
 	return true;
 }

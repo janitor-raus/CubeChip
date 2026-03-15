@@ -78,7 +78,7 @@ private:
 
 public:
 	CHIP8X() noexcept
-		: Chip8_CoreInterface(c_sys_screen_W, c_sys_screen_H, descriptor.system_pretty_name)
+		: Chip8_CoreInterface(c_sys_screen_W, c_sys_screen_H)
 		, m_colored_map(m_colored_buffer, c_sys_screen_W/8, c_sys_screen_H)
 		, m_display_map(m_display_buffer, c_sys_screen_W, c_sys_screen_H)
 	{}

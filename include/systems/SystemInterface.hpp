@@ -17,6 +17,7 @@
 #include "HDIS_HCIS.hpp"
 #include "Thread.hpp"
 
+#include "WindowHost.hpp"
 #include "BasicLogger.hpp"
 #include "ArrayOps.hpp"
 #include "SimpleTimer.hpp"
@@ -81,7 +82,7 @@ protected:
 	std::unique_ptr<BasicKeyboard> m_input;
 
 protected:
-	SystemInterface() noexcept;
+	SystemInterface(std::string_view family_name) noexcept;
 
 public:
 	virtual ~SystemInterface() noexcept = default;
@@ -104,16 +105,18 @@ protected:
 	u32 m_elapsed_frames{};
 
 protected:
-	bool m_render_window_docker = true;
-	bool m_is_currently_focused = true;
+	bool m_is_window_visible = true;
+	bool m_is_window_focused = true;
 
 public:
-	bool is_awaiting_shutdown() const noexcept { return !m_render_window_docker; }
-	bool is_currently_focused() const noexcept { return  m_is_currently_focused; }
+	bool is_window_visible() const noexcept { return m_is_window_visible; }
+	bool is_window_focused() const noexcept { return m_is_window_focused; }
 
-private:
-	[[maybe_unused]]
-	const void* _padding_1{};
+	void is_window_visible(bool state) noexcept { m_is_window_visible = state; }
+	void is_window_focused(bool state) noexcept { m_is_window_focused = state; }
+
+protected:
+	WindowHost m_window_host;
 
 protected:
 	std::string m_file_sha1_hash{};

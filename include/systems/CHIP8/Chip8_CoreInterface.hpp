@@ -226,9 +226,7 @@ protected:
 	}
 
 protected:
-	Chip8_CoreInterface(
-		std::size_t W, std::size_t H, std::string_view system_name
-	) noexcept;
+	Chip8_CoreInterface(std::size_t W, std::size_t H) noexcept;
 
 public:
 	void main_system_loop() override final;

@@ -6,15 +6,16 @@
 
 #pragma once
 
+#include <functional>
+
 #include "ImLabel.hpp"
 #include "FramePacket.hpp"
 #include "TripleBuffer.hpp"
-#include "FrontendInterface.hpp"
 
 /*==================================================================*/
 
 class DisplayDevice {
-	using Callable  = FrontendInterface::Func;
+	using Callable  = std::function<void()>;
 	using Swapchain = TripleBuffer<FramePacket>;
 
 	struct DisplayContext; // make *real* clang happy
@@ -40,7 +41,11 @@ public:
 	auto metadata_staging() noexcept -> FramePacket::Metadata&;
 
 public:
-	DisplayDevice(std::size_t W, std::size_t H, ImLabel name = {}, std::size_t bpp = 4) noexcept;
+	DisplayDevice(
+		std::size_t W, std::size_t H,
+		bool save_settings = true,
+		ImLabel name = ImLabel()
+	) noexcept;
 
 	~DisplayDevice() noexcept;
 

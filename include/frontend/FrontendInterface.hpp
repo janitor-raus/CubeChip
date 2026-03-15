@@ -25,18 +25,26 @@ struct SDL_Window;
 template <typename Fn>
 concept VoidInvocable = std::is_nothrow_invocable_r_v<void, Fn>;
 
+template <typename Fn>
+concept VoidInvocableID = std::is_nothrow_invocable_r_v<void, Fn, unsigned>;
+
 /*==================================================================*/
 
 class FrontendInterface {
 public:
-	using Func = std::function<void()>;
-	using Hook = std::shared_ptr<Func>;
+	using Func   = std::function<void()>;
+	using FuncID = std::function<void(unsigned)>;
+
+	using LiveHook   = std::shared_ptr<Func>;
+	using LiveHookID = std::shared_ptr<FuncID>;
+
 	using LabelKey = ImLabel;
 	using OrderKey = std::pair<std::size_t, std::string>;
 
 private:
+	template <typename Signature>
 	struct HookRegistry {
-		using HookBuffer = std::vector<std::weak_ptr<Func>>;
+		using HookBuffer = std::vector<std::weak_ptr<Signature>>;
 
 		HookBuffer buffer{};
 		unsigned   offset{}; // used when merging, don't touch
@@ -48,8 +56,11 @@ private:
 		HookRegistry() = default;
 	};
 
-	using HookRegistryMapped = std::unordered_map
-		<LabelKey, std::map<OrderKey, HookRegistry>>;
+	using HookRegistryDockMap = std::unordered_map
+		<unsigned, HookRegistry<FuncID>>;
+
+	using HookRegistryMenuMap = std::unordered_map
+		<LabelKey, std::map<OrderKey, HookRegistry<Func>>>;
 
 	template <typename T>
 	struct RegistryBox {
@@ -60,8 +71,9 @@ private:
 	};
 
 	struct RegistryAggregate {
-		RegistryBox<HookRegistry>     windows{};
-		RegistryBox<HookRegistryMapped> menus{};
+		RegistryBox<HookRegistry<Func>>  windows{};
+		RegistryBox<HookRegistryDockMap> dockers{};
+		RegistryBox<HookRegistryMenuMap> menus{};
 	};
 
 	static inline std::unique_ptr
@@ -69,14 +81,13 @@ private:
 
 public:
 	/**
-	 * @brief Registers a nothrow function to be called during the window rendering phase.
+	 * @brief Registers a nothrow callable to be invoked during the window rendering phase.
 	 * Returns a Hook (shared_ptr) that is used to manage lifetime of the registration.
-	 * When the Hook is destroyed, the function is unregistered automatically.
-	 * Nesting is allowed, but unless lifetime persists, the hooks will be erased
-	 * during the next loop of invocation during the same render frame.
+	 * When the Hook is destroyed, the callable is unregistered automatically.
+	 * Nesting is allowed, but lifetime of the nested hook is not extended automatically.
 	 */
 	template <VoidInvocable Fn> [[nodiscard]]
-	static Hook register_window(Fn&& fn) noexcept {
+	static LiveHook register_window(Fn&& fn) noexcept {
 		auto shared_ptr = std::make_shared<Func>(std::forward<Fn>(fn));
 
 		if (s_gui_hooks->windows.registry_lock.try_lock()) { // may fail spuriously (fine)
@@ -91,12 +102,34 @@ public:
 	}
 
 	/**
-	 * @brief Registers a nothrow function to be called during the main menu rendering phase.
+	 * @brief Registers a nothrow callable to be invoked during the dock building phase.
 	 * Returns a Hook (shared_ptr) that is used to manage lifetime of the registration.
-	 * When the Hook is destroyed, the function is unregistered automatically.
+	 * When the Hook is destroyed, the callable is unregistered automatically.
+	 * Nesting is allowed, but lifetime of the nested hook is not extended automatically.
+	 */
+	template <VoidInvocableID Fn> [[nodiscard]]
+	static LiveHookID register_docker(unsigned dock_id, Fn&& fn) noexcept {
+		auto shared_ptr = std::make_shared<FuncID>(std::forward<Fn>(fn));
+
+		if (s_gui_hooks->dockers.registry_lock.try_lock()) { // may fail spuriously (fine)
+			s_gui_hooks->dockers.registry[dock_id].buffer.push_back(shared_ptr);
+			s_gui_hooks->dockers.registry_lock.unlock();
+		} else {
+			std::scoped_lock lock(s_gui_hooks->dockers.overflow_lock); // must wait to acquire
+			s_gui_hooks->dockers.overflow[dock_id].buffer.push_back(shared_ptr);
+		}
+
+		return shared_ptr;
+	}
+
+	/**
+	 * @brief Registers a nothrow callable to be invoked during the main menu rendering phase.
+	 * Returns a Hook (shared_ptr) that is used to manage lifetime of the registration.
+	 * When the Hook is destroyed, the callable is unregistered automatically.
+	 * Nesting is allowed, but lifetime of the nested hook is not extended automatically.
 	 */
 	template <VoidInvocable Fn> [[nodiscard]]
-	static Hook register_menu(const LabelKey& window_tag, const OrderKey& menu_title, Fn&& fn) noexcept {
+	static LiveHook register_menu(const LabelKey& window_tag, const OrderKey& menu_title, Fn&& fn) noexcept {
 		auto shared_ptr = std::make_shared<Func>(std::forward<Fn>(fn));
 
 		if (s_gui_hooks->menus.registry_lock.try_lock()) { // may fail spuriously (fine)
@@ -113,7 +146,7 @@ public:
 	}
 
 private:
-	static inline HookRegistry* s_active_menu{};
+	static inline HookRegistry<Func>* s_active_menu{};
 public:
 	static bool was_menu_clicked() noexcept {
 		return s_active_menu && s_active_menu->first_hit;
@@ -121,10 +154,13 @@ public:
 
 private:
 	static bool merge_overflowing_windows() noexcept;
-	static void invoke_registered_windows() noexcept;
+	static bool invoke_registered_windows() noexcept;
+
+	static bool merge_overflowing_dockers(unsigned dock_id) noexcept;
+	static bool invoke_registered_dockers(unsigned dock_id) noexcept;
 
 	static bool merge_overflowing_menus(const LabelKey& tag) noexcept;
-	static void invoke_registered_menus(const LabelKey& tag) noexcept;
+	static bool invoke_registered_menus(const LabelKey& tag) noexcept;
 
 public:
 	static void init_context(std::string_view home_dir);
@@ -143,6 +179,8 @@ public:
 	static void  set_ui_text_scaling(float scale) noexcept;
 	static float get_ui_text_scaling() noexcept;
 
+	static float get_ui_total_scaling() noexcept;
+
 public:
 	static void process_event(void* event);
 	static void begin_new_frame();
@@ -150,6 +188,9 @@ public:
 
 	static void dock_next_window_to(unsigned id, bool first_time = false) noexcept;
 
-	static void call_menubar(const char* window_name) noexcept;
+	static void call_docker(unsigned dock_id, bool* has_run = nullptr) noexcept;
+	static void call_docker(unsigned dock_id, std::atomic<bool>* has_run) noexcept;
+
+	static void call_menubar(const char* window_name, bool* can_render = nullptr) noexcept;
 	static void call_autohide_menubar(const char* window_name, bool& hidden) noexcept;
 };

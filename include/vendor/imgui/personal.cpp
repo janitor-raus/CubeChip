@@ -60,63 +60,94 @@ Vec4::operator ImVec4() const noexcept {
 }
 
 namespace ImGui {
-	void TextUnformatted(const char* text, unsigned color, const char* text_end) noexcept {
+	void TextUnformatted(const char* text, unsigned color, const char* text_end) {
 		PushStyleColor(ImGuiCol_Text, color);
 		TextUnformatted(text, text_end);
 		PopStyleColor();
 	}
 
-	void AddCursorPos(const ImVec2& delta) noexcept {
+	void AddCursorPos(const ImVec2& delta) {
 		SetCursorPos(GetCursorPos() + delta);
 	}
 
-	void AddCursorPosX(float delta) noexcept {
+	void AddCursorPosX(float delta) {
 		SetCursorPosX(GetCursorPosX() + delta);
 	}
 
-	void AddCursorPosY(float delta) noexcept {
+	void AddCursorPosY(float delta) {
 		SetCursorPosY(GetCursorPosY() + delta);
 	}
 
-	ImVec2 GetWindowDecoSize() noexcept {
+	ImVec2 GetWindowDecoSize() {
 		const auto& style = GetStyle();
 
 		return ImVec2(style.WindowPadding.x * 2.0f, style.WindowPadding.y * 2.0f
 			+ GetFontSize() + style.FramePadding.y * 2.0f);
 	}
 
-	void Dummy(float mult_w, float mult_h) noexcept {
+	void Dummy(float mult_w, float mult_h) {
 		const auto mult_vec2 = ImVec2(mult_w, mult_h);
 		Dummy(GetStyle().FramePadding * mult_vec2);
 	}
 
-	void DummyX(float mult) noexcept {
+	void DummyX(float mult) {
 		Dummy(ImVec2(mult * GetStyle().FramePadding.x, 0.0f));
 	}
 
-	void DummyY(float mult) noexcept {
+	void DummyY(float mult) {
 		Dummy(ImVec2(0.0f, mult * GetStyle().FramePadding.y));
 	}
 
-	void Separator(float mult) noexcept {
+	void Separator(float mult) {
 		DummyY(mult * 0.5f);
 		Separator();
 		DummyY(mult * 0.5f);
 	}
 
-	void SetNextWindowMinClientSize(const ImVec2& min) noexcept {
+	void SetNextWindowMinClientSize(const ImVec2& min) {
 		SetNextWindowSizeConstraints(min + GetWindowDecoSize(), ImVec2(FLT_MAX, FLT_MAX));
 	}
 
-	void DockNextWindowTo(unsigned dock_id, bool first_use) noexcept {
+	void DockNextWindowTo(unsigned dock_id, bool first_use) {
 		SetNextWindowDockID(dock_id, first_use
 			? ImGuiCond_FirstUseEver : ImGuiCond_Always);
+	}
+
+	void SelectWindowInDockNodeTab(void* window_ptr) {
+		auto window = reinterpret_cast<ImGuiWindow*>
+			(window_ptr ? window_ptr : GetCurrentWindow());
+
+		if (!window || !window->DockIsActive) { return; }
+
+		auto* node = window->DockNode;
+		if (!node || !node->TabBar) { return; }
+
+		auto* tab_bar = node->TabBar;
+		tab_bar->SelectedTabId = window->TabId;
+		tab_bar->NextSelectedTabId = window->TabId;
+	}
+
+	bool IsDockspaceFocused(unsigned dockspace_id) {
+		const auto* context = ImGui::GetCurrentContext();
+		if (!context) { return false; }
+
+		const auto* nav_window = context->NavWindow;
+		if (!nav_window) { return false; }
+
+		const auto* dock_node = nav_window->DockNode;
+		if (!dock_node) { return false; }
+
+		while (dock_node->ParentNode) {
+			dock_node = dock_node->ParentNode;
+		}
+
+		return dock_node->ID == dockspace_id;
 	}
 
 	void WriteText(
 		const char* textString, unsigned textColor,
 		Vec2 textAlign, Vec2 textPadding
-	) noexcept {
+	) {
 		using namespace ImGui;
 		const auto textPos = GetCursorPos() + textPadding + textAlign * (
 			GetContentRegionAvail() - CalcTextSize(textString) - textPadding * 2);
@@ -128,7 +159,7 @@ namespace ImGui {
 	void WriteShadowedText(
 		const char* textString, unsigned textColor,
 		Vec2 textAlign, Vec2 textPadding, Vec2 shadowDist
-	) noexcept {
+	) {
 		using namespace ImGui;
 		const auto textPos = GetCursorPos() + textPadding + textAlign * (
 			GetContentRegionAvail() - CalcTextSize(textString) - textPadding * 2);
@@ -144,7 +175,7 @@ namespace ImGui {
 	void DrawRotatedImage(
 		void* texture, const ImVec2& dims, unsigned rotation,
 		const ImVec2& uv0, const ImVec2& uv1, unsigned tint
-	) noexcept {
+	) {
 		if (!texture) { return; }
 
 		const ImVec2 TL = GetCursorScreenPos();
@@ -173,42 +204,18 @@ namespace ImGui {
 		);
 	}
 
-	void DrawRect(const ImVec2& dims, float width, float round, unsigned color) noexcept {
+	void DrawRect(const ImVec2& dims, float width, float round, unsigned color) {
 		const auto origin = GetCursorScreenPos();
 
 		GetWindowDrawList()->AddRect(origin, origin + dims,
 			color, round, ImDrawFlags_RoundCornersAll, width);
 	}
 
-	void DrawRectFilled(const ImVec2& dims, float round, unsigned color) noexcept {
+	void DrawRectFilled(const ImVec2& dims, float round, unsigned color) {
 		const auto origin = GetCursorScreenPos();
 
 		GetWindowDrawList()->AddRectFilled(origin, origin + dims,
 			color, round, ImDrawFlags_RoundCornersAll);
-	}
-
-	void Draw5pStarFilled(
-		const ImVec2& center, float radius,
-		unsigned color
-	) noexcept {
-		constexpr auto n_points = 5u;
-		constexpr auto n_verts = n_points * 2;
-		ImVec2 verts[n_verts];
-
-		auto inner_radius = radius * 0.5f;
-		auto angle = -IM_PI / 2.0f; // start at top
-		auto step = IM_PI / n_points;
-
-		for (auto i = 0; i < n_verts; ++i) {
-			auto r = (i % 2 == 0) ? radius : inner_radius;
-			verts[i] = ImVec2(
-				center.x + std::cos(angle) * r,
-				center.y + std::sin(angle) * r
-			);
-			angle += step;
-		}
-
-		GetWindowDrawList()->AddConvexPolyFilled(verts, n_verts, color);
 	}
 
 	bool ButtonContainer(
@@ -216,7 +223,7 @@ namespace ImGui {
 		const std::function<void()>& foreground_children,
 		const std::function<void()>& background_children,
 		bool selected
-	) noexcept {
+	) {
 		const auto& style = GetStyle();
 
 		const bool pressed = InvisibleButton(id, size);

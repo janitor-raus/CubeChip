@@ -89,7 +89,7 @@ void FrontendHost::prune_terminated_systems() noexcept {
 	while (it != m_systems.end()) {
 		const auto& [id, system] = *it;
 
-		if (!system || system->is_awaiting_shutdown()) {
+		if (!system || !system->is_window_visible()) {
 			blog.info("System instance {} terminated, unloading...", id);
 			m_focus_mru.erase(id);
 			it = m_systems.erase(it);
@@ -102,11 +102,15 @@ void FrontendHost::find_last_focused_system() noexcept {
 		for (const auto& id : *m_focus_mru) {
 			if (m_focus_mru[0] == id) { continue; }
 
-			if (m_systems[id]->is_currently_focused()) {
+			if (m_systems[id]->is_window_focused()) {
 				blog.debug("Focused system instance is now {}.", id);
 				m_focus_mru.insert(id); return;
 			}
 		}
+	}
+	// XXX - clear flag for next imgui frame, but we might reorder where this method runs!
+	for (const auto& id : *m_focus_mru) {
+		m_systems[id]->is_window_focused(false);
 	}
 }
 

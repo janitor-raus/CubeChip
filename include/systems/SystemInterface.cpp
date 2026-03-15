@@ -15,10 +15,13 @@
 #include "SystemInterface.hpp"
 #include "SystemDescriptor.hpp"
 #include "SystemStaging.hpp"
+#include "FrontendInterface.hpp"
+
+#include <imgui_internal.h>
 
 /*==================================================================*/
 
-SystemInterface::SystemInterface() noexcept
+SystemInterface::SystemInterface(std::string_view family_name) noexcept
 	: instance_id([]() noexcept {
 		static std::atomic<u32> instance_counter = 1u;
 		return instance_counter.fetch_add(1, mo::relaxed);
@@ -26,9 +29,31 @@ SystemInterface::SystemInterface() noexcept
 	, m_statistics_data(std::make_shared<std::string>())
 	, m_rng(std::make_unique<Well512>(Millis::initial()))
 	, m_input(std::make_unique<BasicKeyboard>())
+	, m_window_host({ family_name, make_system_id(instance_id, family_name) })
 	, m_file_image(std::move(SystemStaging::file_image))
 {
 	m_statistics_work_buffer.reserve(1_KiB);
+	m_window_host.set_window_visible_output(&m_is_window_visible);
+	m_window_host.set_window_focused_output(&m_is_window_focused);
+	m_window_host.edit_callbacks([](auto& callbacks) noexcept {
+		callbacks.window_init = [](auto& flags) noexcept {
+			flags |= ImGuiWindowFlags_NoCollapse  | ImGuiWindowFlags_NoScrollWithMouse
+				  |  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
+
+			FrontendInterface::dock_next_window_to(0, true);
+
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2());
+
+			return 2;
+		};
+		callbacks.window_prep = [](bool open, auto& docker_flags) noexcept {
+			docker_flags |= ImGuiDockNodeFlags_NoTabBar;
+			if (open && ImGui::IsWindowAppearing()) {
+				ImGui::SelectWindowInDockNodeTab();
+			}
+		};
+	});
 }
 
 void SystemInterface::start_workers() noexcept {
@@ -59,8 +84,8 @@ void SystemInterface::start_workers() noexcept {
 			FrameLimiter pacer(get_real_system_framerate());
 
 			do {
-				if (pacer.isFrameReady(!has_system_state(EmuState::BENCH))) {
-					pacer.setLimiterProperties(get_real_system_framerate());
+				if (pacer.is_frame_ready(!has_system_state(EmuState::BENCH))) {
+					pacer.set_limiter_props(get_real_system_framerate());
 
 					if (!can_system_work()) [[unlikely]] { continue; }
 

@@ -165,7 +165,7 @@ bool FrontendInterface::merge_overflowing_windows() noexcept {
 	return true;
 }
 
-void FrontendInterface::invoke_registered_windows() noexcept {
+bool FrontendInterface::invoke_registered_windows() noexcept {
 	std::scoped_lock lock(s_gui_hooks->windows.registry_lock);
 
 	auto& windows = s_gui_hooks->windows.registry;
@@ -180,7 +180,50 @@ void FrontendInterface::invoke_registered_windows() noexcept {
 		}
 	} while (merge_overflowing_windows());
 
-	windows.offset = 0;
+	return !!std::exchange(windows.offset, 0);
+}
+
+bool FrontendInterface::merge_overflowing_dockers(unsigned dock_id) noexcept {
+	std::scoped_lock lock(s_gui_hooks->dockers.overflow_lock);
+
+	auto& src_dockers = s_gui_hooks->dockers.overflow[dock_id].buffer;
+	if (src_dockers.empty()) { return false; }
+
+	auto& dst_dockers = s_gui_hooks->dockers.registry[dock_id].buffer;
+
+	blog.debug("Merging {} late docker callables for dock ID {}",
+		src_dockers.size(), dock_id);
+
+	dst_dockers.insert(
+		dst_dockers.end(),
+		std::make_move_iterator(src_dockers.begin()),
+		std::make_move_iterator(src_dockers.end())
+	);
+	src_dockers.clear();
+
+	return true;
+}
+
+bool FrontendInterface::invoke_registered_dockers(unsigned dock_id) noexcept {
+	std::scoped_lock lock(s_gui_hooks->dockers.registry_lock);
+
+	merge_overflowing_dockers(dock_id);
+	auto it = s_gui_hooks->dockers.registry.find(dock_id);
+	if (it == s_gui_hooks->dockers.registry.end()) { return false; }
+
+	auto& docker = it->second;
+
+	do {
+		while (docker.offset < docker.buffer.size()) {
+			if (auto shared_ptr = docker.buffer[docker.offset].lock()) {
+				(*shared_ptr)(dock_id); ++docker.offset;
+			} else {
+				docker.buffer.erase(docker.buffer.begin() + docker.offset);
+			}
+		}
+	} while (merge_overflowing_dockers(dock_id));
+
+	return !!std::exchange(docker.offset, 0);
 }
 
 bool FrontendInterface::merge_overflowing_menus(const LabelKey& window_key) noexcept {
@@ -208,16 +251,16 @@ bool FrontendInterface::merge_overflowing_menus(const LabelKey& window_key) noex
 	return !!migration_count;
 }
 
-void FrontendInterface::invoke_registered_menus(const LabelKey& window_key) noexcept {
+bool FrontendInterface::invoke_registered_menus(const LabelKey& window_key) noexcept {
 	std::scoped_lock lock(s_gui_hooks->menus.registry_lock);
 
 	merge_overflowing_menus(window_key); // unconditional first merge
-	auto window = s_gui_hooks->menus.registry.find(window_key.get_id_or_label());
-	if (window == s_gui_hooks->menus.registry.end()) { return; }
+	auto it = s_gui_hooks->menus.registry.find(window_key.get_id_or_label());
+	if (it == s_gui_hooks->menus.registry.end()) { return false; }
 
 	do {
 		// iterate over all registered menu tabs for this window
-		for (auto& [menu_key, hooks] : window->second) {
+		for (auto& [menu_key, hooks] : it->second) {
 			if (hooks.buffer.empty()) { continue; }
 
 			// clean-up pass before we enter BeginMenu tabs
@@ -249,8 +292,13 @@ void FrontendInterface::invoke_registered_menus(const LabelKey& window_key) noex
 		}
 	} while (merge_overflowing_menus(window_key));
 
-	for (auto& [_, hooks] : window->second)
-		{ hooks.offset = 0; } // reset for next frame
+	auto invoke_count = 0u;
+
+	for (auto& [_, hooks] : it->second) {
+		invoke_count += std::exchange(hooks.offset, 0); // reset for next frame
+	}
+
+	return invoke_count > 0;
 }
 
 /*==================================================================*/
@@ -274,6 +322,10 @@ void FrontendInterface::set_ui_text_scaling(float scale) noexcept {
 
 float FrontendInterface::get_ui_text_scaling() noexcept {
 	return s_text_scaling;
+}
+
+float FrontendInterface::get_ui_total_scaling() noexcept {
+	return s_zoom_scaling * s_text_scaling;
 }
 
 /*==================================================================*/
@@ -349,21 +401,9 @@ void FrontendInterface::begin_new_frame() {
 		ImGui::EndMainMenuBar();
 	}
 
-	const auto& viewport = *ImGui::GetMainViewport();
-	ImGui::SetNextWindowPos(viewport.WorkPos);
-	ImGui::SetNextWindowSize(viewport.WorkSize);
-	ImGui::SetNextWindowViewport(viewport.ID);
-
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2());
-	ImGui::Begin("MainDockspace", nullptr, ImGuiWindowFlags_NoSavedSettings
-		| ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs
-		| ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
-	ImGui::PopStyleVar(2);
-
-	s_main_dock_id = ImGui::GetID("MainDockspace");
-	ImGui::DockSpace(s_main_dock_id);
-	ImGui::End();
+	s_main_dock_id = ImGui::DockSpaceOverViewport(
+		ImGui::GetID("main_dock"), ImGui::GetMainViewport());
+	//FrontendInterface::call_docker(s_main_dock_id);
 
 	invoke_registered_windows();
 }
@@ -379,9 +419,24 @@ void FrontendInterface::dock_next_window_to(unsigned id, bool first_time) noexce
 		first_time ? ImGuiCond_FirstUseEver : ImGuiCond_Always);
 }
 
-void FrontendInterface::call_menubar(const char* window_name) noexcept {
+void FrontendInterface::call_docker(unsigned dock_id, bool* has_run) noexcept {
+	if (!has_run || !*has_run) {
+		bool invoked = invoke_registered_dockers(dock_id);
+		if (has_run) { *has_run = invoked; }
+	}
+}
+
+void FrontendInterface::call_docker(unsigned dock_id, std::atomic<bool>* has_run) noexcept {
+	if (!has_run || !has_run->load(std::memory_order::acquire)) {
+		bool invoked = invoke_registered_dockers(dock_id);
+		if (has_run) { has_run->store(invoked, std::memory_order::release); }
+	}
+}
+
+void FrontendInterface::call_menubar(const char* window_name, bool* can_render) noexcept {
 	if (ImGui::BeginMenuBar()) {
-		invoke_registered_menus(window_name);
+		bool invoked = invoke_registered_menus(window_name);
+		if (can_render) { *can_render = invoked; }
 		ImGui::EndMenuBar();
 	}
 }

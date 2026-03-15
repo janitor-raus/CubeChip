@@ -74,16 +74,16 @@ private:
 	static_assert((alignof(Buffer) & s_dirty_flag) == 0,
 		"TripleBuffer: Buffer alignment must permit pointer tagging (LSB == 0).");
 
-	constexpr bool getFlag(Buffer* ptr) const noexcept {
+	constexpr bool get_dirty(Buffer* ptr) const noexcept {
 		return reinterpret_cast<std::uintptr_t>(ptr) & s_dirty_flag;
 	}
 
-	constexpr Buffer* addFlag(Buffer* ptr) const noexcept {
+	constexpr Buffer* add_dirty(Buffer* ptr) const noexcept {
 		auto new_ptr = reinterpret_cast<std::uintptr_t>(ptr);
 		return reinterpret_cast<Buffer*>(new_ptr | s_dirty_flag);
 	}
 
-	constexpr Buffer* subFlag(Buffer* ptr) const noexcept {
+	constexpr Buffer* sub_dirty(Buffer* ptr) const noexcept {
 		auto new_ptr = reinterpret_cast<std::uintptr_t>(ptr);
 		return reinterpret_cast<Buffer*>(new_ptr & ~s_dirty_flag);
 	}
@@ -138,8 +138,8 @@ public:
 	) {
 		std::scoped_lock lock(m_context->m_reader_lock);
 
-		if (getFlag(m_context->m_swap_ptr.load(std::memory_order::acquire))) {
-			m_context->m_read_ptr.store(subFlag(m_context->m_swap_ptr.exchange(
+		if (get_dirty(m_context->m_swap_ptr.load(std::memory_order::acquire))) {
+			m_context->m_read_ptr.store(sub_dirty(m_context->m_swap_ptr.exchange(
 				m_context->m_read_ptr, std::memory_order::acq_rel)), std::memory_order::release);
 
 			return std::forward<Fn>(function)(
@@ -179,13 +179,13 @@ public:
 
 		if constexpr (std::is_void_v<std::invoke_result_t<Fn, Buffer&>>) {
 			std::forward<Fn>(function)(*m_context->m_work_ptr);
-			m_context->m_work_ptr = subFlag(m_context->m_swap_ptr.exchange(
-				addFlag(m_context->m_work_ptr), std::memory_order::acq_rel));
+			m_context->m_work_ptr = sub_dirty(m_context->m_swap_ptr.exchange(
+				add_dirty(m_context->m_work_ptr), std::memory_order::acq_rel));
 		}
 		else {
 			decltype(auto) result = std::forward<Fn>(function)(*m_context->m_work_ptr);
-			m_context->m_work_ptr = subFlag(m_context->m_swap_ptr.exchange(
-				addFlag(m_context->m_work_ptr), std::memory_order::acq_rel));
+			m_context->m_work_ptr = sub_dirty(m_context->m_swap_ptr.exchange(
+				add_dirty(m_context->m_work_ptr), std::memory_order::acq_rel));
 			return result;
 		}
 	}

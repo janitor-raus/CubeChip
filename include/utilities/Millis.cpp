@@ -5,22 +5,10 @@
 */
 
 #include "Millis.hpp"
+#include "RelaxCPU.hpp"
 
 #include <chrono>
 #include <thread>
-
-/*==================================================================*/
-
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386) || defined(_M_IX86)
-	#include <immintrin.h>
-	#define cpu_relax() _mm_pause()
-#elif defined(__aarch64__) || defined(__arm__)
-	#define cpu_relax() asm volatile("yield")
-#elif defined(__riscv) && defined(__riscv_zihintpause)
-	#define cpu_relax() asm volatile("pause")
-#else
-	#define cpu_relax() ((void)0)
-#endif
 
 /*==================================================================*/
 
@@ -88,7 +76,7 @@ void Millis::sleeplock_for(double millis) noexcept {
 		if (target - cur_time >= microseconds(2300)) {
 			std::this_thread::sleep_for(milliseconds(1));
 		} else {
-			for (auto i = 0; ++i <= 128;) { cpu_relax(); }
+			for (auto i = 0; ++i <= 128;) { ::cpu_relax(); }
 			std::this_thread::yield();
 		}
 	}

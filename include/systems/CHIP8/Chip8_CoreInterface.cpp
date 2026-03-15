@@ -11,14 +11,23 @@
 #include "BasicLogger.hpp"
 #include "SimpleFileIO.hpp"
 #include "Millis.hpp"
+#include <imgui_internal.h>
 
 /*==================================================================*/
 
-Chip8_CoreInterface::Chip8_CoreInterface(
-	std::size_t W, std::size_t H, std::string_view system_name
-) noexcept
-	: m_display_device(W, H, { system_name, make_system_id(instance_id, family_name) })
+Chip8_CoreInterface::Chip8_CoreInterface(std::size_t W, std::size_t H) noexcept
+	: SystemInterface(family_pretty_name)
+	, m_display_device(W, H, false, { "", make_system_id(instance_id, family_name)})
 {
+	m_window_host.set_layout_callable([&](auto id) noexcept {
+		//ImGui::DockBuilderRemoveNode(id);
+		//auto new_node = ImGui::DockBuilderAddNode(id, ImGuiDockNodeFlags_HiddenTabBar);
+		//ImGui::DockBuilderDockWindow(m_display_device.get_window_label(), new_node);
+		//ImGui::DockBuilderFinish(id);
+		ImGui::DockNextWindowTo(id, true);
+		blog.warn("Docking system {} to node {}", instance_id, id);
+	});
+
 	if (calc_file_image_sha1()) {
 		if (auto* path = add_system_path("savestate", family_name)) {
 			m_savestate_path = (fs::Path(*path) / m_file_sha1_hash).string();
@@ -35,6 +44,7 @@ Chip8_CoreInterface::Chip8_CoreInterface(
 		}
 	}
 
+	m_display_device.set_window_focus_output(&m_is_window_focused);
 	m_display_device.set_osd_callable([&]() {
 		if (m_interrupt == Interrupt::INPUT) {
 			osd::key_press_indicator(WaveForms::pulse_t(
@@ -44,8 +54,6 @@ Chip8_CoreInterface::Chip8_CoreInterface(
 			osd::simple_text_overlay(copy_statistics_string());
 		}
 	});
-	m_display_device.set_window_state_output(&m_render_window_docker);
-	m_display_device.set_window_focus_output(&m_is_currently_focused);
 
 	m_audio_device.add_audio_stream(STREAM::MAIN, 48'000);
 	m_audio_device.resume_streams();

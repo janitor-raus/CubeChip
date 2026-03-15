@@ -442,13 +442,13 @@ void FrontendHost::setup_gui_callables() noexcept {
 
 							// System name segment
 							{
-								const auto system_name = candidate.get_descriptor()
-									->system_pretty_name.data();
+								const auto system_name = std::string(
+									candidate.get_descriptor()->system_pretty_name);
 
 								PushFont(nullptr, 22.0f);
-								const auto text_width = CalcTextSize(system_name).x;
+								const auto text_width = CalcTextSize(system_name.c_str()).x;
 								AddCursorPosX((button_fg_size.x - text_width) * 0.5f);
-								TextUnformatted(system_name);
+								TextUnformatted(system_name.c_str());
 								PopFont();
 							}
 

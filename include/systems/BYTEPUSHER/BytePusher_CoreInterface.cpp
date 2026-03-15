@@ -10,14 +10,23 @@
 
 #include "BasicInput.hpp"
 #include "SimpleFileIO.hpp"
+#include <imgui_internal.h>
 
 /*==================================================================*/
 
-BytePusher_CoreInterface::BytePusher_CoreInterface(
-	std::size_t W, std::size_t H, std::string_view system_name
-) noexcept
-	: m_display_device(W, H, { system_name, make_system_id(instance_id, family_name) })
+BytePusher_CoreInterface::BytePusher_CoreInterface(std::size_t W, std::size_t H) noexcept
+	: SystemInterface(family_pretty_name)
+	, m_display_device(W, H, false, { "Display", make_system_id(instance_id, family_name) })
 {
+	m_window_host.set_layout_callable([&](auto id) noexcept {
+		//ImGui::DockBuilderRemoveNode(id);
+		//auto new_node = ImGui::DockBuilderAddNode(id, ImGuiDockNodeFlags_HiddenTabBar);
+		//ImGui::DockBuilderDockWindow(m_display_device.get_window_label(), new_node);
+		//ImGui::DockBuilderFinish(id);
+		ImGui::DockNextWindowTo(id, true);
+		blog.warn("Docking system {} to node {}", instance_id, id);
+	});
+
 	if (calc_file_image_sha1()) {
 		if (auto* path = add_system_path("savestate", family_name)) {
 			s_savestate_path = (fs::Path(*path) / m_file_sha1_hash).string();
@@ -27,12 +36,11 @@ BytePusher_CoreInterface::BytePusher_CoreInterface(
 		}
 	}
 
+	m_display_device.set_window_focus_output(&m_is_window_focused);
 	m_display_device.set_osd_callable([&]() {
 		if (!has_system_state(EmuState::STATS)) { return; }
 		osd::simple_text_overlay(copy_statistics_string());
 	});
-	m_display_device.set_window_state_output(&m_render_window_docker);
-	m_display_device.set_window_focus_output(&m_is_currently_focused);
 
 	load_preset_binds();
 }

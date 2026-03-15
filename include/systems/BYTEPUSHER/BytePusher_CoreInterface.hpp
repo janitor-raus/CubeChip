@@ -49,9 +49,7 @@ protected:
 	virtual void push_video_data() noexcept = 0;
 
 protected:
-	BytePusher_CoreInterface(
-		std::size_t W, std::size_t H, std::string_view system_name
-	) noexcept;
+	BytePusher_CoreInterface(std::size_t W, std::size_t H) noexcept;
 
 public:
 	void main_system_loop() override;

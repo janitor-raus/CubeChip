@@ -228,7 +228,7 @@ private:
 
 public:
 	XOCHIP() noexcept
-		: Chip8_CoreInterface(c_sys_screen_W, c_sys_screen_H, descriptor.system_pretty_name)
+		: Chip8_CoreInterface(c_sys_screen_W, c_sys_screen_H)
 		, m_display_map{
 			Map2D(m_display_buffer[P0].data(), c_sys_screen_W/2, c_sys_screen_H/2),
 			Map2D(m_display_buffer[P1].data(), c_sys_screen_W/2, c_sys_screen_H/2),

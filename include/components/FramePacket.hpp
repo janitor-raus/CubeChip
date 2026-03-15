@@ -185,8 +185,8 @@ private:
 	}
 
 public:
-	FramePacket(std::size_t SIZE, std::size_t W, std::size_t H) noexcept
-		: m_buffer(::allocate_n<value_type, MAX_ALIGN>(W * H * SIZE).as_value().release())
+	FramePacket(std::size_t W, std::size_t H, std::size_t bpp = sizeof(RGBA)) noexcept
+		: m_buffer(::allocate_n<value_type, MAX_ALIGN>(W * H * bpp).as_value().release())
 		, metadata(static_cast<int>(W), static_cast<int>(H))
 	{}
 

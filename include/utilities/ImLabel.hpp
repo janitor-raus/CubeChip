@@ -11,21 +11,21 @@
 /*==================================================================*/
 
 /**
- * @brief Utility class for handling ImGui labels with optional tags.
+ * @brief Utility class for handling ImGui labels.
  *
- * ImGui uses '##' as a separator between the visible label and an internal
- * identifier tag. This class encapsulates that functionality, allowing easy
- * manipulation of both the label and tag components.
+ * ImGui uses '###' as a separator between the visible name and an internal
+ * hashable tag. This class encapsulates that functionality, allowing easy
+ * manipulation of both the name and tag components.
  */
 struct ImLabel {
-	static constexpr const char* separator = "##";
+	static constexpr const char* separator = "###";
 
 	std::string value;
 
 	constexpr ImLabel() noexcept = default;
 	constexpr ImLabel(std::string&& v)    noexcept : value(std::move(v)) {}
 	constexpr ImLabel(std::string_view v) noexcept : value(v) {}
-	constexpr ImLabel(const char* v)      noexcept : value(v) {}
+	constexpr ImLabel(const char* v)      noexcept : value(v ? v : "") {}
 
 	template <typename T1, typename T2> requires (
 		(std::convertible_to<T1, std::string_view>) &&
@@ -39,6 +39,7 @@ struct ImLabel {
 
 	constexpr operator std::string_view() const noexcept { return value; }
 	constexpr operator const char*()      const noexcept { return value.c_str(); }
+	constexpr operator bool()             const noexcept { return !value.empty(); }
 
 	constexpr       std::string* operator->()       noexcept { return &value; }
 	constexpr const std::string* operator->() const noexcept { return &value; }
@@ -59,6 +60,10 @@ private:
 public:
 	constexpr bool has_id() const noexcept {
 		return find_separator() != std::string::npos;
+	}
+
+	constexpr bool has_name() const noexcept {
+		return find_separator() - 1 < std::string::npos - 1;
 	}
 
 	constexpr std::string_view get_name() const noexcept {
