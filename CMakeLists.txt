@@ -14,7 +14,6 @@ endif()
 # ==================================================================================== #
 
 project("CubeChip" LANGUAGES CXX)
-add_definitions(-DPROJECT_NAME=${PROJECT_NAME})
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -65,7 +64,11 @@ target_sources("${PROJECT_NAME}" PRIVATE ${SYSTEM_BYTEPUSHER_HEADERS} ${SYSTEM_B
 target_sources("${PROJECT_NAME}" PRIVATE ${SYSTEM_GAMEBOY_HEADERS}    ${SYSTEM_GAMEBOY_SOURCES})
 
 target_compile_features("${PROJECT_NAME}" PRIVATE cxx_std_20)
-target_compile_definitions("${PROJECT_NAME}" PRIVATE FMT_HEADER_ONLY)
+target_compile_definitions(
+	"${PROJECT_NAME}" PRIVATE
+	FMT_HEADER_ONLY
+	PROJECT_NAME="${PROJECT_NAME}"
+)
 
 target_include_directories(
 	"${PROJECT_NAME}" PRIVATE
