@@ -14,7 +14,7 @@ endif()
 # ==================================================================================== #
 
 project("CubeChip" LANGUAGES CXX)
-add_definitions(-DPROJECT_NAME=\"${PROJECT_NAME}\")
+add_definitions(-DPROJECT_NAME=${PROJECT_NAME})
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -89,6 +89,22 @@ target_link_libraries(
 	mio::mio
 	imgui
 )
+
+if (UNIX AND NOT APPLE)
+    find_package(TBB QUIET)
+
+    if (NOT TBB_FOUND)
+        message(FATAL_ERROR
+            "TBB is required on this platform (libstdc++ uses it for std::jthread).\n"
+            "Install it via:\n"
+            "  Arch:     yay -S onetbb   (or: sudo pacman -S intel-oneapi-tbb)\n"
+            "  Debian:   sudo apt install libtbb-dev\n"
+            "  Fedora:   sudo dnf install tbb-devel\n"
+        )
+    endif()
+
+    target_link_libraries(CubeChip PRIVATE TBB::tbb)
+endif()
 
 # ==================================================================================== #
 

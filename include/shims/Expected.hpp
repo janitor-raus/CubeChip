@@ -8,7 +8,6 @@
 
 #include <version>
 #include <utility>
-#include <type_traits>
 
 /*==================================================================*/
 
