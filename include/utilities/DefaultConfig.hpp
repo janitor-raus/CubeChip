@@ -7,6 +7,7 @@
 #pragma once
 
 #include <string_view>
+#include <algorithm>
 
 #include "Expected.hpp"
 
