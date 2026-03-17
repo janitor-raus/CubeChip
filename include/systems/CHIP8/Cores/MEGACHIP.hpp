@@ -47,8 +47,8 @@ public:
 
 /*==================================================================*/
 
-	MemoryBank<c_sys_memory_size>
-		m_memory_bank{};
+	MirroredMemory<c_sys_memory_size>
+		m_memory{};
 
 	std::array<u8, c_sys_screen_W/2 * c_sys_screen_H/3>
 		m_display_buffer{};
@@ -117,7 +117,7 @@ public:
 
 /*==================================================================*/
 
-	auto NNNN() const noexcept { return m_memory_bank[m_current_pc] << 8 | m_memory_bank[m_current_pc + 1]; }
+	auto NNNN() const noexcept { return m_memory[m_current_pc] << 8 | m_memory[m_current_pc + 1]; }
 
 public:
 	MEGACHIP() noexcept

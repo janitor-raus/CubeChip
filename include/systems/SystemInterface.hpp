@@ -207,23 +207,11 @@ protected:
 	std::string  copy_statistics_string() const noexcept;
 };
 
+/*==================================================================*/
 
+namespace osd {
+	void simple_text_overlay(const std::string& overlay_data) noexcept;
+	void key_press_indicator(float phase) noexcept;
 
-template <std::size_t N>
-class MemoryBank : public SimpleContainerFacade<MemoryBank<N>, std::uint8_t> {
-	static_assert(std::has_single_bit(N),
-		"MemoryBank size must be a power of two!");
-
-	std::array<std::uint8_t, N> mem{};
-
-public:
-	constexpr       auto& operator[](std::size_t index)       noexcept
-		{ return mem[index & (N - 1)]; }
-	constexpr const auto& operator[](std::size_t index) const noexcept
-		{ return mem[index & (N - 1)]; }
-
-	constexpr auto size() const noexcept { return N; }
-
-	constexpr       auto* data()       noexcept { return mem.data(); }
-	constexpr const auto* data() const noexcept { return mem.data(); }
-};
+	inline void key_press_indicator(double phase) noexcept { key_press_indicator(float(phase)); }
+}

@@ -16,8 +16,8 @@ REGISTER_SYSTEM_CORE(XOCHIP)
 void XOCHIP::initialize_system() noexcept {
 	Quirk.wrap_sprites = true;
 
-	copy_file_image_to(m_memory_bank, c_game_load_pos);
-	copy_font_data_to(m_memory_bank, 80);
+	copy_file_image_to(m_memory, c_game_load_pos);
+	copy_font_data_to(m_memory, 80);
 
 	set_base_system_framerate(c_sys_refresh_rate);
 
@@ -44,8 +44,8 @@ void XOCHIP::handle_cycle_loop() noexcept
 template <typename Lambda>
 void XOCHIP::instruction_loop(Lambda&& condition) noexcept {
 	for (m_cycle_count = 0; condition(); ++m_cycle_count) {
-		const auto HI = m_memory_bank[m_current_pc++];
-		const auto LO = m_memory_bank[m_current_pc++];
+		const auto HI = m_memory[m_current_pc++];
+		const auto LO = m_memory[m_current_pc++];
 
 		#define _NNN ((HI << 8 | LO) & 0xFFF)
 		#define _X (HI & 0xF)
@@ -450,33 +450,33 @@ void XOCHIP::scroll_display_rt() noexcept {
 	void XOCHIP::instruction_5xy2(u32 X, u32 Y) noexcept {
 		if (X < Y) {
 			for (auto i = X; i <= Y; ++i) {
-				m_memory_bank[m_register_I + i - X] = m_registers_V[i];
+				m_memory[m_register_I + i - X] = m_registers_V[i];
 			}
 		} else {
 			for (auto i = X; i >= Y; --i) {
-				m_memory_bank[m_register_I + X - i] = m_registers_V[i];
+				m_memory[m_register_I + X - i] = m_registers_V[i];
 			}
 		}
 	}
 	void XOCHIP::instruction_5xy3(u32 X, u32 Y) noexcept {
 		if (X < Y) {
 			for (auto i = X; i <= Y; ++i) {
-				m_registers_V[i] = m_memory_bank[m_register_I + i - X];
+				m_registers_V[i] = m_memory[m_register_I + i - X];
 			}
 		} else {
 			for (auto i = X; i >= Y; --i) {
-				m_registers_V[i] = m_memory_bank[m_register_I + X - i];
+				m_registers_V[i] = m_memory[m_register_I + X - i];
 			}
 		}
 	}
 	void XOCHIP::instruction_5xy4(u32 X, u32 Y) noexcept {
 		if (X < Y) {
 			for (auto i = X; i <= Y; ++i) {
-				m_bit_colors[i] = c_color_palette[m_memory_bank[m_register_I + i - X]];
+				m_bit_colors[i] = c_color_palette[m_memory[m_register_I + i - X]];
 			}
 		} else {
 			for (auto i = X; i >= Y; --i) {
-				m_bit_colors[i] = c_color_palette[m_memory_bank[m_register_I + X - i]];
+				m_bit_colors[i] = c_color_palette[m_memory[m_register_I + X - i]];
 			}
 		}
 	}
@@ -628,7 +628,7 @@ void XOCHIP::scroll_display_rt() noexcept {
 	void XOCHIP::draw_single_row(u32 X, u32 Y) noexcept {
 		const auto I = m_register_I + s_plane_mask[P][m_plane_mask];
 
-		draw_byte(X, Y, P, m_memory_bank[I]);
+		draw_byte(X, Y, P, m_memory[I]);
 	}
 
 	template <std::size_t P>
@@ -636,8 +636,8 @@ void XOCHIP::scroll_display_rt() noexcept {
 		const auto I = m_register_I + s_plane_mask[P][m_plane_mask] * 32;
 
 		for (auto H = 0u; H < 16u; ++H) {
-			draw_byte(X + 0, Y, P, m_memory_bank[I + H * 2 + 0]);
-			draw_byte(X + 8, Y, P, m_memory_bank[I + H * 2 + 1]);
+			draw_byte(X + 0, Y, P, m_memory[I + H * 2 + 0]);
+			draw_byte(X + 8, Y, P, m_memory[I + H * 2 + 1]);
 
 			if (!Quirk.wrap_sprites && Y == (m_display_map[P].height() - 1)) { break; }
 			else { ++Y &= (m_display_map[P].height() - 1); }
@@ -649,7 +649,7 @@ void XOCHIP::scroll_display_rt() noexcept {
 		const auto I = m_register_I + s_plane_mask[P][m_plane_mask] * N;
 
 		for (auto H = 0u; H < N; ++H) {
-			draw_byte(X, Y, P, m_memory_bank[I + H]);
+			draw_byte(X, Y, P, m_memory[I + H]);
 
 			if (!Quirk.wrap_sprites && Y == (m_display_map[P].height() - 1)) { break; }
 			else { ++Y &= (m_display_map[P].height() - 1); }
@@ -711,7 +711,7 @@ void XOCHIP::scroll_display_rt() noexcept {
 	}
 	void XOCHIP::instruction_F002() noexcept {
 		for (auto i = 0u; i < 16u; ++i) {
-			pulse_pattern_data()[i] = m_memory_bank[m_register_I + i];
+			pulse_pattern_data()[i] = m_memory[m_register_I + i];
 		}
 	}
 	void XOCHIP::instruction_FN01(u32 N) noexcept {
@@ -742,19 +742,19 @@ void XOCHIP::scroll_display_rt() noexcept {
 	void XOCHIP::instruction_Fx33(u32 X) noexcept {
 		const TriBCD bcd{ m_registers_V[X] };
 
-		m_memory_bank[m_register_I + 0] = bcd.digit[2];
-		m_memory_bank[m_register_I + 1] = bcd.digit[1];
-		m_memory_bank[m_register_I + 2] = bcd.digit[0];
+		m_memory[m_register_I + 0] = bcd.digit[2];
+		m_memory[m_register_I + 1] = bcd.digit[1];
+		m_memory[m_register_I + 2] = bcd.digit[0];
 	}
 	void XOCHIP::instruction_Fx3A(u32 X) noexcept {
 		set_pattern_pitch(m_registers_V[X]);
 	}
 	void XOCHIP::instruction_FN55(u32 N) noexcept {
-		for (auto i = 0u; i <= N; ++i) { m_memory_bank[m_register_I + i] = m_registers_V[i]; }
+		for (auto i = 0u; i <= N; ++i) { m_memory[m_register_I + i] = m_registers_V[i]; }
 		if (!Quirk.no_inc_i_reg) [[likely]] { ::assign_cast_add(m_register_I, N + 1); }
 	}
 	void XOCHIP::instruction_FN65(u32 N) noexcept {
-		for (auto i = 0u; i <= N; ++i) { m_registers_V[i] = m_memory_bank[m_register_I + i]; }
+		for (auto i = 0u; i <= N; ++i) { m_registers_V[i] = m_memory[m_register_I + i]; }
 		if (!Quirk.no_inc_i_reg) [[likely]] { ::assign_cast_add(m_register_I, N + 1); }
 	}
 	void XOCHIP::instruction_FN75(u32 N) noexcept {

@@ -7,7 +7,6 @@
 #pragma once
 
 #include <memory>
-#include <mutex>
 #include <functional>
 
 #include "ImLabel.hpp"
@@ -15,7 +14,7 @@
 /*==================================================================*/
 
 class WindowHost {
-	using CallableID = std::function<void(unsigned)>;
+	using DockerFn = std::function<void(unsigned id)>;
 
 	struct HostContext;
 	friend struct HostContext;
@@ -51,28 +50,18 @@ public:
 	void set_window_visible_output(bool* out) noexcept;
 	void set_window_focused_output(bool* out) noexcept;
 
-	void set_layout_callable(CallableID callable) noexcept;
+	void set_layout_callable(DockerFn callable) noexcept;
 
 private:
-	class LockedCallbacks {
-		std::scoped_lock<std::mutex> lock;
-		Callbacks& callbacks_reference;
-
-	public:
-		LockedCallbacks(std::mutex& mutex, Callbacks& callbacks) noexcept
-			: lock(mutex), callbacks_reference(callbacks)
-		{}
-
-		constexpr Callbacks& operator*() noexcept { return callbacks_reference; }
-	};
-
-	auto get_callbacks() noexcept -> LockedCallbacks;
+	auto get_callbacks() noexcept -> std::shared_ptr<Callbacks>;
+	void set_callbacks(std::shared_ptr<Callbacks> new_callbacks) noexcept;
 
 public:
 	template <typename Fn>
 		requires(std::is_nothrow_invocable_r_v<void, Fn, Callbacks&>)
 	void edit_callbacks(Fn&& fn) noexcept {
-		auto callbacks = get_callbacks();
-		std::forward<Fn>(fn)(*callbacks);
+		auto next = std::make_shared<Callbacks>(*get_callbacks());
+		std::forward<Fn>(fn)(*next);
+		set_callbacks(std::move(next));
 	}
 };

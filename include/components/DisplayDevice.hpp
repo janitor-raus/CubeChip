@@ -69,12 +69,3 @@ public:
 	void set_window_focus_output(bool* out) noexcept;
 	void set_osd_callable(Callable callable) noexcept;
 };
-
-/*==================================================================*/
-
-namespace osd {
-	void simple_text_overlay(const std::string& overlay_data) noexcept;
-	void key_press_indicator(float phase) noexcept;
-
-	inline void key_press_indicator(double phase) noexcept { key_press_indicator(float(phase)); }
-}

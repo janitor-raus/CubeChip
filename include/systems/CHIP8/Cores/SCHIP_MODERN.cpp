@@ -14,8 +14,8 @@ REGISTER_SYSTEM_CORE(SCHIP_MODERN)
 /*==================================================================*/
 
 void SCHIP_MODERN::initialize_system() noexcept {
-	copy_file_image_to(m_memory_bank, c_game_load_pos);
-	copy_font_data_to(m_memory_bank, 240);
+	copy_file_image_to(m_memory, c_game_load_pos);
+	copy_font_data_to(m_memory, 240);
 
 	set_base_system_framerate(c_sys_refresh_rate);
 
@@ -43,8 +43,8 @@ void SCHIP_MODERN::handle_cycle_loop() noexcept
 template <typename Lambda>
 void SCHIP_MODERN::instruction_loop(Lambda&& condition) noexcept {
 	for (m_cycle_count = 0; condition(); ++m_cycle_count) {
-		const auto HI = m_memory_bank[m_current_pc++];
-		const auto LO = m_memory_bank[m_current_pc++];
+		const auto HI = m_memory[m_current_pc++];
+		const auto LO = m_memory[m_current_pc++];
 
 		#define _NNN ((HI << 8 | LO) & 0xFFF)
 		#define _X (HI & 0xF)
@@ -524,15 +524,15 @@ void SCHIP_MODERN::scroll_display_rt() noexcept {
 		switch (N) {
 			[[unlikely]]
 			case 1:
-				draw_byte(pX, pY, m_memory_bank[m_register_I]);
+				draw_byte(pX, pY, m_memory[m_register_I]);
 				break;
 
 			[[unlikely]]
 			case 0:
 				for (auto tN = 0u, tY = pY; tN < 32;)
 				{
-					draw_byte(pX + 0, tY, m_memory_bank[m_register_I + tN + 0]);
-					draw_byte(pX + 8, tY, m_memory_bank[m_register_I + tN + 1]);
+					draw_byte(pX + 0, tY, m_memory[m_register_I + tN + 0]);
+					draw_byte(pX + 8, tY, m_memory[m_register_I + tN + 1]);
 					if (!Quirk.wrap_sprites && tY == (m_display_map.height() - 1)) { break; }
 					else { tN += 2; ++tY &= (m_display_map.height() - 1); }
 				}
@@ -542,7 +542,7 @@ void SCHIP_MODERN::scroll_display_rt() noexcept {
 			default:
 				for (auto tN = 0u, tY = pY; tN < N;)
 				{
-					draw_byte(pX, tY, m_memory_bank[m_register_I + tN]);
+					draw_byte(pX, tY, m_memory[m_register_I + tN]);
 					if (!Quirk.wrap_sprites && tY == (m_display_map.height() - 1)) { break; }
 					else { tN += 1; ++tY &= (m_display_map.height() - 1); }
 				}
@@ -596,16 +596,16 @@ void SCHIP_MODERN::scroll_display_rt() noexcept {
 	void SCHIP_MODERN::instruction_Fx33(u32 X) noexcept {
 		const TriBCD bcd{ m_registers_V[X] };
 
-		m_memory_bank[m_register_I + 0] = bcd.digit[2];
-		m_memory_bank[m_register_I + 1] = bcd.digit[1];
-		m_memory_bank[m_register_I + 2] = bcd.digit[0];
+		m_memory[m_register_I + 0] = bcd.digit[2];
+		m_memory[m_register_I + 1] = bcd.digit[1];
+		m_memory[m_register_I + 2] = bcd.digit[0];
 	}
 	void SCHIP_MODERN::instruction_FN55(u32 N) noexcept {
-		for (auto i = 0u; i <= N; ++i) { m_memory_bank[m_register_I + i] = m_registers_V[i]; }
+		for (auto i = 0u; i <= N; ++i) { m_memory[m_register_I + i] = m_registers_V[i]; }
 		if (!Quirk.no_inc_i_reg) [[likely]] { ::assign_cast_add(m_register_I, N + 1); }
 	}
 	void SCHIP_MODERN::instruction_FN65(u32 N) noexcept {
-		for (auto i = 0u; i <= N; ++i) { m_registers_V[i] = m_memory_bank[m_register_I + i]; }
+		for (auto i = 0u; i <= N; ++i) { m_registers_V[i] = m_memory[m_register_I + i]; }
 		if (!Quirk.no_inc_i_reg) [[likely]] { ::assign_cast_add(m_register_I, N + 1); }
 	}
 	void SCHIP_MODERN::instruction_FN75(u32 N) noexcept {

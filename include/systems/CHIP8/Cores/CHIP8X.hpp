@@ -51,8 +51,8 @@ private:
 	u32 m_background_color = 0x00;
 	u32 m_color_pixel_mask = 0xFC;
 
-	MemoryBank<c_sys_memory_size>
-		m_memory_bank{};
+	MirroredMemory<c_sys_memory_size>
+		m_memory{};
 
 	std::array<RGBA, c_sys_screen_W/8 * c_sys_screen_H>
 		m_colored_buffer{};

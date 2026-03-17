@@ -14,11 +14,11 @@ REGISTER_SYSTEM_CORE(CHIP8E)
 /*==================================================================*/
 
 void CHIP8E::initialize_system() noexcept {
-	::generate_n(m_memory_bank, 0, c_sys_memory_size,
+	::generate_n(m_memory, 0, c_sys_memory_size,
 		[&]() noexcept { return u8(m_rng->next()); });
 
-	copy_file_image_to(m_memory_bank, c_game_load_pos);
-	copy_font_data_to(m_memory_bank, 80);
+	copy_file_image_to(m_memory, c_game_load_pos);
+	copy_font_data_to(m_memory, 80);
 
 	set_base_system_framerate(c_sys_refresh_rate);
 
@@ -44,8 +44,8 @@ void CHIP8E::handle_cycle_loop() noexcept
 template <typename Lambda>
 void CHIP8E::instruction_loop(Lambda&& condition) noexcept {
 	for (m_cycle_count = 0; condition(); ++m_cycle_count) {
-		const auto HI = m_memory_bank[m_current_pc++];
-		const auto LO = m_memory_bank[m_current_pc++];
+		const auto HI = m_memory[m_current_pc++];
+		const auto LO = m_memory[m_current_pc++];
 
 		#define _NNN ((HI << 8 | LO) & 0xFFF)
 		#define _X (HI & 0xF)
@@ -344,12 +344,12 @@ void CHIP8E::push_video_data() noexcept {
 	}
 	void CHIP8E::instruction_5xy2(u32 X, u32 Y) noexcept {
 		for (auto Z = 0; Z + X <= Y; ++Z) {
-			m_memory_bank[m_register_I++] = m_registers_V[Z + X];
+			m_memory[m_register_I++] = m_registers_V[Z + X];
 		}
 	}
 	void CHIP8E::instruction_5xy3(u32 X, u32 Y) noexcept {
 		for (auto Z = 0; Z + X <= Y; ++Z) {
-			m_registers_V[Z + X] = m_memory_bank[m_register_I++];
+			m_registers_V[Z + X] = m_memory[m_register_I++];
 		}
 	}
 
@@ -506,14 +506,14 @@ void CHIP8E::push_video_data() noexcept {
 
 			[[likely]]
 			case 1:
-				draw_byte(pX, pY, m_memory_bank[m_register_I]);
+				draw_byte(pX, pY, m_memory[m_register_I]);
 				break;
 
 			[[unlikely]]
 			default:
 				for (auto H = 0u; H < N; ++H)
 				{
-					draw_byte(pX, pY, m_memory_bank[m_register_I + H]);
+					draw_byte(pX, pY, m_memory[m_register_I + H]);
 					if (++pY == c_sys_screen_H) { break; }
 				}
 				break;
@@ -570,20 +570,20 @@ void CHIP8E::push_video_data() noexcept {
 	void CHIP8E::instruction_Fx33(u32 X) noexcept {
 		const TriBCD bcd{ m_registers_V[X] };
 
-		m_memory_bank[m_register_I + 0] = bcd.digit[2];
-		m_memory_bank[m_register_I + 1] = bcd.digit[1];
-		m_memory_bank[m_register_I + 2] = bcd.digit[0];
+		m_memory[m_register_I + 0] = bcd.digit[2];
+		m_memory[m_register_I + 1] = bcd.digit[1];
+		m_memory[m_register_I + 2] = bcd.digit[0];
 	}
 	void CHIP8E::instruction_Fx4F(u32 X) noexcept {
 		::assign_cast(m_delay_timer, m_registers_V[X]);
 		trigger_interrupt(Interrupt::DELAY);
 	}
 	void CHIP8E::instruction_FN55(u32 N) noexcept {
-		for (auto i = 0u; i <= N; ++i) { m_memory_bank[m_register_I + i] = m_registers_V[i]; }
+		for (auto i = 0u; i <= N; ++i) { m_memory[m_register_I + i] = m_registers_V[i]; }
 		::assign_cast_add(m_register_I, N + 1);
 	}
 	void CHIP8E::instruction_FN65(u32 N) noexcept {
-		for (auto i = 0u; i <= N; ++i) { m_registers_V[i] = m_memory_bank[m_register_I + i]; }
+		for (auto i = 0u; i <= N; ++i) { m_registers_V[i] = m_memory[m_register_I + i]; }
 		::assign_cast_add(m_register_I, N + 1);
 	}
 	void CHIP8E::instruction_FxE3(u32  ) noexcept {

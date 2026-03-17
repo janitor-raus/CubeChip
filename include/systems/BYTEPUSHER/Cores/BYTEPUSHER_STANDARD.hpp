@@ -44,20 +44,20 @@ public:
 /*==================================================================*/
 
 private:
-	MemoryBank<c_sys_memory_size>
-		m_memory_bank{};
+	MirroredMemory<c_sys_memory_size>
+		m_memory{};
 
 	template<u32 T> requires (T >= 1 && T <= 3)
 	u32 read_data(u32 pos) const noexcept {
 		if        constexpr (T == 1) {
-			return m_memory_bank[pos + 0];
+			return m_memory[pos + 0];
 		} else if constexpr (T == 2) {
-			return m_memory_bank[pos + 0] << 8
-				 | m_memory_bank[pos + 1];
+			return m_memory[pos + 0] << 8
+				 | m_memory[pos + 1];
 		} else if constexpr (T == 3) {
-			return m_memory_bank[pos + 0] << 16
-				 | m_memory_bank[pos + 1] << 8
-				 | m_memory_bank[pos + 2];
+			return m_memory[pos + 0] << 16
+				 | m_memory[pos + 1] << 8
+				 | m_memory[pos + 2];
 		}
 	}
 

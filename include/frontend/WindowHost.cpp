@@ -25,8 +25,7 @@ struct WindowHost::HostContext {
 	bool* m_window_visible_out = nullptr;
 	bool* m_window_focused_out = nullptr;
 
-	Callbacks  callbacks{};
-	std::mutex callbacks_mutex;
+	AtomSharedPtr<Callbacks> m_callbacks;
 
 	const unsigned c_dockspace_id;
 
@@ -46,6 +45,7 @@ public:
 		, m_window_hook(FrontendInterface::register_window(
 			[this]() noexcept { render_window(); }))
 		, c_dockspace_id(ImGui::GetID(this))
+		, m_callbacks(std::make_shared<Callbacks>())
 	{}
 
 	auto get_window_label() const noexcept {
@@ -59,18 +59,15 @@ public:
 
 private:
 	void render_window() noexcept {
-		const auto local = [this]() noexcept {
-			std::scoped_lock lock(callbacks_mutex);
-			return callbacks;
-		}();
+		const auto local = m_callbacks.load(std::memory_order::acquire);
 
 		const auto window_label = get_window_label();
 
 		int window_flags = m_display_menubar
 			? ImGuiWindowFlags_MenuBar : 0;
 
-		const auto style_push_count = local.window_init
-			? local.window_init(window_flags) : 0;
+		const auto style_push_count = local->window_init
+			? local->window_init(window_flags) : 0;
 
 		const bool window_open = ImGui::Begin(*window_label,
 			m_window_visible_out, ImGuiWindowFlags(window_flags));
@@ -86,16 +83,16 @@ private:
 		}
 
 		int docker_flags = ImGuiDockNodeFlags_AutoHideTabBar;
-		if (local.window_prep) { local.window_prep(window_open, docker_flags); }
+		if (local->window_prep) { local->window_prep(window_open, docker_flags); }
 
 		ImGui::DockSpace(c_dockspace_id, ImVec2(), ImGuiDockNodeFlags(docker_flags));
 		FrontendInterface::call_docker(c_dockspace_id, &m_docker_executed);
 
-		if (local.window_body) { local.window_body(window_open); }
+		if (local->window_body) { local->window_body(window_open); }
 
 		ImGui::End();
 
-		if (local.window_quit) { local.window_quit(window_open); }
+		if (local->window_quit) { local->window_quit(window_open); }
 	}
 };
 
@@ -129,14 +126,14 @@ void WindowHost::set_window_label(std::string_view name) noexcept {
 }
 
 void WindowHost::set_window_visible_output(bool* out) noexcept {
-	m_context->m_window_focused_out = out;
+	m_context->m_window_visible_out = out;
 }
 
 void WindowHost::set_window_focused_output(bool* out) noexcept {
 	m_context->m_window_focused_out = out;
 }
 
-void WindowHost::set_layout_callable(CallableID callable) noexcept {
+void WindowHost::set_layout_callable(DockerFn callable) noexcept {
 	if (!callable) {
 		m_context->m_docker_hook.reset();
 		m_context->m_docker_executed = true; // prevents lookup
@@ -148,6 +145,10 @@ void WindowHost::set_layout_callable(CallableID callable) noexcept {
 	m_context->m_docker_executed = false; // allow lookup on next frame
 }
 
-auto WindowHost::get_callbacks() noexcept -> LockedCallbacks {
-	return { m_context->callbacks_mutex, m_context->callbacks };
+auto WindowHost::get_callbacks() noexcept -> std::shared_ptr<Callbacks> {
+	return m_context->m_callbacks.load(std::memory_order::acquire);
+}
+
+void WindowHost::set_callbacks(std::shared_ptr<Callbacks> new_callbacks) noexcept {
+	m_context->m_callbacks.store(std::move(new_callbacks), std::memory_order::release);
 }

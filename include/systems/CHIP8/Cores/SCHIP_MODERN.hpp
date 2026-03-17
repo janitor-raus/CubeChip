@@ -47,8 +47,8 @@ public:
 
 /*==================================================================*/
 
-	MemoryBank<c_sys_memory_size>
-		m_memory_bank{};
+	MirroredMemory<c_sys_memory_size>
+		m_memory{};
 
 	std::array<u8, c_sys_screen_W * c_sys_screen_H>
 		m_display_buffer{};

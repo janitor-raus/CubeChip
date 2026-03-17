@@ -49,21 +49,21 @@ private:
 	public:
 
 
-	MemoryBank<c_sys_memory_size> m_memory_bank{};
+	MirroredMemory<c_sys_memory_size> m_memory{};
 
 		/* Memory Map */
-		std::span<u8, 0x0100> mBootRomBank{ m_memory_bank.begin() + 0x0000, 0x0100 }; // BOOT ROM
-		std::span<u8, 0x4000> mRomBank00  { m_memory_bank.begin() + 0x0000, 0x4000 }; // ROM BANK 0
-		std::span<u8, 0x4000> mRomBankNN  { m_memory_bank.begin() + 0x4000, 0x4000 }; // ROM BANK N
-		std::span<u8, 0x2000> mVideoBank  { m_memory_bank.begin() + 0x8000, 0x2000 }; // VRAM
-		std::span<u8, 0x2000> mExtBank    { m_memory_bank.begin() + 0xA000, 0x2000 }; // EXT RAM
-		std::span<u8, 0x1000> mWorkBank0  { m_memory_bank.begin() + 0xC000, 0x1000 }; // WRAM 0
-		std::span<u8, 0x1000> mWorkBankN  { m_memory_bank.begin() + 0xD000, 0x1000 }; // WRAM N
-		std::span<u8, 0x1E00> mEchoBank   { m_memory_bank.begin() + 0xE000, 0x1E00 }; // ECHO RAM (C000-DDFF)
-		std::span<u8, 0x00A0> mObjAttrBank{ m_memory_bank.begin() + 0xFE00, 0x00A0 }; // OAM
-		//std::span<u8, 0x0060> mProhibited { m_memory_bank.begin() + 0xFEA0, 0x0060 }; // PROHIBITED
-		std::span<u8, 0x0080> mInOutBank  { m_memory_bank.begin() + 0xFF00, 0x0080 }; // IO REGS
-		std::span<u8, 0x007F> mHighBank   { m_memory_bank.begin() + 0xFF80, 0x007F }; // HRAM
+		std::span<u8, 0x0100> mBootRomBank{ m_memory.begin() + 0x0000, 0x0100 }; // BOOT ROM
+		std::span<u8, 0x4000> mRomBank00  { m_memory.begin() + 0x0000, 0x4000 }; // ROM BANK 0
+		std::span<u8, 0x4000> mRomBankNN  { m_memory.begin() + 0x4000, 0x4000 }; // ROM BANK N
+		std::span<u8, 0x2000> mVideoBank  { m_memory.begin() + 0x8000, 0x2000 }; // VRAM
+		std::span<u8, 0x2000> mExtBank    { m_memory.begin() + 0xA000, 0x2000 }; // EXT RAM
+		std::span<u8, 0x1000> mWorkBank0  { m_memory.begin() + 0xC000, 0x1000 }; // WRAM 0
+		std::span<u8, 0x1000> mWorkBankN  { m_memory.begin() + 0xD000, 0x1000 }; // WRAM N
+		std::span<u8, 0x1E00> mEchoBank   { m_memory.begin() + 0xE000, 0x1E00 }; // ECHO RAM (C000-DDFF)
+		std::span<u8, 0x00A0> mObjAttrBank{ m_memory.begin() + 0xFE00, 0x00A0 }; // OAM
+		//std::span<u8, 0x0060> mProhibited { m_memory.begin() + 0xFEA0, 0x0060 }; // PROHIBITED
+		std::span<u8, 0x0080> mInOutBank  { m_memory.begin() + 0xFF00, 0x0080 }; // IO REGS
+		std::span<u8, 0x007F> mHighBank   { m_memory.begin() + 0xFF80, 0x007F }; // HRAM
 
 		/* Video Bank 0 Tile Map */
 		std::span<u8, 0x0800> mVideoTileMap0{ mVideoBank.begin() + 0x0000, 0x0800 };
@@ -152,7 +152,7 @@ private:
 		u8& mPCM12{ mInOutBank[0x76] }; // Audio digital out 1 & 2
 		u8& mPCM34{ mInOutBank[0x77] }; // Audio digital out 3 & 4
 
-		u8& mIE   { m_memory_bank[0xFFFF] }; // Interrupt enable
+		u8& mIE   { m_memory[0xFFFF] }; // Interrupt enable
 	} mMMU;
 
 	u8 mInputControl{};

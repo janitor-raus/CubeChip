@@ -118,3 +118,24 @@ private:
 	constexpr       Derived& self()       noexcept { return *static_cast<      Derived*>(this); }
 	constexpr const Derived& self() const noexcept { return *static_cast<const Derived*>(this); }
 };
+
+/*==================================================================*/
+
+template <std::size_t N, typename T = std::uint8_t>
+class MirroredMemory : public SimpleContainerFacade<MirroredMemory<N>, T> {
+	static_assert(std::has_single_bit(N),
+		"MirroredMemory size must be a power of two!");
+
+	std::array<T, N> mem{};
+
+public:
+	constexpr       auto& operator[](std::size_t index)       noexcept
+		{ return mem[index & (N - 1)]; }
+	constexpr const auto& operator[](std::size_t index) const noexcept
+		{ return mem[index & (N - 1)]; }
+
+	constexpr auto size() const noexcept { return N; }
+
+	constexpr       auto* data()       noexcept { return mem.data(); }
+	constexpr const auto* data() const noexcept { return mem.data(); }
+};

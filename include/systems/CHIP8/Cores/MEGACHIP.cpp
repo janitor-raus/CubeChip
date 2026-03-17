@@ -14,8 +14,8 @@ REGISTER_SYSTEM_CORE(MEGACHIP)
 /*==================================================================*/
 
 void MEGACHIP::initialize_system() noexcept {
-	copy_file_image_to(m_memory_bank, c_game_load_pos);
-	copy_font_data_to(m_memory_bank, 180);
+	copy_file_image_to(m_memory, c_game_load_pos);
+	copy_font_data_to(m_memory, 180);
 
 	set_base_system_framerate(c_sys_refresh_rate);
 
@@ -39,8 +39,8 @@ void MEGACHIP::handle_cycle_loop() noexcept
 template <typename Lambda>
 void MEGACHIP::instruction_loop(Lambda&& condition) noexcept {
 	for (m_cycle_count = 0; condition(); ++m_cycle_count) {
-		const auto HI = m_memory_bank[m_current_pc++];
-		const auto LO = m_memory_bank[m_current_pc++];
+		const auto HI = m_memory[m_current_pc++];
+		const auto LO = m_memory[m_current_pc++];
 
 		#define _NNN ((HI << 8 | LO) & 0xFFF)
 		#define _X (HI & 0xF)
@@ -361,7 +361,7 @@ void MEGACHIP::set_display_properties(Resolution mode) noexcept {
 /*==================================================================*/
 
 void MEGACHIP::skip_instruction() noexcept {
-	m_current_pc += m_memory_bank[m_current_pc] == 0x01 ? 4 : 2;
+	m_current_pc += m_memory[m_current_pc] == 0x01 ? 4 : 2;
 }
 
 void MEGACHIP::scroll_display_up(u32 N) noexcept {
@@ -439,16 +439,16 @@ void MEGACHIP::start_audio_track(bool repeat) noexcept {
 	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
 
 		m_track.loop = repeat;
-		m_track.data = &m_memory_bank[m_register_I + 6];
-		m_track.size = m_memory_bank[m_register_I + 2] << 16
-					 | m_memory_bank[m_register_I + 3] <<  8
-					 | m_memory_bank[m_register_I + 4];
+		m_track.data = &m_memory[m_register_I + 6];
+		m_track.size = m_memory[m_register_I + 2] << 16
+					 | m_memory[m_register_I + 3] <<  8
+					 | m_memory[m_register_I + 4];
 
-		const bool oob = m_track.data + m_track.size > &m_memory_bank.back();
+		const bool oob = m_track.data + m_track.size > &m_memory.back();
 		if (!m_track.size || oob) { m_track.reset(); }
 		else {
 			m_voices[VOICE::UNIQUE].set_phase(0.0).set_step(get_framerate_multiplier() * (
-				(m_memory_bank[m_register_I + 0] << 8 | m_memory_bank[m_register_I + 1]) \
+				(m_memory[m_register_I + 0] << 8 | m_memory[m_register_I + 1]) \
 				/ f64(m_track.size) / stream->get_freq())).userdata = &m_track;
 		}
 	}
@@ -567,10 +567,10 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 	void MEGACHIP::instruction_02NN(u32 NN) noexcept {
 		for (auto pos = 0u, byte = 0u; pos < NN; byte += 4) {
 			m_color_palette[++pos] = {
-				m_memory_bank[m_register_I + byte + 1],
-				m_memory_bank[m_register_I + byte + 2],
-				m_memory_bank[m_register_I + byte + 3],
-				m_memory_bank[m_register_I + byte + 0],
+				m_memory[m_register_I + byte + 1],
+				m_memory[m_register_I + byte + 2],
+				m_memory[m_register_I + byte + 3],
+				m_memory[m_register_I + byte + 0],
 			};
 		}
 	}
@@ -816,7 +816,7 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 			for (auto rowN = 0u, offsetY = originY; rowN < N; ++rowN)
 			{
 				if (Quirk.wrap_sprites && offsetY >= c_sys_screen_H) { continue; }
-				const auto octoPixelBatch = m_memory_bank[m_register_I + rowN];
+				const auto octoPixelBatch = m_memory[m_register_I + rowN];
 
 				for (auto colN = 0u, offsetX = originX; colN < 8u; ++colN)
 				{
@@ -843,7 +843,7 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 
 				for (auto colN = 0u, offsetX = originX; colN < m_texture.w; ++colN)
 				{
-					if (const auto sourceColorIdx = m_memory_bank[m_register_I + offsetI + colN])
+					if (const auto sourceColorIdx = m_memory[m_register_I + offsetI + colN])
 					{
 						auto& collideCoord = m_collision_map(offsetX, offsetY);
 						auto& backbufCoord = m_background_map(offsetX, offsetY);
@@ -874,8 +874,8 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 						const auto offsetY = originY + rowN;
 
 						collisions += draw_single_byte(originX, offsetY, offsetX ? 24 : 16, (
-							m_memory_bank[m_register_I + 2 * rowN + 0] << 8 |
-							m_memory_bank[m_register_I + 2 * rowN + 1] << 0
+							m_memory[m_register_I + 2 * rowN + 0] << 8 |
+							m_memory[m_register_I + 2 * rowN + 1] << 0
 						) << offsetX);
 
 						if (offsetY == (c_sys_screen_H/3 - 1)) { break; }
@@ -885,7 +885,7 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 						const auto offsetY = originY + rowN;
 
 						collisions += draw_single_byte(originX, offsetY, offsetX ? 16 : 8,
-							m_memory_bank[m_register_I + rowN] << offsetX);
+							m_memory[m_register_I + rowN] << offsetX);
 
 						if (offsetY == (c_sys_screen_H/3 - 1)) { break; }
 					}
@@ -904,7 +904,7 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 					const auto offsetY = originY + rowN * 2u;
 
 					collisions += draw_double_byte(originX, offsetY, 0x20,
-						ez::bit_dup8(m_memory_bank[m_register_I + rowN]) << offsetX);
+						ez::bit_dup8(m_memory[m_register_I + rowN]) << offsetX);
 
 					if (offsetY == (c_sys_screen_H/3 - 2)) { break; }
 				}
@@ -964,15 +964,15 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 	void MEGACHIP::instruction_Fx33(u32 X) noexcept {
 		const TriBCD bcd{ m_registers_V[X] };
 
-		m_memory_bank[m_register_I + 0] = bcd.digit[2];
-		m_memory_bank[m_register_I + 1] = bcd.digit[1];
-		m_memory_bank[m_register_I + 2] = bcd.digit[0];
+		m_memory[m_register_I + 0] = bcd.digit[2];
+		m_memory[m_register_I + 1] = bcd.digit[1];
+		m_memory[m_register_I + 2] = bcd.digit[0];
 	}
 	void MEGACHIP::instruction_FN55(u32 N) noexcept {
-		for (auto i = 0u; i <= N; ++i) { m_memory_bank[m_register_I + i] = m_registers_V[i]; }
+		for (auto i = 0u; i <= N; ++i) { m_memory[m_register_I + i] = m_registers_V[i]; }
 	}
 	void MEGACHIP::instruction_FN65(u32 N) noexcept {
-		for (auto i = 0u; i <= N; ++i) { m_registers_V[i] = m_memory_bank[m_register_I + i]; }
+		for (auto i = 0u; i <= N; ++i) { m_registers_V[i] = m_memory[m_register_I + i]; }
 	}
 	void MEGACHIP::instruction_FN75(u32 N) noexcept {
 		set_permaregs(std::min(N, 7u) + 1);

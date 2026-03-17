@@ -99,18 +99,20 @@ void FrontendHost::prune_terminated_systems() noexcept {
 
 void FrontendHost::find_last_focused_system() noexcept {
 	if (!std::exchange(m_suppress_auto_refocus, false)) {
+		bool found_focused_system = false;
 		for (const auto& id : *m_focus_mru) {
-			if (m_focus_mru[0] == id) { continue; }
 
-			if (m_systems[id]->is_window_focused()) {
-				blog.debug("Focused system instance is now {}.", id);
-				m_focus_mru.insert(id); return;
+			if (!found_focused_system) {
+				if (m_focus_mru[0] == id) { continue; }
+
+				if (m_systems[id]->is_window_focused()) {
+					blog.debug("Focused system instance is now {}.", id);
+					m_focus_mru.insert(id);
+					found_focused_system = true;
+				}
 			}
+			m_systems[id]->is_window_focused(false);
 		}
-	}
-	// XXX - clear flag for next imgui frame, but we might reorder where this method runs!
-	for (const auto& id : *m_focus_mru) {
-		m_systems[id]->is_window_focused(false);
 	}
 }
 
