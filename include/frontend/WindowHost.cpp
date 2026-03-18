@@ -66,13 +66,13 @@ private:
 		int window_flags = m_display_menubar
 			? ImGuiWindowFlags_MenuBar : 0;
 
-		const auto style_push_count = local->window_init
-			? local->window_init(window_flags) : 0;
+		std::function<void()> window_tidy = nullptr;
+		if (local->window_init) { local->window_init(window_flags, window_tidy); }
 
 		const bool window_open = ImGui::Begin(*window_label,
 			m_window_visible_out, ImGuiWindowFlags(window_flags));
 
-		ImGui::PopStyleVar(style_push_count);
+		if (window_tidy) { window_tidy(); }
 
 		if (window_open) {
 			if (m_window_focused_out) {
@@ -92,7 +92,7 @@ private:
 
 		ImGui::End();
 
-		if (local->window_quit) { local->window_quit(window_open); }
+		if (local->window_post) { local->window_post(window_open); }
 	}
 };
 

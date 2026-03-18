@@ -56,7 +56,7 @@ struct SystemDescriptor;
 
 /*==================================================================*/
 
-class alignas(HDIS) SystemInterface {
+class /*alignas(HDIS)*/ SystemInterface {
 
 	Thread m_system_thread;
 	Thread m_timing_thread;
@@ -112,8 +112,12 @@ public:
 	bool is_window_visible() const noexcept { return m_is_window_visible; }
 	bool is_window_focused() const noexcept { return m_is_window_focused; }
 
-	void is_window_visible(bool state) noexcept { m_is_window_visible = state; }
-	void is_window_focused(bool state) noexcept { m_is_window_focused = state; }
+	bool is_window_visible(std::optional<bool> state = std::nullopt) noexcept {
+		return state ? std::exchange(m_is_window_visible, *state) : m_is_window_visible;
+	}
+	bool is_window_focused(std::optional<bool> state = std::nullopt) noexcept {
+		return state ? std::exchange(m_is_window_focused, *state) : m_is_window_focused;
+	}
 
 protected:
 	WindowHost m_window_host;

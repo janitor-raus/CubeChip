@@ -181,11 +181,10 @@ protected:
 	std::array<u8, 16>
 		s_permaregs_V{};
 
-	alignas(sizeof(u8) * 16)
 	std::array<u8, 16>
 		m_registers_V{};
 
-	alignas(sizeof(u32) * 16)
+	alignas(HDIS)
 	std::array<u32, 16>
 		m_stack_bank{};
 

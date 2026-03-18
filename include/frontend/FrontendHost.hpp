@@ -72,10 +72,10 @@ struct ProjectVersion {
 	constexpr static inline auto* with_hash = PROJECT_VERSION_WITH_HASH;
 };
 
-constexpr static inline ProjectVersion AppVer{};
+constexpr static inline ProjectVersion c_app_ver{};
 
-constexpr auto* AppName = PROJECT_NAME;
-constexpr auto* OrgName = "";
+constexpr auto* c_app_name = PROJECT_NAME;
+constexpr auto* c_org_name = "";
 
 /*==================================================================*/
 
@@ -143,7 +143,6 @@ private:
 	void prune_terminated_systems() noexcept;
 	void find_last_focused_system() noexcept;
 
-	bool m_suppress_auto_refocus{};
 	void unload_system_instance(SystemID system_id = 0) noexcept;
 	void insert_system_instance(SystemInterface* system) noexcept;
 

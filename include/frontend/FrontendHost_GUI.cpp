@@ -101,7 +101,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 	{ 10, "Debug" }, [&]() noexcept {
 		if (BeginMenu("About...")) {
 			PushFont(nullptr, 21.0f);
-			TextUnformatted(AppName);
+			TextUnformatted(c_app_name);
 		#if !defined(NDEBUG) || defined(DEBUG)
 			SameLine();
 			TextUnformatted(" [DEBUG]");
@@ -112,7 +112,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 
 			TextUnformatted("Version: ");
 			SameLine();
-			TextUnformatted(AppVer.with_hash);
+			TextUnformatted(c_app_ver.with_hash);
 
 			DummyY(1.0f);
 

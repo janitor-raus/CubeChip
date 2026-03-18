@@ -23,14 +23,19 @@ class WindowHost {
 
 public:
 	struct Callbacks {
-		// Pre-Begin(), for setting window flags/style/etc, must return number of style pushes, if any.
-		std::function<int(int& window_flags)> window_init{};
+		// Pre-Begin(), for setting window flags, pushing styles/colors, and other init needs.
+		// Set the post-Begin() `&window_tidy` callable if needed, such as to pop styles.
+		std::function<void(int& window_flags, std::function<void()>& window_tidy)>
+			window_init{};
 		// Mid-Begin(), before dockspace init and after menubar/focus is handled.
-		std::function<void(bool open, int& docker_flags)> window_prep{};
+		std::function<void(bool open, int& docker_flags)>
+			window_prep{};
 		// Mid-Begin(), after dockspace is applied, intendedfor actual window contents.
-		std::function<void(bool open)> window_body{};
-		// Post-End(), for cleanup purposes or for additional rendering if needed.
-		std::function<void(bool open)> window_quit{};
+		std::function<void(bool open)>
+			window_body{};
+		// Post-End(), for finalizing logic or for additional rendering if needed.
+		std::function<void(bool open)>
+			window_post{};
 	};
 
 public:

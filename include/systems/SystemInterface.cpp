@@ -36,16 +36,14 @@ SystemInterface::SystemInterface(std::string_view family_name) noexcept
 	m_window_host.set_window_visible_output(&m_is_window_visible);
 	m_window_host.set_window_focused_output(&m_is_window_focused);
 	m_window_host.edit_callbacks([](auto& callbacks) noexcept {
-		callbacks.window_init = [](auto& flags) noexcept {
+		callbacks.window_init = [](auto& flags, auto& window_tidy) noexcept {
 			flags |= ImGuiWindowFlags_NoCollapse  | ImGuiWindowFlags_NoScrollWithMouse
 				  |  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
 
 			FrontendInterface::dock_next_window_to(0, true);
 
-			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2());
-
-			return 2;
+			window_tidy = []() noexcept { ImGui::PopStyleVar(1); };
 		};
 		callbacks.window_prep = [](bool open, auto& docker_flags) noexcept {
 			docker_flags |= ImGuiDockNodeFlags_NoTabBar;

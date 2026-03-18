@@ -50,7 +50,7 @@ void FrontendHost::set_open_file_dialog_result(std::string_view file) noexcept {
 /*==================================================================*/
 
 FrontendHost::FrontendHost() noexcept {
-	BVS->set_window_title(AppName);
+	BVS->set_window_title(c_app_name);
 	CoreRegistry::load_game_database();
 
 	setup_gui_callables();
@@ -98,20 +98,14 @@ void FrontendHost::prune_terminated_systems() noexcept {
 }
 
 void FrontendHost::find_last_focused_system() noexcept {
-	if (!std::exchange(m_suppress_auto_refocus, false)) {
-		bool found_focused_system = false;
-		for (const auto& id : *m_focus_mru) {
+	bool found_focused_system = false;
+	for (const auto& id : *m_focus_mru) {
+		const bool is_focused = m_systems[id]->is_window_focused(false);
 
-			if (!found_focused_system) {
-				if (m_focus_mru[0] == id) { continue; }
-
-				if (m_systems[id]->is_window_focused()) {
-					blog.debug("Focused system instance is now {}.", id);
-					m_focus_mru.insert(id);
-					found_focused_system = true;
-				}
-			}
-			m_systems[id]->is_window_focused(false);
+		if (!found_focused_system && is_focused && m_focus_mru[0] != id) {
+			blog.debug("Focused system instance is now {}.", id);
+			m_focus_mru.insert(id);
+			found_focused_system = true;
 		}
 	}
 }
@@ -130,7 +124,6 @@ void FrontendHost::insert_system_instance(SystemInterface* ptr) noexcept {
 	blog.info("Starting up '{}' ({}) system instance.",
 		ptr->get_descriptor().system_pretty_name, ptr->instance_id);
 
-	m_suppress_auto_refocus = true;
 	m_focus_mru.insert(ptr->instance_id);
 	blog.debug("Forcing focus to newly inserted system instance with ID {}.", ptr->instance_id);
 	auto& system = m_systems[m_focus_mru[0]];
@@ -163,7 +156,7 @@ FrontendHost* FrontendHost::init_application(
 	if (self) { return self; }
 
 	HDM = HomeDirManager::initialize(
-		home_override, config_name, force_portable, OrgName, AppName);
+		home_override, config_name, force_portable, c_org_name, c_app_name);
 	if (!HDM) { return nullptr; }
 
 	blog.create_log(std::to_string(thread_affinity::get_process_id()),
@@ -254,9 +247,6 @@ int FrontendHost::handle_client_events(void* event) noexcept {
 int FrontendHost::process_client_frame() {
 	handle_main_hotkeys();
 
-	prune_terminated_systems();
-	find_last_focused_system();
-
 	for (auto& [id, system] : m_systems) {
 		set_system_hidden_status(system, id == m_focus_mru[0]
 			? m_application_minimized : true);
@@ -271,9 +261,12 @@ int FrontendHost::process_client_frame() {
 		s_pending_file_drops.clear();
 	}
 
-	return BVS->render_present([]() {
+	return BVS->render_present([&]() {
 		FrontendInterface::begin_new_frame();
 		FrontendInterface::render_frame();
+
+		prune_terminated_systems();
+		find_last_focused_system();
 	}) ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
 }
 
