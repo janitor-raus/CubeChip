@@ -6,12 +6,10 @@
 
 #include "HomeDirManager.hpp"
 
-#include "EzMaths.hpp"
 #include "SimpleFileIO.hpp"
 #include "BasicLogger.hpp"
 #include "DefaultConfig.hpp"
 #include "PathGetters.hpp"
-#include "ExecPolicy.hpp"
 
 #include <SDL3/SDL_messagebox.h>
 
@@ -57,7 +55,7 @@ HomeDirManager::HomeDirManager(
 		error_on_init = true; return; }
 
 	if (config_name.empty()) { config_name = "settings.toml"; }
-	s_config_at = (Path(s_home_path) / config_name).string();
+	s_config_at = (fs::Path(s_home_path) / config_name).string();
 }
 
 bool HomeDirManager::set_home_path(
@@ -87,7 +85,7 @@ bool HomeDirManager::set_home_path(
 	}
 
 	if (::get_base_path()) {
-		const auto fileExists = fs::exists(Path(::get_base_path()) / "portable.txt");
+		const auto fileExists = fs::exists(fs::Path(::get_base_path()) / "portable.txt");
 		if (fileExists && fileExists.value()) {
 			if (::is_location_writable(::get_base_path())) {
 				s_home_path = ::get_base_path();

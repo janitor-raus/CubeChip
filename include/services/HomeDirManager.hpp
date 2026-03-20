@@ -6,18 +6,12 @@
 
 #pragma once
 
-#include <span>
-#include <vector>
-#include <filesystem>
-
 #include "SettingWrapper.hpp"
 
 /*==================================================================*/
 	#pragma region HomeDirManager Singleton Class
 
 class HomeDirManager final {
-	using Path = std::filesystem::path;
-
 	HomeDirManager(
 		std::string_view home_override, std::string_view config_name,
 		bool force_portable, std::string_view org, std::string_view app,
