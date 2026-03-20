@@ -53,18 +53,18 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 
 	{
 		options.add_options("Runtime")
-			("program",  "Forces the application to load a program on startup.",
+			("program",  "Force application to load a program on startup.",
 				cxxopts::value<std::string>())
-			("headless", "Forces the application to run without a graphical user interface.",
-				cxxopts::value<bool>()->default_value("false"));
+			("headless", "Force application to run without a graphical user interface (stub).",
+				cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
 
 		options.add_options("Configuration")
-			("homedir",  "Forces application to use a different home directory to read/write files.",
+			("homedir",  "Force application to use a different home directory to read/write files.",
 				cxxopts::value<std::string>())
-			("config",   "Forces application to use a different config file to load/save settings, relative to the home directory.",
+			("config",   "Force application to use a different config file to load/save settings, relative to the home directory.",
 				cxxopts::value<std::string>())
-			("portable", "Force application to operate in portable mode, setting the home directory to the executable's location. Overriden by --home.",
-				cxxopts::value<bool>()->default_value("false"));
+			("portable", "Force application to operate in portable mode, setting the home directory to the executable's location. Overridden by --homedir.",
+				cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
 
 		options.add_options("General")
 			("version", "Print application version info.")
@@ -74,7 +74,14 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 		options.positional_help("program_file");
 	}
 
-	auto result = options.parse(argc, argv);
+	cxxopts::ParseResult result;
+	try { result = options.parse(argc, argv); }
+	catch (const cxxopts::exceptions::exception& e) {
+		console::attach();
+		fmt::println(stderr, "Error parsing options: {}", e.what());
+		fmt::println(stderr, "Use --help to list options.");
+		return SDL_APP_FAILURE;
+	}
 
 	if (result.count("version")) {
 		console::attach();
@@ -95,7 +102,7 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 		result["homedir"].as_optional<std::string>().value_or(""),
 		result["config" ].as_optional<std::string>().value_or(""),
 		result["program"].as_optional<std::string>().value_or(""),
-		result.count("portable") ? true : false
+		result["program"].as_optional<bool>().value_or(false)
 	);
 
 	return *Host ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
