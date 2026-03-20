@@ -47,24 +47,28 @@ Some extension combinations aren't possible, see footnotes for now. Due to major
 ## Planned Features
 
 - [x] Implement SHA1 hashing for identifying programs that lack metadata.
-- [ ] Utilize JSON for program database use.
-- [x] Implement TOML for application settings.
-- [x] Implement ImGUI to get a rudimentary and reactive interface going instead of the current single render window.
-- [ ] Expand the input system to allow for forms of input and bindings beyond simple keyboard/mouse detection.
-- [x] Refactor application to decouple the frontend from the backend emulation worker.
-- [x] Implement thread-allocation logic to control which CPU threads the program threads have access to.
-- [x] Refactor system interfacing to allow interacting with multiple (and possibly concurrently active) systems, as well as specialized cores for each.
-- [x] Implement a triple-buffer middle-man between the frontend and backend worker.
-- [x] Allow fetching and displaying rudimentary OSD statistics on a per-system basis.
+- [x] Utilize TOML for storing/loading application settings.
+- [x] Utilize ImGUI to get a rudimentary and reactive interface that replaces the old single-window video output.
+- [x] Redesign frontend to decouple the main thread logic from the emulation worker thread(s).
+- [x] Implement thread-allocation logic to manage CPU thread utilization on demand and ensure the GUI/main thread will never conflict with an emulation thread.
+- [x] Refactor the System Interface and System Host to allow for concurrent emulation of multiple systems.
+- [x] Utilize mailbox-style triple-buffering to decouple emulation frame rendering from frontend display rendering.
+- [x] Allow compiling and displaying rudimentary OSD statistics on a per-system basis.
 - [x] Implement File Picker dialog for when drag-n-drop doesn't work, for some reason.
+- [x] Refactor the basic logger to safely receive cross-thread messages, and safely write to file via a threaded time/load-checking sink. Also implement Logger window to view logs in real-time.
 - [x] Refactor cmake build script for smarter generation and cached vendoring of fetched third party libraries.
-- [x] Allow choosing desired core to boot when loading a program file that is eligible with multiple specialized cores.
-- [ ] Implement stepping controls for debugging, initially limited to simple full-frame and per-instruction stepping.
-- [x] Implement (initially) a slot-in ImGUI interface where custom ImGUI code can be pointer'd to to execute, and defined elsewhere as desired.
-- [ ] By extension, a configuration ImGUI layer for each system, optionally expandable by each specialized core.
-- [ ] Figure out a good way to serialize, version, and differentiate the full state of different cores for savestate support.
-- [ ] Implement an abstraction layer to allow core-driven copying of state data and ImGUI presentation layer that (initially) the frontend will passively read from as a means of displaying debug information, among other things.
+- [x] Allow free selection of which family/system core to boot a game file with, whether it is eligible for that core or not.
 - [x] Provide flexible audio with easily manageable streams, voices, and mastering for each.
 - [x] Provide command-line arguments for those who enjoy them, and to facilitate headless runs in the future (for the likes of unit tests, etc).
-- [x] Implement more color types, conversions between them, lerps, waveforms, and other color/match related features for flexibility.
-- [ ] Find time to focus entirely on finishing the Gameboy (Color) core.
+- [x] Implement more color types, conversions between them, lerps, waveforms, and other color/math related features for general use.
+- [ ] Start and maintain a JSON (or TOML??) database, keyed by SHA1 hashes for system families lacking a concrete identifier mark, as well as to define defaults/overrides on a per-entry basis.
+- [ ] Redesign the SDL input to allow for more forms of input (mouse, gamepads, etc) and binding control beyond a "X = Y or Z". This will require interaction with ImGUI to allow live mapping and feedback.
+- [ ] By extension, also need to implement a hotkey manager that will be remappable live, and allow for hot-swapping new entries depending on which system family is currently active.
+- [ ] Implement stepping framework for debugging, initially limited to simple full-frame and per-instruction stepping, for the system families/cores already implemented.
+- [ ] Add configuration ImGUI panels for each family, extended optionally by each system core, to allow for live adjustment of various properties/quirks.
+- [ ] Similarly, add further GUI controls for standard actions, such as pausing a system, toggling OSD, etc.
+- [ ] Further, design standard ImGUI widgets to recycle for various uses, particularly in debugging tools, such as wave/pattern visualizers, memory viewers, disasm viewers, etc.
+- [ ] Start work on supporting initializing system instances and feeding them custom data, and controlling exact runtime parameters to allow for actual support of single-step-tests later.
+- [ ] Figure out a good way to serialize, version, and differentiate the full state of different systems for savestate support, with modular assembly of each eligible component of a system at the lower end, and also the inheritance layers at the high end.
+- [ ] Modify the audio backend to allow for streams with differing stream io formats, rather than being restricted to having the same on both ends. Required for BytePusher running under custom framerate.
+- [ ] Find time to focus entirely on progressing the Gameboy (Color) family interface and system cores.
