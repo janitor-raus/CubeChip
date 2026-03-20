@@ -29,6 +29,7 @@ protected:
 	enum STREAM { MAIN };
 	enum VOICE { ID_0, COUNT };
 
+	WindowHost    m_display_window;
 	DisplayDevice m_display_device;
 
 	AudioDevice m_audio_device;

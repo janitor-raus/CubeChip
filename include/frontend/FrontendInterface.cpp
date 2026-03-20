@@ -183,49 +183,6 @@ bool FrontendInterface::invoke_registered_windows() noexcept {
 	return !!std::exchange(windows.offset, 0);
 }
 
-bool FrontendInterface::merge_overflowing_dockers(unsigned dock_id) noexcept {
-	std::scoped_lock lock(s_gui_hooks->dockers.overflow_lock);
-
-	auto& src_dockers = s_gui_hooks->dockers.overflow[dock_id].buffer;
-	if (src_dockers.empty()) { return false; }
-
-	auto& dst_dockers = s_gui_hooks->dockers.registry[dock_id].buffer;
-
-	blog.debug("Merging {} late docker callables for dock ID {}",
-		src_dockers.size(), dock_id);
-
-	dst_dockers.insert(
-		dst_dockers.end(),
-		std::make_move_iterator(src_dockers.begin()),
-		std::make_move_iterator(src_dockers.end())
-	);
-	src_dockers.clear();
-
-	return true;
-}
-
-bool FrontendInterface::invoke_registered_dockers(unsigned dock_id) noexcept {
-	std::scoped_lock lock(s_gui_hooks->dockers.registry_lock);
-
-	merge_overflowing_dockers(dock_id);
-	auto it = s_gui_hooks->dockers.registry.find(dock_id);
-	if (it == s_gui_hooks->dockers.registry.end()) { return false; }
-
-	auto& docker = it->second;
-
-	do {
-		while (docker.offset < docker.buffer.size()) {
-			if (auto shared_ptr = docker.buffer[docker.offset].lock()) {
-				(*shared_ptr)(dock_id); ++docker.offset;
-			} else {
-				docker.buffer.erase(docker.buffer.begin() + docker.offset);
-			}
-		}
-	} while (merge_overflowing_dockers(dock_id));
-
-	return !!std::exchange(docker.offset, 0);
-}
-
 bool FrontendInterface::merge_overflowing_menus(const LabelKey& window_key) noexcept {
 	std::scoped_lock lock(s_gui_hooks->menus.overflow_lock);
 
@@ -403,7 +360,6 @@ void FrontendInterface::begin_new_frame() {
 
 	s_main_dock_id = ImGui::DockSpaceOverViewport(
 		ImGui::GetID("main_dock"), ImGui::GetMainViewport());
-	//FrontendInterface::call_docker(s_main_dock_id);
 
 	invoke_registered_windows();
 }
@@ -417,20 +373,6 @@ void FrontendInterface::render_frame(SDL_Renderer* renderer) {
 void FrontendInterface::dock_next_window_to(unsigned id, bool first_time) noexcept {
 	ImGui::SetNextWindowDockID(id ? id : s_main_dock_id,
 		first_time ? ImGuiCond_FirstUseEver : ImGuiCond_Always);
-}
-
-void FrontendInterface::call_docker(unsigned dock_id, bool* has_run) noexcept {
-	if (!has_run || !*has_run) {
-		bool invoked = invoke_registered_dockers(dock_id);
-		if (has_run) { *has_run = invoked; }
-	}
-}
-
-void FrontendInterface::call_docker(unsigned dock_id, std::atomic<bool>* has_run) noexcept {
-	if (!has_run || !has_run->load(std::memory_order::acquire)) {
-		bool invoked = invoke_registered_dockers(dock_id);
-		if (has_run) { has_run->store(invoked, std::memory_order::release); }
-	}
 }
 
 void FrontendInterface::call_menubar(const char* window_name, bool* can_render) noexcept {

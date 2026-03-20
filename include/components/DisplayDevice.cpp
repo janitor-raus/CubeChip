@@ -21,89 +21,51 @@ struct DisplayDevice::DisplayContext {
 	using Callable = DisplayDevice::Callable;
 	using LiveHook = FrontendInterface::LiveHook;
 
-	AtomSharedPtr<ImLabel>   m_window_label;
-	AtomSharedPtr<Callable>  m_osd_callable;
 	SDL_Unique<SDL_Texture>  m_stream_texture;
 	SDL_Unique<SDL_Texture>  m_target_texture;
 	DisplayDevice::Swapchain m_swapchain;
 	FramePacket::Metadata    m_staging_data;
+	AtomSharedPtr<Callable>  m_osd_callable;
 
-	LiveHook m_settings_menu_hook;
-	LiveHook m_debugger_menu_hook;
-	LiveHook m_render_window_hook;
+	LiveHook m_settings_menu_hook{};
+	LiveHook m_debugger_menu_hook{};
 
 	ez::Frame m_old_target_size{};
 
 	bool* m_window_state_out = nullptr; // wire pointer to detect window closure
 	bool* m_window_focus_out = nullptr; // write pointer to detect window focus
 
-	bool  m_disable_menubar = true;
-	bool  m_view_debug_menu = false;
-	bool  m_fullscreen_mode = false;
-
-	const bool c_save_settings = true;
-
 	int   m_screen_rotation{};
+	bool  m_view_debug_menu{};
 	bool  m_integer_scaling{};
 	bool  m_utilize_shaders{};
 
-private:
-	auto make_sanitized_label(ImLabel&& name) const noexcept {
-		return std::make_shared<ImLabel>(!name->empty()
-			? std::move(name) : ImLabel("", std::to_string(ImGui::GetID(this)))
-		);
-	}
-
 public:
-	DisplayContext(std::size_t W, std::size_t H, bool save_settings, ImLabel name) noexcept
-		: m_window_label(make_sanitized_label(std::move(name)))
-		, m_osd_callable(nullptr)
-		, m_stream_texture(BasicVideoSpec::create_stream_texture(RENDERER, int(W), int(H)))
+	DisplayContext(std::size_t W, std::size_t H, ImLabel window_label) noexcept
+		: m_stream_texture(BasicVideoSpec::create_stream_texture(RENDERER, int(W), int(H)))
 		, m_swapchain(int(W), int(H))
 		, m_staging_data(int(W), int(H))
-		, m_settings_menu_hook(bind_settings_menu())
-		, m_debugger_menu_hook(nullptr)
-		, m_render_window_hook(FrontendInterface::register_window([&]() noexcept { render_window(); }))
-		, c_save_settings(save_settings)
+		, m_osd_callable(nullptr)
+		, m_settings_menu_hook(!window_label ? nullptr
+			: bind_settings_menu(std::move(window_label))
+		)
 	{
 		if (m_staging_data.get_base_frame().area() != (W * H)) {
 			blog.warn("Display W/H out of size bounds, clamping!");
 		}
 	}
 
-	auto get_window_label() const noexcept {
-		return m_window_label.load(std::memory_order::relaxed);
-	}
-
-	void set_window_label(ImLabel&& name) noexcept {
-		m_window_label.store(make_sanitized_label(std::move(name)),
-			std::memory_order::relaxed);
-	}
-
-private:
+public:
 	void render_window() noexcept {
-		m_swapchain.present([&](auto frame) noexcept {
-			const auto& metadata = m_view_debug_menu
-				? m_staging_data : frame.buffer.metadata;
-
-			BasicVideoSpec::write_stream_texture(RENDERER,
-				m_stream_texture, frame.buffer.data());
-
-			const auto window_label = get_window_label();
-			const auto window_flags = ImGuiWindowFlags_NoCollapse
-				| ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
-				| (m_disable_menubar ? ImGuiWindowFlags_None : ImGuiWindowFlags_MenuBar)
-				| (c_save_settings ? ImGuiWindowFlags_None : ImGuiWindowFlags_NoSavedSettings)
-				| (window_label->has_name() ? ImGuiWindowFlags_None : ImGuiWindowFlags_NoTitleBar);
-
-			const auto s_window_contents = [&]() noexcept {
-				if (m_window_focus_out) {
-					*m_window_focus_out |= ImGui::IsWindowFocused(
-						ImGuiFocusedFlags_RootAndChildWindows);
+		if (ImGui::BeginChild("##display_child")) {
+			m_swapchain.present([&](auto frame) noexcept {
+				if (frame.dirty) {
+					BasicVideoSpec::write_stream_texture(RENDERER,
+						m_stream_texture, frame.buffer.data());
 				}
 
-				FrontendInterface::call_autohide_menubar(
-					*window_label, m_disable_menubar);
+				const auto& metadata = m_view_debug_menu
+					? m_staging_data : frame.buffer.metadata;
 
 				const auto px_ratio = float(metadata.pixel_ratio);
 				const auto min_zoom = float(metadata.minimum_zoom);
@@ -194,94 +156,66 @@ private:
 				auto osd_callable = m_osd_callable.load(std::memory_order::relaxed);
 				if (osd_callable) { (*osd_callable)(); }
 
-				// toggle fullscreen mode on double-click
-				if (ImGui::IsWindowHovered(ImGuiHoveredFlags_RootWindow
-					| ImGuiHoveredFlags_NoPopupHierarchy
-					| ImGuiHoveredFlags_AllowWhenBlockedByActiveItem
-				) && !ImGui::IsAnyItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-					m_fullscreen_mode = !m_fullscreen_mode;
-				}
-
 				#ifdef DISPLAYDEVICEDEBUG
-				ImGui::SetCursorPos(origin_point);
+							ImGui::SetCursorPos(origin_point);
 
-				if (ImGui::BeginTable("##debug_table", 2,
-					ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoBordersInBody
-				)) {
-					static auto row = [](const char* label, auto fmt, auto... args) {
-						ImGui::TableNextRow();
-						ImGui::TableSetColumnIndex(0);
-						ImGui::TextUnformatted(label);
-						ImGui::TableSetColumnIndex(1);
-						ImGui::Text(fmt, args...);
-					};
-					static auto row_separate = []() {
-						ImGui::TableNextRow();
-						ImGui::TableSetColumnIndex(0);
-						ImGui::Dummy(ImVec2(0.0f, ImGui::GetTextLineHeight() * 0.3f));
-					};
+							if (ImGui::BeginTable("##debug_table", 2,
+								ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoBordersInBody
+							)) {
+								static auto row = [](const char* label, auto fmt, auto... args) {
+									ImGui::TableNextRow();
+									ImGui::TableSetColumnIndex(0);
+									ImGui::TextUnformatted(label);
+									ImGui::TableSetColumnIndex(1);
+									ImGui::Text(fmt, args...);
+								};
+								static auto row_separate = []() {
+									ImGui::TableNextRow();
+									ImGui::TableSetColumnIndex(0);
+									ImGui::Dummy(ImVec2(0.0f, ImGui::GetTextLineHeight() * 0.3f));
+								};
 
-					const auto window_size = ImGui::GetWindowSize();
-					const auto usable_size = display_zone;
+								const auto window_size = ImGui::GetWindowSize();
+								const auto usable_size = display_zone;
 
-					const auto deco_margin = ImGui::GetWindowDecoSize();
-					const auto constraints =
-						ImVec2(float(dar_viewport.w), float(dar_viewport.h)) *
-							min_zoom + padding_vec2 + borders_vec2 + deco_margin;
+								const auto deco_margin = ImGui::GetWindowDecoSize();
+								const auto constraints =
+									ImVec2(float(dar_viewport.w), float(dar_viewport.h)) *
+										min_zoom + padding_vec2 + borders_vec2 + deco_margin;
 
 
-					row("Window size:", "%.0f x %.0f", window_size.x, window_size.y);
-					row("Deco size:",   "%.0f x %.0f", deco_margin.x, deco_margin.y);
-					row("Constrained:", "%.0f x %.0f", constraints.x, constraints.y);
-					row("Usable size",  "%.0f x %.0f", usable_size.x, usable_size.y);
-					row_separate();
-					row("Viewport (w,h):", "%d x %d", dar_viewport.w, dar_viewport.h);
-					row("Viewport (x,y):", "%d , %d", dar_viewport.x, dar_viewport.y);
-					row_separate();
-					row("Base AR:",   "%.3f", base_AR);
-					row("Target AR:", "%.3f", target_AR);
-					row_separate();
-					row("Texture area size:", "%.0f x %.0f", texture_area.x, texture_area.y);
-					row("Borders area size:", "%.0f x %.0f", borders_area.x, borders_area.y);
-					row_separate();
-					row("Texture scaled as:", "%d x %d", new_target_size.w, new_target_size.h);
+								row("Window size:", "%.0f x %.0f", window_size.x, window_size.y);
+								row("Deco size:",   "%.0f x %.0f", deco_margin.x, deco_margin.y);
+								row("Constrained:", "%.0f x %.0f", constraints.x, constraints.y);
+								row("Usable size",  "%.0f x %.0f", usable_size.x, usable_size.y);
+								row_separate();
+								row("Viewport (w,h):", "%d x %d", dar_viewport.w, dar_viewport.h);
+								row("Viewport (x,y):", "%d , %d", dar_viewport.x, dar_viewport.y);
+								row_separate();
+								row("Base AR:",   "%.3f", base_AR);
+								row("Target AR:", "%.3f", target_AR);
+								row_separate();
+								row("Texture area size:", "%.0f x %.0f", texture_area.x, texture_area.y);
+								row("Borders area size:", "%.0f x %.0f", borders_area.x, borders_area.y);
+								row_separate();
+								row("Texture scaled as:", "%d x %d", new_target_size.w, new_target_size.h);
 
-					ImGui::EndTable();
-				}
+								ImGui::EndTable();
+							}
 				#endif
-			};
-
-			//ImGui::DockNextWindowTo(FrontendInterface::get_main_dockspace_id(), true);
-			ImGui::SetNextWindowMinClientSize(ImVec2(480.0f, 360.0f));
-
-			if (ImGui::Begin(*window_label, m_window_state_out, window_flags)) {
-				if (!m_fullscreen_mode) { s_window_contents(); }
-			} else {
-				m_fullscreen_mode = false;
-			}
-			ImGui::End();
-
-			if (m_fullscreen_mode) {
-				const auto* viewport = ImGui::GetMainViewport();
-				ImGui::SetNextWindowPos(viewport->Pos);
-				ImGui::SetNextWindowSize(viewport->Size);
-
-				const auto temp_label = ::join(window_label->get_id(), "_fullscreen");
-				if (ImGui::Begin(temp_label.c_str(), nullptr, window_flags
-					| ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDecoration
-				)) { s_window_contents(); }
-				ImGui::End();
-			}
-		});
+			});
+		}
+		ImGui::EndChild();
 	}
 
-	auto bind_settings_menu() noexcept -> LiveHook {
-		return FrontendInterface::register_menu(*get_window_label(),
-		{ 89, "Settings" }, [&]() noexcept {{
+private:
+	auto bind_settings_menu(const ImLabel& window_label) noexcept -> LiveHook {
+		return FrontendInterface::register_menu(window_label,
+		{ 89, "Settings" }, [&, window_label]() noexcept { {
 			ImGui::Separator(2.0f);
 			if (ImGui::Checkbox("Enable Debug Menu?", &m_view_debug_menu)) {
 				if (m_view_debug_menu) {
-					m_debugger_menu_hook = bind_debugger_menu();
+					m_debugger_menu_hook = bind_debugger_menu(window_label);
 				} else {
 					m_debugger_menu_hook.reset();
 				}
@@ -289,8 +223,8 @@ private:
 		}});
 	}
 
-	auto bind_debugger_menu() noexcept -> LiveHook {
-		return FrontendInterface::register_menu(*get_window_label(),
+	auto bind_debugger_menu(const ImLabel& window_label) noexcept -> LiveHook {
+		return FrontendInterface::register_menu(window_label,
 		{ 90, "Debug" }, [&]() noexcept {{
 			int value = m_staging_data.border_width;
 			if (ImGui::SliderInt("Border Width", &value, m_staging_data.border_width.min,
@@ -365,14 +299,11 @@ private:
 
 /*==================================================================*/
 
-DisplayDevice::DisplayDevice(
-	std::size_t W, std::size_t H,
-	bool save_settings, ImLabel name
-) noexcept
+DisplayDevice::DisplayDevice(std::size_t W, std::size_t H, ImLabel window_label) noexcept
 	: m_context(std::make_unique<DisplayContext>(
 		std::clamp<std::size_t>(W, 1u, 8192u),
 		std::clamp<std::size_t>(H, 1u, 8192u),
-		save_settings, std::move(name) // yes, we pass as-is
+		std::move(window_label)
 	))
 {}
 
@@ -416,20 +347,8 @@ void DisplayDevice::set_utilize_shaders(bool enable) noexcept {
 	m_context->m_utilize_shaders = enable;
 }
 
-auto DisplayDevice::get_window_label() const noexcept -> ImLabel {
-	return *m_context->get_window_label();
-}
-
-void DisplayDevice::set_window_label(std::string_view name) noexcept {
-	m_context->set_window_label(name);
-}
-
-void DisplayDevice::set_window_state_output(bool* out) noexcept {
-	m_context->m_window_state_out = out;
-}
-
-void DisplayDevice::set_window_focus_output(bool* out) noexcept {
-	m_context->m_window_focus_out = out;
+void DisplayDevice::render_window() noexcept {
+	m_context->render_window();
 }
 
 void DisplayDevice::set_osd_callable(Callable callable) noexcept {

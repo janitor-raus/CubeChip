@@ -21,7 +21,7 @@
 
 /*==================================================================*/
 
-SystemInterface::SystemInterface(std::string_view family_name) noexcept
+SystemInterface::SystemInterface(std::string_view window_anme) noexcept
 	: instance_id([]() noexcept {
 		static std::atomic<u32> instance_counter = 1u;
 		return instance_counter.fetch_add(1, mo::relaxed);
@@ -29,27 +29,37 @@ SystemInterface::SystemInterface(std::string_view family_name) noexcept
 	, m_statistics_data(std::make_shared<std::string>())
 	, m_rng(std::make_unique<Well512>(Millis::initial()))
 	, m_input(std::make_unique<BasicKeyboard>())
-	, m_window_host({ family_name, make_system_id(instance_id, family_name) })
+	, m_window_host({ window_anme, make_system_id(instance_id, "system")})
 	, m_file_image(std::move(SystemStaging::file_image))
 {
 	m_statistics_work_buffer.reserve(1_KiB);
 	m_window_host.set_window_visible_output(&m_is_window_visible);
 	m_window_host.set_window_focused_output(&m_is_window_focused);
 	m_window_host.edit_callbacks([](auto& callbacks) noexcept {
-		callbacks.window_init = [](auto& flags, auto& window_tidy) noexcept {
+		callbacks.window_init = []
+		(auto& flags, auto& window_tidy) mutable noexcept {
 			flags |= ImGuiWindowFlags_NoCollapse  | ImGuiWindowFlags_NoScrollWithMouse
 				  |  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
 
-			FrontendInterface::dock_next_window_to(0, true);
+			ImGui::DockNextWindowTo(FrontendInterface::get_main_dockspace_id(), true);
 
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2());
 			window_tidy = []() noexcept { ImGui::PopStyleVar(1); };
 		};
-		callbacks.window_prep = [](bool open, auto& docker_flags) noexcept {
-			docker_flags |= ImGuiDockNodeFlags_NoTabBar;
-			if (open && ImGui::IsWindowAppearing()) {
+
+		callbacks.window_dock = [docker_class = ImGuiWindowClass()]
+		(bool window_open, auto window_id) mutable noexcept {
+			if (window_open && ImGui::IsWindowAppearing()) {
 				ImGui::SelectWindowInDockNodeTab();
 			}
+
+			docker_class.ClassId = window_id;
+			docker_class.DockingAllowUnclassed = false;
+
+			static constexpr auto docker_flags =
+				 ImGuiDockNodeFlags_AutoHideTabBar;
+
+			ImGui::DockSpace(window_id, ImVec2(), docker_flags, &docker_class);
 		};
 	});
 }
@@ -109,8 +119,8 @@ void SystemInterface::stop_workers() noexcept {
 
 /*==================================================================*/
 
-std::string SystemInterface::make_system_id(u32 id, std::string_view family_name) noexcept {
-	return ::join_with(".", std::to_string(id), family_name);
+std::string SystemInterface::make_system_id(u32 id, std::string_view identifier) noexcept {
+	return ::join_with(".", std::to_string(id), identifier);
 }
 
 std::string SystemInterface::get_system_id() const noexcept {

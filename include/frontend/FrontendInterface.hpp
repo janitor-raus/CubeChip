@@ -156,9 +156,6 @@ private:
 	static bool merge_overflowing_windows() noexcept;
 	static bool invoke_registered_windows() noexcept;
 
-	static bool merge_overflowing_dockers(unsigned dock_id) noexcept;
-	static bool invoke_registered_dockers(unsigned dock_id) noexcept;
-
 	static bool merge_overflowing_menus(const LabelKey& tag) noexcept;
 	static bool invoke_registered_menus(const LabelKey& tag) noexcept;
 
@@ -187,9 +184,6 @@ public:
 	static void render_frame(SDL_Renderer* = nullptr);
 
 	static void dock_next_window_to(unsigned id, bool first_time = false) noexcept;
-
-	static void call_docker(unsigned dock_id, bool* has_run = nullptr) noexcept;
-	static void call_docker(unsigned dock_id, std::atomic<bool>* has_run) noexcept;
 
 	static void call_menubar(const char* window_name, bool* can_render = nullptr) noexcept;
 	static void call_autohide_menubar(const char* window_name, bool& hidden) noexcept;

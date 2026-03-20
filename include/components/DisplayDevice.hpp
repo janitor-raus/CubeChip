@@ -15,7 +15,7 @@
 /*==================================================================*/
 
 class DisplayDevice {
-	using Callable  = std::function<void()>;
+	using Callable = std::function<void()>;
 	using Swapchain = TripleBuffer<FramePacket>;
 
 	struct DisplayContext; // make *real* clang happy
@@ -41,11 +41,7 @@ public:
 	auto metadata_staging() noexcept -> FramePacket::Metadata&;
 
 public:
-	DisplayDevice(
-		std::size_t W, std::size_t H,
-		bool save_settings = true,
-		ImLabel name = ImLabel()
-	) noexcept;
+	DisplayDevice(std::size_t W, std::size_t H, ImLabel window_label) noexcept;
 
 	~DisplayDevice() noexcept;
 
@@ -62,10 +58,6 @@ public:
 	bool get_utilize_shaders() const noexcept;
 	void set_utilize_shaders(bool enable) noexcept;
 
-	auto get_window_label() const noexcept -> ImLabel;
-	void set_window_label(std::string_view name) noexcept;
-
-	void set_window_state_output(bool* out) noexcept;
-	void set_window_focus_output(bool* out) noexcept;
 	void set_osd_callable(Callable callable) noexcept;
+	void render_window() noexcept;
 };

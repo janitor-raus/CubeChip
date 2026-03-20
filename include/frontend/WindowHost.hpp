@@ -14,8 +14,6 @@
 /*==================================================================*/
 
 class WindowHost {
-	using DockerFn = std::function<void(unsigned id)>;
-
 	struct HostContext;
 	friend struct HostContext;
 
@@ -27,35 +25,39 @@ public:
 		// Set the post-Begin() `&window_tidy` callable if needed, such as to pop styles.
 		std::function<void(int& window_flags, std::function<void()>& window_tidy)>
 			window_init{};
-		// Mid-Begin(), before dockspace init and after menubar/focus is handled.
-		std::function<void(bool open, int& docker_flags)>
-			window_prep{};
-		// Mid-Begin(), after dockspace is applied, intendedfor actual window contents.
-		std::function<void(bool open)>
+
+		// Mid-Begin(), after menubar/focus is handled where you can prepare a Dockspace.
+		std::function<void(bool open, unsigned window_id)>
+			window_dock{};
+
+		// Mid-Begin(), after the Dockspace, intended for actual window contents.
+		// The 'fullscreen' parameter signals whether the callback executes in a fullscreen context.
+		std::function<void(bool open, bool fullscreen)>
 			window_body{};
+
 		// Post-End(), for finalizing logic or for additional rendering if needed.
 		std::function<void(bool open)>
 			window_post{};
 	};
 
 public:
-	WindowHost(ImLabel name = {}) noexcept;
+	WindowHost(ImLabel name = {}, bool allow_fullscreen = false) noexcept;
 	~WindowHost() noexcept;
 
 	WindowHost(WindowHost&&) noexcept;
 	WindowHost& operator=(WindowHost&&) noexcept;
 
 public:
-	auto get_dockspace_id() const noexcept -> unsigned;
-	bool is_fullscreened() const noexcept;
+	// Wire output pointers for window state. Only call on main thread!
+	void set_window_visible_output(bool* out) noexcept;
+	// Wire output pointers for window state. Only call on main thread!
+	void set_window_focused_output(bool* out) noexcept;
 
 	auto get_window_label() const noexcept -> ImLabel;
 	void set_window_label(std::string_view name) noexcept;
 
-	void set_window_visible_output(bool* out) noexcept;
-	void set_window_focused_output(bool* out) noexcept;
-
-	void set_layout_callable(DockerFn callable) noexcept;
+	auto get_window_id() const noexcept -> unsigned;
+	bool is_fullscreen() const noexcept;
 
 private:
 	auto get_callbacks() noexcept -> std::shared_ptr<Callbacks>;

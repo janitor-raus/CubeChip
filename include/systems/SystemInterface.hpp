@@ -82,7 +82,7 @@ protected:
 	std::unique_ptr<BasicKeyboard> m_input;
 
 protected:
-	SystemInterface(std::string_view family_name) noexcept;
+	SystemInterface(std::string_view window_anme) noexcept;
 
 public:
 	virtual ~SystemInterface() noexcept = default;
@@ -92,7 +92,7 @@ public:
 	void stop_workers() noexcept;
 
 	virtual const SystemDescriptor& get_descriptor() const noexcept = 0;
-	static std::string make_system_id(u32 id, std::string_view family_name) noexcept;
+	static std::string make_system_id(u32 id, std::string_view identifier) noexcept;
 
 public:
 	std::string get_system_id() const noexcept;

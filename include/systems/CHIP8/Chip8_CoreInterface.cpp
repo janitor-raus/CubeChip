@@ -11,22 +11,52 @@
 #include "BasicLogger.hpp"
 #include "SimpleFileIO.hpp"
 #include "Millis.hpp"
-#include <imgui_internal.h>
+#include "FrontendInterface.hpp"
+#include <imgui.h>
 
 /*==================================================================*/
 
 Chip8_CoreInterface::Chip8_CoreInterface(std::size_t W, std::size_t H) noexcept
 	: SystemInterface(family_pretty_name)
-	, m_display_device(W, H, false, { "", make_system_id(instance_id, family_name)})
+	, m_display_window({ "Display", make_system_id(instance_id, "display")})
+	, m_display_device(W, H, m_display_window.get_window_label())
 {
-	m_window_host.set_layout_callable([&](auto id) noexcept {
-		//ImGui::DockBuilderRemoveNode(id);
-		//auto new_node = ImGui::DockBuilderAddNode(id, ImGuiDockNodeFlags_HiddenTabBar);
-		//ImGui::DockBuilderDockWindow(m_display_device.get_window_label(), new_node);
-		//ImGui::DockBuilderFinish(id);
-		ImGui::DockNextWindowTo(id, true);
-		blog.warn("Docking system {} to node {}", instance_id, id);
+	m_display_window.set_window_focused_output(&m_is_window_focused);
+	m_display_window.edit_callbacks([&, window_id = m_window_host.get_window_id()]
+	(auto& callbacks) noexcept {
+		callbacks.window_init = [window_id, window_class = ImGuiWindowClass()]
+		(auto& flags, auto&) mutable noexcept {
+			flags |= ImGuiWindowFlags_NoCollapse  | ImGuiWindowFlags_NoScrollWithMouse
+				  |  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings
+				  |  ImGuiWindowFlags_MenuBar;
+
+			window_class.ClassId = window_id;
+			window_class.DockingAllowUnclassed = false;
+
+			ImGui::SetNextWindowClass(&window_class);
+			ImGui::DockNextWindowTo(window_class.ClassId, true);
+			ImGui::SetNextWindowMinClientSize(ImVec2(480.0f, 360.0f)
+				* FrontendInterface::get_ui_total_scaling());
+		};
+
+		callbacks.window_body = [&](bool window_open, bool) noexcept {
+			if (window_open) { m_display_device.render_window(); }
+		};
 	});
+
+	m_display_device.set_osd_callable([&]() noexcept {
+		if (m_interrupt == Interrupt::INPUT) {
+			osd::key_press_indicator(WaveForms::pulse_t(
+				500, u32(Millis::now())).as_unipolar());
+		}
+		if (!has_system_state(EmuState::STATS)) { return; }
+		osd::simple_text_overlay(copy_statistics_string());
+	});
+
+	m_audio_device.add_audio_stream(STREAM::MAIN, 48'000);
+	m_audio_device.resume_streams();
+
+	load_preset_binds();
 
 	if (calc_file_image_sha1()) {
 		if (auto* path = add_system_path("savestate", family_name)) {
@@ -43,22 +73,6 @@ Chip8_CoreInterface::Chip8_CoreInterface(std::size_t W, std::size_t H) noexcept
 				"permanent register storage will be unavailable!", family_pretty_name);
 		}
 	}
-
-	m_display_device.set_window_focus_output(&m_is_window_focused);
-	m_display_device.set_osd_callable([&]() {
-		if (m_interrupt == Interrupt::INPUT) {
-			osd::key_press_indicator(WaveForms::pulse_t(
-				500, u32(Millis::now())).as_unipolar());
-		}
-		if (has_system_state(EmuState::STATS)) {
-			osd::simple_text_overlay(copy_statistics_string());
-		}
-	});
-
-	m_audio_device.add_audio_stream(STREAM::MAIN, 48'000);
-	m_audio_device.resume_streams();
-
-	load_preset_binds();
 }
 
 /*==================================================================*/
