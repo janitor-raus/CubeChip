@@ -8,18 +8,13 @@
 
 #include <optional>
 #include <utility>
-#include <array>
 #include <span>
-#include <bit>
 
 #include "EzMaths.hpp"
 #include "AtomSharedPtr.hpp"
-#include "HDIS_HCIS.hpp"
 #include "Thread.hpp"
 
 #include "WindowHost.hpp"
-#include "BasicLogger.hpp"
-#include "ArrayOps.hpp"
 #include "SimpleTimer.hpp"
 #include "BasicInput.hpp"
 #include "Well512.hpp"
@@ -27,6 +22,7 @@
 #include "FileImage.hpp"
 
 #include <SDL3/SDL_scancode.h>
+#include <fmt/format.h>
 
 /*==================================================================*/
 

@@ -9,6 +9,8 @@
 #define ENABLE_CHIP8_SYSTEM
 #ifdef ENABLE_CHIP8_SYSTEM
 
+#include <array>
+
 #include "../SystemInterface.hpp"
 
 #include "AssignCast.hpp"

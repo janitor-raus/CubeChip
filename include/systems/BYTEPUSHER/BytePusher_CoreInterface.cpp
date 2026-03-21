@@ -8,6 +8,7 @@
 
 #ifdef ENABLE_BYTEPUSHER_SYSTEM
 
+#include "BasicLogger.hpp"
 #include "BasicInput.hpp"
 #include "SimpleFileIO.hpp"
 #include "FrontendInterface.hpp"

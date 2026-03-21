@@ -12,6 +12,7 @@
 #if defined(ENABLE_BYTEPUSHER_SYSTEM) && defined(ENABLE_BYTEPUSHER_STANDARD)
 
 #include "SystemDescriptor.hpp"
+#include "ArrayOps.hpp"
 
 /*==================================================================*/
 

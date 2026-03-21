@@ -12,12 +12,13 @@
 #include "Millis.hpp"
 #include "SHA1.hpp"
 
+#include "BasicLogger.hpp"
 #include "SystemInterface.hpp"
 #include "SystemDescriptor.hpp"
 #include "SystemStaging.hpp"
 #include "FrontendInterface.hpp"
 
-#include <imgui_internal.h>
+#include <imgui.h>
 
 /*==================================================================*/
 

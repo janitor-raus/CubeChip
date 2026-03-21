@@ -13,6 +13,7 @@
 
 #include "SystemDescriptor.hpp"
 #include "Map2D.hpp"
+#include "ArrayOps.hpp"
 
 /*==================================================================*/
 

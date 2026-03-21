@@ -10,7 +10,7 @@
 #include <fstream>
 #include <utility>
 #include <cstddef>
-#include <memory>
+#include <atomic>
 #include <filesystem>
 
 #include "Concepts.hpp"

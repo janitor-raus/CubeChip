@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <bit>
+#include <array>
 #include <numeric>
 #include <cstddef>
 #include <algorithm>
