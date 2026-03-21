@@ -33,10 +33,8 @@ concept VoidInvocableID = std::is_nothrow_invocable_r_v<void, Fn, unsigned>;
 class FrontendInterface {
 public:
 	using Func   = std::function<void()>;
-	using FuncID = std::function<void(unsigned)>;
 
 	using LiveHook   = std::shared_ptr<Func>;
-	using LiveHookID = std::shared_ptr<FuncID>;
 
 	using LabelKey = ImLabel;
 	using OrderKey = std::pair<std::size_t, std::string>;
@@ -56,9 +54,6 @@ private:
 		HookRegistry() = default;
 	};
 
-	using HookRegistryDockMap = std::unordered_map
-		<unsigned, HookRegistry<FuncID>>;
-
 	using HookRegistryMenuMap = std::unordered_map
 		<LabelKey, std::map<OrderKey, HookRegistry<Func>>>;
 
@@ -72,7 +67,6 @@ private:
 
 	struct RegistryAggregate {
 		RegistryBox<HookRegistry<Func>>  windows{};
-		RegistryBox<HookRegistryDockMap> dockers{};
 		RegistryBox<HookRegistryMenuMap> menus{};
 	};
 
@@ -96,27 +90,6 @@ public:
 		} else {
 			std::scoped_lock lock(s_gui_hooks->windows.overflow_lock); // must wait to acquire
 			s_gui_hooks->windows.overflow.buffer.push_back(shared_ptr);
-		}
-
-		return shared_ptr;
-	}
-
-	/**
-	 * @brief Registers a nothrow callable to be invoked during the dock building phase.
-	 * Returns a Hook (shared_ptr) that is used to manage lifetime of the registration.
-	 * When the Hook is destroyed, the callable is unregistered automatically.
-	 * Nesting is allowed, but lifetime of the nested hook is not extended automatically.
-	 */
-	template <VoidInvocableID Fn> [[nodiscard]]
-	static LiveHookID register_docker(unsigned dock_id, Fn&& fn) noexcept {
-		auto shared_ptr = std::make_shared<FuncID>(std::forward<Fn>(fn));
-
-		if (s_gui_hooks->dockers.registry_lock.try_lock()) { // may fail spuriously (fine)
-			s_gui_hooks->dockers.registry[dock_id].buffer.push_back(shared_ptr);
-			s_gui_hooks->dockers.registry_lock.unlock();
-		} else {
-			std::scoped_lock lock(s_gui_hooks->dockers.overflow_lock); // must wait to acquire
-			s_gui_hooks->dockers.overflow[dock_id].buffer.push_back(shared_ptr);
 		}
 
 		return shared_ptr;

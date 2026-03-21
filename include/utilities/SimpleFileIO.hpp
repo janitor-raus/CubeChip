@@ -10,10 +10,12 @@
 #include <fstream>
 #include <utility>
 #include <cstddef>
+#include <memory>
 #include <filesystem>
 
 #include "Concepts.hpp"
 #include "Expected.hpp"
+#include "StringJoin.hpp"
 
 /*==================================================================*/
 
@@ -106,6 +108,39 @@ namespace fs {
 		std::error_code error;
 		auto value = std::filesystem::is_regular_file(file_path, error);
 		return ::make_expected(std::move(value), std::move(error));
+	}
+
+	[[maybe_unused]]
+	inline auto is_directory(const Path& file_path) noexcept {
+		std::error_code error;
+		auto value = std::filesystem::is_directory(file_path, error);
+		return ::make_expected(std::move(value), std::move(error));
+	}
+
+	[[maybe_unused]]
+	inline auto is_writable_directory(const Path& dir) noexcept
+		-> Expected<bool, std::error_code>
+	{
+		std::error_code ec;
+
+		const bool is_dir = std::filesystem::is_directory(dir, ec);
+		if (ec) { return ::make_unexpected(std::move(ec)); }
+		else if (!is_dir) { return false; }
+
+		static std::atomic<unsigned> s_counter = 0;
+		const auto test_file = dir / ::join(".__fs_write_test_", std::to_string(
+			s_counter.fetch_add(1, std::memory_order::relaxed)), ".tmp");
+
+		{
+			std::ofstream stream(test_file, std::ios::out | std::ios::trunc);
+			if (!stream.is_open()) {
+				return ::make_unexpected(std::make_error_code(std::errc::permission_denied));
+			}
+		}
+
+		const bool removed = std::filesystem::remove(test_file, ec);
+		if (ec) { return ::make_unexpected(std::move(ec));}
+		else { return removed; }
 	}
 
 	/**

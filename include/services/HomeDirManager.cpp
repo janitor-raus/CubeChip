@@ -12,6 +12,7 @@
 #include "PathGetters.hpp"
 
 #include <SDL3/SDL_messagebox.h>
+#include <fmt/format.h>
 
 /*==================================================================*/
 
@@ -22,91 +23,98 @@ static toml::table s_config_model{};
 
 /*==================================================================*/
 
-static void trigger_fatal_error(const char* error) noexcept {
-	blog.fatal(error);
-	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING,
-		"Fatal Initialization Error", error, nullptr);
-}
-
-static bool is_location_writable(const char* path) noexcept {
-	if (!path) { return false; }
-	const auto file = fs::Path(path) / "__DELETE_ME__";
-	std::ofstream test(file);
-
-	if (test.is_open()) {
-		test.close();
-		const auto result = fs::remove(file);
-		return result && result.value();
-	} else {
-		return false;
-	}
+template <typename... T>
+static void println_fatal(fmt::format_string<T...> fmt_str, T&&... args) noexcept {
+	std::string message = fmt::format(fmt_str, std::forward<T>(args)...);
+	fmt::println(stderr, "{}", message);
+	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,
+		"Fatal Initialization Error", message.c_str(), nullptr);
 }
 
 /*==================================================================*/
-	#pragma region HomeDirManager Class
 
 HomeDirManager::HomeDirManager(
 	std::string_view home_override, std::string_view config_name,
-	bool force_portable, std::string_view org, std::string_view app,
-	bool& error_on_init
+	bool force_portable, std::string_view org, std::string_view app
 ) noexcept {
-	if (!set_home_path(home_override, force_portable, org, app))
-		{
-		error_on_init = true; return; }
+	set_home_path(home_override, force_portable, org, app);
+	if (s_home_path.empty()) { return; }
 
 	if (config_name.empty()) { config_name = "settings.toml"; }
 	s_config_at = (fs::Path(s_home_path) / config_name).string();
 }
 
-bool HomeDirManager::set_home_path(
+HomeDirManager* HomeDirManager::initialize(
+	std::string_view home_override, std::string_view config_name,
+	bool force_portable, std::string_view org, std::string_view app
+) noexcept {
+	static HomeDirManager self(home_override, config_name, force_portable, org, app);
+	return s_home_path.empty() ? nullptr : &self;
+}
+
+/*==================================================================*/
+
+void HomeDirManager::set_home_path(
 	std::string_view home_override, bool force_portable,
-	std::string_view org, std::string_view app) noexcept
-{
+	std::string_view org, std::string_view app
+) noexcept {
 	if (!home_override.empty()) {
-		if (::is_location_writable(home_override.data())) {
-			blog.info("Home path override successful!");
-			s_home_path = home_override;
-			return true;
+		const auto writable_dir = fs::is_writable_directory(home_override);
+		if (writable_dir.value_or(false)) {
+			fmt::println("Home path (--homedir) has been successfully "
+				"re-routed to '{}'.", (s_home_path = home_override));
+			return;
 		} else {
-			::trigger_fatal_error("Home path override failure: cannot write to location!");
-			return false;
+			::println_fatal("Failed to re-route Home path (--homedir) to '{}': {}", home_override,
+				writable_dir.error() ? writable_dir.error().message() : "not a directory or doesn't exist!");
+			return;
 		}
 	}
 
 	if (force_portable) {
-		if (::is_location_writable(::get_base_path())) {
-			blog.info("Forced portable mode successful!");
-			s_home_path = ::get_base_path();
-			return true;
+		const auto writable_dir = fs::is_writable_directory(::get_base_path());
+		if (writable_dir.value_or(false)) {
+			fmt::println("Home path (--portable) has been successfully "
+				"re-routed to '{}'.", (s_home_path = ::get_base_path()));
+			return;
 		} else {
-			::trigger_fatal_error("Forced portable mode failure: cannot write to location!");
-			return false;
+			::println_fatal("Failed to re-route Home path (--portable) to '{}': {}", ::get_base_path(),
+				writable_dir.error() ? writable_dir.error().message() : "cannot write to directory!");
+			return;
 		}
 	}
 
-	if (::get_base_path()) {
-		const auto fileExists = fs::exists(fs::Path(::get_base_path()) / "portable.txt");
-		if (fileExists && fileExists.value()) {
-			if (::is_location_writable(::get_base_path())) {
-				s_home_path = ::get_base_path();
-				return true;
+	if (!::get_base_path().empty()) {
+		if (fs::exists(fs::Path(::get_base_path()) / "portable.txt").value_or(false)) {
+			const auto writable_dir = fs::is_writable_directory(::get_base_path());
+			if (writable_dir.value_or(false)) {
+				fmt::println("Home path (portable.txt) has been successfully "
+					"re-routed to '{}'.", (s_home_path = ::get_base_path()));
+				return;
 			} else {
-				blog.error("Portable mode: cannot write to location, falling back to Home path!");
+				::println_fatal("Failed to re-route Home path (portable.txt) to '{}': {}"
+					"\nIgnoring error and falling back to default Home path detection!", ::get_base_path(),
+					writable_dir.error() ? writable_dir.error().message() : "cannot write to directory!");
 			}
 		}
 	}
 
-	if (::is_location_writable(::get_home_path(
+	const auto writable_dir = fs::is_writable_directory(::get_home_path(
 		org.empty() ? nullptr : org.data(),
 		app.empty() ? nullptr : app.data()
-	))) {
-		s_home_path = ::get_home_path();
-		return true;
+	));
+	if (writable_dir.value_or(false)) {
+		fmt::println("Home path has been successfully "
+			"set to '{}'.", (s_home_path = ::get_home_path()));
+		return;
 	} else {
-		::trigger_fatal_error("Failed to determine Home path: cannot write to location!");
-		return false;
+		::println_fatal("Failed to determine if '{}' is writable: {}", ::get_home_path(),
+			writable_dir.error() ? writable_dir.error().message() : "not a directory or doesn't exist!");
+		return;
 	}
 }
+
+/*==================================================================*/
 
 void HomeDirManager::parse_app_config_file() const noexcept {
 	if (const auto result = TomlConfig::parse_from_file(s_config_at.c_str())) {
@@ -142,15 +150,4 @@ void HomeDirManager::update_map_from_config(const SettingsMap& map) const noexce
 		});
 	}
 }
-
-HomeDirManager* HomeDirManager::initialize(
-	std::string_view home_override, std::string_view config_name,
-	bool force_portable, std::string_view org, std::string_view app
-) noexcept {
-	static bool error_on_init{};
-	static HomeDirManager self(home_override, config_name, force_portable, org, app, error_on_init);
-	return error_on_init ? nullptr : &self;
-}
-
-	#pragma endregion
-/*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
+/*==================================================================*/

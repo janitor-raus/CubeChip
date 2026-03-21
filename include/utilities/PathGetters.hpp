@@ -6,11 +6,15 @@
 
 #pragma once
 
+#include <string_view>
+
 /*==================================================================*/
 
-const char* get_home_path(
+// SDL-backed pref-path getter. The first call is statically cached and reused thereafter.
+std::string_view get_home_path(
 	const char* org = nullptr,
 	const char* app = nullptr
 ) noexcept;
 
-const char* get_base_path() noexcept;
+// SDL-backed base-path getter. The first call is statically cached and reused thereafter.
+std::string_view get_base_path() noexcept;

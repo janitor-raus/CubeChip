@@ -155,8 +155,8 @@ FrontendHost* FrontendHost::init_application(
 	static FrontendHost* self = nullptr;
 	if (self) { return self; }
 
-	HDM = HomeDirManager::initialize(
-		home_override, config_name, force_portable, c_org_name, c_app_name);
+	HDM = HomeDirManager::initialize(home_override, config_name,
+		force_portable, c_org_name, c_app_name);
 	if (!HDM) { return nullptr; }
 
 	blog.create_log(std::to_string(thread_affinity::get_process_id()),

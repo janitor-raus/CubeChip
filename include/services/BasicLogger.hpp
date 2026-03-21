@@ -103,7 +103,6 @@ public:
 };
 
 /*==================================================================*/
-	#pragma region BasicLogger Singleton Class
 
 class BasicLoggerContext;
 
@@ -180,7 +179,6 @@ public:
 	void fatal(const char* message) noexcept { push_entry(BLOG::FTL, std::string(message)); }
 };
 
-	#pragma endregion
-/*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
+/*==================================================================*/
 
 extern BasicLogger& blog;

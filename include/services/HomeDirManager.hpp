@@ -14,8 +14,7 @@
 class HomeDirManager final {
 	HomeDirManager(
 		std::string_view home_override, std::string_view config_name,
-		bool force_portable, std::string_view org, std::string_view app,
-		bool& error_on_init
+		bool force_portable, std::string_view org, std::string_view app
 	) noexcept;
 
 	HomeDirManager(const HomeDirManager&) = delete;
@@ -29,7 +28,7 @@ private:
 	std::string s_config_at{};
 
 private:
-	bool set_home_path(std::string_view home_override, bool portable,
+	void set_home_path(std::string_view home_override, bool portable,
 		std::string_view org, std::string_view app) noexcept;
 public:
 	static const auto& get_home_path() noexcept { return s_home_path; }

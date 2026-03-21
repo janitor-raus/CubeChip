@@ -61,21 +61,21 @@ struct ProjectVersion {
 	constexpr static inline auto patch_i = PROJECT_VERSION_PATCH_I;
 	constexpr static inline auto tweak_i = PROJECT_VERSION_TWEAK_I;
 
-	constexpr static inline auto* major = PROJECT_VERSION_MAJOR;
-	constexpr static inline auto* minor = PROJECT_VERSION_MINOR;
-	constexpr static inline auto* patch = PROJECT_VERSION_PATCH;
-	constexpr static inline auto* tweak = PROJECT_VERSION_TWEAK;
+	constexpr static inline const char* major = PROJECT_VERSION_MAJOR;
+	constexpr static inline const char* minor = PROJECT_VERSION_MINOR;
+	constexpr static inline const char* patch = PROJECT_VERSION_PATCH;
+	constexpr static inline const char* tweak = PROJECT_VERSION_TWEAK;
 
-	constexpr static inline auto* ghash = PROJECT_VERSION_GHASH;
+	constexpr static inline const char* ghash = PROJECT_VERSION_GHASH;
 
-	constexpr static inline auto* with_date = PROJECT_VERSION_WITH_DATE;
-	constexpr static inline auto* with_hash = PROJECT_VERSION_WITH_HASH;
+	constexpr static inline const char* with_date = PROJECT_VERSION_WITH_DATE;
+	constexpr static inline const char* with_hash = PROJECT_VERSION_WITH_HASH;
 };
 
 constexpr static inline ProjectVersion c_app_ver{};
 
-constexpr auto* c_app_name = PROJECT_NAME;
-constexpr auto* c_org_name = "";
+constexpr const char* c_app_name = PROJECT_NAME;
+constexpr const char* c_org_name = "";
 
 /*==================================================================*/
 

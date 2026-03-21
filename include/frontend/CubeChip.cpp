@@ -59,7 +59,7 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 				cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
 
 		options.add_options("Configuration")
-			("homedir",  "Force application to use a different home directory to read/write files.",
+			("homedir",  "Force application to use a different home directory to read/write files. Takes precedence over --portable.",
 				cxxopts::value<std::string>())
 			("config",   "Force application to use a different config file to load/save settings, relative to the home directory.",
 				cxxopts::value<std::string>())

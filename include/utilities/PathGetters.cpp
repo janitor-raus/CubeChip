@@ -10,15 +10,21 @@
 
 /*==================================================================*/
 
-const char* get_home_path(
+std::string_view get_home_path(
 	const char* org,
 	const char* app
 ) noexcept {
-	static auto* home_path = SDL_GetPrefPath(org, app);
+	static std::string_view home_path = [&]() noexcept {
+		auto* path = SDL_GetPrefPath(org, app);
+		return path ? path : "";
+	}();
 	return home_path;
 }
 
-const char* get_base_path() noexcept {
-	static auto* base_path = SDL_GetBasePath();
+std::string_view get_base_path() noexcept {
+	static std::string_view base_path = [&]() noexcept {
+		auto* path = SDL_GetBasePath();
+		return path ? path : "";
+	}();
 	return base_path;
 }
