@@ -40,7 +40,7 @@ Chip8_CoreInterface::Chip8_CoreInterface(std::size_t W, std::size_t H) noexcept
 		};
 
 		callbacks.window_body = [&](bool window_open, bool) noexcept {
-			if (window_open) { m_display_device.render_window(); }
+			if (window_open) { m_display_device.render_display(); }
 		};
 	});
 

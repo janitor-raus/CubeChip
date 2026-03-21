@@ -46,9 +46,8 @@ public:
 		, m_swapchain(int(W), int(H))
 		, m_staging_data(int(W), int(H))
 		, m_osd_callable(nullptr)
-		, m_settings_menu_hook(!window_label ? nullptr
-			: bind_settings_menu(std::move(window_label))
-		)
+		, m_settings_menu_hook(window_label->empty() ? nullptr
+			: bind_settings_menu(std::move(window_label)))
 	{
 		if (m_staging_data.get_base_frame().area() != (W * H)) {
 			blog.warn("Display W/H out of size bounds, clamping!");
@@ -56,7 +55,7 @@ public:
 	}
 
 public:
-	void render_window() noexcept {
+	void render_display() noexcept {
 		if (ImGui::BeginChild("##display_child")) {
 			m_swapchain.present([&](auto frame) noexcept {
 				if (frame.dirty) {
@@ -347,8 +346,8 @@ void DisplayDevice::set_utilize_shaders(bool enable) noexcept {
 	m_context->m_utilize_shaders = enable;
 }
 
-void DisplayDevice::render_window() noexcept {
-	m_context->render_window();
+void DisplayDevice::render_display() noexcept {
+	m_context->render_display();
 }
 
 void DisplayDevice::set_osd_callable(Callable callable) noexcept {
