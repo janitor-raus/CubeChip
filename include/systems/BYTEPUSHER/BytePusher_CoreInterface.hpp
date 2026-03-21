@@ -9,6 +9,8 @@
 #define ENABLE_BYTEPUSHER_SYSTEM
 #ifdef ENABLE_BYTEPUSHER_SYSTEM
 
+#include <array>
+
 #include "../SystemInterface.hpp"
 
 #include "AudioDevice.hpp"
@@ -56,7 +58,7 @@ public:
 	void main_system_loop() override;
 
 protected:
-	static constexpr RGBA c_bit_colors[]{
+	static constexpr std::array<RGBA, 256> c_bit_colors = {
 		0x000000FF, 0x000033FF, 0x000066FF, 0x000099FF,
 		0x0000CCFF, 0x0000FFFF, 0x003300FF, 0x003333FF,
 		0x003366FF, 0x003399FF, 0x0033CCFF, 0x0033FFFF,
