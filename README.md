@@ -71,4 +71,5 @@ Some extension combinations aren't possible, see footnotes for now. Due to major
 - [ ] Start work on supporting initializing system instances and feeding them custom data, and controlling exact runtime parameters to allow for actual support of single-step-tests later.
 - [ ] Figure out a good way to serialize, version, and differentiate the full state of different systems for savestate support, with modular assembly of each eligible component of a system at the lower end, and also the inheritance layers at the high end.
 - [ ] Modify the audio backend to allow for streams with differing stream io formats, rather than being restricted to having the same on both ends. Required for BytePusher running under custom framerate.
+- [ ] Figure out a decent way to capture internal/output screenshots from a system, probably through SDL.
 - [ ] Find time to focus entirely on progressing the Gameboy (Color) family interface and system cores.
