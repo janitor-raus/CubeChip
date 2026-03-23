@@ -18,14 +18,15 @@
 
 BytePusher_CoreInterface::BytePusher_CoreInterface(std::size_t W, std::size_t H) noexcept
 	: SystemInterface(family_pretty_name)
-	, m_display_window({ "Display", make_system_id(instance_id, "display") })
+	, m_display_window({ "Display", make_system_id(instance_id, "display") }, true)
 	, m_display_device(W, H, m_display_window.get_window_label())
 {
 	m_display_window.set_window_focused_output(&m_is_window_focused);
-	m_display_window.edit_callbacks([&, window_id = m_window_host.get_window_id()]
-	(auto& callbacks) noexcept {
-		callbacks.window_init = [window_id, window_class = ImGuiWindowClass()]
-		(auto& flags, auto&) mutable noexcept {
+	m_display_window.edit_callbacks([&](auto& callbacks) noexcept {
+		callbacks.window_init = [
+			window_id = m_window_host.get_window_id(),
+			window_class = ImGuiWindowClass()
+		](auto& flags, auto&) mutable noexcept {
 			window_class.ClassId = window_id;
 			window_class.DockingAllowUnclassed = false;
 
@@ -85,11 +86,12 @@ void BytePusher_CoreInterface::load_preset_binds() noexcept {
 u32  BytePusher_CoreInterface::get_key_states() noexcept {
 	auto key_states = 0u;
 
-	m_input->update_states();
+	m_input.advance_state();
 
 	for (const auto& mapping : m_custom_binds) {
-		if (m_input->are_any_held(mapping.key, mapping.alt))
-			{ key_states |= 1u << mapping.idx; }
+		if (m_input.is_held(mapping.key) || m_input.is_held(mapping.alt)) {
+			key_states |= 1 << mapping.idx;
+		}
 	}
 
 	return key_states;

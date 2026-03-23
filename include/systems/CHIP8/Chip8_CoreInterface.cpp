@@ -18,14 +18,15 @@
 
 Chip8_CoreInterface::Chip8_CoreInterface(std::size_t W, std::size_t H) noexcept
 	: SystemInterface(family_pretty_name)
-	, m_display_window({ "Display", make_system_id(instance_id, "display")})
+	, m_display_window({ "Display", make_system_id(instance_id, "display")}, true)
 	, m_display_device(W, H, m_display_window.get_window_label())
 {
 	m_display_window.set_window_focused_output(&m_is_window_focused);
-	m_display_window.edit_callbacks([&, window_id = m_window_host.get_window_id()]
-	(auto& callbacks) noexcept {
-		callbacks.window_init = [window_id, window_class = ImGuiWindowClass()]
-		(auto& flags, auto&) mutable noexcept {
+	m_display_window.edit_callbacks([&](auto& callbacks) noexcept {
+		callbacks.window_init = [
+			window_id = m_window_host.get_window_id(),
+			window_class = ImGuiWindowClass()
+		](auto& flags, auto&) mutable noexcept {
 			flags |= ImGuiWindowFlags_NoCollapse  | ImGuiWindowFlags_NoScrollWithMouse
 				  |  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings
 				  |  ImGuiWindowFlags_MenuBar;
@@ -80,14 +81,15 @@ Chip8_CoreInterface::Chip8_CoreInterface(std::size_t W, std::size_t H) noexcept
 void Chip8_CoreInterface::update_key_states() noexcept {
 	if (!m_custom_binds.size()) { return; }
 
-	m_input->update_states();
+	m_input.advance_state();
 
 	m_keys_last = m_keys_this;
 	m_keys_this = 0;
 
 	for (const auto& mapping : m_custom_binds) {
-		if (m_input->are_any_held(mapping.key, mapping.alt))
-			{ m_keys_this |= 1 << mapping.idx; }
+		if (m_input.is_held(mapping.key) || m_input.is_held(mapping.alt)) {
+			m_keys_this |= 1 << mapping.idx;
+		}
 	}
 
 	m_keys_loop &= m_keys_hide &= ~(m_keys_last ^ m_keys_this);

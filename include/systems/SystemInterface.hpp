@@ -74,8 +74,8 @@ private:
 		m_statistics_data{};
 
 protected:
-	std::unique_ptr<Well512>       m_rng;
-	std::unique_ptr<BasicKeyboard> m_input;
+	std::unique_ptr<Well512> m_rng;
+	BasicKeyboard m_input;
 
 protected:
 	SystemInterface(std::string_view window_anme) noexcept;

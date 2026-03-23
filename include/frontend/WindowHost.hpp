@@ -64,6 +64,14 @@ private:
 	void set_callbacks(std::shared_ptr<Callbacks> new_callbacks) noexcept;
 
 public:
+	/**
+	 * @brief Edit the window's callbacks. A copy of the current callbacks is made and passed to the provided
+	 *        function as a reference, allowing for partial callback updates to take place atomically.
+	 *        Users are encouraged to take advantage of lambda captures (and be careful of expiring ref captures)
+	 *        when editing the callbacks to benefit from function storage captures for additional state control.
+	 * @tparam Fn A void-returning invocable type that takes a reference to a Callbacks object. Must not throw exceptions.
+	 * @param fn The function to invoke with the copied callbacks for editing. The modified callbacks will be set atomically after the function returns.
+	 */
 	template <typename Fn>
 		requires(std::is_nothrow_invocable_r_v<void, Fn, Callbacks&>)
 	void edit_callbacks(Fn&& fn) noexcept {

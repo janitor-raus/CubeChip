@@ -12,6 +12,9 @@
 #include <SDL3/SDL_mouse.h>
 
 #include <concepts>
+#include <atomic>
+#include <memory>
+#include <array>
 
 /*==================================================================*/
 
@@ -27,40 +30,55 @@ enum BIC_Button : unsigned {
 };
 
 /*==================================================================*/
-	#pragma region BasicKeyboard Class
 
 class BasicKeyboard final {
-	static constexpr auto TOTALKEYS = 0u + SDL_SCANCODE_COUNT;
-
-	bool m_old_state[TOTALKEYS]{};
-	bool m_new_state[TOTALKEYS]{};
+	static constexpr size_t c_total_keys = SDL_SCANCODE_COUNT;
 
 public:
-	void update_states() noexcept;
+	using Buffer = std::array<bool, c_total_keys>;
 
-	bool was_held   (SDL_Scancode key) const noexcept { return m_old_state[key]; }
-	bool is_held    (SDL_Scancode key) const noexcept { return m_new_state[key]; }
-	bool is_pressed (SDL_Scancode key) const noexcept { return !was_held(key) &&  is_held(key); }
-	bool is_released(SDL_Scancode key) const noexcept { return  was_held(key) && !is_held(key); }
+private:
+	static inline Buffer s_buffers[2]{};
+	static inline std::atomic<Buffer*>
+		s_current = &s_buffers[0];
 
-	template <std::same_as<SDL_Scancode>... S>
-		requires (sizeof...(S) >= 1)
-	bool are_all_held(S... code) const noexcept {
-		return (is_held(code) && ...);
+	static auto* get_active_buffer() noexcept {
+		return s_current.load(std::memory_order::acquire);
 	}
 
-	template <std::same_as<SDL_Scancode>... S>
-		requires (sizeof...(S) >= 1)
-	bool are_any_held(S... code) const noexcept {
-		return (is_held(code) || ...);
+	static auto* get_backup_buffer() noexcept {
+		return get_active_buffer() == &s_buffers[0]
+			? &s_buffers[1] : &s_buffers[0];
 	}
-};
 
-	#pragma endregion
-/*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
+	static void swap_active_buffer() noexcept {
+		s_current.store(get_backup_buffer(), std::memory_order::release);
+	}
+
+public:
+	// Must only call on the main thread!
+	static void poll_global_state() noexcept;
 
 /*==================================================================*/
-	#pragma region BasicMouse Class
+private:
+	struct BufferState;
+	std::unique_ptr<BufferState> m_buffers;
+
+public:
+	BasicKeyboard() noexcept;
+	~BasicKeyboard() noexcept;
+
+public:
+	bool was_held(SDL_Scancode key) const noexcept;
+	bool is_held(SDL_Scancode key) const noexcept;
+
+	bool is_pressed(SDL_Scancode key) const noexcept;
+	bool is_released(SDL_Scancode key) const noexcept;
+
+	void advance_state() noexcept;
+};
+
+/*==================================================================*/
 
 class BasicMouse final {
 	unsigned m_new_state{}, m_old_state{};
@@ -92,6 +110,3 @@ public:
 		return (is_held(code) || ...);
 	}
 };
-
-	#pragma endregion
-/*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/

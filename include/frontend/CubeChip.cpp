@@ -5,6 +5,7 @@
 */
 
 #include "BasicLogger.hpp"
+#include "BasicInput.hpp"
 #include "AttachConsole.hpp"
 
 #include <cxxopts.hpp>
@@ -113,6 +114,7 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 SDL_AppResult SDL_AppIterate(void *pHost) {
 	auto* Host = static_cast<FrontendHost*>(pHost);
 
+	BasicKeyboard::poll_global_state();
 	return SDL_AppResult(Host->process_client_frame());
 }
 

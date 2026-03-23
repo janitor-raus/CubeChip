@@ -29,7 +29,6 @@ SystemInterface::SystemInterface(std::string_view window_anme) noexcept
 	}())
 	, m_statistics_data(std::make_shared<std::string>())
 	, m_rng(std::make_unique<Well512>(Millis::initial()))
-	, m_input(std::make_unique<BasicKeyboard>())
 	, m_window_host({ window_anme, make_system_id(instance_id, "system")})
 	, m_file_image(std::move(SystemStaging::file_image))
 {

@@ -271,10 +271,10 @@ int FrontendHost::process_client_frame() {
 }
 
 void FrontendHost::handle_main_hotkeys() {
-	static BasicKeyboard Input;
-	Input.update_states();
+	static BasicKeyboard s_input;
+	s_input.advance_state();
 
-	if (Input.is_pressed(KEY(F8))) {
+	if (s_input.is_pressed(KEY(F8))) {
 		CoreRegistry::load_game_database();
 	}
 
@@ -282,30 +282,30 @@ void FrontendHost::handle_main_hotkeys() {
 		auto& system = m_systems[m_focus_mru[0]];
 		const auto& descriptor = system->get_descriptor();
 
-		if (Input.are_any_held(KEY(LSHIFT), KEY(RSHIFT))
-			&& Input.is_pressed(KEY(ESCAPE))
+		if ((s_input.is_held(KEY(LSHIFT)) || s_input.is_held(KEY(RSHIFT)))
+			&& s_input.is_pressed(KEY(ESCAPE))
 		) {
 			blog.info("System '{}' ({}) terminated by hotkey.",
 				descriptor.system_name, m_focus_mru[0]);
 			unload_system_instance(); return;
 		}
-		//if (Input.is_pressed(KEY(BACKSPACE))) {
+		//if (s_input.is_pressed(KEY(BACKSPACE))) {
 		//	// XXX - need to perform manual system reset now
 		//	blog.info("Emulator core restarted manually.");
 		//	return;
 		//}
-		if (Input.is_pressed(KEY(F9))) {
+		if (s_input.is_pressed(KEY(F9))) {
 			if (auto paused = system->try_pause_system()) {
 				blog.info("System '{}' ({}) {} by hotkey!",
 					descriptor.system_name, m_focus_mru[0],
 					*paused ? "paused" : "unpaused");
 			}
 		}
-		if (Input.is_pressed(KEY(F11))) {
+		if (s_input.is_pressed(KEY(F11))) {
 			system.statistics = !system.statistics;
 			toggle_system_statistics(system);
 		}
-		if (Input.is_pressed(KEY(F10))) {
+		if (s_input.is_pressed(KEY(F10))) {
 			system.delimiters = !system.delimiters;
 			toggle_system_delimiters(system);
 		}

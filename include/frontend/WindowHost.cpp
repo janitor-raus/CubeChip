@@ -60,6 +60,8 @@ private:
 	void render_window() noexcept {
 		using FI = FrontendInterface;
 
+		// XXX - this won't work currently with docked windows, and also it should be flexible,
+		//       meaning we should allow the user to define the behavior and possibly trigger point
 		static constexpr auto toggle_fullscreen_mode = [](bool allowed, bool& state) noexcept {
 			if (!allowed) { return; }
 			const auto hover_flags = ImGuiHoveredFlags_NoPopupHierarchy
