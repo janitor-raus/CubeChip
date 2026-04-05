@@ -43,7 +43,7 @@ namespace ImGui {
 	ImVec2 min  (const ImVec2& value, const ImVec2& min) noexcept;
 	ImVec2 max  (const ImVec2& value, const ImVec2& max) noexcept;
 
-	void TextUnformatted(const char* text, unsigned color, const char* text_end = 0);
+	void TextUnformatted(const char* text, unsigned color, const char* text_end = nullptr);
 
 	void AddCursorPos(const ImVec2& delta);
 	void AddCursorPosX(float delta);

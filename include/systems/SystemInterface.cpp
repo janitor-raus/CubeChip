@@ -22,7 +22,7 @@
 
 /*==================================================================*/
 
-SystemInterface::SystemInterface(std::string_view window_anme) noexcept
+SystemInterface::SystemInterface(std::string_view window_name) noexcept
 	: instance_id([]() noexcept {
 		static std::atomic<u32> instance_counter = 1u;
 		return instance_counter.fetch_add(1, mo::relaxed);

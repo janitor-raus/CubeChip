@@ -21,22 +21,39 @@ class WindowHost {
 
 public:
 	struct Callbacks {
-		// Pre-Begin(), for setting window flags, pushing styles/colors, and other init needs.
-		// Set the post-Begin() `&window_tidy` callable if needed, such as to pop styles.
-		std::function<void(int& window_flags, std::function<void()>& window_tidy)>
+		/**
+		 * @brief Callback for window initialization, executed before ImGui::Begin().
+		 *        Provides references to window_flags for modification and an optional
+		 *        single-call `out_callable` for immediate post-Begin() execution.
+		 */
+		std::function<void(int& window_flags, std::function<void()>& out_callable)>
 			window_init{};
 
-		// Mid-Begin(), after menubar/focus is handled where you can prepare a Dockspace.
-		std::function<void(bool open, unsigned window_id)>
+		/**
+		 * @brief Callback for window dockspace setup, executed after ImGui::Begin()
+		 *        and before the window_body() callback. Provides the `window_open`
+		 *        state and window's instance ID for docking decisions.
+		 */
+		std::function<void(bool window_open, unsigned window_id)>
 			window_dock{};
 
-		// Mid-Begin(), after the Dockspace, intended for actual window contents.
-		// The 'fullscreen' parameter signals whether the callback executes in a fullscreen context.
-		std::function<void(bool open, bool fullscreen)>
+		/**
+		 * @brief Callback for window body rendering, executed after ImGui::Begin()
+		 *        and the window_dock() callback. Provies the `window_open` state and
+		 *        the `fullscreen` state, which indicates whether the window is currently
+		 *        rendering in a fullscreen context. This callback is shared between the
+		 *        two window modes, so care should be taken to ensure the callback logic
+		 *        accounts properly for what should be rendered in each mode, if important.
+		 */
+		std::function<void(bool window_open, bool fullscreen)>
 			window_body{};
 
-		// Post-End(), for finalizing logic or for additional rendering if needed.
-		std::function<void(bool open)>
+		/**
+		 * @brief Callback for post-window rendering, executed after ImGui::End() and
+		 *        after the fullscreen mode too. Provides the `window_open` state in case
+		 *        it is important for finalization logic or for additional rendering.
+		 */
+		std::function<void(bool window_open)>
 			window_post{};
 	};
 
@@ -69,6 +86,7 @@ public:
 	 *        function as a reference, allowing for partial callback updates to take place atomically.
 	 *        Users are encouraged to take advantage of lambda captures (and be careful of expiring ref captures)
 	 *        when editing the callbacks to benefit from function storage captures for additional state control.
+	 *        Callbacks that provide boolean arguments do so for decision making purposes, such as whether the window is open.
 	 * @tparam Fn A void-returning invocable type that takes a reference to a Callbacks object. Must not throw exceptions.
 	 * @param fn The function to invoke with the copied callbacks for editing. The modified callbacks will be set atomically after the function returns.
 	 */

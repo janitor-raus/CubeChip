@@ -89,7 +89,7 @@ void FrontendHost::prune_terminated_systems() noexcept {
 	while (it != m_systems.end()) {
 		const auto& [id, system] = *it;
 
-		if (!system || !system->is_window_visible()) {
+		if (!system || !system->is_viewport_visible()) {
 			blog.info("System instance {} terminated, unloading...", id);
 			m_focus_mru.erase(id);
 			it = m_systems.erase(it);
@@ -100,7 +100,7 @@ void FrontendHost::prune_terminated_systems() noexcept {
 void FrontendHost::find_last_focused_system() noexcept {
 	bool found_focused_system = false;
 	for (const auto& id : *m_focus_mru) {
-		const bool is_focused = m_systems[id]->is_window_focused(false);
+		const bool is_focused = m_systems[id]->force_viewport_focused(false);
 
 		if (!found_focused_system && is_focused && m_focus_mru[0] != id) {
 			blog.debug("Focused system instance is now {}.", id);

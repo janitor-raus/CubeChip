@@ -72,10 +72,12 @@ private:
 			) { state = !state; }
 		};
 
+		if (m_window_visible_out && !*m_window_visible_out) { return; }
+
 		const auto callbacks    = m_callbacks.load(std::memory_order::acquire);
 		const auto window_label = get_window_label();
 
-		int window_flags = (m_fullscreen_mode && !m_disable_menubar)
+		signed window_flags = (m_fullscreen_mode && !m_disable_menubar)
 			? ImGuiWindowFlags_MenuBar : ImGuiWindowFlags_None;
 
 		std::function<void()> window_tidy = nullptr;

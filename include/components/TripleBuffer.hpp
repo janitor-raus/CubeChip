@@ -50,7 +50,9 @@ class TripleBuffer {
 		alignas(HDIS) Buffer m_swap_buffer;
 
 		alignas(HDIS) mutable std::mutex m_reader_lock;
+		mutable std::atomic<std::size_t> m_present_count{};
 		alignas(HDIS) mutable std::mutex m_worker_lock;
+		mutable std::atomic<std::size_t> m_acquire_count{};
 
 		alignas(HDIS) mutable Buffer* m_work_ptr = &m_work_buffer;
 		alignas(HDIS) mutable AtomBuf m_read_ptr = &m_read_buffer;
@@ -95,6 +97,8 @@ public:
 		: m_context(std::make_unique<TripleBufferContext>(std::forward<Args>(args)...))
 	{}
 
+	auto get_present_count() const noexcept { return m_context->m_present_count.load(std::memory_order::acquire); }
+	auto get_acquire_count() const noexcept { return m_context->m_acquire_count.load(std::memory_order::acquire); }
 
 private:
 	template <bool DIRTY>
@@ -137,6 +141,7 @@ public:
 		std::is_nothrow_invocable_v<Fn, BufferView<false>>
 	) {
 		std::scoped_lock lock(m_context->m_reader_lock);
+		m_context->m_present_count.fetch_add(1, std::memory_order::acq_rel);
 
 		if (get_dirty(m_context->m_swap_ptr.load(std::memory_order::acquire))) {
 			m_context->m_read_ptr.store(sub_dirty(m_context->m_swap_ptr.exchange(
@@ -176,6 +181,7 @@ public:
 		std::is_nothrow_invocable_v<Fn, Buffer&>
 	) {
 		std::scoped_lock lock(m_context->m_worker_lock);
+		m_context->m_acquire_count.fetch_add(1, std::memory_order::acq_rel);
 
 		if constexpr (std::is_void_v<std::invoke_result_t<Fn, Buffer&>>) {
 			std::forward<Fn>(function)(*m_context->m_work_ptr);
