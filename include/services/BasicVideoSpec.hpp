@@ -6,21 +6,15 @@
 
 #pragma once
 
-#include "LifetimeWrapperSDL.hpp"
 #include "SettingWrapper.hpp"
 #include "EzMaths.hpp"
 
-#include <functional>
-
 /*==================================================================*/
-	#pragma region BasicVideoSpec Singleton Class
+
+struct SDL_Window;
+struct SDL_Renderer;
 
 class BasicVideoSpec final {
-
-	SDL_Unique<SDL_Window>   m_main_window{};
-	SDL_Unique<SDL_Renderer> m_main_renderer{};
-
-/*==================================================================*/
 
 public:
 	struct Settings {
@@ -53,14 +47,14 @@ public:
 
 /*==================================================================*/
 
-public:
-	float get_display_refresh_rate(SDL_DisplayID display) noexcept;
-	void  normalize_rect_to_display(ez::Rect& rect, ez::Rect& deco, bool first_run) noexcept;
+private:
+	void normalize_rect_to_display(ez::Rect& rect, ez::Rect& deco, bool first_run) noexcept;
 
 /*==================================================================*/
 
-	SDL_Window*   get_main_window()   const noexcept { return m_main_window; }
-	SDL_Renderer* get_main_renderer() const noexcept { return m_main_renderer; }
+public:
+	SDL_Window*   get_main_window()   const noexcept;
+	SDL_Renderer* get_main_renderer() const noexcept;
 
 /*==================================================================*/
 
@@ -80,14 +74,20 @@ public:
 		SDL_Texture* dst_texture, SDL_Texture* src_texture) noexcept;
 
 public:
-	float get_display_pixel_density(SDL_DisplayID display_id = 0) noexcept;
-	float get_window_pixel_density(SDL_Window* window = nullptr) noexcept;
 	bool  set_window_title(const std::string& title, SDL_Window* window = nullptr) noexcept;
 	bool  is_main_window_id(unsigned id) const noexcept;
 	bool  raise_window(SDL_Window* window = nullptr) noexcept;
 
-	bool render_present(std::function<void()> render_callable) noexcept;
-};
+	template <typename Fn> requires(std::is_invocable_r_v<void, Fn>)
+	bool render_present(Fn&& render_callable) noexcept(
+		std::is_nothrow_invocable_r_v<void, Fn>
+	) {
+		set_automatic_render_scale_for_renderer();
+		std::forward<Fn>(render_callable)();
+		return try_render_present();
+	}
 
-	#pragma endregion
-/*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
+private:
+	void set_automatic_render_scale_for_renderer() noexcept;
+	bool try_render_present() noexcept;
+};

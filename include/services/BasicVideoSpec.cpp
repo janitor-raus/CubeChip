@@ -4,6 +4,7 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
+#include "LifetimeWrapperSDL.hpp"
 #include "BasicVideoSpec.hpp"
 #include "BasicLogger.hpp"
 
@@ -50,15 +51,23 @@ void throw_fatal_error(unsigned line, const char* function) noexcept(false) {
 
 /*==================================================================*/
 
+static SDL_Unique<SDL_Window>   s_main_window{};
+static SDL_Unique<SDL_Renderer> s_main_renderer{};
+
+SDL_Window*   BasicVideoSpec::get_main_window()   const noexcept { return s_main_window; }
+SDL_Renderer* BasicVideoSpec::get_main_renderer() const noexcept { return s_main_renderer; }
+
+/*==================================================================*/
+
 BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept {
 	try {
 		if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) { \
 			throw_fatal_error(__LINE__, __func__);
 		}
 
-		m_main_window = SDL_CreateWindow(nullptr, 0, 0, \
+		s_main_window = SDL_CreateWindow(nullptr, 0, 0, \
 			SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY); \
-		if (!m_main_window) { throw_fatal_error(__LINE__, __func__); }
+		if (!s_main_window) { throw_fatal_error(__LINE__, __func__); }
 
 		#if defined(_WIN32) && defined(WINDOWS_NO_ROUNDED_CORNERS)
 			#ifdef OLD_WINDOWS_SDK
@@ -69,18 +78,18 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 					"Windows SDK is too old: {}.{}.{}", NTDDI_MAJOR, NTDDI_MINOR, NTDDI_BUILD);
 			#else
 				else {
-					const auto windowHandle = SDL_GetPointerProperty(
+					const auto window_handle = SDL_GetPointerProperty(
 						SDL_GetWindowProperties(m_main_window),
 						SDL_PROP_WINDOW_WIN32_HWND_POINTER,
 						nullptr
 					);
 
-					if (windowHandle) {
-						static constexpr auto cornerMode = DWMWCP_DONOTROUND;
+					if (window_handle) {
+						static constexpr auto corner_mode = DWMWCP_DONOTROUND;
 						DwmSetWindowAttribute(
-							static_cast<HWND>(windowHandle),
+							static_cast<HWND>(window_handle),
 							DWMWA_WINDOW_CORNER_PREFERENCE,
-							&cornerMode, sizeof(cornerMode)
+							&corner_mode, sizeof(corner_mode)
 						);
 					}
 				}
@@ -98,21 +107,21 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 			#endif
 			SDL_ShowWindow(dummy);
 			SDL_SyncWindow(dummy);
-			SDL_RenderPresent(m_main_renderer);
+			SDL_RenderPresent(s_main_renderer);
 			SDL_GetWindowBordersSize(dummy, &deco.x, &deco.y, &deco.w, &deco.h);
 		}
 
 		auto window = settings.window;
 		normalize_rect_to_display(window, deco, settings.first_run);
 
-		SDL_SetWindowPosition(m_main_window, window.x, window.y);
-		SDL_SetWindowSize(m_main_window, window.w, window.h);
-		SDL_SetWindowMinimumSize(m_main_window, 960, 780);
+		SDL_SetWindowPosition(s_main_window, window.x, window.y);
+		SDL_SetWindowSize(s_main_window, window.w, window.h);
+		SDL_SetWindowMinimumSize(s_main_window, 960, 780);
 
-		m_main_renderer = SDL_CreateRenderer(m_main_window, nullptr); \
-		if (!m_main_renderer) { throw_fatal_error(__LINE__, __func__); }
+		s_main_renderer = SDL_CreateRenderer(s_main_window, nullptr); \
+		if (!s_main_renderer) { throw_fatal_error(__LINE__, __func__); }
 
-		SDL_ShowWindow(m_main_window);
+		SDL_ShowWindow(s_main_window);
 	}
 	catch (const FatalError&) {
 		success = false; return;
@@ -142,13 +151,13 @@ SettingsMap BasicVideoSpec::Settings::map() noexcept {
 auto BasicVideoSpec::export_settings() const noexcept -> Settings {
 	Settings out;
 
-	if (SDL_GetWindowFlags(m_main_window) & SDL_WINDOW_MAXIMIZED) {
-		SDL_RestoreWindow(m_main_window);
-		SDL_SyncWindow(m_main_window);
+	if (SDL_GetWindowFlags(s_main_window) & SDL_WINDOW_MAXIMIZED) {
+		SDL_RestoreWindow(s_main_window);
+		SDL_SyncWindow(s_main_window);
 	}
 
-	SDL_GetWindowPosition(m_main_window, &out.window.x, &out.window.y);
-	SDL_GetWindowSize(m_main_window, &out.window.w, &out.window.h);
+	SDL_GetWindowPosition(s_main_window, &out.window.x, &out.window.y);
+	SDL_GetWindowSize(s_main_window, &out.window.w, &out.window.h);
 	out.first_run = false;
 
 	return out;
@@ -156,43 +165,30 @@ auto BasicVideoSpec::export_settings() const noexcept -> Settings {
 
 /*==================================================================*/
 
-float BasicVideoSpec::get_display_refresh_rate(SDL_DisplayID display) noexcept {
-	if (const auto* mode = SDL_GetCurrentDisplayMode(display)) {
-		if (mode->refresh_rate_denominator > 0) {
-			return float(mode->refresh_rate_numerator) /
-				float(mode->refresh_rate_denominator);
-		} else {
-			return (mode->refresh_rate > 0.0f)
-				? mode->refresh_rate : 60.0f;
-		}
-	}
-	return 60.0f;
-}
-
 void BasicVideoSpec::normalize_rect_to_display(ez::Rect& rect, ez::Rect& deco, bool first_run) noexcept {
-	auto numDisplays =  0; // count of displays SDL found
-	auto bestDisplay = -1; // index of display our window will use
-	bool rectIntersectsDisplay{};
+	auto num_displays =  0; // count of displays SDL found
+	auto best_display = -1; // index of display our window will use
+	bool rect_intersects_display{};
 
 	// 1: fetch all eligible display IDs
-	auto displays = sdl::make_unique(SDL_GetDisplays(&numDisplays));
-	if (!displays || numDisplays <= 0) [[unlikely]]
-		{ rect = Settings::defaults; return; }
+	const auto displays = sdl::make_unique(SDL_GetDisplays(&num_displays));
+	if (!displays || num_displays <= 0) { rect = Settings::defaults; return; }
 
 	// 2: fill vector with usable display bounds rects
-	std::vector<ez::Rect> displayBounds;
-	displayBounds.reserve(numDisplays);
+	std::vector<ez::Rect> display_bounds;
+	display_bounds.reserve(num_displays);
 
-	for (auto i = 0; i < numDisplays; ++i) {
-		if (displays[i] == SDL_GetPrimaryDisplay()) { bestDisplay = i; }
+	for (auto i = 0; i < num_displays; ++i) {
+		if (displays[i] == SDL_GetPrimaryDisplay()) { best_display = i; }
 		SDL_Rect display;
 		if (SDL_GetDisplayUsableBounds(displays[i], &display)) {
-			ez::Rect bounds{ display.x, display.y, display.w, display.h };
-			displayBounds.push_back(std::move(bounds));
+			display_bounds.push_back(ez::Rect{
+				display.x, display.y,
+				display.w, display.h
+			});
 		}
 	}
-	if (displayBounds.empty()) [[unlikely]]
-		{ rect = Settings::defaults; return; }
+	if (display_bounds.empty()) { rect = Settings::defaults; return; }
 
 	// 3: validate rect w/h, use fallbacks if needed
 	rect.w = std::max(rect.w, Settings::defaults.w);
@@ -200,27 +196,27 @@ void BasicVideoSpec::normalize_rect_to_display(ez::Rect& rect, ez::Rect& deco, b
 
 	if (!first_run) {
 		// 4: find largest window/display overlap, if any
-		auto bestOverlap = 0ull;
-		for (auto i = 0u; i < displayBounds.size(); ++i) {
-			const auto overlapArea{ ez::intersect(rect, displayBounds[i]).area() };
-			if (overlapArea > bestOverlap) { bestOverlap = overlapArea; bestDisplay = i; }
+		auto best_overlap = 0ull;
+		for (auto i = 0u; i < display_bounds.size(); ++i) {
+			const auto overlap_area = ez::intersect(rect, display_bounds[i]).area();
+			if (overlap_area > best_overlap) { best_overlap = overlap_area; best_display = i; }
 		}
 
 		// 5: fall back to searching for closest display
-		if ((rectIntersectsDisplay = !!bestOverlap) == false) {
-			auto bestDistance = ~0ull;
-			const auto currentCenter{ rect.center() };
+		if ((rect_intersects_display = !!best_overlap) == false) {
+			auto best_distance = ~0ull;
+			const auto current_center = rect.center();
 
-			for (auto i = 0u; i < displayBounds.size(); ++i) {
-				const auto displayCenter{ displayBounds[i].center() };
-				const auto distance{ ez::distance(currentCenter, displayCenter) };
-				if (distance < bestDistance) { bestDistance = distance; bestDisplay = i; }
+			for (auto i = 0u; i < display_bounds.size(); ++i) {
+				const auto display_center = display_bounds[i].center();
+				const auto distance = ez::distance(current_center, display_center);
+				if (distance < best_distance) { best_distance = distance; best_display = i; }
 			}
 		}
 	}
 
 	// 6: shrink window to best fit chosen display
-	const auto& target = displayBounds[bestDisplay];
+	const auto& target = display_bounds[best_display];
 
 	const auto up = deco.x, lt = deco.y;
 	const auto dn = deco.w, rt = deco.h;
@@ -228,7 +224,7 @@ void BasicVideoSpec::normalize_rect_to_display(ez::Rect& rect, ez::Rect& deco, b
 	rect.w = std::min(rect.w, target.w - lt - rt);
 	rect.h = std::min(rect.h, target.h - up - dn);
 
-	if (!rectIntersectsDisplay) {
+	if (!rect_intersects_display) {
 		// 7a: if we didn't overlap before, center to display
 		rect.x = target.x + (target.w - lt - rt - rect.w) / 2 + lt;
 		rect.y = target.y + (target.h - up - dn - rect.h) / 2 + up;
@@ -320,36 +316,28 @@ void BasicVideoSpec::write_stream_texture(
 
 /*==================================================================*/
 
-float BasicVideoSpec::get_display_pixel_density(SDL_DisplayID display_id) noexcept {
-	return SDL_GetDisplayContentScale(display_id ? display_id : SDL_GetPrimaryDisplay());
-}
-
-float BasicVideoSpec::get_window_pixel_density(SDL_Window* window) noexcept {
-	return SDL_GetWindowPixelDensity(window ? window : m_main_window.get());
-}
-
 bool BasicVideoSpec::set_window_title(const std::string& title, SDL_Window* window) noexcept {
-	return SDL_SetWindowTitle(window ? window : m_main_window.get(), title.c_str());
+	return SDL_SetWindowTitle(window ? window : s_main_window.get(), title.c_str());
 }
 
 bool BasicVideoSpec::is_main_window_id(unsigned id) const noexcept {
-	return id && id == SDL_GetWindowID(m_main_window);
+	return id && id == SDL_GetWindowID(s_main_window);
 }
 
 bool BasicVideoSpec::raise_window(SDL_Window* window) noexcept {
-	return SDL_RaiseWindow(window ? window : m_main_window.get());
+	return SDL_RaiseWindow(window ? window : s_main_window.get());
 }
 
 /*==================================================================*/
 
-bool BasicVideoSpec::render_present(std::function<void()> render_callable) noexcept {
-	const auto scale = SDL_GetWindowPixelDensity(m_main_window);
-	SDL_SetRenderScale(m_main_renderer, scale, scale);
+void BasicVideoSpec::set_automatic_render_scale_for_renderer() noexcept {
+	const auto scale = SDL_GetWindowPixelDensity(s_main_window);
+	SDL_SetRenderScale(s_main_renderer, scale, scale);
+}
 
+bool BasicVideoSpec::try_render_present() noexcept {
 	try {
-		if (render_callable) { render_callable(); }
-
-		if (!SDL_RenderPresent(m_main_renderer)) { \
+		if (!SDL_RenderPresent(s_main_renderer)) { \
 			throw_fatal_error(__LINE__, __func__);
 		}
 
