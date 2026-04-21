@@ -105,17 +105,19 @@ protected:
 		m_keys_last = m_keys_this = m_keys_hide = 0;
 	}
 
-	bool catch_key_press(u8* keyReg) noexcept;
-	bool is_key_held_P1(u32 keyIndex) const noexcept;
-	bool is_key_held_P2(u32 keyIndex) const noexcept;
+	bool catch_key_press(u8* key_reg) noexcept;
+	bool is_key_held_P1(u32 key_index) const noexcept;
+	bool is_key_held_P2(u32 key_index) const noexcept;
 
 /*==================================================================*/
 
+protected:
 	WindowHost    m_display_window;
 	DisplayDevice m_display_device;
 
 /*==================================================================*/
 
+protected:
 	struct alignas(int) PlatformQuirks final {
 		bool reset_vf_reg{};
 		bool jump_with_vx{};
@@ -187,7 +189,7 @@ protected:
 	std::array<u8, 16>
 		m_registers_V{};
 
-	alignas(HDIS)
+	//alignas(sizeof(u32) * 16)
 	std::array<u32, 16>
 		m_stack_bank{};
 

@@ -26,11 +26,11 @@ void MEGACHIP::initialize_system() noexcept {
 
 	set_display_properties(Resolution::LO);
 
-	auto& meta = m_display_device.metadata_staging();
+	auto meta = m_display_device.edit_metadata();
 
-	meta.minimum_zoom = 2;
-	meta.inner_margin = 4;
-	meta.enabled = true;
+	meta->minimum_zoom = 2;
+	meta->inner_margin = 4;
+	meta->enabled = true;
 }
 
 void MEGACHIP::handle_cycle_loop() noexcept
@@ -292,7 +292,7 @@ void MEGACHIP::push_audio_data() noexcept {
 			{ make_pulse_wave,  &m_voices[VOICE::BUZZER] },
 		});
 
-		m_display_device.metadata_staging().set_border_color_if(
+		m_display_device.edit_metadata()->set_border_color_if(
 			!!m_audio_timers[VOICE::BUZZER], s_bit_colors[1]);
 	}
 	else {
@@ -303,7 +303,7 @@ void MEGACHIP::push_audio_data() noexcept {
 			{ make_pulse_wave, &m_voices[VOICE::BUZZER] },
 		});
 
-		m_display_device.metadata_staging().set_border_color_if(
+		m_display_device.edit_metadata()->set_border_color_if(
 			!!::accumulate(m_audio_timers, 0), s_bit_colors[1]);
 	}
 }
@@ -333,18 +333,18 @@ void MEGACHIP::push_video_data() noexcept {
 void MEGACHIP::set_display_properties(Resolution mode) noexcept {
 	use_manual_vsync(mode == Resolution::MC);
 
-	auto& meta = m_display_device.metadata_staging();
+	auto meta = m_display_device.edit_metadata();
 
 	if (use_manual_vsync()) {
-		meta.set_viewport(c_sys_screen_W, c_sys_screen_H);
-		meta.texture_tint = RGBA::Black;
+		meta->set_viewport(c_sys_screen_W, c_sys_screen_H);
+		meta->texture_tint = RGBA::Black;
 
 		Quirk.await_vblank = false;
 		m_target_cpf = c_sys_speed_lo * 100;
 	}
 	else {
-		meta.set_viewport(c_sys_screen_W, c_sys_screen_W/2);
-		meta.texture_tint = c_bit_colors[0];
+		meta->set_viewport(c_sys_screen_W, c_sys_screen_W/2);
+		meta->texture_tint = c_bit_colors[0];
 
 		if (mode == Resolution::LO) {
 			use_hires_screen(false);
@@ -416,7 +416,7 @@ void MEGACHIP::scrap_all_video_buffers() noexcept {
 
 void MEGACHIP::flush_all_video_buffers(bool by_blending, bool and_advance) noexcept {
 	m_display_device.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = ++m_display_device.metadata_staging();
+		frame.metadata = *m_display_device.read_metadata();
 		if (by_blending) {
 			frame.copy_from(m_old_render_map, m_background_map, RGBA::alpha_blend);
 		} else {
@@ -581,8 +581,7 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 		m_texture.h = NN ? NN : 256u;
 	}
 	void MEGACHIP::instruction_05NN(u32 NN) noexcept {
-		m_display_device.metadata_staging()
-			.texture_tint.set_A(NN & 0xFF);
+		m_display_device.edit_metadata()->texture_tint.set_A(NN & 0xFF);
 	}
 	void MEGACHIP::instruction_060N(u32 N) noexcept {
 		start_audio_track(N == 0u);

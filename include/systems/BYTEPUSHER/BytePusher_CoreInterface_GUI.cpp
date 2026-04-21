@@ -63,13 +63,6 @@ BytePusher_CoreInterface::BytePusher_CoreInterface(std::size_t W, std::size_t H)
 		}
 	};
 
-	m_frontend_hooks.emplace_back(FrontendInterface::register_menu(
-	m_workspace_host.get_window_label(), { 60, "System" }, [&]() noexcept {
-		if (ImGui::BeginMenu("Dummy")) {
-			ImGui::EndMenu();
-		}
-	}));
-
 	if (calc_file_image_sha1()) {
 		if (auto* path = add_system_path("savestate", family_name)) {
 			s_savestate_path = (fs::Path(*path) / m_file_sha1_hash).string();

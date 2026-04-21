@@ -32,12 +32,12 @@ void SCHIP_LEGACY::initialize_system() noexcept {
 
 	Quirk.await_vblank = true;
 
-	auto& meta = m_display_device.metadata_staging();
+	auto meta = m_display_device.edit_metadata();
 
-	meta.minimum_zoom = 4;
-	meta.inner_margin = 4;
-	meta.texture_tint = s_bit_colors[0];
-	meta.enabled = true;
+	meta->minimum_zoom = 4;
+	meta->inner_margin = 4;
+	meta->texture_tint = s_bit_colors[0];
+	meta->enabled = true;
 }
 
 void SCHIP_LEGACY::handle_cycle_loop() noexcept
@@ -228,13 +228,13 @@ void SCHIP_LEGACY::push_audio_data() noexcept {
 		{ make_pulse_wave, &m_voices[VOICE::BUZZER] },
 	});
 
-	m_display_device.metadata_staging().set_border_color_if(
+	m_display_device.edit_metadata()->set_border_color_if(
 		!!::accumulate(m_audio_timers, 0), s_bit_colors[1]);
 }
 
 void SCHIP_LEGACY::push_video_data() noexcept {
 	m_display_device.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = ++m_display_device.metadata_staging();
+		frame.metadata = *m_display_device.read_metadata();
 		frame.copy_from(m_display_map, use_pixel_trails()
 			? [](u32 pixel) noexcept { return RGBA::premul(s_bit_colors[pixel != 0], c_bit_weight[pixel]); }
 			: [](u32 pixel) noexcept { return s_bit_colors[pixel >> 3]; }

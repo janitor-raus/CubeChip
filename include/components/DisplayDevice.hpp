@@ -8,20 +8,22 @@
 
 #include <functional>
 
-#include "ImLabel.hpp"
+#include "AtomicBox.hpp"
 #include "FramePacket.hpp"
 #include "TripleBuffer.hpp"
 
 /*==================================================================*/
 
 class DisplayDevice {
-	using Callable = std::function<void()>;
-	using Swapchain = TripleBuffer<FramePacket>;
+	using ScopedRead = AtomicBox<FramePacket::Metadata>::ScopedRead;
+	using ScopedEdit = AtomicBox<FramePacket::Metadata>::ScopedEdit;
 
-	struct DisplayContext; // make *real* clang happy
-	friend struct DisplayContext;
-
+	struct DisplayContext;
 	std::unique_ptr<DisplayContext> m_context;
+
+public:
+	using Callable  = std::function<void()>;
+	using Swapchain = TripleBuffer<FramePacket>;
 
 public:
 	/**
@@ -38,10 +40,11 @@ public:
 	 * storage, as well as for writing to the swapchain's internal
 	 * metadata instance to propagate state changes atomically.
 	**/
-	auto metadata_staging() noexcept -> FramePacket::Metadata&;
+	auto read_metadata() noexcept -> ScopedRead;
+	auto edit_metadata() noexcept -> ScopedEdit;
 
 public:
-	DisplayDevice(std::size_t W, std::size_t H, ImLabel window_label) noexcept;
+	DisplayDevice(std::size_t W, std::size_t H, void* sdl_renderer) noexcept;
 
 	~DisplayDevice() noexcept;
 
@@ -60,4 +63,5 @@ public:
 
 	void set_osd_callable(Callable callable) noexcept;
 	void render_display() noexcept;
+	void render_settings_menu() noexcept;
 };

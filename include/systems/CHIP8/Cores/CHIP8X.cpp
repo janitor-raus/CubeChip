@@ -31,12 +31,12 @@ void CHIP8X::initialize_system() noexcept {
 	// test first color rect as the original hardware did
 	m_colored_map(0, 0) = c_fore_colors[2];
 
-	auto& meta = m_display_device.metadata_staging();
+	auto meta = m_display_device.edit_metadata();
 
-	meta.minimum_zoom = 8;
-	meta.inner_margin = 4;
-	meta.texture_tint = c_back_colors[m_background_color];
-	meta.enabled = true;
+	meta->minimum_zoom = 8;
+	meta->inner_margin = 4;
+	meta->texture_tint = c_back_colors[m_background_color];
+	meta->enabled = true;
 }
 
 void CHIP8X::handle_cycle_loop() noexcept
@@ -227,14 +227,14 @@ void CHIP8X::push_audio_data() noexcept {
 	});
 
 	static constexpr u32 idx[]{ 2, 7, 4, 1 };
-	m_display_device.metadata_staging().set_border_color_if(
+	m_display_device.edit_metadata()->set_border_color_if(
 		!!::accumulate(m_audio_timers, 0), c_fore_colors[idx[m_background_color]]);
 }
 
 void CHIP8X::push_video_data() noexcept {
 	if (use_pixel_trails()) {
 		m_display_device.swapchain().acquire([&](auto& frame) noexcept {
-			frame.metadata = ++m_display_device.metadata_staging();
+			frame.metadata = *m_display_device.read_metadata();
 			frame.copy_from(m_display_map, [&](auto& pixel) noexcept {
 				if (pixel == 0) {
 					return c_back_colors[m_background_color];
@@ -255,7 +255,7 @@ void CHIP8X::push_video_data() noexcept {
 		);
 	} else {
 		m_display_device.swapchain().acquire([&](auto& frame) noexcept {
-			frame.metadata = ++m_display_device.metadata_staging();
+			frame.metadata = *m_display_device.read_metadata();
 			frame.copy_from(m_display_map, [&](auto& pixel) noexcept {
 				if (pixel == 0) {
 					return c_back_colors[m_background_color];
@@ -305,7 +305,7 @@ void CHIP8X::color_hires_zone(u32 X, u32 Y, u32 idx, u32 N) noexcept {
 		m_current_pc = m_stack_bank[--m_stack_head & 0xF];
 	}
 	void CHIP8X::instruction_02A0() noexcept {
-		m_display_device.metadata_staging().texture_tint
+		m_display_device.edit_metadata()->texture_tint
 			= c_back_colors[++m_background_color &= 0x3];
 	}
 

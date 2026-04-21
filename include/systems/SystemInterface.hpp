@@ -14,10 +14,12 @@
 #include "AtomSharedPtr.hpp"
 #include "Thread.hpp"
 
+#include "MemoryEditor.hpp"
 #include "WindowHost.hpp"
 #include "SimpleTimer.hpp"
 #include "BasicInput.hpp"
 #include "Well512.hpp"
+#include "FrontendInterface.hpp"
 
 #include "FileImage.hpp"
 
@@ -78,10 +80,13 @@ protected:
 	BasicKeyboard m_input;
 
 protected:
-	SystemInterface(std::string_view window_anme) noexcept;
+	SystemInterface(std::string_view window_name) noexcept;
 
 public:
 	virtual ~SystemInterface() noexcept = default;
+
+private:
+	void prepare_user_interface() noexcept;
 
 public:
 	void start_workers() noexcept;
@@ -101,35 +106,42 @@ protected:
 	u32 m_elapsed_frames{};
 
 protected:
-	bool m_is_window_visible = true;
-	bool m_is_window_focused = true;
+	bool m_is_viewport_visible = true;
+	bool m_is_viewport_focused = true;
 
 public:
-	bool is_window_visible() const noexcept { return m_is_window_visible; }
-	bool is_window_focused() const noexcept { return m_is_window_focused; }
+	bool is_viewport_visible() const noexcept { return m_is_viewport_visible; }
+	bool is_viewport_focused() const noexcept { return m_is_viewport_focused; }
 
-	bool is_window_visible(std::optional<bool> state = std::nullopt) noexcept {
-		return state ? std::exchange(m_is_window_visible, *state) : m_is_window_visible;
+	bool force_viewport_visible(bool state) noexcept {
+		return std::exchange(m_is_viewport_visible, state);
 	}
-	bool is_window_focused(std::optional<bool> state = std::nullopt) noexcept {
-		return state ? std::exchange(m_is_window_focused, *state) : m_is_window_focused;
+	bool force_viewport_focused(bool state) noexcept {
+		return std::exchange(m_is_viewport_focused, state);
 	}
 
 protected:
-	WindowHost m_window_host;
+	WindowHost m_workspace_host;
+
+	std::vector<FrontendInterface::Hook>
+		m_frontend_hooks;
 
 protected:
-	std::string m_file_sha1_hash{};
-	bool calc_file_image_sha1() noexcept;
-
 	FileImage m_file_image{};
 	void copy_file_image_to(std::span<u8> dest, std::size_t offset) noexcept;
+
+	std::string m_file_sha1_hash{};
+	bool calc_file_image_sha1() noexcept;
 
 	std::vector<std::string> m_system_paths{};
 	auto add_system_path(
 		std::string_view dir_name,
 		std::string_view family_name
 	) noexcept -> const std::string*;
+
+protected:
+	WindowHost   m_memview_window;
+	MemoryEditor m_memory_editor;
 
 public:
 	// Adds a State to the System, returns previous value of State.

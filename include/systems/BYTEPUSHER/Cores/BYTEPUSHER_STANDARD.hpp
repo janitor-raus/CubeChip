@@ -48,18 +48,23 @@ private:
 	MirroredMemory<c_sys_memory_size>
 		m_memory{};
 
-	template<u32 T> requires (T >= 1 && T <= 3)
+	enum class ByteSpan { SINGLE, DOUBLE, TRIPLE };
+	template<ByteSpan SPAN>
 	u32 read_data(u32 pos) const noexcept {
-		if        constexpr (T == 1) {
+		if        constexpr (SPAN == ByteSpan::SINGLE) {
 			return m_memory[pos + 0];
-		} else if constexpr (T == 2) {
+		} else if constexpr (SPAN == ByteSpan::DOUBLE) {
 			return m_memory[pos + 0] << 8
 				 | m_memory[pos + 1];
-		} else if constexpr (T == 3) {
+		} else if constexpr (SPAN == ByteSpan::TRIPLE) {
 			return m_memory[pos + 0] << 16
 				 | m_memory[pos + 1] << 8
 				 | m_memory[pos + 2];
 		}
+	}
+
+	u32 get_program_counter() const noexcept override {
+		return read_data<ByteSpan::TRIPLE>(2);
 	}
 
 	void instruction_loop() noexcept override;

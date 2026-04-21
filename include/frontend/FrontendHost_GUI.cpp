@@ -13,6 +13,7 @@
 #include "BasicVideoSpec.hpp"
 #include "GlobalAudioBase.hpp"
 #include "DefaultConfig.hpp"
+#include "SystemInterface.hpp"
 #include "SystemDescriptor.hpp"
 #include "SystemStaging.hpp"
 #include "CoreRegistry.hpp"
@@ -43,7 +44,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 	static auto s_menu_file__data_folder = FrontendInterface::register_menu("",
 	{ 0, "File" }, [&]() noexcept {
 		static std::atomic<bool> s_opening_url{};
-		static auto s_home_url = "file:///" + HomeDirManager::get_home_path();
+		static auto s_home_url = "file:///" + HDM->get_home_path();
 
 		BeginDisabled(s_opening_url.load(mo::acquire));
 		if (MenuItem("Open Data Folder...", nullptr, nullptr, !s_opening_url.load(mo::acquire))) {
@@ -80,6 +81,26 @@ void FrontendHost::setup_gui_callables() noexcept {
 			}
 		}
 	});
+
+/*==================================================================*/
+
+	static auto s_menu_system__resume_pause = FrontendInterface::register_menu("",
+	{50, "Toggles?"}, [&]() noexcept {
+		Dummy(ImVec2(GetTextLineHeight() * 12, 0.0f));
+		if (m_systems.empty()) {
+			MenuItem("No Active System", "", false, false);
+		} else {
+			auto& system = m_systems[m_focus_mru.front()];
+			if (MenuItem("Toggle Delimiter", "F10", &system.delimiters)) {
+				toggle_system_delimiters(system);
+			}
+			if (MenuItem("Toggle Statistics", "F11", &system.statistics)) {
+				toggle_system_statistics(system);
+			}
+		}
+	});
+
+/*==================================================================*/
 
 	static bool s_show_window_demo{};
 	static auto s_menu_debug__imgui_demo = FrontendInterface::register_menu("",
@@ -128,6 +149,8 @@ void FrontendHost::setup_gui_callables() noexcept {
 		}
 	});
 
+/*==================================================================*/
+
 	static auto s_menu_settings__zoom_scale = FrontendInterface::register_menu("",
 	{ 20, "Settings" }, [&]() noexcept {
 		static int  s_scale_factor{};
@@ -162,6 +185,8 @@ void FrontendHost::setup_gui_callables() noexcept {
 		if (SliderInt("Master Volume", &global_gain, 0, 100, "%d%%"))
 			{ GAB->set_glogal_gain(global_gain * 0.01f); }
 	});
+
+/*==================================================================*/
 
 	static auto s_window_none__imgui_demo = FrontendInterface::register_window(
 	[&]() noexcept {

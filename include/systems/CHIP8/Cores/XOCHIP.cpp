@@ -30,12 +30,12 @@ void XOCHIP::initialize_system() noexcept {
 	m_target_cpf = c_sys_speed_lo;
 	m_bit_colors = s_bit_colors;
 
-	auto& meta = m_display_device.metadata_staging();
+	auto meta = m_display_device.edit_metadata();
 
-	meta.minimum_zoom = 4;
-	meta.inner_margin = 4;
-	meta.texture_tint = m_bit_colors[0];
-	meta.enabled = true;
+	meta->minimum_zoom = 4;
+	meta->inner_margin = 4;
+	meta->texture_tint = m_bit_colors[0];
+	meta->enabled = true;
 }
 
 void XOCHIP::handle_cycle_loop() noexcept
@@ -255,7 +255,7 @@ void XOCHIP::push_audio_data() noexcept {
 		{ make_pulse_wave,   &m_voices[VOICE::BUZZER] },
 	});
 
-	m_display_device.metadata_staging().set_border_color_if(
+	m_display_device.edit_metadata()->set_border_color_if(
 		!!m_audio_timers[VOICE::BUZZER], m_bit_colors[1]);
 }
 
@@ -293,7 +293,7 @@ void XOCHIP::push_video_data() noexcept {
 	}
 
 	m_display_device.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = ++m_display_device.metadata_staging();
+		frame.metadata = *m_display_device.read_metadata();
 		frame.copy_from(composite_buffer, [&](auto pixel) noexcept { return m_bit_colors[pixel]; });
 	});
 }

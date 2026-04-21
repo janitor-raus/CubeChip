@@ -16,9 +16,6 @@
 #include "SystemInterface.hpp"
 #include "SystemDescriptor.hpp"
 #include "SystemStaging.hpp"
-#include "FrontendInterface.hpp"
-
-#include <imgui.h>
 
 /*==================================================================*/
 
@@ -29,39 +26,13 @@ SystemInterface::SystemInterface(std::string_view window_name) noexcept
 	}())
 	, m_statistics_data(std::make_shared<std::string>())
 	, m_rng(std::make_unique<Well512>(Millis::initial()))
-	, m_window_host({ window_anme, make_system_id(instance_id, "system")})
+	, m_workspace_host({ window_name, make_system_id(instance_id, "system")})
 	, m_file_image(std::move(SystemStaging::file_image))
+	, m_memview_window({ "Memory Editor", make_system_id(instance_id, "mem_edit") })
 {
 	m_statistics_work_buffer.reserve(1_KiB);
-	m_window_host.set_window_visible_output(&m_is_window_visible);
-	m_window_host.set_window_focused_output(&m_is_window_focused);
-	m_window_host.edit_callbacks([](auto& callbacks) noexcept {
-		callbacks.window_init = []
-		(auto& flags, auto& window_tidy) mutable noexcept {
-			flags |= ImGuiWindowFlags_NoCollapse  | ImGuiWindowFlags_NoScrollWithMouse
-				  |  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
 
-			ImGui::DockNextWindowTo(FrontendInterface::get_main_dockspace_id(), true);
-
-			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2());
-			window_tidy = []() noexcept { ImGui::PopStyleVar(1); };
-		};
-
-		callbacks.window_dock = [docker_class = ImGuiWindowClass()]
-		(bool window_open, auto window_id) mutable noexcept {
-			if (window_open && ImGui::IsWindowAppearing()) {
-				ImGui::SelectWindowInDockNodeTab();
-			}
-
-			docker_class.ClassId = window_id;
-			docker_class.DockingAllowUnclassed = false;
-
-			static constexpr auto docker_flags =
-				 ImGuiDockNodeFlags_AutoHideTabBar;
-
-			ImGui::DockSpace(window_id, ImVec2(), docker_flags, &docker_class);
-		};
-	});
+	prepare_user_interface();
 }
 
 void SystemInterface::start_workers() noexcept {
@@ -129,6 +100,11 @@ std::string SystemInterface::get_system_id() const noexcept {
 
 /*==================================================================*/
 
+void SystemInterface::copy_file_image_to(std::span<u8> dest, std::size_t offset) noexcept {
+	std::memcpy(dest.data() + offset, m_file_image.data(),
+		std::min(m_file_image.size(), dest.size() - offset));
+}
+
 bool SystemInterface::calc_file_image_sha1() noexcept {
 	if (!SystemStaging::sha1_hash.empty()) {
 		m_file_sha1_hash = SystemStaging::sha1_hash;
@@ -146,11 +122,6 @@ bool SystemInterface::calc_file_image_sha1() noexcept {
 	}
 }
 
-void SystemInterface::copy_file_image_to(std::span<u8> dest, std::size_t offset) noexcept {
-	std::memcpy(dest.data() + offset, m_file_image.data(),
-		std::min(m_file_image.size(), dest.size() - offset));
-}
-
 auto SystemInterface::add_system_path(
 	std::string_view dir_name,
 	std::string_view family_name
@@ -158,7 +129,7 @@ auto SystemInterface::add_system_path(
 	if (dir_name.empty()) { return nullptr; }
 
 	const auto new_dir_path = fs::Path(HomeDirManager \
-		::get_home_path()) / family_name / dir_name;
+		::get_instance()->get_home_path()) / family_name / dir_name;
 
 	const auto it = std::find(m_system_paths.begin(),
 		m_system_paths.end(), new_dir_path);
@@ -202,15 +173,16 @@ void SystemInterface::append_statistics_data() noexcept {
 		"Framerate:{:9.3f} fps |{:9.3f}ms\n"
 		"Frametime:{:9.3f} ms ({:>6.2f}%)\n",
 		framerate, framespan, frametime,
-		frametime / framespan * 100.0f);
+		frametime / framespan * 100.0f
+	);
 }
 
 void SystemInterface::create_statistics_data() noexcept {
 	if (!has_system_state(EmuState::STATS)) { return; }
 	append_statistics_data();
 
-	m_statistics_data.store(std::make_shared<std::string> \
-		(std::move(m_statistics_work_buffer)), mo::release);
+	m_statistics_data.store(std::make_shared<std::string>(
+		std::move(m_statistics_work_buffer)), mo::release);
 	m_statistics_work_buffer.clear();
 }
 

@@ -19,6 +19,8 @@ void CHIP8_MODERN::initialize_system() noexcept {
 
 	set_base_system_framerate(c_sys_refresh_rate);
 
+	m_memory_editor.set_memory_range(m_memory.data(), m_memory.size(), 0x8000);
+
 	m_voices[VOICE::ID_0].userdata = &m_audio_timers[VOICE::ID_0];
 	m_voices[VOICE::ID_1].userdata = &m_audio_timers[VOICE::ID_1];
 	m_voices[VOICE::ID_2].userdata = &m_audio_timers[VOICE::ID_2];
@@ -27,12 +29,12 @@ void CHIP8_MODERN::initialize_system() noexcept {
 	m_current_pc = c_sys_boot_pos;
 	m_target_cpf = Quirk.await_vblank ? c_sys_speed_hi : c_sys_speed_lo;
 
-	auto& meta = m_display_device.metadata_staging();
+	auto meta = m_display_device.edit_metadata();
 
-	meta.minimum_zoom = 8;
-	meta.inner_margin = 4;
-	meta.texture_tint = s_bit_colors[0];
-	meta.enabled = true;
+	meta->minimum_zoom = 8;
+	meta->inner_margin = 4;
+	meta->texture_tint = s_bit_colors[0];
+	meta->enabled = true;
 }
 
 void CHIP8_MODERN::handle_cycle_loop() noexcept
@@ -196,13 +198,13 @@ void CHIP8_MODERN::push_audio_data() noexcept {
 		{ make_pulse_wave, &m_voices[VOICE::BUZZER] },
 	});
 
-	m_display_device.metadata_staging().set_border_color_if(
+	m_display_device.edit_metadata()->set_border_color_if(
 		!!::accumulate(m_audio_timers, 0), s_bit_colors[1]);
 }
 
 void CHIP8_MODERN::push_video_data() noexcept {
 	m_display_device.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = ++m_display_device.metadata_staging();
+		frame.metadata = *m_display_device.read_metadata();
 		frame.copy_from(m_display_map, use_pixel_trails()
 			? [](u32 pixel) noexcept { return RGBA::premul(s_bit_colors[pixel != 0], c_bit_weight[pixel]); }
 			: [](u32 pixel) noexcept { return s_bit_colors[pixel >> 3]; }

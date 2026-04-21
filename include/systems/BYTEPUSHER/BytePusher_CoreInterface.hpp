@@ -31,11 +31,14 @@ protected:
 	enum STREAM { MAIN };
 	enum VOICE { ID_0, COUNT };
 
+
+protected:
 	WindowHost    m_display_window;
 	DisplayDevice m_display_device;
 
-	AudioDevice m_audio_device;
+	AudioDevice   m_audio_device;
 
+protected:
 	std::vector<SimpleKeyMapping> m_custom_binds;
 
 	u32  get_key_states() noexcept;
@@ -53,6 +56,7 @@ protected:
 
 protected:
 	BytePusher_CoreInterface(std::size_t W, std::size_t H) noexcept;
+	virtual u32 get_program_counter() const noexcept = 0;
 
 public:
 	void main_system_loop() override;

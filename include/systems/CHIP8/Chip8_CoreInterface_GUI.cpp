@@ -66,10 +66,16 @@ Chip8_CoreInterface::Chip8_CoreInterface(std::size_t W, std::size_t H) noexcept
 		}
 	};
 
-	m_frontend_hooks.emplace_back(FrontendInterface::register_menu(
-	m_workspace_host.get_window_label(), { 60, "System" }, [&]() noexcept {
-		if (ImGui::BeginMenu("Dummy")) {
-			ImGui::EndMenu();
+	m_frontend_hooks.emplace_back(FrontendInterface::register_menu("",
+	{ 50, "System" }, [&]() noexcept {
+		Dummy(ImVec2(GetTextLineHeight() * 12, 0.0f));
+		if (MenuItem(can_system_work() ? "Pause" : "Resume",
+			"F9", false, can_system_pause())) {
+			xor_system_state(EmuState::PAUSED);
+		}
+		Separator(2.0f);
+		if (BeginMenu("")) {
+			EndMenu();
 		}
 	}));
 

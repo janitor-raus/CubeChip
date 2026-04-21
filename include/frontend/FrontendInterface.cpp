@@ -9,6 +9,12 @@
 
 #include "fonts/RobotoMono.hpp"
 
+#include <map>
+#include <unordered_map>
+#include <mutex>
+#include <vector>
+#include <functional>
+
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
@@ -24,6 +30,47 @@ static float s_zoom_scaling = 1.0f;
 static float s_text_scaling = 1.0f;
 
 static bool  s_pending_style_changes = true;
+
+/*==================================================================*/
+
+using Func     = FrontendInterface::Func;
+using LabelKey = FrontendInterface::LabelKey;
+using OrderKey = FrontendInterface::OrderKey;
+
+template <typename Signature>
+struct HookRegistry {
+	using HookBuffer = std::vector<std::weak_ptr<Signature>>;
+
+	HookBuffer buffer{};
+	unsigned   offset{}; // used when merging, don't touch
+
+	bool has_focus{}; // indicates focus status, don't touch
+	bool first_hit{}; // set for a single frame only on focus
+
+	// make Clang happy I guess.
+	HookRegistry() noexcept = default;
+};
+
+using HookRegistryMenuMap = std::unordered_map
+	<LabelKey, std::map<OrderKey, HookRegistry<Func>>>;
+
+template <typename T>
+struct RegistryBox {
+	T registry, overflow;
+
+	std::mutex registry_lock;
+	std::mutex overflow_lock;
+};
+
+struct RegistryAggregate {
+	RegistryBox<HookRegistry<Func>>  windows{};
+	RegistryBox<HookRegistryMenuMap> menus{};
+};
+
+static inline std::unique_ptr
+	<RegistryAggregate> s_gui_hooks = nullptr;
+
+static HookRegistry<Func>* s_active_menu{};
 
 /*==================================================================*/
 
@@ -45,8 +92,8 @@ static void setup_default_theme() noexcept {
 
 	s_default_style.WindowRounding = 4.0f;
 	s_default_style.ChildRounding  = 4.0f;
-	s_default_style.FrameRounding  = 2.0f;
-	s_default_style.PopupRounding  = 2.0f;
+	s_default_style.FrameRounding  = 4.0f;
+	s_default_style.PopupRounding  = 4.0f;
 	s_default_style.GrabRounding   = 2.0f;
 
 	s_default_style.ScrollbarSize     = 10.0f;
@@ -94,7 +141,7 @@ static void setup_default_theme() noexcept {
 	colors[ImGuiCol_TitleBgActive]          = ImVec4(0.23f, 0.18f, 0.29f, 1.00f);
 	colors[ImGuiCol_TitleBgCollapsed]       = ImVec4(0.11f, 0.11f, 0.13f, 1.00f);
 	colors[ImGuiCol_MenuBarBg]              = ImVec4(0.77f, 0.50f, 1.00f, 0.06f);
-	colors[ImGuiCol_ScrollbarBg]            = ImVec4(0.17f, 0.17f, 0.21f, 1.00f);
+	colors[ImGuiCol_ScrollbarBg]            = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
 	colors[ImGuiCol_ScrollbarGrab]          = ImVec4(0.77f, 0.50f, 1.00f, 0.38f);
 	colors[ImGuiCol_ScrollbarGrabHovered]   = ImVec4(0.77f, 0.50f, 1.00f, 0.50f);
 	colors[ImGuiCol_ScrollbarGrabActive]    = ImVec4(0.77f, 0.50f, 1.00f, 0.75f);
@@ -142,6 +189,30 @@ static void setup_default_theme() noexcept {
 	colors[ImGuiCol_NavWindowingHighlight]  = ImVec4(1.00f, 1.00f, 1.00f, 0.70f);
 	colors[ImGuiCol_NavWindowingDimBg]      = ImVec4(0.80f, 0.80f, 0.80f, 0.20f);
 	colors[ImGuiCol_ModalWindowDimBg]       = ImVec4(0.00f, 0.00f, 0.00f, 0.65f);
+}
+
+/*==================================================================*/
+
+void FrontendInterface::register_window_impl(const Hook& shared_func) noexcept {
+	if (s_gui_hooks->windows.registry_lock.try_lock()) { // may fail spuriously (fine)
+		s_gui_hooks->windows.registry.buffer.push_back(shared_func);
+		s_gui_hooks->windows.registry_lock.unlock();
+	} else {
+		std::scoped_lock lock(s_gui_hooks->windows.overflow_lock); // must wait to acquire
+		s_gui_hooks->windows.overflow.buffer.push_back(shared_func);
+	}
+}
+
+void FrontendInterface::register_menu_impl(LabelKey window_tag, OrderKey menu_title, const Hook& shared_func) noexcept {
+	if (s_gui_hooks->menus.registry_lock.try_lock()) { // may fail spuriously (fine)
+		s_gui_hooks->menus.registry[window_tag.get_id_or_label()] \
+			[std::move(menu_title)].buffer.push_back(shared_func);
+		s_gui_hooks->menus.registry_lock.unlock();
+	} else {
+		std::scoped_lock lock(s_gui_hooks->menus.overflow_lock); // must wait to acquire
+		s_gui_hooks->menus.overflow[window_tag.get_id_or_label()] \
+			[std::move(menu_title)].buffer.push_back(shared_func);
+	}
 }
 
 /*==================================================================*/
@@ -373,6 +444,10 @@ void FrontendInterface::render_frame(SDL_Renderer* renderer) {
 void FrontendInterface::dock_next_window_to(unsigned id, bool first_time) noexcept {
 	ImGui::SetNextWindowDockID(id ? id : s_main_dock_id,
 		first_time ? ImGuiCond_FirstUseEver : ImGuiCond_Always);
+}
+
+bool FrontendInterface::was_menu_clicked() noexcept {
+	return s_active_menu && s_active_menu->first_hit;
 }
 
 void FrontendInterface::call_menubar(const char* window_name, bool* can_render) noexcept {
