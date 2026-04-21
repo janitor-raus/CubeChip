@@ -224,8 +224,9 @@ namespace EzMaths{
 	public:
 		constexpr EMA() : value(std::numeric_limits<f32>::quiet_NaN()) {}
 
-		constexpr void set_alpha(f32 v) noexcept
-			{ alpha = 2.0f / std::max(v, 0.0f); }
+		constexpr void set_alpha(f32 v) noexcept {
+			alpha = v > 0.0f ? std::min(2.0f / v, 1.0f) : 1.0f;
+		}
 
 		constexpr void add(f32 v) noexcept {
 			if (value != value) [[unlikely]] { value = v; }

@@ -20,7 +20,7 @@ auto SimpleTimer::start() noexcept -> self& {
 auto SimpleTimer::resume() noexcept -> self& {
 	if (is_paused()) {
 		m_paused_for += clock::now() - m_time_stop;
-		m_is_active   = false;
+		m_is_paused   = false;
 	}
 	return *this;
 }
@@ -28,7 +28,7 @@ auto SimpleTimer::resume() noexcept -> self& {
 auto SimpleTimer::pause() noexcept -> self& {
 	if (!is_paused()) {
 		m_time_stop = clock::now();
-		m_is_active = true;
+		m_is_paused = true;
 	}
 	return *this;
 }

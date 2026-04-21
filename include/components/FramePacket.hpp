@@ -48,9 +48,7 @@ struct FramePacket {
 	using pointer = value_type*;
 
 	class Metadata {
-		using self = Metadata;
-		using Counter = u64;
-		using Byte    = u8;
+		friend struct FramePacket;
 
 	private:
 		ez::Frame base_frame;
@@ -66,13 +64,12 @@ struct FramePacket {
 		ez::Rect viewport_rect;
 
 	public:
-		constexpr auto  get_viewport() const noexcept { return viewport_rect; }
-		constexpr self& set_viewport(s32 w, s32 h, s32 x = 0, s32 y = 0) noexcept {
+		constexpr auto get_viewport() const noexcept { return viewport_rect; }
+		constexpr void set_viewport(s32 w, s32 h, s32 x = 0, s32 y = 0) noexcept {
 			viewport_rect.x = std::clamp(x, 0, base_frame.w - 1);
 			viewport_rect.y = std::clamp(y, 0, base_frame.h - 1);
 			viewport_rect.w = std::clamp(w, 1, base_frame.w - viewport_rect.x);
 			viewport_rect.h = std::clamp(h, 1, base_frame.h - viewport_rect.y);
-			return *this;
 		}
 
 	public:
@@ -86,34 +83,29 @@ struct FramePacket {
 
 		static constexpr RGBA default_border_color = RGBA(0x303030FF);
 
-		constexpr self& set_border_color_if(bool cond, RGBA color) noexcept {
-			border_color = cond ? color : default_border_color; return *this;
-		}
-
-		constexpr self& set_border_color_if(bool cond, RGBA color1, RGBA color2) noexcept {
-			border_color = cond ? color1 : color2; return *this;
+		constexpr void set_border_color_if(bool cond, RGBA color) noexcept {
+			border_color = cond ? color : default_border_color;
 		}
 
 		// Forces a mininum zoom level for the texture (1-16x)
-		BoundedParam<Byte(1), 1, 16> minimum_zoom;
+		BoundedParam<1, 1, 16> minimum_zoom;
 
 		// Adds inner margin between the texture and border (max: 32px)
-		BoundedParam<Byte(0), 0, 32> inner_margin;
+		BoundedParam<0, 0, 32> inner_margin;
 
-		Byte debug_flag{}; // debug mode flag (signal for frontend use)
+		u8 debug_flags{}; // debug mode flag (signal for frontend use)
 
+		bool debug_mode{}; // enable debug mode,
 		bool interlaced{}; // signal is interlaced, framerate is halved
 		bool enabled{};    // enables the display (for systems that need it off)
 
-		BoundedParam<Byte(4), 0, 32> border_width;
+		BoundedParam<4, 0, 32> border_width;
 
 		// Sets the texture's pixel aspect ratio (0.1..4.0)
 		BoundedParam<1.0f, 0.1f, 4.0f> pixel_ratio;
 
 		// Describes the display's refresh rate in Hz, but has no effect on the actual framerate of the system.
 		BoundedParam<60.0f, 1.0f, 1000.0f> refresh_rate;
-
-		Counter frame_count{}; // number of frames rendered
 
 	public:
 		Metadata(s32 W, s32 H) noexcept
@@ -141,16 +133,9 @@ struct FramePacket {
 				border_width = other.border_width;
 				refresh_rate = other.refresh_rate;
 				pixel_ratio  = other.pixel_ratio;
-				frame_count  = other.frame_count;
 			}
 			return *this;
 		}
-
-		/**
-		 * @brief Simple helper to increment frame_count by one. Primarily intended
-		 *        when copying from another source which was used to stage changes.
-		 */
-		Metadata& operator++() noexcept { ++frame_count; return *this; }
 
 		// Calculates Screen Aspect Ratio (as: viewport.W / viewport.H)
 		constexpr auto calc_sar() const noexcept {
@@ -174,8 +159,8 @@ private:
 public:
 	Metadata metadata;
 
-	pointer data()       noexcept { return m_buffer.get(); }
-	pointer data() const noexcept { return m_buffer.get(); }
+	/***/ pointer data()       noexcept { return m_buffer.get(); }
+	const pointer data() const noexcept { return m_buffer.get(); }
 
 	auto size() const noexcept { return metadata.get_base_frame().area(); }
 

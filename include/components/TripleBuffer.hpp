@@ -76,16 +76,16 @@ private:
 	static_assert((alignof(Buffer) & s_dirty_flag) == 0,
 		"TripleBuffer: Buffer alignment must permit pointer tagging (LSB == 0).");
 
-	constexpr bool get_dirty(Buffer* ptr) const noexcept {
+	static constexpr bool get_dirty(Buffer* ptr) noexcept {
 		return reinterpret_cast<std::uintptr_t>(ptr) & s_dirty_flag;
 	}
 
-	constexpr Buffer* add_dirty(Buffer* ptr) const noexcept {
+	static constexpr Buffer* add_dirty(Buffer* ptr) noexcept {
 		auto new_ptr = reinterpret_cast<std::uintptr_t>(ptr);
 		return reinterpret_cast<Buffer*>(new_ptr | s_dirty_flag);
 	}
 
-	constexpr Buffer* sub_dirty(Buffer* ptr) const noexcept {
+	static constexpr Buffer* sub_dirty(Buffer* ptr) noexcept {
 		auto new_ptr = reinterpret_cast<std::uintptr_t>(ptr);
 		return reinterpret_cast<Buffer*>(new_ptr & ~s_dirty_flag);
 	}

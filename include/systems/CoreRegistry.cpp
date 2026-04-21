@@ -42,7 +42,7 @@ void CoreRegistry::load_game_database(std::string_view db_file_path) noexcept {
 		s_game_database.clear();
 		blog.warn("Failed to load ProgramDB: \"{}\"", normalized_path);
 	} else {
-		blog.warn("Successfully loaded ProgramDB: \"{}\"", normalized_path);
+		blog.info("Successfully loaded ProgramDB: \"{}\"", normalized_path);
 	}
 }
 

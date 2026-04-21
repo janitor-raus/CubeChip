@@ -67,7 +67,7 @@ unsigned thread_affinity::get_current_core() noexcept {
 		const auto cpu_count = get_logical_core_count();
 
 		const auto valid_mask = cpu_count >= 64 ? affinity_mask
-			: affinity_mask & ((1 << cpu_count) - 1);
+			: affinity_mask & ((1ull << cpu_count) - 1);
 
 		if (valid_mask == 0x0) { return false; }
 
@@ -119,7 +119,7 @@ thread_affinity::Manager::Manager(
 ) noexcept
 	: timestamp(-Millis::now())
 	, cooldown_p(cooldown_p * 1000)
-	, avoid_mask(avoid_mask )
+	, avoid_mask(avoid_mask)
 {}
 
 #if defined(_WIN32) || defined(__linux__)

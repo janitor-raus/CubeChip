@@ -13,7 +13,7 @@
 /*==================================================================*/
 
 template <typename T>
-static constexpr std::size_t view_size(const T& t) noexcept {
+constexpr std::size_t view_size(const T& t) noexcept {
 	using U = std::remove_cvref_t<T>;
 	/****/ if constexpr (std::is_same_v<U, std::string> || std::is_same_v<U, std::string_view>) {
 		return t.size();
@@ -27,7 +27,7 @@ static constexpr std::size_t view_size(const T& t) noexcept {
 }
 
 template <typename T>
-static constexpr const char* view_data(const T& t) noexcept {
+constexpr const char* view_data(const T& t) noexcept {
 	using U = std::remove_cvref_t<T>;
 	/****/ if constexpr (std::is_same_v<U, std::string> || std::is_same_v<U, std::string_view>) {
 		return t.data();
@@ -46,7 +46,7 @@ template <typename... T> requires (
 	(std::convertible_to<T, std::string_view> && ...)
 	&& (sizeof...(T) > 1)
 )
-static constexpr auto join(const T&... parts) noexcept {
+constexpr auto join(const T&... parts) noexcept {
 	std::string result;
 
 	result.reserve((view_size(parts) + ...));
@@ -59,7 +59,7 @@ template <typename... T> requires (
 	(std::convertible_to<T, std::string_view> && ...)
 	&& (sizeof...(T) > 1)
 )
-static constexpr auto join_with(std::string_view sep, const T&... parts) noexcept {
+constexpr auto join_with(std::string_view sep, const T&... parts) noexcept {
 	std::string result;
 
 	result.reserve((view_size(parts) + ...)
@@ -74,7 +74,7 @@ template <typename... T> requires (
 	(std::convertible_to<T, std::string_view> && ...)
 	&& (sizeof...(T) >= 1)
 )
-static constexpr void join_into(std::string& src, const T&... parts) noexcept {
+constexpr void join_into(std::string& src, const T&... parts) noexcept {
 	src.reserve((view_size(parts) + ...) + src.size());
 	(src.append(view_data(parts), view_size(parts)), ...);
 }

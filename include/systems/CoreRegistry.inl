@@ -63,7 +63,7 @@ auto CoreRegistry::register_new_system_core()
 	}
 
 	const auto hook = std::make_shared<const RegistryEntry>(
-		[]() noexcept { return construct_core_instance<Core>(); },\
+		[]() noexcept { return construct_core_instance<Core>(); },
 		&Core::descriptor
 	);
 

@@ -87,18 +87,18 @@ namespace thread_affinity {
 	 * @endcode
 	 */
 	class Manager {
-		long long timestamp{};
-		unsigned  cooldown_p{};
+		long long timestamp = 0;
+		unsigned  cooldown_p = 0;
 
-		bool is_thread_pinned = true;
+		bool is_thread_pinned = false;
 
-		unsigned long long avoid_mask{};
-		unsigned long long last_group{};
+		unsigned long long avoid_mask = 0;
+		unsigned long long last_group = 0;
 
 	public:
 		Manager(
 			unsigned           cooldown_p,
-			unsigned long long avoid_mask = 0ull
+			unsigned long long avoid_mask = 0
 		) noexcept;
 
 		bool refresh_affinity() noexcept;
