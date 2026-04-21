@@ -13,11 +13,13 @@
 
 template <auto Def, auto Min, auto Max> requires (
 	std::convertible_to<decltype(Min), decltype(Def)> &&
-	std::convertible_to<decltype(Max), decltype(Def)> &&
-	static_cast<decltype(Def)>(Min) < static_cast<decltype(Def)>(Max) &&
-	Def >= static_cast<decltype(Def)>(Min) &&
-	Def <= static_cast<decltype(Def)>(Max)
+	std::convertible_to<decltype(Max), decltype(Def)>
 ) class BoundedParam {
+	static_assert(static_cast<decltype(Def)>(Min) < static_cast<decltype(Def)>(Max),
+		"Min value is not lesser than Max value");
+	static_assert(Def >= static_cast<decltype(Def)>(Min) && Def <= static_cast<decltype(Def)>(Max),
+		"Def value is not within [Min..Max] bounds");
+
 	using T = decltype(Def);
 	T value;
 
