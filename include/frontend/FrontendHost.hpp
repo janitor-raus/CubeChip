@@ -175,16 +175,15 @@ private:
 /*==================================================================*/
 
 private:
-	void load_file_from_disk(std::string_view file_path);
-	void handle_main_hotkeys();
+	void load_file_from_disk(std::string_view file_path) noexcept;
+	void handle_main_hotkeys() noexcept;
 	void setup_gui_callables() noexcept;
 
 /*==================================================================*/
 
 public:
-	static FrontendHost*
-	init_application(std::string_view home_override, std::string_view config_name,
-		std::string_view game_file_path, bool force_portable) noexcept;
+	static FrontendHost* init_application(
+		std::string_view game_file_path, bool headless = false) noexcept;
 
 	void quit_application() noexcept;
 

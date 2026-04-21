@@ -11,6 +11,7 @@
 #include "DefaultConfig.hpp"
 #include "PathGetters.hpp"
 
+#include <memory>
 #include <SDL3/SDL_messagebox.h>
 #include <fmt/format.h>
 
@@ -20,6 +21,7 @@
 #include <toml++/toml.hpp>
 
 static toml::table s_config_model{};
+static std::unique_ptr<HomeDirManager> s_instance{};
 
 /*==================================================================*/
 
@@ -38,18 +40,22 @@ HomeDirManager::HomeDirManager(
 	bool force_portable, std::string_view org, std::string_view app
 ) noexcept {
 	set_home_path(home_override, force_portable, org, app);
-	if (s_home_path.empty()) { return; }
+	if (m_home_path.empty()) { return; }
 
 	if (config_name.empty()) { config_name = "settings.toml"; }
-	s_config_at = (fs::Path(s_home_path) / config_name).string();
+	m_config_at = (fs::Path(m_home_path) / config_name).string();
 }
 
-HomeDirManager* HomeDirManager::initialize(
+void HomeDirManager::initialize(
 	std::string_view home_override, std::string_view config_name,
 	bool force_portable, std::string_view org, std::string_view app
 ) noexcept {
-	static HomeDirManager self(home_override, config_name, force_portable, org, app);
-	return s_home_path.empty() ? nullptr : &self;
+	s_instance = std::unique_ptr<HomeDirManager>(new HomeDirManager(
+		home_override, config_name, force_portable, org, app));
+}
+
+HomeDirManager* HomeDirManager::get_instance() noexcept {
+	return s_instance.get();
 }
 
 /*==================================================================*/
@@ -62,7 +68,7 @@ void HomeDirManager::set_home_path(
 		const auto writable_dir = fs::is_writable_directory(home_override);
 		if (writable_dir.value_or(false)) {
 			fmt::println("Home path (--homedir) has been successfully "
-				"re-routed to '{}'.", (s_home_path = home_override));
+				"re-routed to '{}'.", (m_home_path = home_override));
 			return;
 		} else {
 			::println_fatal("Failed to re-route Home path (--homedir) to '{}': {}", home_override,
@@ -75,7 +81,7 @@ void HomeDirManager::set_home_path(
 		const auto writable_dir = fs::is_writable_directory(::get_base_path());
 		if (writable_dir.value_or(false)) {
 			fmt::println("Home path (--portable) has been successfully "
-				"re-routed to '{}'.", (s_home_path = ::get_base_path()));
+				"re-routed to '{}'.", (m_home_path = ::get_base_path()));
 			return;
 		} else {
 			::println_fatal("Failed to re-route Home path (--portable) to '{}': {}", ::get_base_path(),
@@ -89,7 +95,7 @@ void HomeDirManager::set_home_path(
 			const auto writable_dir = fs::is_writable_directory(::get_base_path());
 			if (writable_dir.value_or(false)) {
 				fmt::println("Home path (portable.txt) has been successfully "
-					"re-routed to '{}'.", (s_home_path = ::get_base_path()));
+					"re-routed to '{}'.", (m_home_path = ::get_base_path()));
 				return;
 			} else {
 				::println_fatal("Failed to re-route Home path (portable.txt) to '{}': {}"
@@ -105,7 +111,7 @@ void HomeDirManager::set_home_path(
 	));
 	if (writable_dir.value_or(false)) {
 		fmt::println("Home path has been successfully "
-			"set to '{}'.", (s_home_path = ::get_home_path()));
+			"set to '{}'.", (m_home_path = ::get_home_path()));
 		return;
 	} else {
 		::println_fatal("Failed to determine if '{}' is writable: {}", ::get_home_path(),
@@ -117,7 +123,7 @@ void HomeDirManager::set_home_path(
 /*==================================================================*/
 
 void HomeDirManager::parse_app_config_file() const noexcept {
-	if (const auto result = TomlConfig::parse_from_file(s_config_at.c_str())) {
+	if (const auto result = TomlConfig::parse_from_file(m_config_at.c_str())) {
 		TomlConfig::update_existing_table_contents(s_config_model, result.table());
 		blog.info("[TOML] App Config found, previous settings loaded!");
 	} else {
@@ -127,7 +133,7 @@ void HomeDirManager::parse_app_config_file() const noexcept {
 }
 
 void HomeDirManager::write_app_config_file() const noexcept {
-	if (const auto result = TomlConfig::write_into_file(s_config_model, s_config_at.c_str())) {
+	if (const auto result = TomlConfig::write_into_file(s_config_model, m_config_at.c_str())) {
 		blog.info("[TOML] App Config written to file successfully!");
 	} else {
 		blog.error("[TOML] Failed to write App Config, runtime settings lost!"

@@ -102,7 +102,7 @@ void FrontendHost::find_last_focused_system() noexcept {
 	for (const auto& id : *m_focus_mru) {
 		const bool is_focused = m_systems[id]->force_viewport_focused(false);
 
-		if (!found_focused_system && is_focused && m_focus_mru[0] != id) {
+		if (!found_focused_system && is_focused && m_focus_mru.front() != id) {
 			blog.debug("Focused system instance is now {}.", id);
 			m_focus_mru.insert(id);
 			found_focused_system = true;
@@ -112,7 +112,7 @@ void FrontendHost::find_last_focused_system() noexcept {
 
 void FrontendHost::unload_system_instance(SystemID system_id) noexcept {
 	const auto target_system_id = system_id ? system_id
-		: (m_focus_mru.empty() ? 0 : m_focus_mru[0]);
+		: (m_focus_mru.empty() ? 0 : m_focus_mru.front());
 	m_systems.erase(target_system_id);
 	m_focus_mru.erase(target_system_id);
 }
@@ -126,7 +126,7 @@ void FrontendHost::insert_system_instance(SystemInterface* ptr) noexcept {
 
 	m_focus_mru.insert(ptr->instance_id);
 	blog.debug("Forcing focus to newly inserted system instance with ID {}.", ptr->instance_id);
-	auto& system = m_systems[m_focus_mru[0]];
+	auto& system = m_systems[m_focus_mru.front()];
 
 	system.core.reset(ptr);
 	system->start_workers();
@@ -134,7 +134,7 @@ void FrontendHost::insert_system_instance(SystemInterface* ptr) noexcept {
 
 /*==================================================================*/
 
-void FrontendHost::load_file_from_disk(std::string_view file_path) {
+void FrontendHost::load_file_from_disk(std::string_view file_path) noexcept {
 	if (SystemStaging::file_image.load(std::string(file_path))) {
 		if (SystemStaging::file_image.size() == 0) {
 			SystemStaging::file_image.clear();
@@ -149,20 +149,17 @@ void FrontendHost::load_file_from_disk(std::string_view file_path) {
 }
 
 FrontendHost* FrontendHost::init_application(
-	std::string_view home_override, std::string_view config_name,
-	std::string_view game_file_path, bool force_portable
+	std::string_view game_file_path, bool headless
 ) noexcept {
 	static FrontendHost* self = nullptr;
 	if (self) { return self; }
 
-	HDM = HomeDirManager::initialize(home_override, config_name,
-		force_portable, c_org_name, c_app_name);
-	if (!HDM) { return nullptr; }
+	HDM = HomeDirManager::get_instance();
 
 	blog.create_log(std::to_string(thread_affinity::get_process_id()),
 		(fs::Path(HDM->get_home_path()) / "logs").string());
 
-	FrontendInterface::init_context(HomeDirManager::get_home_path().c_str());
+	FrontendInterface::init_context(HDM->get_home_path().c_str());
 
 	GlobalAudioBase::Settings GAB_settings;
 	BasicVideoSpec ::Settings BVS_settings;
@@ -248,7 +245,7 @@ int FrontendHost::process_client_frame() {
 	handle_main_hotkeys();
 
 	for (auto& [id, system] : m_systems) {
-		set_system_hidden_status(system, id == m_focus_mru[0]
+		set_system_hidden_status(system, id == m_focus_mru.front()
 			? m_application_minimized : true);
 	}
 
@@ -257,7 +254,7 @@ int FrontendHost::process_client_frame() {
 
 	else if (s_pending_file_drops.size() > 0) {
 		// XXX - we only allow a single file load a time (for now?)
-		load_file_from_disk(s_pending_file_drops[0]);
+		load_file_from_disk(s_pending_file_drops.front());
 		s_pending_file_drops.clear();
 	}
 
@@ -270,7 +267,7 @@ int FrontendHost::process_client_frame() {
 	}) ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
 }
 
-void FrontendHost::handle_main_hotkeys() {
+void FrontendHost::handle_main_hotkeys() noexcept {
 	static BasicKeyboard s_input;
 	s_input.advance_state();
 
@@ -279,14 +276,14 @@ void FrontendHost::handle_main_hotkeys() {
 	}
 
 	if (!m_focus_mru.empty()) {
-		auto& system = m_systems[m_focus_mru[0]];
+		auto& system = m_systems[m_focus_mru.front()];
 		const auto& descriptor = system->get_descriptor();
 
 		if ((s_input.is_held(KEY(LSHIFT)) || s_input.is_held(KEY(RSHIFT)))
 			&& s_input.is_pressed(KEY(ESCAPE))
 		) {
 			blog.info("System '{}' ({}) terminated by hotkey.",
-				descriptor.system_name, m_focus_mru[0]);
+				descriptor.system_name, m_focus_mru.front());
 			unload_system_instance(); return;
 		}
 		//if (s_input.is_pressed(KEY(BACKSPACE))) {
@@ -297,7 +294,7 @@ void FrontendHost::handle_main_hotkeys() {
 		if (s_input.is_pressed(KEY(F9))) {
 			if (auto paused = system->try_pause_system()) {
 				blog.info("System '{}' ({}) {} by hotkey!",
-					descriptor.system_name, m_focus_mru[0],
+					descriptor.system_name, m_focus_mru.front(),
 					*paused ? "paused" : "unpaused");
 			}
 		}

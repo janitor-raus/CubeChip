@@ -26,13 +26,19 @@ class SimpleMRU {
 public:
 	using value_type = T;
 
-	auto size() const noexcept { return m_items.size(); }
+	auto size()  const noexcept { return m_items.size(); }
 
 	bool empty() const noexcept { return m_items.empty(); }
 	void clear()       noexcept { m_items.clear(); }
 
+	/***/ T& front()       noexcept { return m_items.front(); }
+	const T& front() const noexcept { return m_items.front(); }
+
+	/***/ T& back()       noexcept { return m_items.back(); }
+	const T& back() const noexcept { return m_items.back(); }
+
+	/***/ T& operator[](std::size_t i)       { return m_items[i]; }
 	const T& operator[](std::size_t i) const { return m_items[i]; }
-	      T& operator[](std::size_t i)       { return m_items[i]; }
 
 	auto span() const noexcept { return std::span<const T>(m_items); }
 	auto span()       noexcept { return std::span<      T>(m_items); }
@@ -42,6 +48,9 @@ public:
 
 	/***/ auto& operator*()       noexcept { return m_items; }
 	const auto& operator*() const noexcept { return m_items; }
+
+	/***/ auto* operator->()       noexcept { return &m_items; }
+	const auto* operator->() const noexcept { return &m_items; }
 
 /*==================================================================*/
 

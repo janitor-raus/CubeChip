@@ -4,6 +4,7 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
+#include "HomeDirManager.hpp"
 #include "BasicLogger.hpp"
 #include "BasicInput.hpp"
 #include "AttachConsole.hpp"
@@ -99,11 +100,19 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 		return SDL_APP_SUCCESS;
 	}
 
+	HomeDirManager::initialize(
+		result["homedir" ].as_optional<std::string>().value_or(""),
+		result["config"  ].as_optional<std::string>().value_or(""),
+		result["portable"].as_optional<bool>().value_or(false),
+		c_org_name, c_app_name
+	);
+
+	const auto* HDM = HomeDirManager::get_instance();
+	if (!HDM || HDM->get_home_path().empty()) { return SDL_APP_FAILURE; }
+
 	*Host = FrontendHost::init_application(
-		result["homedir"].as_optional<std::string>().value_or(""),
-		result["config" ].as_optional<std::string>().value_or(""),
-		result["program"].as_optional<std::string>().value_or(""),
-		result["program"].as_optional<bool>().value_or(false)
+		result["program" ].as_optional<std::string>().value_or(""),
+		result["headless"].as_optional<bool>().value_or(false)
 	);
 
 	return *Host ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
