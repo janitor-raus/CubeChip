@@ -11,6 +11,7 @@
 #include <concepts>
 #include <algorithm>
 #include <limits>
+#include <bit>
 
 #include "Macros.hpp"
 
@@ -160,6 +161,23 @@ namespace EzMaths {
 	inline constexpr T peak_mirror_fold(T value, u64 max) noexcept {
 		auto wrapped = value % (max * 2);
 		return T(wrapped < max ? wrapped : (2 * max - 1) - wrapped);
+	}
+
+	template <std::floating_point T>
+	constexpr bool isfinite(T value) noexcept {
+		#ifdef __cpp_lib_constexpr_cmath // C++23
+			return std::isfinite(value);
+		#else
+			if constexpr (sizeof(T) == sizeof(u64)) {
+				static constexpr u64 exponent_mask = 0x7FF0000000000000;
+				return (std::bit_cast<u64>(value) & exponent_mask) != exponent_mask;
+			} else if constexpr (sizeof(T) == sizeof(u32)) {
+				static constexpr u32 exponent_mask = 0x7F800000;
+				return (std::bit_cast<u32>(value) & exponent_mask) != exponent_mask;
+			} else {
+				static_assert(sizeof(T) == 0, "isfinite: unsupported float type");
+			}
+		#endif
 	}
 }
 

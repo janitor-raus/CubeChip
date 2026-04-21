@@ -10,6 +10,7 @@
 
 #include <cmath>
 #include <numbers>
+#include <cassert>
 
 /*==================================================================*/
 
@@ -23,7 +24,13 @@ private:
 public:
 	template <std::integral Any_Int>
 	constexpr Phase(Any_Int phase) noexcept : m_phase(Byte_T(phase) * (1.0 / 255.0)) {}
-	constexpr Phase(Float_T phase) noexcept : m_phase(phase - int(phase)) {}
+	constexpr Phase(Float_T phase) noexcept {
+		assert(ez::isfinite(phase) && "Phase: non-finite input");
+		assert(phase < 0x1p32 && "Phase: input too large (32-bit overflow)");
+		m_phase = ez::isfinite(phase) && phase < 0x1p32
+			? phase - s64(phase) : 0.0;
+		if (m_phase < 0.0) { m_phase += 1.0; }
+	}
 	constexpr Phase() noexcept = default;
 
 	constexpr operator Float_T() const noexcept { return m_phase; }
@@ -63,11 +70,11 @@ public:
 	static CONSTEXPR_MATH Bipolar cosine(Phase phase) noexcept
 		{ return std::cos(std::numbers::pi * 2.0 * phase); }
 	static CONSTEXPR_MATH Bipolar cosine_t(Millis p, Millis t) noexcept
-		{ return cos(calc_period(p, t)); }
+		{ return cosine(calc_period(p, t)); }
 	static CONSTEXPR_MATH Bipolar sine(Phase phase) noexcept
 		{ return std::sin(std::numbers::pi * 2.0 * phase); }
 	static CONSTEXPR_MATH Bipolar sine_t(Millis p, Millis t) noexcept
-		{ return sin(calc_period(p, t)); }
+		{ return sine(calc_period(p, t)); }
 
 
 	static constexpr Bipolar sawtooth(Phase phase) noexcept
