@@ -13,6 +13,7 @@ source_group("Shims" FILES ${SHIMS_HEADERS})
 set(FRONTEND_HEADERS
 	"${PROJECT_INCLUDE_DIR}/frontend/FrontendHost.hpp"
 	"${PROJECT_INCLUDE_DIR}/frontend/FrontendInterface.hpp"
+	"${PROJECT_INCLUDE_DIR}/frontend/MemoryEditor.hpp"
 	"${PROJECT_INCLUDE_DIR}/frontend/WindowHost.hpp"
 )
 set(FRONTEND_SOURCES
@@ -20,6 +21,7 @@ set(FRONTEND_SOURCES
 	"${PROJECT_INCLUDE_DIR}/frontend/FrontendHost.cpp"
 	"${PROJECT_INCLUDE_DIR}/frontend/FrontendHost_GUI.cpp"
 	"${PROJECT_INCLUDE_DIR}/frontend/FrontendInterface.cpp"
+	"${PROJECT_INCLUDE_DIR}/frontend/MemoryEditor.cpp"
 	"${PROJECT_INCLUDE_DIR}/frontend/WindowHost.cpp"
 )
 source_group("Frontend" FILES ${FRONTEND_HEADERS} ${FRONTEND_SOURCES})

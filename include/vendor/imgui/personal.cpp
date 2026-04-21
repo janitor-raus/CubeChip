@@ -99,9 +99,12 @@ namespace ImGui {
 	}
 
 	void Separator(float mult) {
-		DummyY(mult * 0.5f);
-		Separator();
-		DummyY(mult * 0.5f);
+		mult *= 0.5f; // halve and add to both sides
+		if (GetCurrentWindow()->DC.LayoutType == ImGuiLayoutType_Horizontal) {
+			SameLine(0, mult); Separator(); SameLine(0, mult);
+		} else {
+			DummyY(mult); Separator(); DummyY(mult);
+		}
 	}
 
 	void SetNextWindowMinClientSize(const ImVec2& min) {
@@ -216,6 +219,114 @@ namespace ImGui {
 
 		GetWindowDrawList()->AddRectFilled(origin, origin + dims,
 			color, round, ImDrawFlags_RoundCornersAll);
+	}
+
+	void DrawPartialRect(
+		const ImVec2& p_min, const ImVec2& p_max,
+		unsigned col, float rounding, unsigned flags,
+		PartialRectFlags sides, float thickness
+	) {
+		if ((col & IM_COL32_A_MASK) == 0) { return; }
+		if (sides == 0 || thickness < 0.5f) { return; }
+
+		if ((flags & ImDrawFlags_RoundCornersMask_) == 0) {
+			flags |= ImDrawFlags_RoundCornersAll;
+		}
+
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+
+		const ImVec2 a = p_min + ImVec2(0.50f, 0.50f); // center of pixel for better anti-aliasing
+		const ImVec2 b = p_max - ImVec2(0.49f, 0.49f); // almost center, we'd lose a pixel otherwise
+
+		const bool has_adjacent_edges =
+			((sides & PartialRectFlags::CORNER_TL) == PartialRectFlags::CORNER_TL) ||
+			((sides & PartialRectFlags::CORNER_TR) == PartialRectFlags::CORNER_TR) ||
+			((sides & PartialRectFlags::CORNER_BR) == PartialRectFlags::CORNER_BR) ||
+			((sides & PartialRectFlags::CORNER_BL) == PartialRectFlags::CORNER_BL);
+
+		if (has_adjacent_edges && rounding >= 0.5f) {
+			rounding = ImMin(rounding, ImAbs(b.x - a.x) * (((flags & ImDrawFlags_RoundCornersTop) == ImDrawFlags_RoundCornersTop) ||
+				((flags & ImDrawFlags_RoundCornersBottom) == ImDrawFlags_RoundCornersBottom) ? 0.5f : 1.0f) - 1.0f);
+			rounding = ImMin(rounding, ImAbs(b.y - a.y) * (((flags & ImDrawFlags_RoundCornersLeft) == ImDrawFlags_RoundCornersLeft) ||
+				((flags & ImDrawFlags_RoundCornersRight) == ImDrawFlags_RoundCornersRight) ? 0.5f : 1.0f) - 1.0f);
+
+			const float radius_tl = rounding * !!(flags & ImDrawFlags_RoundCornersTopLeft);
+			const float radius_tr = rounding * !!(flags & ImDrawFlags_RoundCornersTopRight);
+			const float radius_br = rounding * !!(flags & ImDrawFlags_RoundCornersBottomRight);
+			const float radius_bl = rounding * !!(flags & ImDrawFlags_RoundCornersBottomLeft);
+
+			struct CornerData {
+				ImVec2 point;  // the actual corner coordinate
+				float  radius; // arc radius (0.0f if not rounded)
+				ImVec2 center; // center point of the arc
+				int    angle;  // arc start angle (in 12 segments, e.g. 3 = 90 degrees)
+			};
+
+			const CornerData corners[4] = {
+				{ ImVec2(a.x, a.y), radius_tl, ImVec2(a.x + radius_tl, a.y + radius_tl), 6 },
+				{ ImVec2(b.x, a.y), radius_tr, ImVec2(b.x - radius_tr, a.y + radius_tr), 9 },
+				{ ImVec2(b.x, b.y), radius_br, ImVec2(b.x - radius_br, b.y - radius_br), 0 },
+				{ ImVec2(a.x, b.y), radius_bl, ImVec2(a.x + radius_bl, b.y - radius_bl), 3 },
+			};
+
+			auto stroke_arc = [&](auto... edge_i) {
+				auto emit_corner = [&](const CornerData& c) {
+					if (c.radius >= thickness) {
+						dl->PathArcToFast(c.center, c.radius, c.angle, c.angle + 3);
+					} else {
+						dl->PathLineTo(c.point);
+					}
+				};
+
+				dl->PathClear(); const bool closed = (sizeof...(edge_i) == 4);
+				int last = -1; ((emit_corner(corners[edge_i]), last = edge_i), ...);
+				if (!closed) { emit_corner(corners[(last + 1) % 4]); }
+				dl->PathStroke(col, closed ? ImDrawFlags_Closed : 0, thickness);
+			};
+
+			switch (sides) {
+				case PartialRectFlags::ALL:         stroke_arc(0, 1, 2, 3); break;
+				case PartialRectFlags::PIPE_END_UP: stroke_arc(3, 0, 1); break;
+				case PartialRectFlags::PIPE_END_RT: stroke_arc(0, 1, 2); break;
+				case PartialRectFlags::PIPE_END_DN: stroke_arc(1, 2, 3); break;
+				case PartialRectFlags::PIPE_END_LT: stroke_arc(2, 3, 0); break;
+				case PartialRectFlags::CORNER_TL:   stroke_arc(3, 0); break;
+				case PartialRectFlags::CORNER_TR:   stroke_arc(0, 1); break;
+				case PartialRectFlags::CORNER_BR:   stroke_arc(1, 2); break;
+				case PartialRectFlags::CORNER_BL:   stroke_arc(2, 3); break;
+				default: IM_ASSERT("We're not meant to be here...");
+			}
+		}
+		else {
+			auto stroke = [&](bool closed, auto... points) {
+				dl->PathClear(); (dl->PathLineTo(points), ...);
+				dl->PathStroke(col, closed ? ImDrawFlags_Closed : 0, thickness);
+			};
+
+			const ImVec2 tl = ImVec2(a.x, a.y);
+			const ImVec2 tr = ImVec2(b.x, a.y);
+			const ImVec2 br = ImVec2(b.x, b.y);
+			const ImVec2 bl = ImVec2(a.x, b.y);
+
+			switch (sides) {
+				case PartialRectFlags::ALL:         stroke(true,  tl, tr, br, bl); break;
+				case PartialRectFlags::PIPE_END_UP: stroke(false, bl, tl, tr, br); break;
+				case PartialRectFlags::PIPE_END_RT: stroke(false, tl, tr, br, bl); break;
+				case PartialRectFlags::PIPE_END_DN: stroke(false, tr, br, bl, tl); break;
+				case PartialRectFlags::PIPE_END_LT: stroke(false, br, bl, tl, tr); break;
+				case PartialRectFlags::CORNER_TL:   stroke(false, tr, tl, bl); break;
+				case PartialRectFlags::CORNER_TR:   stroke(false, tl, tr, br); break;
+				case PartialRectFlags::CORNER_BR:   stroke(false, tr, br, bl); break;
+				case PartialRectFlags::CORNER_BL:   stroke(false, br, bl, tl); break;
+				case PartialRectFlags::PIPE_V:      stroke(false, tl, bl); stroke(false, tr, br); break;
+				case PartialRectFlags::PIPE_H:      stroke(false, tl, tr); stroke(false, bl, br); break;
+				case PartialRectFlags::UP:          stroke(false, tl, tr); break;
+				case PartialRectFlags::RT:          stroke(false, tr, br); break;
+				case PartialRectFlags::DN:          stroke(false, bl, br); break;
+				case PartialRectFlags::LT:          stroke(false, tl, bl); break;
+				default: IM_ASSERT("We're not meant to be here...");
+			}
+		}
 	}
 
 	bool ButtonContainer(

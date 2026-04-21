@@ -100,6 +100,43 @@ namespace ImGui {
 		unsigned color = 0xFFFFFFFF
 	);
 
+	enum PartialRectFlags {
+		NONE = 0,
+		UP = 1 << 0,
+		RT = 1 << 1,
+		DN = 1 << 2,
+		LT = 1 << 3,
+		CORNER_TL = UP | LT,
+		CORNER_TR = UP | RT,
+		CORNER_BR = DN | RT,
+		CORNER_BL = DN | LT,
+		PIPE_V = LT | RT,
+		PIPE_H = UP | DN,
+		PIPE_END_UP = PIPE_V | UP,
+		PIPE_END_RT = PIPE_H | RT,
+		PIPE_END_DN = PIPE_V | DN,
+		PIPE_END_LT = PIPE_H | LT,
+		ALL = UP | RT | DN | LT
+	};
+
+	inline PartialRectFlags operator|(PartialRectFlags a, PartialRectFlags b) {
+		return static_cast<PartialRectFlags>(unsigned(a) | unsigned(b));
+	}
+
+	inline PartialRectFlags& operator|=(PartialRectFlags& a, PartialRectFlags b) {
+		return a = a | b;
+	}
+
+	void DrawPartialRect(
+		const ImVec2& p_min,
+		const ImVec2& p_max,
+		unsigned col,
+		float rounding = 0.0f,
+		unsigned flags = 0,
+		PartialRectFlags sides = PartialRectFlags::ALL,
+		float thickness = 1.0f
+	);
+
 	bool ButtonContainer(
 		const char* id, const ImVec2& size,
 		const std::function<void()>& foreground_children,
