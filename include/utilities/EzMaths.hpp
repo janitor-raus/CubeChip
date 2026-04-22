@@ -163,17 +163,18 @@ namespace EzMaths {
 		return T(wrapped < max ? wrapped : (2 * max - 1) - wrapped);
 	}
 
+	static constexpr u64 c_exponent_mask_f64 = 0x7FF0000000000000;
+	static constexpr u32 c_exponent_mask_f32 = 0x7F800000;
+
 	template <std::floating_point T>
 	constexpr bool isfinite(T value) noexcept {
 		#ifdef __cpp_lib_constexpr_cmath // C++23
 			return std::isfinite(value);
 		#else
 			if constexpr (sizeof(T) == sizeof(u64)) {
-				static constexpr u64 exponent_mask = 0x7FF0000000000000;
-				return (std::bit_cast<u64>(value) & exponent_mask) != exponent_mask;
+				return (std::bit_cast<u64>(value) & c_exponent_mask_f64) != c_exponent_mask_f64;
 			} else if constexpr (sizeof(T) == sizeof(u32)) {
-				static constexpr u32 exponent_mask = 0x7F800000;
-				return (std::bit_cast<u32>(value) & exponent_mask) != exponent_mask;
+				return (std::bit_cast<u32>(value) & c_exponent_mask_f32) != c_exponent_mask_f32;
 			} else {
 				static_assert(sizeof(T) == 0, "isfinite: unsupported float type");
 			}

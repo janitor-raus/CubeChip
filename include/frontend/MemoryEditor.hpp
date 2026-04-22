@@ -6,15 +6,7 @@
 
 #pragma once
 
-// Usage:
-//   // If you already have a window, use DrawContents() instead:
-//   static MemoryEditor mem_edit_2;
-//   ImGui::Begin("MyWindow")
-//   mem_edit_2.DrawContents(this, sizeof(*this), (size_t)this);
-//   ImGui::End();
-
 // TODO:
-// - This is generally old/crappy code, it should work but isn't very good.. to be rewritten some day.
 // - PageUp/PageDown are not supported because we use _NoNav. This is a good test scenario for working out idioms of how to mix natural nav and our own...
 // - Arrows are being sent to the InputText() about to disappear which for LeftArrow makes the text cursor appear at position 1 for one frame.
 // - Using InputText() is awkward and maybe overkill here, consider implementing something custom.
@@ -36,7 +28,7 @@ struct MemoryEditor {
 		BIN, // Binary
 		DEC, // Decimal
 		HEX, // Hexadecimal
-		BAR, // Code 128(B)
+		BAR, // Code 128(B) --- XXX add meeeee (for funzies)
 	};
 
 	enum DataType : u8 {

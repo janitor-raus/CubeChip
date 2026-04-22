@@ -4,10 +4,7 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#pragma once
-
 #include "MemoryEditor.hpp"
-#include "BasicLogger.hpp"
 
 #include <cstddef>
 #include <array>
