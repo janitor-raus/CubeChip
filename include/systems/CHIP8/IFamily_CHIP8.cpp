@@ -4,85 +4,25 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "Chip8_CoreInterface.hpp"
+#include "IFamily_CHIP8.hpp"
 
 #ifdef ENABLE_CHIP8_SYSTEM
 
 #include "BasicLogger.hpp"
 #include "SimpleFileIO.hpp"
-#include "Millis.hpp"
-#include <imgui.h>
 
 /*==================================================================*/
 
-Chip8_CoreInterface::Chip8_CoreInterface(std::size_t W, std::size_t H) noexcept
-	: SystemInterface(family_pretty_name)
+IFamily_CHIP8::IFamily_CHIP8(std::size_t W, std::size_t H) noexcept
+	: ISystemEmu(family_pretty_name)
 	, m_display_window({ "Display", make_system_id(instance_id, "display")})
-	, m_display_device(W, H, FrontendInterface::get_current_renderer())
+	, m_display_device(W, H, UserInterface::get_current_renderer())
 {
-	m_display_window.set_window_focused_output(&m_is_viewport_focused);
-	m_display_window.allow_fullscreen(true);
-
-	m_display_window.edit_callbacks().window_init = [
-		window_id = m_workspace_host.get_window_id(),
-		window_class = ImGuiWindowClass()
-	](auto& window_flags, auto&) mutable noexcept {
-		window_flags |= ImGuiWindowFlags_NoCollapse  | ImGuiWindowFlags_NoScrollWithMouse
-					 |  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
-
-		window_class.ClassId = window_id;
-		window_class.DockingAllowUnclassed = false;
-
-		ImGui::SetNextWindowClass(&window_class);
-		ImGui::DockNextWindowTo(window_class.ClassId, true);
-		ImGui::SetNextWindowMinClientSize(ImVec2(480.0f, 360.0f)
-			* FrontendInterface::get_ui_total_scaling());
-	};
-
-	m_display_window.edit_callbacks().window_body =
-	[&](bool window_open, bool) noexcept {
-		if (window_open) { m_display_device.render_display(); }
-	};
-
-	m_display_device.set_osd_callable([&]() noexcept {
-		if (m_interrupt == Interrupt::INPUT) {
-			osd::key_press_indicator(WaveForms::pulse_t(
-				500, u32(Millis::now())).as_unipolar());
-		}
-		if (!has_system_state(EmuState::STATS)) { return; }
-		osd::simple_text_overlay(copy_statistics_string());
-	});
-
-	m_frontend_hooks.emplace_back(FrontendInterface::register_menu(
-		m_workspace_host.get_window_label(), { 9999, "Debug" },
-		[&]() noexcept { m_display_device.render_settings_menu(); }
-	));
-
-	m_memory_editor.set_preview_endianness(MemoryEditor::Endian::BE);
-	m_memview_window.edit_callbacks().window_dock =
-	[&](bool window_open, auto) noexcept {
-		if (window_open && can_system_work()) {
-			m_memory_editor.follow_address(m_current_pc, 2);
-		}
-	};
-
-	m_frontend_hooks.emplace_back(FrontendInterface::register_menu("",
-	{ 50, "System" }, [&]() noexcept {
-		Dummy(ImVec2(GetTextLineHeight() * 12, 0.0f));
-		if (MenuItem(can_system_work() ? "Pause" : "Resume",
-			"F9", false, can_system_pause())) {
-			xor_system_state(EmuState::PAUSED);
-		}
-		Separator(2.0f);
-		if (BeginMenu("")) {
-			EndMenu();
-		}
-	}));
+	prepare_user_interface();
+	load_preset_binds();
 
 	m_audio_device.add_audio_stream(STREAM::MAIN, 48'000);
 	m_audio_device.resume_streams();
-
-	load_preset_binds();
 
 	if (calc_file_image_sha1()) {
 		if (auto* path = add_system_path("savestate", family_name)) {
@@ -103,7 +43,7 @@ Chip8_CoreInterface::Chip8_CoreInterface(std::size_t W, std::size_t H) noexcept
 
 /*==================================================================*/
 
-void Chip8_CoreInterface::update_key_states() noexcept {
+void IFamily_CHIP8::update_key_states() noexcept {
 	if (!m_custom_binds.size()) { return; }
 
 	m_input.advance_state();
@@ -120,7 +60,7 @@ void Chip8_CoreInterface::update_key_states() noexcept {
 	m_keys_loop &= m_keys_hide &= ~(m_keys_last ^ m_keys_this);
 }
 
-void Chip8_CoreInterface::load_preset_binds() noexcept {
+void IFamily_CHIP8::load_preset_binds() noexcept {
 	static constexpr auto _ = SDL_SCANCODE_UNKNOWN;
 	static constexpr SimpleKeyMapping default_key_mappings[]{
 		{0x1, KEY(1), _}, {0x2, KEY(2), _}, {0x3, KEY(3), _}, {0xC, KEY(4), _},
@@ -132,7 +72,7 @@ void Chip8_CoreInterface::load_preset_binds() noexcept {
 	load_custom_binds(std::span(default_key_mappings));
 }
 
-bool Chip8_CoreInterface::catch_key_press(u8* key_reg) noexcept {
+bool IFamily_CHIP8::catch_key_press(u8* key_reg) noexcept {
 	if (!m_custom_binds.size()) { return false; }
 
 	if (m_elapsed_frames >= m_tick_last + m_tick_span)
@@ -153,17 +93,17 @@ bool Chip8_CoreInterface::catch_key_press(u8* key_reg) noexcept {
 	return press_keys;
 }
 
-bool Chip8_CoreInterface::is_key_held_P1(u32 key_index) const noexcept {
+bool IFamily_CHIP8::is_key_held_P1(u32 key_index) const noexcept {
 	return m_keys_this & ~m_keys_hide & (0x01 << (key_index & 0xF));
 }
 
-bool Chip8_CoreInterface::is_key_held_P2(u32 key_index) const noexcept {
+bool IFamily_CHIP8::is_key_held_P2(u32 key_index) const noexcept {
 	return m_keys_this & ~m_keys_hide & (0x10 << (key_index & 0xF));
 }
 
 /*==================================================================*/
 
-void Chip8_CoreInterface::handle_pre_work_interrupts() noexcept {
+void IFamily_CHIP8::handle_pre_work_interrupts() noexcept {
 	switch (m_interrupt)
 	{
 		case Interrupt::CLEAR:
@@ -190,7 +130,7 @@ void Chip8_CoreInterface::handle_pre_work_interrupts() noexcept {
 	}
 }
 
-void Chip8_CoreInterface::handle_post_work_interrupts() noexcept {
+void IFamily_CHIP8::handle_post_work_interrupts() noexcept {
 	switch (m_interrupt)
 	{
 		case Interrupt::INPUT:
@@ -219,18 +159,18 @@ void Chip8_CoreInterface::handle_post_work_interrupts() noexcept {
 	}
 }
 
-void Chip8_CoreInterface::handle_timer_ticks() noexcept {
+void IFamily_CHIP8::handle_timer_ticks() noexcept {
 	if (m_delay_timer) { --m_delay_timer; }
 
 	for (auto& timer : m_audio_timers)
 		{ timer.dec(); }
 }
 
-void Chip8_CoreInterface::skip_instruction() noexcept {
+void IFamily_CHIP8::skip_instruction() noexcept {
 	::assign_cast_add(m_current_pc, 2);
 }
 
-void Chip8_CoreInterface::jump_program_to(u32 next) noexcept {
+void IFamily_CHIP8::jump_program_to(u32 next) noexcept {
 	const auto old_pc = (m_current_pc - 2);
 	::assign_cast(m_current_pc, next);
 	if (m_current_pc == old_pc) [[unlikely]]
@@ -239,7 +179,7 @@ void Chip8_CoreInterface::jump_program_to(u32 next) noexcept {
 
 /*==================================================================*/
 
-void Chip8_CoreInterface::main_system_loop() {
+void IFamily_CHIP8::main_system_loop() {
 	update_key_states();
 
 	handle_timer_ticks();
@@ -252,7 +192,7 @@ void Chip8_CoreInterface::main_system_loop() {
 	create_statistics_data();
 }
 
-void Chip8_CoreInterface::append_statistics_data() noexcept {
+void IFamily_CHIP8::append_statistics_data() noexcept {
 	if (has_system_state(EmuState::BENCH)) {
 		static thread_local ez::EMA suavemente{};
 
@@ -263,18 +203,18 @@ void Chip8_CoreInterface::append_statistics_data() noexcept {
 			suavemente.avg(), m_benched_frames);
 	}
 
-	SystemInterface::append_statistics_data();
+	ISystemEmu::append_statistics_data();
 }
 
 /*==================================================================*/
 
-void Chip8_CoreInterface::start_voice(u32 duration, u32 tone) noexcept {
+void IFamily_CHIP8::start_voice(u32 duration, u32 tone) noexcept {
 	auto voice_index = 0;
 	start_voice_at(voice_index, duration, tone);
 	if (duration) { ++voice_index %= VOICE::COUNT - 1; }
 }
 
-void Chip8_CoreInterface::start_voice_at(u32 voice_index, u32 duration, u32 tone) noexcept {
+void IFamily_CHIP8::start_voice_at(u32 voice_index, u32 duration, u32 tone) noexcept {
 	m_audio_timers[voice_index].set(duration);
 	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
 		m_voices[voice_index].set_step((c_tonal_offset + (tone ? tone : 8 \
@@ -283,7 +223,7 @@ void Chip8_CoreInterface::start_voice_at(u32 voice_index, u32 duration, u32 tone
 	}
 }
 
-void Chip8_CoreInterface::mix_audio_data(VoiceGenerators processors) noexcept {
+void IFamily_CHIP8::mix_audio_data(VoiceGenerators processors) noexcept {
 	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
 
 		auto buffer = ::allocate_n<f32>
@@ -300,7 +240,7 @@ void Chip8_CoreInterface::mix_audio_data(VoiceGenerators processors) noexcept {
 	}
 }
 
-void Chip8_CoreInterface::make_pulse_wave(f32* data, u32 size, Voice* voice, Stream*) noexcept {
+void IFamily_CHIP8::make_pulse_wave(f32* data, u32 size, Voice* voice, Stream*) noexcept {
 	if (!voice || !voice->userdata) [[unlikely]] { return; }
 	auto* timer = static_cast<AudioTimer*>(voice->userdata);
 
@@ -313,17 +253,17 @@ void Chip8_CoreInterface::make_pulse_wave(f32* data, u32 size, Voice* voice, Str
 	voice->step_phase(size);
 }
 
-void Chip8_CoreInterface::instruction_error(u32 HI, u32 LO) noexcept {
+void IFamily_CHIP8::instruction_error(u32 HI, u32 LO) noexcept {
 	blog.info("Unknown instruction: 0x{:04X}", (HI << 8) | LO);
 	trigger_interrupt(Interrupt::ERROR);
 }
 
-void Chip8_CoreInterface::trigger_interrupt(Interrupt type) noexcept {
+void IFamily_CHIP8::trigger_interrupt(Interrupt type) noexcept {
 	set_frame_stop_flag(true);
 	m_interrupt = type;
 }
 
-void Chip8_CoreInterface::trigger_interrupt(Interrupt type, bool cond) noexcept {
+void IFamily_CHIP8::trigger_interrupt(Interrupt type, bool cond) noexcept {
 	if (cond) [[unlikely]] { trigger_interrupt(type); }
 }
 
@@ -347,7 +287,7 @@ static bool make_permaregs_file(std::string_view file_path) noexcept {
 	return is_created.value();
 }
 
-void Chip8_CoreInterface::set_file_permaregs(u32 X) noexcept {
+void IFamily_CHIP8::set_file_permaregs(u32 X) noexcept {
 	auto write_status = ::write_file_data(m_permaregs_path, m_registers_V, X);
 	if (!write_status) {
 		blog.error("File IO error '{}': {}",
@@ -355,7 +295,7 @@ void Chip8_CoreInterface::set_file_permaregs(u32 X) noexcept {
 	}
 }
 
-void Chip8_CoreInterface::get_file_permaregs(u32 X) noexcept {
+void IFamily_CHIP8::get_file_permaregs(u32 X) noexcept {
 	::assign_cast_min(X, s_permaregs_V.size());
 	auto read_status = ::read_file_data(m_permaregs_path, X);
 	if (!read_status) {
@@ -366,7 +306,7 @@ void Chip8_CoreInterface::get_file_permaregs(u32 X) noexcept {
 	}
 }
 
-void Chip8_CoreInterface::set_permaregs(u32 X) noexcept {
+void IFamily_CHIP8::set_permaregs(u32 X) noexcept {
 	if (!m_permaregs_path.empty()) {
 		if (has_regular_file(m_permaregs_path)) { set_file_permaregs(X); }
 		else { m_permaregs_path.clear(); }
@@ -374,7 +314,7 @@ void Chip8_CoreInterface::set_permaregs(u32 X) noexcept {
 	std::copy_n(m_registers_V.begin(), X, s_permaregs_V.begin());
 }
 
-void Chip8_CoreInterface::get_permaregs(u32 X) noexcept {
+void IFamily_CHIP8::get_permaregs(u32 X) noexcept {
 	if (!m_permaregs_path.empty()) {
 		if (!has_regular_file(m_permaregs_path)) {
 			if (!make_permaregs_file(m_permaregs_path)) { m_permaregs_path.clear(); }
@@ -388,7 +328,7 @@ void Chip8_CoreInterface::get_permaregs(u32 X) noexcept {
 
 /*==================================================================*/
 
-void Chip8_CoreInterface::copy_font_data_to(std::span<u8> dest, std::size_t size) noexcept {
+void IFamily_CHIP8::copy_font_data_to(std::span<u8> dest, std::size_t size) noexcept {
 	std::memcpy(dest.data() + c_small_font_offset, s_fonts_data.data(),
 		std::min(size, s_fonts_data.size() - c_small_font_offset));
 }

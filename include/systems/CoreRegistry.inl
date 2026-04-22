@@ -28,7 +28,7 @@ concept HasStaticDescriptor = requires {
 };
 
 template <typename Core, typename... Args> [[nodiscard]]
-SystemInterface* CoreRegistry::construct_core_instance(Args&&... args)
+ISystemEmu* CoreRegistry::construct_core_instance(Args&&... args)
 	noexcept(std::is_nothrow_constructible_v<Core, Args...>)
 {
 	return new (std::align_val_t(::HDIS), std::nothrow)
@@ -38,7 +38,7 @@ SystemInterface* CoreRegistry::construct_core_instance(Args&&... args)
 /*==================================================================*/
 
 template <typename Core>
-	requires (std::derived_from<Core, SystemInterface>)
+	requires (std::derived_from<Core, ISystemEmu>)
 auto CoreRegistry::register_new_system_core()
 	noexcept(std::is_nothrow_constructible_v<Core>) -> const LiveHook
 {

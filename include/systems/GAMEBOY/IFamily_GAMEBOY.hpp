@@ -9,11 +9,11 @@
 //#define ENABLE_GAMEBOY_SYSTEM
 #ifdef ENABLE_GAMEBOY_SYSTEM
 
-#include "../SystemInterface.hpp"
+#include "../ISystem.hpp"
 
 /*==================================================================*/
 
-class GameBoy_CoreInterface : public SystemInterface {
+class IFamily_GAMEBOY : public ISystem {
 
 protected:
 	enum STREAM { MAIN };
@@ -44,7 +44,7 @@ protected:
 	virtual void push_video_data() = 0;
 
 protected:
-	GameBoy_CoreInterface() noexcept;
+	IFamily_GAMEBOY() noexcept;
 
 public:
 	void main_system_loop() override final;

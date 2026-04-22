@@ -11,7 +11,7 @@
 
 #include <cxxopts.hpp>
 
-#include "FrontendHost.hpp"
+#include "ApplicationHost.hpp"
 
 #define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL_main.h>
@@ -110,7 +110,7 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 	const auto* HDM = HomeDirManager::get_instance();
 	if (!HDM || HDM->get_home_path().empty()) { return SDL_APP_FAILURE; }
 
-	*Host = FrontendHost::init_application(
+	*Host = ApplicationHost::init_application(
 		result["program" ].as_optional<std::string>().value_or(""),
 		result["headless"].as_optional<bool>().value_or(false)
 	);
@@ -121,7 +121,7 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 /*==================================================================*/
 
 SDL_AppResult SDL_AppIterate(void *pHost) {
-	auto* Host = static_cast<FrontendHost*>(pHost);
+	auto* Host = static_cast<ApplicationHost*>(pHost);
 
 	BasicKeyboard::poll_global_state();
 	return SDL_AppResult(Host->process_client_frame());
@@ -130,7 +130,7 @@ SDL_AppResult SDL_AppIterate(void *pHost) {
 /*==================================================================*/
 
 SDL_AppResult SDL_AppEvent(void *pHost, SDL_Event *event) {
-	auto* Host = static_cast<FrontendHost*>(pHost);
+	auto* Host = static_cast<ApplicationHost*>(pHost);
 
 	return SDL_AppResult(Host->handle_client_events(event));
 }
@@ -138,7 +138,7 @@ SDL_AppResult SDL_AppEvent(void *pHost, SDL_Event *event) {
 /*==================================================================*/
 
 void SDL_AppQuit(void* pHost, SDL_AppResult) {
-	auto* Host = static_cast<FrontendHost*>(pHost);
+	auto* Host = static_cast<ApplicationHost*>(pHost);
 
 	Host->quit_application();
 	blog.shutdown();

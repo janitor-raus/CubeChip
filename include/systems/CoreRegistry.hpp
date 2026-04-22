@@ -34,10 +34,10 @@ enum class GameFileType {
 
 /*==================================================================*/
 
-class SystemInterface;
+class ISystemEmu;
 struct SystemDescriptor;
 
-using CoreConstructor = SystemInterface* (*)();
+using CoreConstructor = ISystemEmu*(*)();
 
 /*==================================================================*/
 
@@ -67,7 +67,7 @@ private:
 	auto get_available_core_span() noexcept -> std::span<const WeakHook>;
 
 	template <typename Core, typename... Args> [[nodiscard]]
-	static SystemInterface* construct_core_instance(Args&&... args)
+	static ISystemEmu* construct_core_instance(Args&&... args)
 		noexcept(std::is_nothrow_constructible_v<Core, Args...>);
 
 	template <typename Pred>
@@ -88,7 +88,7 @@ public:
 	static void load_game_database(std::string_view db_file_path = {}) noexcept;
 
 	template <typename Core>
-		requires (std::derived_from<Core, SystemInterface>)
+		requires (std::derived_from<Core, ISystemEmu>)
 	static auto register_new_system_core()
 		noexcept(std::is_nothrow_constructible_v<Core>) -> const LiveHook;
 };

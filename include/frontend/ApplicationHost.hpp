@@ -82,15 +82,15 @@ constexpr const char* c_org_name = "";
 class HomeDirManager;
 class GlobalAudioBase;
 class BasicVideoSpec;
-class SystemInterface;
+class ISystemEmu;
 
 /*==================================================================*/
 
-class FrontendHost final {
-	FrontendHost() noexcept;
+class ApplicationHost final {
+	ApplicationHost() noexcept;
 
-	FrontendHost(const FrontendHost&) = delete;
-	FrontendHost& operator=(const FrontendHost&) = delete;
+	ApplicationHost(const ApplicationHost&) = delete;
+	ApplicationHost& operator=(const ApplicationHost&) = delete;
 
 	static void set_open_file_dialog_result(std::string_view file) noexcept;
 
@@ -116,10 +116,10 @@ class FrontendHost final {
 private:
 	class SystemInstance final {
 		struct StopSystemThread {
-			void operator()(SystemInterface*) noexcept;
+			void operator()(ISystemEmu*) noexcept;
 		};
 		using SystemCore = std::unique_ptr
-			<SystemInterface, StopSystemThread>;
+			<ISystemEmu, StopSystemThread>;
 
 	public:
 		SystemCore core;
@@ -144,7 +144,7 @@ private:
 	void find_last_focused_system() noexcept;
 
 	void unload_system_instance(SystemID system_id = 0) noexcept;
-	void insert_system_instance(SystemInterface* system) noexcept;
+	void insert_system_instance(ISystemEmu* system) noexcept;
 
 	void toggle_system_delimiters(SystemInstance& system) noexcept;
 	void toggle_system_statistics(SystemInstance& system) noexcept;
@@ -182,7 +182,7 @@ private:
 /*==================================================================*/
 
 public:
-	static FrontendHost* init_application(
+	static ApplicationHost* init_application(
 		std::string_view game_file_path, bool headless = false) noexcept;
 
 	void quit_application() noexcept;

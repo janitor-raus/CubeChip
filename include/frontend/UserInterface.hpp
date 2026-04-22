@@ -23,7 +23,7 @@ concept VoidInvocable = std::is_nothrow_invocable_r_v<void, Fn>;
 
 /*==================================================================*/
 
-class FrontendInterface {
+class UserInterface {
 public:
 	using Func = std::function<void()>;
 	using Hook = std::shared_ptr<Func>;

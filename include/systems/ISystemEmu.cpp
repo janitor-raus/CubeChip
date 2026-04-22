@@ -13,13 +13,13 @@
 #include "SHA1.hpp"
 
 #include "BasicLogger.hpp"
-#include "SystemInterface.hpp"
+#include "ISystemEmu.hpp"
 #include "SystemDescriptor.hpp"
 #include "SystemStaging.hpp"
 
 /*==================================================================*/
 
-SystemInterface::SystemInterface(std::string_view window_name) noexcept
+ISystemEmu::ISystemEmu(std::string_view window_name) noexcept
 	: instance_id([]() noexcept {
 		static std::atomic<u32> instance_counter = 1u;
 		return instance_counter.fetch_add(1, mo::relaxed);
@@ -35,7 +35,7 @@ SystemInterface::SystemInterface(std::string_view window_name) noexcept
 	prepare_user_interface();
 }
 
-void SystemInterface::start_workers() noexcept {
+void ISystemEmu::start_workers() noexcept {
 	if (!m_system_thread.joinable()) {
 		initialize_system();
 		m_system_thread = Thread([&](StopToken token) noexcept {
@@ -76,7 +76,7 @@ void SystemInterface::start_workers() noexcept {
 	}
 }
 
-void SystemInterface::stop_workers() noexcept {
+void ISystemEmu::stop_workers() noexcept {
 	if (m_system_thread.joinable()) {
 		m_system_thread.request_stop();
 		notify_next_frame(true);
@@ -90,22 +90,22 @@ void SystemInterface::stop_workers() noexcept {
 
 /*==================================================================*/
 
-std::string SystemInterface::make_system_id(u32 id, std::string_view identifier) noexcept {
+std::string ISystemEmu::make_system_id(u32 id, std::string_view identifier) noexcept {
 	return ::join_with(".", std::to_string(id), identifier);
 }
 
-std::string SystemInterface::get_system_id() const noexcept {
+std::string ISystemEmu::get_system_id() const noexcept {
 	return make_system_id(instance_id, get_descriptor().family_name);
 }
 
 /*==================================================================*/
 
-void SystemInterface::copy_file_image_to(std::span<u8> dest, std::size_t offset) noexcept {
+void ISystemEmu::copy_file_image_to(std::span<u8> dest, std::size_t offset) noexcept {
 	std::memcpy(dest.data() + offset, m_file_image.data(),
 		std::min(m_file_image.size(), dest.size() - offset));
 }
 
-bool SystemInterface::calc_file_image_sha1() noexcept {
+bool ISystemEmu::calc_file_image_sha1() noexcept {
 	if (!SystemStaging::sha1_hash.empty()) {
 		m_file_sha1_hash = SystemStaging::sha1_hash;
 		return true;
@@ -122,7 +122,7 @@ bool SystemInterface::calc_file_image_sha1() noexcept {
 	}
 }
 
-auto SystemInterface::add_system_path(
+auto ISystemEmu::add_system_path(
 	std::string_view dir_name,
 	std::string_view family_name
 ) noexcept -> const std::string* {
@@ -147,24 +147,24 @@ auto SystemInterface::add_system_path(
 
 /*==================================================================*/
 
-f32 SystemInterface::get_base_system_framerate() const noexcept
+f32 ISystemEmu::get_base_system_framerate() const noexcept
 	{ return m_base_system_framerate.load(mo::relaxed); }
 
-f32 SystemInterface::get_framerate_multiplier() const noexcept
+f32 ISystemEmu::get_framerate_multiplier() const noexcept
 	{ return m_framerate_multiplier.load(mo::relaxed); }
 
-f32 SystemInterface::get_real_system_framerate() const noexcept
+f32 ISystemEmu::get_real_system_framerate() const noexcept
 	{ return get_base_system_framerate() * get_framerate_multiplier(); }
 
-void SystemInterface::set_base_system_framerate(f32 value) noexcept
+void ISystemEmu::set_base_system_framerate(f32 value) noexcept
 	{ m_base_system_framerate.store(std::clamp(value, 24.0f, 100.0f), mo::relaxed); }
 
-void SystemInterface::set_framerate_multiplier(f32 value) noexcept
+void ISystemEmu::set_framerate_multiplier(f32 value) noexcept
 	{ m_framerate_multiplier.store(std::clamp(value, 0.10f, 10.00f), mo::relaxed); }
 
 /*==================================================================*/
 
-void SystemInterface::append_statistics_data() noexcept {
+void ISystemEmu::append_statistics_data() noexcept {
 	const auto framerate = get_real_system_framerate();
 	const auto frametime = m_timer.get_elapsed_millis();
 	const auto framespan = 1000.0f / framerate;
@@ -177,7 +177,7 @@ void SystemInterface::append_statistics_data() noexcept {
 	);
 }
 
-void SystemInterface::create_statistics_data() noexcept {
+void ISystemEmu::create_statistics_data() noexcept {
 	if (!has_system_state(EmuState::STATS)) { return; }
 	append_statistics_data();
 
@@ -186,6 +186,6 @@ void SystemInterface::create_statistics_data() noexcept {
 	m_statistics_work_buffer.clear();
 }
 
-std::string SystemInterface::copy_statistics_string() const noexcept {
+std::string ISystemEmu::copy_statistics_string() const noexcept {
 	return *m_statistics_data.load(mo::acquire);
 }

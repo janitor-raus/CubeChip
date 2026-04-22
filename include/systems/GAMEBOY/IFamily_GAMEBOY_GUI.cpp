@@ -4,7 +4,7 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "GameBoy_CoreInterface.hpp"
+#include "IFamily_GAMEBOY.hpp"
 
 #ifdef ENABLE_GAMEBOY_SYSTEM
 

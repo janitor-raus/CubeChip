@@ -11,20 +11,21 @@
 
 #include <array>
 
-#include "../SystemInterface.hpp"
+#include "../ISystemEmu.hpp"
 
 #include "AudioDevice.hpp"
 #include "DisplayDevice.hpp"
 
 /*==================================================================*/
 
-class BytePusher_CoreInterface : public SystemInterface {
+class IFamily_BYTEPUSHER : public ISystemEmu {
+	void prepare_user_interface() noexcept;
 
 protected:
 	static constexpr std::string_view family_pretty_name = "BytePusher";
 	static constexpr std::string_view family_name = "bytepusher";
 	static constexpr std::string_view family_desc = "BytePusher family line.";
-	using Family = BytePusher_CoreInterface;
+	using Family = IFamily_BYTEPUSHER;
 
 	static inline std::string s_savestate_path{};
 
@@ -55,7 +56,7 @@ protected:
 	virtual void push_video_data() noexcept = 0;
 
 protected:
-	BytePusher_CoreInterface(std::size_t W, std::size_t H) noexcept;
+	IFamily_BYTEPUSHER(std::size_t W, std::size_t H) noexcept;
 	virtual u32 get_program_counter() const noexcept = 0;
 
 public:

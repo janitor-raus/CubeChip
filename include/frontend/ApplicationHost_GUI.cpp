@@ -7,13 +7,13 @@
 #include <SDL3/SDL_dialog.h>
 #include <SDL3/SDL_misc.h>
 
-#include "FrontendHost.hpp"
-#include "FrontendInterface.hpp"
+#include "ApplicationHost.hpp"
+#include "UserInterface.hpp"
 #include "HomeDirManager.hpp"
 #include "BasicVideoSpec.hpp"
 #include "GlobalAudioBase.hpp"
 #include "DefaultConfig.hpp"
-#include "SystemInterface.hpp"
+#include "ISystemEmu.hpp"
 #include "SystemDescriptor.hpp"
 #include "SystemStaging.hpp"
 #include "CoreRegistry.hpp"
@@ -29,10 +29,10 @@
 
 /*==================================================================*/
 
-void FrontendHost::setup_gui_callables() noexcept {
+void ApplicationHost::setup_gui_callables() noexcept {
 	using namespace ImGui;
 
-	static auto s_menu_file__open_file = FrontendInterface::register_menu("",
+	static auto s_menu_file__open_file = UserInterface::register_menu("",
 	{ 0, "File" }, [&]() noexcept {
 		if (MenuItem("Open File...")) {
 			SDL_ShowOpenFileDialog([](void*, const char* const* file_list, int) noexcept {
@@ -41,7 +41,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 		}
 	});
 
-	static auto s_menu_file__data_folder = FrontendInterface::register_menu("",
+	static auto s_menu_file__data_folder = UserInterface::register_menu("",
 	{ 0, "File" }, [&]() noexcept {
 		static std::atomic<bool> s_opening_url{};
 		static auto s_home_url = "file:///" + HDM->get_home_path();
@@ -60,18 +60,18 @@ void FrontendHost::setup_gui_callables() noexcept {
 		EndDisabled();
 	});
 
-	static auto s_menu_file__recent_files = FrontendInterface::register_menu("",
+	static auto s_menu_file__recent_files = UserInterface::register_menu("",
 	{ 0, "File" }, [&]() noexcept {
 		if (!s_file_mru.size()) { return; }
 		Separator(1.0f);
 		TextUnformatted("Recently opened:");
 		DummyY(2.0f);
 
-		if (FrontendInterface::was_menu_clicked()) {
+		if (UserInterface::was_menu_clicked()) {
 			for (auto& e : s_file_mru.span()) { e.exists(); }
 		}
 
-		bool clicked = FrontendInterface::was_menu_clicked();
+		bool clicked = UserInterface::was_menu_clicked();
 
 		for (auto& entry : s_file_mru.span()) {
 			if (MenuItem(("• " + entry->filename().string()).c_str(),
@@ -84,7 +84,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 
 /*==================================================================*/
 
-	static auto s_menu_system__resume_pause = FrontendInterface::register_menu("",
+	static auto s_menu_system__resume_pause = UserInterface::register_menu("",
 	{50, "Toggles?"}, [&]() noexcept {
 		Dummy(ImVec2(GetTextLineHeight() * 12, 0.0f));
 		if (m_systems.empty()) {
@@ -103,7 +103,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 /*==================================================================*/
 
 	static bool s_show_window_demo{};
-	static auto s_menu_debug__imgui_demo = FrontendInterface::register_menu("",
+	static auto s_menu_debug__imgui_demo = UserInterface::register_menu("",
 	{ 10, "Debug" }, [&]() noexcept {
 		if (MenuItem("ImGUI Demo...", nullptr, s_show_window_demo)) {
 			s_show_window_demo = !s_show_window_demo;
@@ -111,14 +111,14 @@ void FrontendHost::setup_gui_callables() noexcept {
 	});
 
 	static bool s_show_window_logger{};
-	static auto s_menu_debug__show_logs = FrontendInterface::register_menu("",
+	static auto s_menu_debug__show_logs = UserInterface::register_menu("",
 	{ 10, "Debug" }, [&]() noexcept {
 		if (MenuItem("Show Logs...", nullptr, s_show_window_logger)) {
 			s_show_window_logger = !s_show_window_logger;
 		}
 	});
 
-	static auto s_menu_debug__about_app = FrontendInterface::register_menu("",
+	static auto s_menu_debug__about_app = UserInterface::register_menu("",
 	{ 10, "Debug" }, [&]() noexcept {
 		if (BeginMenu("About...")) {
 			PushFont(nullptr, 21.0f);
@@ -151,35 +151,35 @@ void FrontendHost::setup_gui_callables() noexcept {
 
 /*==================================================================*/
 
-	static auto s_menu_settings__zoom_scale = FrontendInterface::register_menu("",
+	static auto s_menu_settings__zoom_scale = UserInterface::register_menu("",
 	{ 20, "Settings" }, [&]() noexcept {
 		static int  s_scale_factor{};
 		static bool s_click_active{};
 
-		if (!s_click_active) { s_scale_factor = int(FrontendInterface::get_ui_zoom_scaling() * 100); }
+		if (!s_click_active) { s_scale_factor = int(UserInterface::get_ui_zoom_scaling() * 100); }
 		SliderInt("UI Zoom Scale", &s_scale_factor, 100, 200, "%d%%");
 
 		s_click_active = IsItemActive();
 		if (IsItemDeactivatedAfterEdit()) {
-			FrontendInterface::set_ui_zoom_scaling(s_scale_factor * 0.01f);
+			UserInterface::set_ui_zoom_scaling(s_scale_factor * 0.01f);
 		}
 	});
 
-	static auto s_menu_settings__text_scale = FrontendInterface::register_menu("",
+	static auto s_menu_settings__text_scale = UserInterface::register_menu("",
 	{ 20, "Settings" }, [&]() noexcept {
 		static int  s_scale_factor{};
 		static bool s_click_active{};
 
-		if (!s_click_active) { s_scale_factor = int(FrontendInterface::get_ui_text_scaling() * 100); }
+		if (!s_click_active) { s_scale_factor = int(UserInterface::get_ui_text_scaling() * 100); }
 		SliderInt("UI Text Scale", &s_scale_factor, 100, 200, "%d%%");
 
 		s_click_active = IsItemActive();
 		if (IsItemDeactivatedAfterEdit()) {
-			FrontendInterface::set_ui_text_scaling(s_scale_factor * 0.01f);
+			UserInterface::set_ui_text_scaling(s_scale_factor * 0.01f);
 		}
 	});
 
-	static auto s_menu_settings__master_vol = FrontendInterface::register_menu("",
+	static auto s_menu_settings__master_vol = UserInterface::register_menu("",
 	{ 20, "Settings" }, [&]() noexcept {
 		auto global_gain = int(GAB->get_global_gain() * 100);
 		if (SliderInt("Master Volume", &global_gain, 0, 100, "%d%%"))
@@ -188,13 +188,13 @@ void FrontendHost::setup_gui_callables() noexcept {
 
 /*==================================================================*/
 
-	static auto s_window_none__imgui_demo = FrontendInterface::register_window(
+	static auto s_window_none__imgui_demo = UserInterface::register_window(
 	[&]() noexcept {
 		if (!s_show_window_demo) { return; }
 		ShowDemoWindow(&s_show_window_demo);
 	});
 
-	static auto s_window_none__log_viewer = FrontendInterface::register_window(
+	static auto s_window_none__log_viewer = UserInterface::register_window(
 	[&]() noexcept {
 		if (!s_show_window_logger) { return; }
 
@@ -303,7 +303,7 @@ void FrontendHost::setup_gui_callables() noexcept {
 		End();
 	});
 
-	static auto s_window_none__load_image = FrontendInterface::register_window(
+	static auto s_window_none__load_image = UserInterface::register_window(
 	[&]() noexcept {
 		if (!SystemStaging::file_image.valid()) { return; }
 
@@ -415,14 +415,14 @@ void FrontendHost::setup_gui_callables() noexcept {
 			{
 				const auto scroll_size = ImVec2(
 					GetContentRegionAvail().x, 420.0f
-					* FrontendInterface::get_ui_zoom_scaling()
-					* FrontendInterface::get_ui_text_scaling());
+					* UserInterface::get_ui_zoom_scaling()
+					* UserInterface::get_ui_text_scaling());
 				BeginChild("##candidate_scroll_region", scroll_size, true);
 
 				const auto button_bg_size = ImVec2(
 					GetContentRegionAvail().x, 56.0f
-						* FrontendInterface::get_ui_zoom_scaling()
-						* FrontendInterface::get_ui_text_scaling());
+						* UserInterface::get_ui_zoom_scaling()
+						* UserInterface::get_ui_text_scaling());
 				const auto button_fg_size = ImVec2(
 					button_bg_size.x - GetStyle().FrameRounding,
 					button_bg_size.y - GetStyle().FrameRounding

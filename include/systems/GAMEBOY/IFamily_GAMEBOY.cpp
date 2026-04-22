@@ -5,15 +5,14 @@
 */
 
 #include "BasicInput.hpp"
-#include "HomeDirManager.hpp"
 
-#include "GameBoy_CoreInterface.hpp"
+#include "IFamily_GAMEBOY.hpp"
 
 #ifdef ENABLE_GAMEBOY_SYSTEM
 
 /*==================================================================*/
 
-GameBoy_CoreInterface::GameBoy_CoreInterface() noexcept {
+IFamily_GAMEBOY::IFamily_GAMEBOY() noexcept {
 	if (const auto* path{ HDM->addSystemDir("savestate", "GAMEBOY") })
 		{ s_savestate_path = *path / HDM->getFileSHA1(); }
 
@@ -25,7 +24,7 @@ GameBoy_CoreInterface::GameBoy_CoreInterface() noexcept {
 
 /*==================================================================*/
 
-void GameBoy_CoreInterface::main_system_loop() {
+void IFamily_GAMEBOY::main_system_loop() {
 	if (!isSystemRunning())
 		[[unlikely]] { return; }
 
@@ -36,7 +35,7 @@ void GameBoy_CoreInterface::main_system_loop() {
 	pushOverlayData();
 }
 
-void GameBoy_CoreInterface::load_preset_binds() {
+void IFamily_GAMEBOY::load_preset_binds() {
 	static constexpr auto _{ SDL_SCANCODE_UNKNOWN };
 	static constexpr SimpleKeyMapping defaultKeyMappings[]{
 		{0x7, KEY(G), _}, // START
@@ -52,7 +51,7 @@ void GameBoy_CoreInterface::load_preset_binds() {
 	load_custom_binds(std::span(defaultKeyMappings));
 }
 
-u32  GameBoy_CoreInterface::getKeyStates() {
+u32  IFamily_GAMEBOY::getKeyStates() {
 	auto keyStates{ 0u };
 
 	Input->updateStates();
@@ -66,7 +65,7 @@ u32  GameBoy_CoreInterface::getKeyStates() {
 	return keyStates;
 }
 
-void GameBoy_CoreInterface::copy_game_to_memory(u8* dest) noexcept {
+void IFamily_GAMEBOY::copy_game_to_memory(u8* dest) noexcept {
 	std::copy_n(EXEC_POLICY(unseq)
 		HDM->getFileData(),
 		HDM->getFileSize(),

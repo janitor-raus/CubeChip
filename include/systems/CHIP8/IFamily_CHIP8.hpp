@@ -11,7 +11,7 @@
 
 #include <array>
 
-#include "../SystemInterface.hpp"
+#include "../ISystemEmu.hpp"
 
 #include "AssignCast.hpp"
 #include "AudioDevice.hpp"
@@ -20,13 +20,14 @@
 
 /*==================================================================*/
 
-class Chip8_CoreInterface : public SystemInterface {
+class IFamily_CHIP8 : public ISystemEmu {
+	void prepare_user_interface() noexcept;
 
 protected:
 	static constexpr std::string_view family_pretty_name = "CHIP-8";
 	static constexpr std::string_view family_name = "chip8";
 	static constexpr std::string_view family_desc = "CHIP-8 family line.";
-	using Family = Chip8_CoreInterface;
+	using Family = IFamily_CHIP8;
 
 	static constexpr const char* validate_program(
 		std::span<const char> file,
@@ -230,7 +231,7 @@ protected:
 	}
 
 protected:
-	Chip8_CoreInterface(std::size_t W, std::size_t H) noexcept;
+	IFamily_CHIP8(std::size_t W, std::size_t H) noexcept;
 
 public:
 	void main_system_loop() override final;

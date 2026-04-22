@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "../Chip8_CoreInterface.hpp"
+#include "../IFamily_CHIP8.hpp"
 
 #define ENABLE_SCHIP_MODERN
 #if defined(ENABLE_CHIP8_SYSTEM) && defined(ENABLE_SCHIP_MODERN)
@@ -17,7 +17,7 @@
 
 /*==================================================================*/
 
-class SCHIP_MODERN final : public Chip8_CoreInterface {
+class SCHIP_MODERN final : public IFamily_CHIP8 {
 	static constexpr u64 c_sys_memory_size  = 4_KiB;
 	static constexpr u32 c_game_load_pos    = 0x200;
 	static constexpr u32 c_sys_boot_pos     = 0x200;
@@ -60,7 +60,7 @@ public:
 
 public:
 	SCHIP_MODERN() noexcept
-		: Chip8_CoreInterface(c_sys_screen_W, c_sys_screen_H)
+		: IFamily_CHIP8(c_sys_screen_W, c_sys_screen_H)
 		, m_display_map(m_display_buffer, c_sys_screen_W/2, c_sys_screen_H/2)
 	{}
 

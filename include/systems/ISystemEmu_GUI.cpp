@@ -9,11 +9,11 @@
 
 #include <imgui.h>
 
-#include "SystemInterface.hpp"
+#include "ISystemEmu.hpp"
 
 /*==================================================================*/
 
-void SystemInterface::prepare_user_interface() noexcept {
+void ISystemEmu::prepare_user_interface() noexcept {
 	using namespace ImGui;
 
 	m_workspace_host.set_window_visible_output(&m_is_viewport_visible);
@@ -25,7 +25,7 @@ void SystemInterface::prepare_user_interface() noexcept {
 			  |  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings
 			  |  ImGuiWindowFlags_MenuBar;
 
-		DockNextWindowTo(FrontendInterface::get_main_dockspace_id(), true);
+		DockNextWindowTo(UserInterface::get_main_dockspace_id(), true);
 
 		PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2());
 		window_tidy = []() noexcept { PopStyleVar(1); };
@@ -46,7 +46,7 @@ void SystemInterface::prepare_user_interface() noexcept {
 		DockSpace(window_id, ImVec2(), docker_flags, &docker_class);
 	};
 
-	m_frontend_hooks.emplace_back(FrontendInterface::register_menu(
+	m_frontend_hooks.emplace_back(UserInterface::register_menu(
 		m_workspace_host.get_window_label(), { 90, "Debug" },
 		[&]() noexcept {
 			MenuItem("Memory Editor", nullptr,
@@ -54,7 +54,7 @@ void SystemInterface::prepare_user_interface() noexcept {
 		}
 	));
 
-	m_frontend_hooks.emplace_back(FrontendInterface::register_menu(
+	m_frontend_hooks.emplace_back(UserInterface::register_menu(
 		m_workspace_host.get_window_label(), { 50, "System" },
 		[&]() noexcept {
 			Dummy(ImVec2(GetTextLineHeight() * 12, 0.0f));

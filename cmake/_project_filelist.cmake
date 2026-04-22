@@ -6,25 +6,25 @@ set(SHIMS_HEADERS
 	"${PROJECT_INCLUDE_DIR}/shims/HDIS_HCIS.hpp"
 	"${PROJECT_INCLUDE_DIR}/shims/Thread.hpp"
 )
-source_group("Shims" FILES ${SHIMS_HEADERS})
+source_group("shims" FILES ${SHIMS_HEADERS})
 
 # ==================================================================================== #
 
 set(FRONTEND_HEADERS
-	"${PROJECT_INCLUDE_DIR}/frontend/FrontendHost.hpp"
-	"${PROJECT_INCLUDE_DIR}/frontend/FrontendInterface.hpp"
+	"${PROJECT_INCLUDE_DIR}/frontend/ApplicationHost.hpp"
 	"${PROJECT_INCLUDE_DIR}/frontend/MemoryEditor.hpp"
+	"${PROJECT_INCLUDE_DIR}/frontend/UserInterface.hpp"
 	"${PROJECT_INCLUDE_DIR}/frontend/WindowHost.hpp"
 )
 set(FRONTEND_SOURCES
 	"${PROJECT_INCLUDE_DIR}/frontend/CubeChip.cpp" # main
-	"${PROJECT_INCLUDE_DIR}/frontend/FrontendHost.cpp"
-	"${PROJECT_INCLUDE_DIR}/frontend/FrontendHost_GUI.cpp"
-	"${PROJECT_INCLUDE_DIR}/frontend/FrontendInterface.cpp"
+	"${PROJECT_INCLUDE_DIR}/frontend/ApplicationHost.cpp"
+	"${PROJECT_INCLUDE_DIR}/frontend/ApplicationHost_GUI.cpp"
 	"${PROJECT_INCLUDE_DIR}/frontend/MemoryEditor.cpp"
+	"${PROJECT_INCLUDE_DIR}/frontend/UserInterface.cpp"
 	"${PROJECT_INCLUDE_DIR}/frontend/WindowHost.cpp"
 )
-source_group("Frontend" FILES ${FRONTEND_HEADERS} ${FRONTEND_SOURCES})
+source_group("frontend" FILES ${FRONTEND_HEADERS} ${FRONTEND_SOURCES})
 
 # ==================================================================================== #
 
@@ -53,7 +53,7 @@ set(COMPONENTS_SOURCES
 	"${PROJECT_INCLUDE_DIR}/components/FrameLimiter.cpp"
 	"${PROJECT_INCLUDE_DIR}/components/SimpleTimer.cpp"
 )
-source_group("Components" FILES ${COMPONENTS_HEADERS} ${COMPONENTS_SOURCES})
+source_group("components" FILES ${COMPONENTS_HEADERS} ${COMPONENTS_SOURCES})
 
 # ==================================================================================== #
 
@@ -90,7 +90,7 @@ set(UTILITIES_SOURCES
 	"${PROJECT_INCLUDE_DIR}/utilities/SHA1.cpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/ThreadAffinity.cpp"
 )
-source_group("Utilities" FILES ${UTILITIES_HEADERS} ${UTILITIES_SOURCES})
+source_group("utilities" FILES ${UTILITIES_HEADERS} ${UTILITIES_SOURCES})
 
 # ==================================================================================== #
 
@@ -106,68 +106,71 @@ set(SERVICES_SOURCES
 	"${PROJECT_INCLUDE_DIR}/services/GlobalAudioBase.cpp"
 	"${PROJECT_INCLUDE_DIR}/services/HomeDirManager.cpp"
 )
-source_group("Services" FILES ${SERVICES_HEADERS} ${SERVICES_SOURCES})
+source_group("services" FILES ${SERVICES_HEADERS} ${SERVICES_SOURCES})
 
 # ==================================================================================== #
 
 set(SYSTEMS_HEADERS
-	"${PROJECT_INCLUDE_DIR}/systems/SystemInterface.hpp"
-	"${PROJECT_INCLUDE_DIR}/systems/SystemInterface_GUI.cpp"
-	"${PROJECT_INCLUDE_DIR}/systems/SystemDescriptor.hpp"
-	"${PROJECT_INCLUDE_DIR}/systems/SystemStaging.hpp"
 	"${PROJECT_INCLUDE_DIR}/systems/CoreRegistry.hpp"
 	"${PROJECT_INCLUDE_DIR}/systems/CoreRegistry.inl"
+	"${PROJECT_INCLUDE_DIR}/systems/ISystemEmu.hpp"
+	"${PROJECT_INCLUDE_DIR}/systems/ISystemEmu_GUI.cpp"
+	"${PROJECT_INCLUDE_DIR}/systems/SystemDescriptor.hpp"
+	"${PROJECT_INCLUDE_DIR}/systems/SystemStaging.hpp"
 )
 set(SYSTEMS_SOURCES
-	"${PROJECT_INCLUDE_DIR}/systems/SystemInterface.cpp"
 	"${PROJECT_INCLUDE_DIR}/systems/CoreRegistry.cpp"
+	"${PROJECT_INCLUDE_DIR}/systems/ISystemEmu.cpp"
 )
-source_group("Systems" FILES ${SYSTEMS_HEADERS} ${SYSTEMS_SOURCES})
+source_group("systems" FILES ${SYSTEMS_HEADERS} ${SYSTEMS_SOURCES})
 
 # ==================================================================================== #
 
 set(SYSTEM_CHIP8_HEADERS
-	"${PROJECT_INCLUDE_DIR}/systems/CHIP8/Chip8_CoreInterface.hpp"
-	"${PROJECT_INCLUDE_DIR}/systems/CHIP8/Cores/CHIP8_MODERN.hpp"
-	"${PROJECT_INCLUDE_DIR}/systems/CHIP8/Cores/SCHIP_MODERN.hpp"
-	"${PROJECT_INCLUDE_DIR}/systems/CHIP8/Cores/SCHIP_LEGACY.hpp"
-	"${PROJECT_INCLUDE_DIR}/systems/CHIP8/Cores/XOCHIP.hpp"
-	"${PROJECT_INCLUDE_DIR}/systems/CHIP8/Cores/MEGACHIP.hpp"
-	"${PROJECT_INCLUDE_DIR}/systems/CHIP8/Cores/CHIP8X.hpp"
-	"${PROJECT_INCLUDE_DIR}/systems/CHIP8/Cores/CHIP8E.hpp"
+	"${PROJECT_INCLUDE_DIR}/systems/chip8/IFamily_CHIP8.hpp"
+	"${PROJECT_INCLUDE_DIR}/systems/chip8/cores/CHIP8_MODERN.hpp"
+	"${PROJECT_INCLUDE_DIR}/systems/chip8/cores/SCHIP_MODERN.hpp"
+	"${PROJECT_INCLUDE_DIR}/systems/chip8/cores/SCHIP_LEGACY.hpp"
+	"${PROJECT_INCLUDE_DIR}/systems/chip8/cores/XOCHIP.hpp"
+	"${PROJECT_INCLUDE_DIR}/systems/chip8/cores/MEGACHIP.hpp"
+	"${PROJECT_INCLUDE_DIR}/systems/chip8/cores/CHIP8X.hpp"
+	"${PROJECT_INCLUDE_DIR}/systems/chip8/cores/CHIP8E.hpp"
 )
 set(SYSTEM_CHIP8_SOURCES
-	"${PROJECT_INCLUDE_DIR}/systems/CHIP8/Chip8_CoreInterface.cpp"
-	"${PROJECT_INCLUDE_DIR}/systems/CHIP8/Cores/CHIP8_MODERN.cpp"
-	"${PROJECT_INCLUDE_DIR}/systems/CHIP8/Cores/SCHIP_MODERN.cpp"
-	"${PROJECT_INCLUDE_DIR}/systems/CHIP8/Cores/SCHIP_LEGACY.cpp"
-	"${PROJECT_INCLUDE_DIR}/systems/CHIP8/Cores/XOCHIP.cpp"
-	"${PROJECT_INCLUDE_DIR}/systems/CHIP8/Cores/MEGACHIP.cpp"
-	"${PROJECT_INCLUDE_DIR}/systems/CHIP8/Cores/CHIP8X.cpp"
-	"${PROJECT_INCLUDE_DIR}/systems/CHIP8/Cores/CHIP8E.cpp"
+	"${PROJECT_INCLUDE_DIR}/systems/chip8/IFamily_CHIP8.cpp"
+	"${PROJECT_INCLUDE_DIR}/systems/chip8/IFamily_CHIP8_GUI.cpp"
+	"${PROJECT_INCLUDE_DIR}/systems/chip8/cores/CHIP8_MODERN.cpp"
+	"${PROJECT_INCLUDE_DIR}/systems/chip8/cores/SCHIP_MODERN.cpp"
+	"${PROJECT_INCLUDE_DIR}/systems/chip8/cores/SCHIP_LEGACY.cpp"
+	"${PROJECT_INCLUDE_DIR}/systems/chip8/cores/XOCHIP.cpp"
+	"${PROJECT_INCLUDE_DIR}/systems/chip8/cores/MEGACHIP.cpp"
+	"${PROJECT_INCLUDE_DIR}/systems/chip8/cores/CHIP8X.cpp"
+	"${PROJECT_INCLUDE_DIR}/systems/chip8/cores/CHIP8E.cpp"
 )
-source_group("Systems\\CHIP8" FILES ${SYSTEM_CHIP8_HEADERS} ${SYSTEM_CHIP8_SOURCES})
+source_group("systems\\chip8" FILES ${SYSTEM_CHIP8_HEADERS} ${SYSTEM_CHIP8_SOURCES})
 
 # ==================================================================================== #
 
 set(SYSTEM_BYTEPUSHER_HEADERS
-	"${PROJECT_INCLUDE_DIR}/systems/BYTEPUSHER/BytePusher_CoreInterface.hpp"
-	"${PROJECT_INCLUDE_DIR}/systems/BYTEPUSHER/Cores/BYTEPUSHER_STANDARD.hpp"
+	"${PROJECT_INCLUDE_DIR}/systems/bytepusher/IFamily_BYTEPUSHER.hpp"
+	"${PROJECT_INCLUDE_DIR}/systems/bytepusher/cores/BYTEPUSHER_STANDARD.hpp"
 )
 set(SYSTEM_BYTEPUSHER_SOURCES
-	"${PROJECT_INCLUDE_DIR}/systems/BYTEPUSHER/BytePusher_CoreInterface.cpp"
-	"${PROJECT_INCLUDE_DIR}/systems/BYTEPUSHER/Cores/BYTEPUSHER_STANDARD.cpp"
+	"${PROJECT_INCLUDE_DIR}/systems/bytepusher/IFamily_BYTEPUSHER.cpp"
+	"${PROJECT_INCLUDE_DIR}/systems/bytepusher/IFamily_BYTEPUSHER_GUI.cpp"
+	"${PROJECT_INCLUDE_DIR}/systems/bytepusher/cores/BYTEPUSHER_STANDARD.cpp"
 )
-source_group("Systems\\BYTEPUSHER" FILES ${SYSTEM_BYTEPUSHER_HEADERS} ${SYSTEM_BYTEPUSHER_SOURCES})
+source_group("systems\\bytepusher" FILES ${SYSTEM_BYTEPUSHER_HEADERS} ${SYSTEM_BYTEPUSHER_SOURCES})
 
 # ==================================================================================== #
 
 set(SYSTEM_GAMEBOY_HEADERS
-	"${PROJECT_INCLUDE_DIR}/systems/GAMEBOY/GameBoy_CoreInterface.hpp"
-	"${PROJECT_INCLUDE_DIR}/systems/GAMEBOY/Cores/GAMEBOY_CLASSIC.hpp"
+	"${PROJECT_INCLUDE_DIR}/systems/gameboy/IFamily_GAMEBOY.hpp"
+	"${PROJECT_INCLUDE_DIR}/systems/gameboy/cores/GAMEBOY_CLASSIC.hpp"
 )
 set(SYSTEM_GAMEBOY_SOURCES
-	"${PROJECT_INCLUDE_DIR}/systems/GAMEBOY/GameBoy_CoreInterface.cpp"
-	"${PROJECT_INCLUDE_DIR}/systems/GAMEBOY/Cores/GAMEBOY_CLASSIC.cpp"
+	"${PROJECT_INCLUDE_DIR}/systems/gameboy/IFamily_GAMEBOY.cpp"
+	"${PROJECT_INCLUDE_DIR}/systems/gameboy/IFamily_GAMEBOY_GUI.cpp"
+	"${PROJECT_INCLUDE_DIR}/systems/gameboy/cores/GAMEBOY_CLASSIC.cpp"
 )
-source_group("Systems\\GAMEBOY" FILES ${SYSTEM_GAMEBOY_HEADERS} ${SYSTEM_GAMEBOY_SOURCES})
+source_group("systems\\gameboy" FILES ${SYSTEM_GAMEBOY_HEADERS} ${SYSTEM_GAMEBOY_SOURCES})

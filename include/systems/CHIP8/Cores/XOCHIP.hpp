@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "../Chip8_CoreInterface.hpp"
+#include "../IFamily_CHIP8.hpp"
 
 #define ENABLE_XOCHIP
 #if defined(ENABLE_CHIP8_SYSTEM) && defined(ENABLE_XOCHIP)
@@ -17,7 +17,7 @@
 
 /*==================================================================*/
 
-class XOCHIP final : public Chip8_CoreInterface {
+class XOCHIP final : public IFamily_CHIP8 {
 	static constexpr u64 c_sys_memory_size  = 64_KiB;
 	static constexpr u32 c_game_load_pos    =   512;
 	static constexpr u32 c_sys_boot_pos     =   512;
@@ -229,7 +229,7 @@ private:
 
 public:
 	XOCHIP() noexcept
-		: Chip8_CoreInterface(c_sys_screen_W, c_sys_screen_H)
+		: IFamily_CHIP8(c_sys_screen_W, c_sys_screen_H)
 		, m_display_map{
 			Map2D(m_display_buffer[P0].data(), c_sys_screen_W/2, c_sys_screen_H/2),
 			Map2D(m_display_buffer[P1].data(), c_sys_screen_W/2, c_sys_screen_H/2),

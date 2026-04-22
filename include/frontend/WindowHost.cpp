@@ -6,7 +6,7 @@
 
 #include "WindowHost.hpp"
 #include "AtomSharedPtr.hpp"
-#include "FrontendInterface.hpp"
+#include "UserInterface.hpp"
 
 #include <imgui.h>
 
@@ -39,7 +39,7 @@ struct WindowHost::HostContext {
 	bool m_disable_menubar = false;
 
 	AtomSharedPtr<ImLabel> m_window_label;
-	FrontendInterface::Hook m_window_hook;
+	UserInterface::Hook    m_window_hook;
 
 private:
 	auto make_sanitized_label(ImLabel&& name) const noexcept {
@@ -51,7 +51,7 @@ public:
 	HostContext(ImLabel&& name) noexcept
 		: c_window_id(ImGui::GetID(this))
 		, m_window_label(make_sanitized_label(std::move(name)))
-		, m_window_hook(FrontendInterface::register_window(
+		, m_window_hook(UserInterface::register_window(
 			[this]() noexcept { render_host_window(); }))
 	{}
 
@@ -85,7 +85,7 @@ private:
 		}
 
 		if (window_tidy) { window_tidy(); }
-		if (window_open && !m_fullscreen_mode) { FrontendInterface::call_menubar(*window_label); }
+		if (window_open && !m_fullscreen_mode) { UserInterface::call_menubar(*window_label); }
 
 		if (m_callbacks.window_dock) { m_callbacks.window_dock(window_open, c_window_id); }
 		if (m_callbacks.window_body) { m_callbacks.window_body(window_open, false); }
@@ -113,7 +113,7 @@ private:
 			const auto temp_label = ::join(window_label->get_id(), "_fullscreen");
 			if (ImGui::Begin(temp_label.c_str(), nullptr, window_flags | full_flags)) {
 				if (m_window_focused_out) { *m_window_focused_out |= true; }
-				FrontendInterface::call_autohide_menubar(*window_label, m_disable_menubar);
+				UserInterface::call_autohide_menubar(*window_label, m_disable_menubar);
 
 				if (m_callbacks.window_body) { m_callbacks.window_body(true, true); }
 

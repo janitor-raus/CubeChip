@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "../GameBoy_CoreInterface.hpp"
+#include "../IFamily_GAMEBOY.hpp"
 #include "BasicLogger.hpp"
 
 #define ENABLE_GAMEBOY_CLASSIC
@@ -16,7 +16,7 @@
 
 /*==================================================================*/
 
-class GAMEBOY_CLASSIC final : public GameBoy_CoreInterface {
+class GAMEBOY_CLASSIC final : public IFamily_GAMEBOY {
 	static constexpr u64 c_sys_memory_size = 64_KiB;
 	static constexpr f32 c_sys_refresh_rate = 59.7275f;
 	static constexpr u32 cScreenSizeX =     160 };

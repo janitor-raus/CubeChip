@@ -11,7 +11,7 @@
 #include "BasicLogger.hpp"
 #include "BasicInput.hpp"
 
-#include "FrontendInterface.hpp"
+#include "UserInterface.hpp"
 #include "BasicVideoSpec.hpp"
 #include "GlobalAudioBase.hpp"
 #include "HDIS_HCIS.hpp"
@@ -20,8 +20,8 @@
 #include "SystemDescriptor.hpp"
 #include "SystemStaging.hpp"
 
-#include "FrontendHost.hpp"
-#include "SystemInterface.hpp"
+#include "ApplicationHost.hpp"
+#include "ISystemEmu.hpp"
 #include "CoreRegistry.hpp"
 
 /*==================================================================*/
@@ -43,28 +43,28 @@ static auto get_open_file_dialog_result() noexcept {
 	return s_open_file_result.exchange(nullptr, mo::relaxed);
 }
 
-void FrontendHost::set_open_file_dialog_result(std::string_view file) noexcept {
+void ApplicationHost::set_open_file_dialog_result(std::string_view file) noexcept {
 	s_open_file_result.store(std::make_shared<std::string>(file), mo::relaxed);
 }
 
 /*==================================================================*/
 
-FrontendHost::FrontendHost() noexcept {
+ApplicationHost::ApplicationHost() noexcept {
 	BVS->set_window_title(c_app_name);
 	CoreRegistry::load_game_database();
 
 	setup_gui_callables();
 }
 
-void FrontendHost::SystemInstance::StopSystemThread::operator()(SystemInterface* ptr) noexcept {
+void ApplicationHost::SystemInstance::StopSystemThread::operator()(ISystemEmu* ptr) noexcept {
 	if (ptr) {
 		ptr->stop_workers();
-		ptr->~SystemInterface();
+		ptr->~ISystemEmu();
 		::operator delete(ptr, std::align_val_t(HDIS));
 	}
 }
 
-SettingsMap FrontendHost::Settings::map() noexcept {
+SettingsMap ApplicationHost::Settings::map() noexcept {
 	return {
 		::make_setting_link("Frontend.Interface.Scale.Zoom", &ui_zoom_scale),
 		::make_setting_link("Frontend.Interface.Scale.Text", &ui_text_scale),
@@ -72,19 +72,19 @@ SettingsMap FrontendHost::Settings::map() noexcept {
 	};
 }
 
-auto FrontendHost::export_settings() const noexcept -> Settings {
+auto ApplicationHost::export_settings() const noexcept -> Settings {
 	Settings out;
 
-	out.ui_zoom_scale = FrontendInterface::get_ui_zoom_scaling();
-	out.ui_text_scale = FrontendInterface::get_ui_text_scaling();
-	FrontendHost::export_mru(out.file_mru_cache);
+	out.ui_zoom_scale = UserInterface::get_ui_zoom_scaling();
+	out.ui_text_scale = UserInterface::get_ui_text_scaling();
+	ApplicationHost::export_mru(out.file_mru_cache);
 
 	return out;
 }
 
 /*==================================================================*/
 
-void FrontendHost::prune_terminated_systems() noexcept {
+void ApplicationHost::prune_terminated_systems() noexcept {
 	auto it = m_systems.begin();
 	while (it != m_systems.end()) {
 		const auto& [id, system] = *it;
@@ -97,7 +97,7 @@ void FrontendHost::prune_terminated_systems() noexcept {
 	}
 }
 
-void FrontendHost::find_last_focused_system() noexcept {
+void ApplicationHost::find_last_focused_system() noexcept {
 	bool found_focused_system = false;
 	for (const auto& id : *m_focus_mru) {
 		const bool is_focused = m_systems[id]->force_viewport_focused(false);
@@ -110,14 +110,14 @@ void FrontendHost::find_last_focused_system() noexcept {
 	}
 }
 
-void FrontendHost::unload_system_instance(SystemID system_id) noexcept {
+void ApplicationHost::unload_system_instance(SystemID system_id) noexcept {
 	const auto target_system_id = system_id ? system_id
 		: (m_focus_mru.empty() ? 0 : m_focus_mru.front());
 	m_systems.erase(target_system_id);
 	m_focus_mru.erase(target_system_id);
 }
 
-void FrontendHost::insert_system_instance(SystemInterface* ptr) noexcept {
+void ApplicationHost::insert_system_instance(ISystemEmu* ptr) noexcept {
 	if (!ptr) { return; }
 	BVS->raise_window(); // bring main window to front!
 
@@ -134,7 +134,7 @@ void FrontendHost::insert_system_instance(SystemInterface* ptr) noexcept {
 
 /*==================================================================*/
 
-void FrontendHost::load_file_from_disk(std::string_view file_path) noexcept {
+void ApplicationHost::load_file_from_disk(std::string_view file_path) noexcept {
 	if (SystemStaging::file_image.load(std::string(file_path))) {
 		if (SystemStaging::file_image.size() == 0) {
 			SystemStaging::file_image.clear();
@@ -148,10 +148,10 @@ void FrontendHost::load_file_from_disk(std::string_view file_path) noexcept {
 	return;
 }
 
-FrontendHost* FrontendHost::init_application(
+ApplicationHost* ApplicationHost::init_application(
 	std::string_view game_file_path, bool headless
 ) noexcept {
-	static FrontendHost* self = nullptr;
+	static ApplicationHost* self = nullptr;
 	if (self) { return self; }
 
 	HDM = HomeDirManager::get_instance();
@@ -159,11 +159,11 @@ FrontendHost* FrontendHost::init_application(
 	blog.create_log(std::to_string(thread_affinity::get_process_id()),
 		(fs::Path(HDM->get_home_path()) / "logs").string());
 
-	FrontendInterface::init_context(HDM->get_home_path().c_str());
+	UserInterface::init_context(HDM->get_home_path().c_str());
 
 	GlobalAudioBase::Settings GAB_settings;
 	BasicVideoSpec ::Settings BVS_settings;
-	FrontendHost   ::Settings FEH_settings;
+	ApplicationHost::Settings FEH_settings;
 
 	HDM->parse_app_config_file(
 		GAB_settings.map(),
@@ -179,22 +179,22 @@ FrontendHost* FrontendHost::init_application(
 	BVS = BasicVideoSpec::initialize(BVS_settings);
 	if (!BVS) { return nullptr; }
 
-	FrontendInterface::init_video(BVS->get_main_window(), BVS->get_main_renderer());
-	FrontendInterface::set_ui_zoom_scaling(FEH_settings.ui_zoom_scale);
-	FrontendInterface::set_ui_text_scaling(FEH_settings.ui_text_scale);
+	UserInterface::init_video(BVS->get_main_window(), BVS->get_main_renderer());
+	UserInterface::set_ui_zoom_scaling(FEH_settings.ui_zoom_scale);
+	UserInterface::set_ui_text_scaling(FEH_settings.ui_text_scale);
 
-	FrontendHost::import_mru(FEH_settings.file_mru_cache);
+	ApplicationHost::import_mru(FEH_settings.file_mru_cache);
 
 	::append_pending_file_drops(game_file_path);
 	thread_affinity::set_affinity(0b11ull);
 
-	static FrontendHost instance;
+	static ApplicationHost instance;
 	return self = &instance;
 }
 
-void FrontendHost::quit_application() noexcept {
-	FrontendInterface::quit_video();
-	FrontendInterface::quit_context();
+void ApplicationHost::quit_application() noexcept {
+	UserInterface::quit_video();
+	UserInterface::quit_context();
 
 	m_systems.clear(); // terminate all systems before quitting
 
@@ -207,8 +207,8 @@ void FrontendHost::quit_application() noexcept {
 
 /*==================================================================*/
 
-int FrontendHost::handle_client_events(void* event) noexcept {
-	FrontendInterface::process_event(event);
+int ApplicationHost::handle_client_events(void* event) noexcept {
+	UserInterface::process_event(event);
 
 	auto sdl_event = reinterpret_cast<SDL_Event*>(event);
 
@@ -241,7 +241,7 @@ int FrontendHost::handle_client_events(void* event) noexcept {
 
 /*==================================================================*/
 
-int FrontendHost::process_client_frame() {
+int ApplicationHost::process_client_frame() {
 	handle_main_hotkeys();
 
 	for (auto& [id, system] : m_systems) {
@@ -259,15 +259,15 @@ int FrontendHost::process_client_frame() {
 	}
 
 	return BVS->render_present([&]() {
-		FrontendInterface::begin_new_frame();
-		FrontendInterface::render_frame();
+		UserInterface::begin_new_frame();
+		UserInterface::render_frame();
 
 		prune_terminated_systems();
 		find_last_focused_system();
 	}) ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
 }
 
-void FrontendHost::handle_main_hotkeys() noexcept {
+void ApplicationHost::handle_main_hotkeys() noexcept {
 	static BasicKeyboard s_input;
 	s_input.advance_state();
 
@@ -309,7 +309,7 @@ void FrontendHost::handle_main_hotkeys() noexcept {
 	}
 }
 
-void FrontendHost::toggle_system_delimiters(SystemInstance& system) noexcept {
+void ApplicationHost::toggle_system_delimiters(SystemInstance& system) noexcept {
 	if (system.delimiters) {
 		if (system) { system->add_system_state(EmuState::BENCH); }
 	} else {
@@ -317,7 +317,7 @@ void FrontendHost::toggle_system_delimiters(SystemInstance& system) noexcept {
 	}
 }
 
-void FrontendHost::toggle_system_statistics(SystemInstance& system) noexcept {
+void ApplicationHost::toggle_system_statistics(SystemInstance& system) noexcept {
 	if (system.statistics) {
 		if (system) { system->add_system_state(EmuState::STATS); }
 	} else {
@@ -325,7 +325,7 @@ void FrontendHost::toggle_system_statistics(SystemInstance& system) noexcept {
 	}
 }
 
-void FrontendHost::set_system_hidden_status(SystemInstance& system, bool state) noexcept {
+void ApplicationHost::set_system_hidden_status(SystemInstance& system, bool state) noexcept {
 	if (state) {
 		if (system) { system->add_system_state(EmuState::HIDDEN); }
 	} else {

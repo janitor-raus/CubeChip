@@ -4,7 +4,7 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "FrontendInterface.hpp"
+#include "UserInterface.hpp"
 #include "BasicLogger.hpp"
 
 #include "fonts/RobotoMono.hpp"
@@ -33,9 +33,9 @@ static bool  s_pending_style_changes = true;
 
 /*==================================================================*/
 
-using Func     = FrontendInterface::Func;
-using LabelKey = FrontendInterface::LabelKey;
-using OrderKey = FrontendInterface::OrderKey;
+using Func     = UserInterface::Func;
+using LabelKey = UserInterface::LabelKey;
+using OrderKey = UserInterface::OrderKey;
 
 template <typename Signature>
 struct HookRegistry {
@@ -193,7 +193,7 @@ static void setup_default_theme() noexcept {
 
 /*==================================================================*/
 
-void FrontendInterface::register_window_impl(const Hook& shared_func) noexcept {
+void UserInterface::register_window_impl(const Hook& shared_func) noexcept {
 	if (s_gui_hooks->windows.registry_lock.try_lock()) { // may fail spuriously (fine)
 		s_gui_hooks->windows.registry.buffer.push_back(shared_func);
 		s_gui_hooks->windows.registry_lock.unlock();
@@ -203,7 +203,7 @@ void FrontendInterface::register_window_impl(const Hook& shared_func) noexcept {
 	}
 }
 
-void FrontendInterface::register_menu_impl(LabelKey window_tag, OrderKey menu_title, const Hook& shared_func) noexcept {
+void UserInterface::register_menu_impl(LabelKey window_tag, OrderKey menu_title, const Hook& shared_func) noexcept {
 	if (s_gui_hooks->menus.registry_lock.try_lock()) { // may fail spuriously (fine)
 		s_gui_hooks->menus.registry[window_tag.get_id_or_label()] \
 			[std::move(menu_title)].buffer.push_back(shared_func);
@@ -217,7 +217,7 @@ void FrontendInterface::register_menu_impl(LabelKey window_tag, OrderKey menu_ti
 
 /*==================================================================*/
 
-bool FrontendInterface::merge_overflowing_windows() noexcept {
+bool UserInterface::merge_overflowing_windows() noexcept {
 	std::scoped_lock lock(s_gui_hooks->windows.overflow_lock);
 
 	auto& src_windows = s_gui_hooks->windows.overflow.buffer;
@@ -236,7 +236,7 @@ bool FrontendInterface::merge_overflowing_windows() noexcept {
 	return true;
 }
 
-bool FrontendInterface::invoke_registered_windows() noexcept {
+bool UserInterface::invoke_registered_windows() noexcept {
 	std::scoped_lock lock(s_gui_hooks->windows.registry_lock);
 
 	auto& windows = s_gui_hooks->windows.registry;
@@ -254,7 +254,7 @@ bool FrontendInterface::invoke_registered_windows() noexcept {
 	return !!std::exchange(windows.offset, 0);
 }
 
-bool FrontendInterface::merge_overflowing_menus(const LabelKey& window_key) noexcept {
+bool UserInterface::merge_overflowing_menus(const LabelKey& window_key) noexcept {
 	std::scoped_lock lock(s_gui_hooks->menus.overflow_lock);
 
 	auto& src_window = s_gui_hooks->menus.overflow[window_key.get_id_or_label()];
@@ -279,7 +279,7 @@ bool FrontendInterface::merge_overflowing_menus(const LabelKey& window_key) noex
 	return !!migration_count;
 }
 
-bool FrontendInterface::invoke_registered_menus(const LabelKey& window_key) noexcept {
+bool UserInterface::invoke_registered_menus(const LabelKey& window_key) noexcept {
 	std::scoped_lock lock(s_gui_hooks->menus.registry_lock);
 
 	merge_overflowing_menus(window_key); // unconditional first merge
@@ -331,34 +331,34 @@ bool FrontendInterface::invoke_registered_menus(const LabelKey& window_key) noex
 
 /*==================================================================*/
 
-SDL_Renderer* FrontendInterface::get_current_renderer()  noexcept { return s_current_renderer; }
-unsigned      FrontendInterface::get_main_dockspace_id() noexcept { return s_main_dock_id; }
+SDL_Renderer* UserInterface::get_current_renderer()  noexcept { return s_current_renderer; }
+unsigned      UserInterface::get_main_dockspace_id() noexcept { return s_main_dock_id; }
 
-void FrontendInterface::set_ui_zoom_scaling(float scale) noexcept {
+void UserInterface::set_ui_zoom_scaling(float scale) noexcept {
 	s_zoom_scaling = std::clamp(scale, 1.0f, 4.0f);
 	s_pending_style_changes = true;
 }
 
-float FrontendInterface::get_ui_zoom_scaling() noexcept {
+float UserInterface::get_ui_zoom_scaling() noexcept {
 	return s_zoom_scaling;
 }
 
-void FrontendInterface::set_ui_text_scaling(float scale) noexcept {
+void UserInterface::set_ui_text_scaling(float scale) noexcept {
 	s_text_scaling = std::clamp(scale, 0.5f, 2.0f);
 	s_pending_style_changes = true;
 }
 
-float FrontendInterface::get_ui_text_scaling() noexcept {
+float UserInterface::get_ui_text_scaling() noexcept {
 	return s_text_scaling;
 }
 
-float FrontendInterface::get_ui_total_scaling() noexcept {
+float UserInterface::get_ui_total_scaling() noexcept {
 	return s_zoom_scaling * s_text_scaling;
 }
 
 /*==================================================================*/
 
-void FrontendInterface::init_context(std::string_view home_dir) {
+void UserInterface::init_context(std::string_view home_dir) {
 	static auto s_ini_path = ::join(home_dir, "imgui.ini");
 	static auto s_log_path = ::join(home_dir, "imgui.log");
 
@@ -388,28 +388,28 @@ void FrontendInterface::init_context(std::string_view home_dir) {
 	io.FontDefault = s_main_font;
 }
 
-void FrontendInterface::quit_context() {
+void UserInterface::quit_context() {
 	ImGui::DestroyContext();
 }
 
-void FrontendInterface::init_video(SDL_Window* window, SDL_Renderer* renderer) {
+void UserInterface::init_video(SDL_Window* window, SDL_Renderer* renderer) {
 	ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
 	ImGui_ImplSDLRenderer3_Init(renderer);
 	s_current_renderer = renderer;
 }
 
-void FrontendInterface::quit_video() {
+void UserInterface::quit_video() {
 	ImGui_ImplSDLRenderer3_Shutdown();
 	ImGui_ImplSDL3_Shutdown();
 }
 
 /*==================================================================*/
 
-void FrontendInterface::process_event(void* event) {
+void UserInterface::process_event(void* event) {
 	ImGui_ImplSDL3_ProcessEvent(reinterpret_cast<SDL_Event*>(event));
 }
 
-void FrontendInterface::begin_new_frame() {
+void UserInterface::begin_new_frame() {
 	if (s_pending_style_changes) {
 		ImGui::GetStyle() = s_default_style;
 
@@ -435,22 +435,22 @@ void FrontendInterface::begin_new_frame() {
 	invoke_registered_windows();
 }
 
-void FrontendInterface::render_frame(SDL_Renderer* renderer) {
+void UserInterface::render_frame(SDL_Renderer* renderer) {
 	ImGui::Render();
 	ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(),
 		renderer ? renderer : s_current_renderer);
 }
 
-void FrontendInterface::dock_next_window_to(unsigned id, bool first_time) noexcept {
+void UserInterface::dock_next_window_to(unsigned id, bool first_time) noexcept {
 	ImGui::SetNextWindowDockID(id ? id : s_main_dock_id,
 		first_time ? ImGuiCond_FirstUseEver : ImGuiCond_Always);
 }
 
-bool FrontendInterface::was_menu_clicked() noexcept {
+bool UserInterface::was_menu_clicked() noexcept {
 	return s_active_menu && s_active_menu->first_hit;
 }
 
-void FrontendInterface::call_menubar(const char* window_name, bool* can_render) noexcept {
+void UserInterface::call_menubar(const char* window_name, bool* can_render) noexcept {
 	if (ImGui::BeginMenuBar()) {
 		bool invoked = invoke_registered_menus(window_name);
 		if (can_render) { *can_render = invoked; }
@@ -458,7 +458,7 @@ void FrontendInterface::call_menubar(const char* window_name, bool* can_render) 
 	}
 }
 
-void FrontendInterface::call_autohide_menubar(const char* window_name, bool& hidden) noexcept {
+void UserInterface::call_autohide_menubar(const char* window_name, bool& hidden) noexcept {
 	const bool is_window_focused = ImGui::IsWindowFocused(
 		ImGuiFocusedFlags_RootAndChildWindows);
 

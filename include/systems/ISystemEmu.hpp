@@ -19,7 +19,7 @@
 #include "SimpleTimer.hpp"
 #include "BasicInput.hpp"
 #include "Well512.hpp"
-#include "FrontendInterface.hpp"
+#include "UserInterface.hpp"
 
 #include "FileImage.hpp"
 
@@ -54,7 +54,7 @@ struct SystemDescriptor;
 
 /*==================================================================*/
 
-class /*alignas(HDIS)*/ SystemInterface {
+class /*alignas(HDIS)*/ ISystemEmu {
 
 	Thread m_system_thread;
 	Thread m_timing_thread;
@@ -80,10 +80,10 @@ protected:
 	BasicKeyboard m_input;
 
 protected:
-	SystemInterface(std::string_view window_name) noexcept;
+	ISystemEmu(std::string_view window_name) noexcept;
 
 public:
-	virtual ~SystemInterface() noexcept = default;
+	virtual ~ISystemEmu() noexcept = default;
 
 private:
 	void prepare_user_interface() noexcept;
@@ -123,7 +123,7 @@ public:
 protected:
 	WindowHost m_workspace_host;
 
-	std::vector<FrontendInterface::Hook>
+	std::vector<UserInterface::Hook>
 		m_frontend_hooks;
 
 protected:

@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "../Chip8_CoreInterface.hpp"
+#include "../IFamily_CHIP8.hpp"
 
 #define ENABLE_CHIP8X
 #if defined(ENABLE_CHIP8_SYSTEM) && defined(ENABLE_CHIP8X)
@@ -17,7 +17,7 @@
 
 /*==================================================================*/
 
-class CHIP8X final : public Chip8_CoreInterface {
+class CHIP8X final : public IFamily_CHIP8 {
 	static constexpr u64 c_sys_memory_size  = 4_KiB;
 	static constexpr u32 c_game_load_pos    = 0x300;
 	static constexpr u32 c_sys_boot_pos     = 0x300;
@@ -79,7 +79,7 @@ private:
 
 public:
 	CHIP8X() noexcept
-		: Chip8_CoreInterface(c_sys_screen_W, c_sys_screen_H)
+		: IFamily_CHIP8(c_sys_screen_W, c_sys_screen_H)
 		, m_colored_map(m_colored_buffer, c_sys_screen_W/8, c_sys_screen_H)
 		, m_display_map(m_display_buffer, c_sys_screen_W, c_sys_screen_H)
 	{}
