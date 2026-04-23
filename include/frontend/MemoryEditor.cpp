@@ -7,6 +7,7 @@
 #include "MemoryEditor.hpp"
 
 #include <cstddef>
+#include <cstring>
 #include <array>
 #include <charconv>
 #include <bit>

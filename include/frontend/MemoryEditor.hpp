@@ -187,6 +187,16 @@ public:
 	}
 
 private:
+#ifdef _LP64
+	// Linux/macOS LP64: u64 is unsigned long, force long long for printf
+	using fmt_u64 = unsigned long long int;
+	using fmt_s64 =   signed long long int;
+#else
+	// LLP64 (Windows): u64 is already unsigned long long, no cast needed
+	using fmt_u64 = u64;
+	using fmt_s64 = s64;
+#endif
+
 	void read_bytes(
 		std::span<const u8> src,
 		std::span</***/ u8> dst,
@@ -222,14 +232,14 @@ private:
 		} else {
 			if (fmt == DataFormat::DEC) {
 				if constexpr (std::is_signed_v<T>) {
-					std::snprintf(output.data(), output.size(), "%lld", s64(data));
+					std::snprintf(output.data(), output.size(), "%lld", fmt_s64(data));
 				} else {
-					std::snprintf(output.data(), output.size(), "%llu", u64(data));
+					std::snprintf(output.data(), output.size(), "%llu", fmt_u64(data));
 				}
 			} else {
 				std::snprintf(output.data(), output.size(),
 					settings.toggle_capital_hex ? "0x%0*llX" : "0x%0*llx",
-					s32(sizeof(T) * 2), u64(std::make_unsigned_t<T>(data)));
+					s32(sizeof(T) * 2), fmt_u64(std::make_unsigned_t<T>(data)));
 			}
 		}
 	}
