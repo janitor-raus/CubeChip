@@ -79,15 +79,15 @@ static ImGuiStyle s_default_style;
 static void setup_default_theme() noexcept {
 	s_default_style.WindowPadding     = ImVec2(6.0f, 6.0f);
 	s_default_style.FramePadding      = ImVec2(8.0f, 4.0f);
-	s_default_style.ItemSpacing       = ImVec2(8.0f, 2.0f);
+	s_default_style.ItemSpacing       = ImVec2(8.0f, 7.0f);
 	s_default_style.ItemInnerSpacing  = ImVec2(8.0f, 2.0f);
 	s_default_style.TouchExtraPadding = ImVec2(0.0f, 0.0f);
 	s_default_style.IndentSpacing = 38.0f;
 	s_default_style.GrabMinSize   =  8.0f;
 
-	s_default_style.WindowBorderSize = 1.0f;
-	s_default_style.ChildBorderSize  = 1.0f;
-	s_default_style.PopupBorderSize  = 1.0f;
+	s_default_style.WindowBorderSize = 2.0f;
+	s_default_style.ChildBorderSize  = 2.0f;
+	s_default_style.PopupBorderSize  = 2.0f;
 	s_default_style.FrameBorderSize  = 0.0f;
 
 	s_default_style.WindowRounding = 4.0f;
@@ -117,7 +117,11 @@ static void setup_default_theme() noexcept {
 	s_default_style.TableAngledHeadersAngle     = 35.0f;
 	s_default_style.TableAngledHeadersTextAlign = ImVec2(0.5f, 0.0f);
 
-	s_default_style.ColorMarkerSize = 4.0f;
+	s_default_style.TreeLinesFlags    = ImGuiTreeNodeFlags_DrawLinesToNodes;
+	s_default_style.TreeLinesRounding = 16.0f;
+	s_default_style.TreeLinesSize     =  2.0f;
+
+	s_default_style.ColorMarkerSize     = 4.0f;
 	s_default_style.ColorButtonPosition = ImGuiDir_Left;
 
 	s_default_style.SeparatorTextBorderSize = 3.0f;
