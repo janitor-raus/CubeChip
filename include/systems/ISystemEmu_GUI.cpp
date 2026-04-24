@@ -40,10 +40,10 @@ void ISystemEmu::prepare_user_interface() noexcept {
 		docker_class.ClassId = window_id;
 		docker_class.DockingAllowUnclassed = false;
 
-		static constexpr auto docker_flags =
-			ImGuiDockNodeFlags_AutoHideTabBar;
+		//static constexpr auto docker_flags =
+		//	ImGuiDockNodeFlags_AutoHideTabBar;
 
-		DockSpace(window_id, ImVec2(), docker_flags, &docker_class);
+		DockSpace(window_id, ImVec2(), 0, &docker_class);
 	};
 
 	m_frontend_hooks.emplace_back(UserInterface::register_menu(
