@@ -15,7 +15,7 @@
 
 IFamily_CHIP8::IFamily_CHIP8(std::size_t W, std::size_t H) noexcept
 	: ISystemEmu(family_pretty_name)
-	, m_display_window({ "Display", make_system_id(instance_id, "display")})
+	, m_display_window({ "Display", make_system_id(instance_id, "display") })
 	, m_display_device(W, H, UserInterface::get_current_renderer())
 {
 	prepare_user_interface();
@@ -180,16 +180,18 @@ void IFamily_CHIP8::jump_program_to(u32 next) noexcept {
 /*==================================================================*/
 
 void IFamily_CHIP8::main_system_loop() {
-	update_key_states();
+	if (!has_system_state(EmuState::IS_PAUSED)) {
+		update_key_states();
 
-	handle_timer_ticks();
-	handle_pre_work_interrupts();
-	handle_cycle_loop();
-	handle_post_work_interrupts();
+		handle_timer_ticks();
+		handle_pre_work_interrupts();
+		handle_cycle_loop();
+		handle_post_work_interrupts();
 
+		push_video_data();
+		create_statistics_data();
+	}
 	push_audio_data();
-	push_video_data();
-	create_statistics_data();
 }
 
 void IFamily_CHIP8::append_statistics_data() noexcept {

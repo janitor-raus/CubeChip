@@ -10,18 +10,17 @@
 #include <functional>
 
 #include "ImLabel.hpp"
-#include "HDIS_HCIS.hpp"
 
 /*==================================================================*/
 
 class WindowHost {
 	struct HostContext;
-	friend struct HostContext;
 
-	std::unique_ptr<HostContext> m_context;
+	std::unique_ptr<HostContext>
+		m_context;
 
 public:
-	struct alignas(HDIS) Callbacks {
+	struct Callbacks {
 		/**
 		 * @brief Callback for window initialization, executed before ImGui::Begin().
 		 *        Provides references to window_flags for modification and an optional
@@ -35,7 +34,7 @@ public:
 		 *        and before the window_body() callback. Provides the `window_open`
 		 *        state and window's instance ID for docking decisions.
 		 */
-		std::function<void(bool window_open, unsigned window_id)>
+		std::function<void(bool window_open, unsigned int window_id)>
 			window_dock{};
 
 		/**
@@ -79,6 +78,9 @@ public:
 	auto get_window_label() const noexcept -> ImLabel;
 	// Set Current window label. Thread-safe.
 	void set_window_label(std::string_view name) noexcept;
+
+	auto get_parent() const noexcept -> const WindowHost*;
+	void set_parent(const WindowHost* parent) noexcept;
 
 	// Get unique window ID number. Only call on main thread!
 	auto get_window_id() const noexcept -> unsigned int;

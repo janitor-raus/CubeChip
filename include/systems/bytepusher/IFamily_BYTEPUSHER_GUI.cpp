@@ -13,7 +13,8 @@
 /*==================================================================*/
 
 void IFamily_BYTEPUSHER::prepare_user_interface() noexcept {
-m_display_window.set_window_focused_output(&m_is_viewport_focused);
+	m_display_window.set_window_focused_output(&m_is_viewport_focused);
+	m_display_window.set_parent(&m_workspace_host);
 	m_display_window.allow_fullscreen(true);
 
 	m_display_window.edit_callbacks().window_init = [

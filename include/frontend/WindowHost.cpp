@@ -32,6 +32,8 @@ struct WindowHost::HostContext {
 	bool* m_window_visible_out = nullptr;
 	bool* m_window_focused_out = nullptr;
 
+	const WindowHost* m_parent = nullptr;
+
 	const unsigned int c_window_id;
 
 	bool m_have_fullscreen = false;
@@ -70,8 +72,8 @@ private:
 
 		const auto window_label = get_window_label();
 
-		int window_flags = (m_fullscreen_mode && !m_disable_menubar)
-			? ImGuiWindowFlags_MenuBar : ImGuiWindowFlags_None;
+		int window_flags = ImGuiWindowFlags_MenuBar
+			* (m_fullscreen_mode && !m_disable_menubar);
 
 		std::function<void()> window_tidy = nullptr;
 		if (m_callbacks.window_init) { m_callbacks.window_init(window_flags, window_tidy); }
@@ -107,13 +109,15 @@ private:
 			ImGui::SetNextWindowPos(viewport->Pos);
 			ImGui::SetNextWindowSize(viewport->Size);
 
-			static constexpr auto full_flags = ImGuiWindowFlags_NoScrollWithMouse
-				| ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove;
+			static constexpr auto full_flags =
+				ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove;
 
-			const auto temp_label = ::join(window_label->get_id(), "_fullscreen");
-			if (ImGui::Begin(temp_label.c_str(), nullptr, window_flags | full_flags)) {
+			ImGui::PushID(c_window_id);
+			if (ImGui::Begin("##fullscreen", nullptr, window_flags | full_flags)) {
 				if (m_window_focused_out) { *m_window_focused_out |= true; }
-				UserInterface::call_autohide_menubar(*window_label, m_disable_menubar);
+				UserInterface::call_autohide_menubar(m_parent
+					? m_parent->get_window_label()
+					: *window_label, m_disable_menubar);
 
 				if (m_callbacks.window_body) { m_callbacks.window_body(true, true); }
 
@@ -124,6 +128,7 @@ private:
 				}
 			}
 			ImGui::End();
+			ImGui::PopID();
 		}
 	}
 };
@@ -159,6 +164,14 @@ auto WindowHost::get_window_label() const noexcept -> ImLabel {
 
 void WindowHost::set_window_label(std::string_view name) noexcept {
 	m_context->set_window_label(name);
+}
+
+auto WindowHost::get_parent() const noexcept -> const WindowHost* {
+	return m_context->m_parent;
+}
+
+void WindowHost::set_parent(const WindowHost* parent) noexcept {
+	m_context->m_parent = parent;
 }
 
 auto WindowHost::get_window_id() const noexcept -> unsigned int {
