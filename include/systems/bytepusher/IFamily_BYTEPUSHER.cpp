@@ -36,6 +36,11 @@ IFamily_BYTEPUSHER::IFamily_BYTEPUSHER(std::size_t W, std::size_t H) noexcept
 /*==================================================================*/
 
 void IFamily_BYTEPUSHER::main_system_loop() {
+	if (has_system_state(EmuState::IS_PAUSED)) {
+		push_audio_data();
+		return;
+	}
+
 	instruction_loop();
 	push_audio_data();
 	push_video_data();
