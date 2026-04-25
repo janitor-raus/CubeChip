@@ -180,18 +180,21 @@ void IFamily_CHIP8::jump_program_to(u32 next) noexcept {
 /*==================================================================*/
 
 void IFamily_CHIP8::main_system_loop() {
-	if (!has_system_state(EmuState::IS_PAUSED)) {
-		update_key_states();
-
-		handle_timer_ticks();
-		handle_pre_work_interrupts();
-		handle_cycle_loop();
-		handle_post_work_interrupts();
-
-		push_video_data();
-		create_statistics_data();
+	if (has_system_state(EmuState::IS_PAUSED)) {
+		push_audio_data();
+		return;
 	}
+
+	update_key_states();
+
+	handle_timer_ticks();
+	handle_pre_work_interrupts();
+	handle_cycle_loop();
+	handle_post_work_interrupts();
+
 	push_audio_data();
+	push_video_data();
+	create_statistics_data();
 }
 
 void IFamily_CHIP8::append_statistics_data() noexcept {
@@ -232,11 +235,10 @@ void IFamily_CHIP8::mix_audio_data(VoiceGenerators processors) noexcept {
 			(stream->get_next_buffer_size(get_real_system_framerate()))
 			.as_value().release_as_container();
 
-		for (auto& bundle : processors)
-			{ bundle.run(buffer, stream); }
-
-		for (auto& sample : buffer)
-			{ sample = ez::fast_tanh(sample); }
+		if (!has_system_state(EmuState::IS_PAUSED)) {
+			for (auto& bundle : processors) { bundle.run(buffer, stream); }
+			for (auto& sample : buffer) { sample = ez::fast_tanh(sample); }
+		}
 
 		stream->push_audio_data(buffer);
 	}

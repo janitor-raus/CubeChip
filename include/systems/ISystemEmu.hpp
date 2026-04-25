@@ -29,19 +29,25 @@
 /*==================================================================*/
 
 enum EmuState : u8 {
-	NORMAL = 0x00, // normal operation
-	HIDDEN = 0x01, // window is hidden
-	PAUSED = 0x02, // paused by hotkey
-	HALTED = 0x04, // normal end path
-	FATAL  = 0x08, // fatal error path
-	BENCH  = 0x10, // benchmarking mode
-	STATS  = 0x20, // produce OSD stats
-	DUMMY  = 0x40, // dummy mode (no audio/video)
-	DEBUG  = 0x80, // debugger enabled
+	NORMAL = 0x00, // normal operation (default state)
+	HIDDEN = 0x01, // window is hidden (unfocused or minimized)
+	PAUSED = 0x02, // paused by hotkey (explicitly a user action)
+	HALTED = 0x04, // normal end path  (system-specific, e.g. powered-off)
+	FATAL  = 0x08, // fatal error path (system-specific, e.g. illegal ops)
+	BENCH  = 0x10, // benchmarking mode (cpu de-limited)
+	STATS  = 0x20, // collect/display OSD stats
+	DUMMY  = 0x40, // dummy mode (no audio/video?)
+	DEBUG  = 0x80, // debugger enabled (reserved for future use)
 
-	NOT_RUNNING = HIDDEN | PAUSED | HALTED | FATAL, // when emulation must wait
-	CANNOT_PAUSE = HIDDEN | HALTED | FATAL, // when pausing is disallowed
+	NOT_RUNNING  = HIDDEN | PAUSED | HALTED | FATAL, // emulation cannot progress
+	CANNOT_PAUSE = HIDDEN | HALTED | FATAL, // pause-trigger is not allowed
+	IS_PAUSED    = HIDDEN | PAUSED, // emulation is currently paused
+	IS_STOPPED   = HALTED | FATAL, // emulation is currently stopped
 };
+
+inline auto test_emu_state(EmuState state, EmuState test) noexcept {
+	return state & test;
+}
 
 struct SimpleKeyMapping {
 	u32          idx; // index value associated with entry
@@ -158,9 +164,9 @@ public:
 	// Tests if the given State is present in the System.
 	bool has_system_state(EmuState state) const noexcept { return !!(get_system_state() & state); }
 	// Tests if the System is allowed to run (temporarily or not).
-	bool can_system_work()               const noexcept { return !(get_system_state() & EmuState::NOT_RUNNING); }
+	bool can_system_work()                const noexcept { return !(get_system_state() & EmuState::NOT_RUNNING); }
 	// Tests if the System is allowed to (un)pause on demand.
-	bool can_system_pause()              const noexcept { return !(get_system_state() & EmuState::CANNOT_PAUSE); }
+	bool can_system_pause()               const noexcept { return !(get_system_state() & EmuState::CANNOT_PAUSE); }
 
 	// Attempts to (un)pause the System if possible, returns paused State value.
 	std::optional<bool> try_pause_system() noexcept {

@@ -45,13 +45,16 @@ void ISystemEmu::start_workers() noexcept {
 
 			do {
 				await_next_frame(false);
+				const auto state = EmuState(get_system_state());
 
 				m_timer.start();
 				main_system_loop();
 
-				m_elapsed_frames += 1;
-				m_benched_frames = has_system_state(EmuState::BENCH)
-					? m_benched_frames + 1 : 0;
+				if (!test_emu_state(state, EmuState::NOT_RUNNING)) {
+					m_elapsed_frames += 1;
+					m_benched_frames = test_emu_state(state, EmuState::BENCH)
+						? m_benched_frames + 1 : 0;
+				}
 			} while (!token.stop_requested());
 		});
 	}
@@ -61,12 +64,17 @@ void ISystemEmu::start_workers() noexcept {
 			thread_affinity::set_affinity(0b11ull);
 
 			FrameLimiter pacer(get_real_system_framerate());
+			bool is_bench   = false;
+			bool is_paused  = false;
 
 			do {
-				if (pacer.is_frame_ready(!has_system_state(EmuState::BENCH))) {
-					pacer.set_limiter_props(get_real_system_framerate());
+				if (pacer.is_frame_ready(is_paused || !is_bench)) {
+					const auto state = EmuState(get_system_state());
+					is_bench   = test_emu_state(state, EmuState::BENCH);
+					is_paused  = test_emu_state(state, EmuState::IS_PAUSED);
 
-					if (!can_system_work()) [[unlikely]] { continue; }
+					if (test_emu_state(state, EmuState::IS_STOPPED)) [[unlikely]] { continue; }
+					if (!is_paused) { pacer.set_limiter_props(get_real_system_framerate()); }
 
 					set_frame_stop_flag(true);
 					notify_next_frame(true);

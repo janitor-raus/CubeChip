@@ -50,16 +50,20 @@ void BYTEPUSHER_STANDARD::instruction_loop() noexcept {
 
 void BYTEPUSHER_STANDARD::push_audio_data() noexcept {
 	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
-		const auto samples = std::span(m_memory.data() + (read_data<ByteSpan::DOUBLE>(6) << 8), 256);
 		auto buffer = ::allocate_n<f32>(stream->get_next_buffer_size(get_real_system_framerate()))
 			.as_value().release_as_container();
 
-		static constexpr auto master_gain = 0.22f;
+		if (!has_system_state(EmuState::IS_PAUSED)) {
+			static constexpr auto master_gain = 0.22f;
 
-		std::transform(EXEC_POLICY(unseq)
-			samples.begin(), samples.end(), buffer.data(),
-			[](const auto sample) noexcept { return s8(sample) * (master_gain / 127.0f); }
-		);
+			const auto samples = std::span(m_memory.data()
+				+ (read_data<ByteSpan::DOUBLE>(6) << 8), 256);
+
+			std::transform(EXEC_POLICY(unseq)
+				samples.begin(), samples.end(), buffer.data(),
+				[](const auto sample) noexcept { return s8(sample) * (master_gain / 127.0f); }
+			);
+		}
 
 		m_audio_device[STREAM::MAIN].push_audio_data(buffer);
 	}

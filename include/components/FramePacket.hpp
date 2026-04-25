@@ -6,7 +6,6 @@
 
 #pragma once
 
-
 #include "EzMaths.hpp"
 #include "ColorOps.hpp"
 #include "Parameter.hpp"
