@@ -46,6 +46,7 @@ concept BinaryTransformFn = std::invocable<F&, T&, T&>
 struct FramePacket {
 	using value_type = std::byte;
 	using pointer = value_type*;
+	using const_pointer = const value_type*;
 
 	class Metadata {
 		friend struct FramePacket;
@@ -160,7 +161,7 @@ public:
 	Metadata metadata;
 
 	/***/ pointer data()       noexcept { return m_buffer.get(); }
-	const pointer data() const noexcept { return m_buffer.get(); }
+	const_pointer data() const noexcept { return m_buffer.get(); }
 
 	auto size() const noexcept { return metadata.get_base_frame().area(); }
 

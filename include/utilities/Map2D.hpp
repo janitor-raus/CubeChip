@@ -30,7 +30,7 @@ struct SpanIterator final {
 	using difference_type = std::ptrdiff_t;
 	using value_type      = std::remove_cv_t<std::span<T>>;
 
-	using iterator_category = std::contiguous_iterator_tag;
+	using iterator_category = std::random_access_iterator_tag;
 
 	using pointer        = std::span<T>*;
 	using const_pointer  = const std::span<T>*;
@@ -74,9 +74,8 @@ public:
 	constexpr auto  operator- (difference_type rhs) const noexcept { return SpanIterator(m_span.data() - rhs * m_span.size(), m_span.size()); }
 
 	constexpr friend auto operator+(difference_type lhs, const SpanIterator& rhs) noexcept { return rhs + lhs; }
-	constexpr friend auto operator-(difference_type lhs, const SpanIterator& rhs) noexcept { return rhs - lhs; }
 
-	constexpr difference_type operator-(const SpanIterator& other) const noexcept { return m_span.data() - other.m_span.data(); }
+	constexpr difference_type operator-(const SpanIterator& other) const noexcept { return (m_span.data() - other.m_span.data()) / difference_type(m_span.size()); }
 
 	constexpr bool operator==(const SpanIterator& other) const noexcept { return m_span.data() == other.m_span.data(); }
 	constexpr bool operator!=(const SpanIterator& other) const noexcept { return m_span.data() != other.m_span.data(); }
@@ -118,9 +117,9 @@ public:
 	using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
 private:
-	pointer   m_data;
-	axis_size m_size_x;
-	axis_size m_size_y;
+	pointer   m_data{};
+	axis_size m_size_x{};
+	axis_size m_size_y{};
 
 public:
 	constexpr size_type size()       const noexcept { return m_size_y * m_size_x; }
@@ -134,14 +133,32 @@ public:
 	constexpr pointer       data()       noexcept { return m_data; }
 	constexpr const_pointer data() const noexcept { return m_data; }
 
-	constexpr reference       front()       { return data()[0]; }
-	constexpr const_reference front() const { return data()[0]; }
+	constexpr reference       front()       {
+		assert(size() > 0 && "front() called with a size of 0");
+		return data()[0];
+	}
+	constexpr const_reference front() const {
+		assert(size() > 0 && "front() called with a size of 0");
+		return data()[0];
+	}
 
-	constexpr reference       back()       { return data()[size() - 1]; }
-	constexpr const_reference back() const { return data()[size() - 1]; }
+	constexpr reference       back()       {
+		assert(size() > 0 && "back() called with a size of 0");
+		return data()[size() - 1];
+	}
+	constexpr const_reference back() const {
+		assert(size() > 0 && "back() called with a size of 0");
+		return data()[size() - 1];
+	}
 
-	constexpr auto first(size_type count) const { return *SpanIterator(data(), count); }
-	constexpr auto last (size_type count) const { return *SpanIterator(data() + size() - count, count); }
+	constexpr auto first(size_type count) const {
+		assert(count <= size() && "first() called with a count larger than size");
+		return *SpanIterator(data(), count);
+	}
+	constexpr auto last (size_type count) const {
+		assert(count <= size() && "last() called with a count larger than size");
+		return *SpanIterator(data() + size() - count, count);
+	}
 
 	constexpr auto make_row_iter(size_type row)  const { return SpanIterator(data() + row * width(), width()); }
 	constexpr auto make_row_proxy(size_type row) const { return *make_row_iter(row); }
