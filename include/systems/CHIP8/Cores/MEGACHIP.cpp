@@ -19,6 +19,8 @@ void MEGACHIP::initialize_system() noexcept {
 
 	set_base_system_framerate(c_sys_refresh_rate);
 
+	m_memory_editor.set_memory_range(m_memory.data(), m_memory.size());
+
 	m_voices[VOICE::UNIQUE].userdata = &m_audio_timers[VOICE::UNIQUE];
 	m_voices[VOICE::BUZZER].userdata = &m_audio_timers[VOICE::BUZZER];
 

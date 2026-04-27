@@ -1,8 +1,26 @@
 diff --git a/imgui_widgets.cpp b/imgui_widgets.cpp
-index d26e407da..d1b4a215b 100644
+index abcb02f2b..6d44d9cbf 100644
 --- a/imgui_widgets.cpp
 +++ b/imgui_widgets.cpp
-@@ -7102,7 +7102,7 @@ bool ImGui::TreeNodeBehavior(ImGuiID id, ImGuiTreeNodeFlags flags, const char* l
+@@ -925,7 +925,7 @@ bool ImGui::CloseButton(ImGuiID id, const ImVec2& pos)
+     // Render
+     ImU32 bg_col = GetColorU32(held ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered);
+     if (hovered)
+-        window->DrawList->AddRectFilled(bb.Min, bb.Max, bg_col);
++        window->DrawList->AddRectFilled(bb.Min, bb.Max, bg_col, g.Style.FrameRounding);
+     RenderNavCursor(bb, id, ImGuiNavRenderCursorFlags_Compact);
+     const ImU32 cross_col = GetColorU32(ImGuiCol_Text);
+     const ImVec2 cross_center = bb.GetCenter() - ImVec2(0.5f, 0.5f);
+@@ -955,7 +955,7 @@ bool ImGui::CollapseButton(ImGuiID id, const ImVec2& pos, ImGuiDockNode* dock_no
+     ImU32 bg_col = GetColorU32((held && hovered) ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
+     ImU32 text_col = GetColorU32(ImGuiCol_Text);
+     if (hovered || held)
+-        window->DrawList->AddRectFilled(bb.Min, bb.Max, bg_col);
++        window->DrawList->AddRectFilled(bb.Min, bb.Max, bg_col, g.Style.FrameRounding);
+     RenderNavCursor(bb, id, ImGuiNavRenderCursorFlags_Compact);
+ 
+     if (dock_node)
+@@ -7113,7 +7113,7 @@ bool ImGui::TreeNodeBehavior(ImGuiID id, ImGuiTreeNodeFlags flags, const char* l
              if (hovered || selected)
              {
                  const ImU32 bg_col = GetColorU32((held && hovered) ? ImGuiCol_HeaderActive : hovered ? ImGuiCol_HeaderHovered : ImGuiCol_Header);
@@ -11,7 +29,7 @@ index d26e407da..d1b4a215b 100644
              }
              RenderNavCursor(frame_bb, id, nav_render_cursor_flags);
              if (span_all_columns && !span_all_columns_label)
-@@ -7484,11 +7484,11 @@ bool ImGui::Selectable(const char* label, bool selected, ImGuiSelectableFlags fl
+@@ -7495,11 +7495,11 @@ bool ImGui::Selectable(const char* label, bool selected, ImGuiSelectableFlags fl
          {
              // Between 1.91.0 and 1.91.4 we made selected Selectable use an arbitrary lerp between _Header and _HeaderHovered. Removed that now. (#8106)
              ImU32 col = GetColorU32((held && highlighted) ? ImGuiCol_HeaderActive : highlighted ? ImGuiCol_HeaderHovered : ImGuiCol_Header);

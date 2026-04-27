@@ -77,7 +77,9 @@ static HookRegistry<Func>* s_active_menu{};
 static ImGuiStyle s_default_style;
 
 static void setup_default_theme() noexcept {
-	s_default_style.WindowPadding     = ImVec2(6.0f, 6.0f);
+	s_default_style.AntiAliasedLinesUseTex = false;
+
+	s_default_style.WindowPadding     = ImVec2(8.0f, 8.0f);
 	s_default_style.FramePadding      = ImVec2(8.0f, 4.0f);
 	s_default_style.ItemSpacing       = ImVec2(8.0f, 7.0f);
 	s_default_style.ItemInnerSpacing  = ImVec2(8.0f, 2.0f);
@@ -100,14 +102,14 @@ static void setup_default_theme() noexcept {
 	s_default_style.ScrollbarRounding =  2.0f;
 	s_default_style.ScrollbarPadding  =  0.0f;
 
-	s_default_style.TabBorderSize      =  1.0f;
+	s_default_style.TabBorderSize      =  0.0f;
 	s_default_style.TabBarBorderSize   =  2.0f;
-	s_default_style.TabBarOverlineSize =  2.0f;
+	s_default_style.TabBarOverlineSize =  3.0f;
 	s_default_style.TabMinWidthBase    = 64.0f;
 	s_default_style.TabMinWidthShrink  = 64.0f;
 	s_default_style.TabCloseButtonMinWidthSelected   = -1.0f;
 	s_default_style.TabCloseButtonMinWidthUnselected = -1.0f;
-	s_default_style.TabRounding        = 4.0f;
+	s_default_style.TabRounding        = 8.0f;
 
 	s_default_style.WindowTitleAlign          = ImVec2(0.0f, 0.5f);
 	s_default_style.WindowBorderHoverPadding  = 4.0f;
@@ -290,6 +292,9 @@ bool UserInterface::invoke_registered_menus(const LabelKey& window_key) noexcept
 	auto it = s_gui_hooks->menus.registry.find(window_key.get_id_or_label());
 	if (it == s_gui_hooks->menus.registry.end()) { return false; }
 
+	const auto window_padding = ImGui::GetStyle().WindowPadding * 1.5f;
+	// WindowPadding - style.ItemSpacing.x * 0.5f
+
 	do {
 		// iterate over all registered menu tabs for this window
 		for (auto& [menu_key, hooks] : it->second) {
@@ -301,7 +306,11 @@ bool UserInterface::invoke_registered_menus(const LabelKey& window_key) noexcept
 				[](auto& w) noexcept { return w.expired(); }
 			), hooks.buffer.end());
 
-			if (ImGui::BeginMenu(menu_key.second.c_str())) {
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, window_padding);
+			const bool menu_opened = ImGui::BeginMenu(menu_key.second.c_str());
+			ImGui::PopStyleVar();
+
+			if (menu_opened) {
 				hooks.first_hit = !std::exchange(hooks.has_focus, true);
 				s_active_menu = &hooks;
 

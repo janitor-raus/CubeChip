@@ -13,6 +13,12 @@
 /*==================================================================*/
 
 static auto default_toggle_fullscreen_callback = [](bool& out_state) {
+	if (out_state && ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::IsAnyItemActive()
+		&& !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId)
+	) {
+		out_state = false; return;
+	}
+
 	const auto hover_flags = ImGuiHoveredFlags_NoPopupHierarchy
 		| ImGuiHoveredFlags_RootAndChildWindows
 		| ImGuiHoveredFlags_AllowWhenBlockedByActiveItem;

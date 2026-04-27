@@ -63,6 +63,8 @@ function(apply_patches LIB_NAME PATCH_BASE_DIR)
     endif()
 
     # apply all patches in order
+    list(LENGTH PATCH_FILES PATCH_COUNT)
+    set(PATCH_FAIL_COUNT 0)
     foreach(PATCH_FILE IN LISTS PATCH_FILES)
         get_filename_component(PATCH_NAME "${PATCH_FILE}" NAME)
         set(STAMP_FILE "${${LIB_NAME}_SOURCE_DIR}/.patch_applied_${PATCH_NAME}")
@@ -73,11 +75,17 @@ function(apply_patches LIB_NAME PATCH_BASE_DIR)
             RESULT_VARIABLE PATCH_RESULT
         )
         if(NOT PATCH_RESULT EQUAL 0)
-            message(FATAL_ERROR "[${LIB_NAME}] Failed to apply patch: ${PATCH_NAME}")
+            message(WARNING "[${LIB_NAME}] Failed to apply patch: ${PATCH_NAME}")
+            math(EXPR PATCH_FAIL_COUNT "${PATCH_FAIL_COUNT} + 1")
         endif()
         file(TOUCH "${STAMP_FILE}")
     endforeach()
-    message(STATUS "[${LIB_NAME}] All patches applied successfully.")
+    math(EXPR PATCH_OK_COUNT "${PATCH_COUNT} - ${PATCH_FAIL_COUNT}")
+    if(PATCH_FAIL_COUNT EQUAL 0)
+        message(STATUS "[${LIB_NAME}] All ${PATCH_COUNT} patches applied successfully.")
+    else()
+        message(WARNING "[${LIB_NAME}] ${PATCH_OK_COUNT}/${PATCH_COUNT} patches applied, ${PATCH_FAIL_COUNT} failed.")
+    endif()
 endfunction()
 
 # ==================================================================================== #

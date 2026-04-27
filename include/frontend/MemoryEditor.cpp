@@ -192,7 +192,7 @@ void MemoryEditor::render_memory_editor() {
 		internals.data_preview_address = c_max_addr;
 	}
 
-	const auto rounding = GetStyle().FrameRounding * 2.0f;
+	const auto rounding = GetStyle().FrameRounding;
 
 	bool advance_editing_cursor = false;
 	bool init_highlighting_once = true;

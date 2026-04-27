@@ -40,10 +40,10 @@ void ISystemEmu::prepare_user_interface() noexcept {
 		docker_class.ClassId = window_id;
 		docker_class.DockingAllowUnclassed = false;
 
-		//static constexpr auto docker_flags =
-		//	ImGuiDockNodeFlags_AutoHideTabBar;
+		static constexpr auto docker_flags =
+			ImGuiDockNodeFlags_AutoHideTabBar;
 
-		DockSpace(window_id, ImVec2(), 0, &docker_class);
+		DockSpace(window_id, ImVec2(), docker_flags, &docker_class);
 	};
 
 	m_frontend_hooks.emplace_back(UserInterface::register_menu(
@@ -57,7 +57,6 @@ void ISystemEmu::prepare_user_interface() noexcept {
 	m_frontend_hooks.emplace_back(UserInterface::register_menu(
 		m_workspace_host.get_window_label(), { 50, "System" },
 		[&]() noexcept {
-			Dummy(ImVec2(GetTextLineHeight() * 12, 0.0f));
 			if (MenuItem(can_system_work() ? "Pause" : "Resume",
 				"F9", false, can_system_pause()))
 			{

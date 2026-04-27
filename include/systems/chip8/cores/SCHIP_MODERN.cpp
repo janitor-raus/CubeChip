@@ -19,6 +19,8 @@ void SCHIP_MODERN::initialize_system() noexcept {
 
 	set_base_system_framerate(c_sys_refresh_rate);
 
+	m_memory_editor.set_memory_range(m_memory.data(), m_memory.size());
+
 	m_voices[VOICE::ID_0].userdata = &m_audio_timers[VOICE::ID_0];
 	m_voices[VOICE::ID_1].userdata = &m_audio_timers[VOICE::ID_1];
 	m_voices[VOICE::ID_2].userdata = &m_audio_timers[VOICE::ID_2];

@@ -86,7 +86,6 @@ void ApplicationHost::setup_gui_callables() noexcept {
 
 	static auto s_menu_system__resume_pause = UserInterface::register_menu("",
 	{50, "Toggles?"}, [&]() noexcept {
-		Dummy(ImVec2(GetTextLineHeight() * 12, 0.0f));
 		if (m_systems.empty()) {
 			MenuItem("No Active System", "", false, false);
 		} else {

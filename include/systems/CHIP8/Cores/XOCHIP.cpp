@@ -21,6 +21,8 @@ void XOCHIP::initialize_system() noexcept {
 
 	set_base_system_framerate(c_sys_refresh_rate);
 
+	m_memory_editor.set_memory_range(m_memory.data(), m_memory.size());
+
 	set_pattern_pitch(64);
 
 	m_voices[VOICE::UNIQUE].userdata = &m_audio_timers[VOICE::UNIQUE];
