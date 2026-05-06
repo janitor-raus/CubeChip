@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include <mutex>
-#include <cstdint>
+#include <atomic>
+#include <memory>
 #include <type_traits>
 
 #include "HDIS_HCIS.hpp"
@@ -17,52 +17,73 @@
 	#pragma warning(disable: 4324)
 #endif
 
+#ifdef TRIPLE_BUFFER_ENFORCE_SPSC
+	#include <mutex>
+#endif
+
 /*==================================================================*/
 
 /**
- * @brief A thread-safe, Mailbox-style Triple Buffer implementation
- *        that operates flexibly with a given fixed-size Buffer type.
+ * @brief A thread-safe, flexible, Mailbox-style triple-buffer implementation.
  *
- * TripleBuffer maintains three copies of the Buffer:
- *   - A read buffer (for consumers)
- *   - A work buffer (for producers)
- *   - A swap buffer (for atomic publishing)
+ * TripleBuffer maintains three instances of a given Buffer type:
+ *   - A reader Buffer (for consumers)
+ *   - A writer Buffer (for producers)
+ *   - A middle Buffer (for atomic swap & publish)
  *
  * The class provides single-shot access methods:
- *   - read(Fn&&) - locks the read buffer, invokes a callable with an
- *     auto argument exposing const access to the buffer and
- *     a compile-time dirty flag.
- *   - write(Fn&&) - locks the work buffer, invokes a callable with a
- *     mutable auto& argument, and publishes the buffer atomically
- *     after the callable returns.
+ *   - present(Fn&&) - accesses the reader Buffer and invokes a callable with an
+ *     'auto' argument exposing const access to the Buffer and a compile-time dirty flag.
+ *   - acquire(Fn&&) - accesses the writer Buffer, invokes a callable with a
+ *     mutable 'auto&' argument, and publishes the Buffer atomically after completion.
  *
  * Thread-safety:
- *   - Reads and writes are independently locked.
- *   - Dirty-flag propagation ensures consumers know when new data is available.
+ *   - Concurrent producer/consumer usage is safe under the intended SPSC model.
+ *   - Dirty-flag propagation allows the consumer to determine whether new data
+ *     has been published since the last 'present()' call.
+ *
+ * @note This implementation assumes the developer will respect SPSC usage patterns.
+ *       If stricter enforcement is required, define the compile-time
+ *       'TRIPLE_BUFFER_ENFORCE_SPSC' macro before including this header. This enables
+ *       mutual exclusion on each access path. Without it, misuse may only be detected
+ *       in debug builds via runtime guards.
+ *
+ * @warning Returning references or pointers into the provided Buffer via the
+ *          'present()' or 'acquire()' methods is undefined behavior.
  */
 template <class Buffer>
 class TripleBuffer {
 	struct alignas(HDIS) TripleBufferContext {
 		using AtomBuf = std::atomic<Buffer*>;
 
-		alignas(HDIS) Buffer m_work_buffer;
-		alignas(HDIS) Buffer m_read_buffer;
-		alignas(HDIS) Buffer m_swap_buffer;
+		alignas(HDIS) Buffer m_writer_buffer;
+		alignas(HDIS) Buffer m_reader_buffer;
+		alignas(HDIS) Buffer m_middle_buffer;
 
+#ifdef TRIPLE_BUFFER_ENFORCE_SPSC
 		alignas(HDIS) mutable std::mutex m_reader_lock;
-		mutable std::atomic<std::size_t> m_present_count{};
-		alignas(HDIS) mutable std::mutex m_worker_lock;
-		mutable std::atomic<std::size_t> m_acquire_count{};
+		mutable std::atomic_size_t m_present_count{};
+		alignas(HDIS) mutable std::mutex m_writer_lock;
+		mutable std::atomic_size_t m_acquire_count{};
+#else
+		alignas(HDIS)
+	#if !defined(NDEBUG) || defined(DEBUG)
+		mutable std::atomic_flag m_reader_used{};
+		mutable std::atomic_flag m_writer_used{};
+	#endif
+		mutable std::atomic_size_t m_present_count{};
+		mutable std::atomic_size_t m_acquire_count{};
+#endif
 
-		alignas(HDIS) mutable Buffer* m_work_ptr = &m_work_buffer;
-		alignas(HDIS) mutable AtomBuf m_read_ptr = &m_read_buffer;
-		alignas(HDIS) mutable AtomBuf m_swap_ptr = &m_swap_buffer;
+		alignas(HDIS) mutable Buffer* m_work_ptr = &m_writer_buffer;
+		alignas(HDIS) mutable AtomBuf m_read_ptr = &m_reader_buffer;
+		alignas(HDIS) mutable AtomBuf m_swap_ptr = &m_middle_buffer;
 
 		template <typename... Args>
 		TripleBufferContext(Args&&... args) noexcept(std::is_nothrow_constructible_v<Buffer, Args...>)
-			: m_work_buffer(std::forward<Args>(args)...)
-			, m_read_buffer(std::forward<Args>(args)...)
-			, m_swap_buffer(std::forward<Args>(args)...)
+			: m_writer_buffer(std::forward<Args>(args)...)
+			, m_reader_buffer(std::forward<Args>(args)...)
+			, m_middle_buffer(std::forward<Args>(args)...)
 		{}
 	};
 
@@ -93,6 +114,7 @@ private:
 
 public:
 	template <typename... Args>
+		requires std::constructible_from<Buffer, Args...>
 	TripleBuffer(Args&&... args) noexcept(std::is_nothrow_constructible_v<Buffer, Args...>)
 		: m_context(std::make_unique<TripleBufferContext>(std::forward<Args>(args)...))
 	{}
@@ -107,30 +129,42 @@ private:
 		const Buffer& buffer;
 	};
 
+	class ActiveGuard {
+		std::atomic_flag& m_flag;
+
+	public:
+		ActiveGuard(std::atomic_flag& flag) noexcept : m_flag(flag) {
+			if (m_flag.test_and_set(std::memory_order::relaxed))
+				[[unlikely]] { std::terminate(); }
+		}
+
+		~ActiveGuard() noexcept {
+			m_flag.clear(std::memory_order::relaxed);
+		}
+	};
+
 
 public:
 	/**
-	 * @brief Provides read-only access to the read buffer in a thread-safe,
-	 *        single-shot manner.
+	 * @brief Provides read-only Buffer access to a reader in a thread-safe, single-shot manner.
 	 *
 	 * The callable is invoked with a single 'BufferView<DIRTY>' argument,
-	 * and exposes the following access methods:
+	 * and exposes the following access members:
 	 *
 	 *   - dirty - static bool, marks whether buffer was updated (dirty) since last read.
 	 *   - buffer - const reference to the underlying buffer object.
 	 *
-	 * Callers are recommended to accept the argument as auto to handle both
+	 * Callables are recommended to accept the argument as 'auto' to handle both
 	 * 'BufferView<true>' and 'BufferView<false>' cases transparently.
 	 *
 	 * @tparam Fn  A callable that can be invoked with 'auto' and may return
 	 *             any type (including 'void').
 	 *
-	 * @param function  The callable to execute under the read lock.
+	 * @param function  The callable to invoke.
 	 *
-	 * @return decltype(auto) - forwards whatever the callable returns.
+	 * @return decltype(auto) - forwards anything the callable returns.
 	 *
-	 * Thread-safety: The read buffer is locked for the entire duration
-	 *                of the callable.
+	 * Thread-safety: See notes from the class description.
 	 */
 	template <typename Fn> requires (
 		std::is_invocable_v<Fn, BufferView<true>> &&
@@ -140,8 +174,12 @@ public:
 		std::is_nothrow_invocable_v<Fn, BufferView<true>> &&
 		std::is_nothrow_invocable_v<Fn, BufferView<false>>
 	) {
+#ifdef TRIPLE_BUFFER_ENFORCE_SPSC
 		std::scoped_lock lock(m_context->m_reader_lock);
-		m_context->m_present_count.fetch_add(1, std::memory_order::acq_rel);
+#elif !defined(NDEBUG) || defined(DEBUG)
+		ActiveGuard guard(m_context->m_reader_used);
+#endif
+		m_context->m_present_count.fetch_add(1, std::memory_order::relaxed);
 
 		if (get_dirty(m_context->m_swap_ptr.load(std::memory_order::acquire))) {
 			m_context->m_read_ptr.store(sub_dirty(m_context->m_swap_ptr.exchange(
@@ -156,32 +194,33 @@ public:
 	}
 
 	/**
-	 * @brief Provides write access to the work buffer in a thread-safe,
-	 *        single-shot manner.
+	 * @brief Provides Buffer access to a writer in a thread-safe, single-shot manner.
 	 *
-	 * The callable is invoked with a single 'Buffer&' argument pointing to the
-	 * writable work buffer. The callable may freely modify the contents of this
-	 * buffer. Once it completes, the buffer is safely published as the new swap
-	 * target.
+	 * The callable is invoked with a single 'Buffer&' argument. The callable may
+	 * freely modify the contents of this buffer and once completes, the buffer is
+	 * safely published for consumption.
 	 *
-	 * Callers are recommended to accept the argument explicitly as 'auto&'.
+	 * Callables are recommended to accept the argument explicitly as 'auto&'.
 	 *
 	 * @tparam Fn  A callable that can be invoked with 'auto&' and may return
 	 *             any type (including 'void').
 	 *
-	 * @param function  The callable to execute under the work lock.
+	 * @param function  The callable to invoke.
 	 *
-	 * @return decltype(auto) - forwards whatever the callable returns.
+	 * @return decltype(auto) - forwards anything the callable returns.
 	 *
-	 * Thread-safety: The work buffer is locked for the entire duration of the
-	 *                callable and is published atomically afterward.
+	 * Thread-safety: See notes from the class description.
 	 */
 	template <typename Fn> requires (std::is_invocable_v<Fn, Buffer&>)
 	decltype(auto) acquire(Fn&& function) noexcept(
 		std::is_nothrow_invocable_v<Fn, Buffer&>
 	) {
-		std::scoped_lock lock(m_context->m_worker_lock);
-		m_context->m_acquire_count.fetch_add(1, std::memory_order::acq_rel);
+#ifdef TRIPLE_BUFFER_ENFORCE_SPSC
+		std::scoped_lock lock(m_context->m_writer_lock);
+#elif !defined(NDEBUG) || defined(DEBUG)
+		ActiveGuard guard(m_context->m_writer_used);
+#endif
+		m_context->m_acquire_count.fetch_add(1, std::memory_order::relaxed);
 
 		if constexpr (std::is_void_v<std::invoke_result_t<Fn, Buffer&>>) {
 			std::forward<Fn>(function)(*m_context->m_work_ptr);
