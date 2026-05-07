@@ -29,11 +29,11 @@ void MemoryEditor::recalculate_all_sizes() {
 	// needed to represent the full memory range we are iterating over.
 	sizes.address_digit_count = std::max(auto_address_digits, settings.address_digit_count);
 
-	sizes.glyph_width = CalcTextSize("F").x + 1.0f;// We assume the font is mono-space
-	sizes.hex_cell_width    = std::floor(sizes.glyph_width * 2.5f);  // "FF " we include trailing space in the width to easily catch clicks everywhere
+	sizes.glyph_width       = CalcTextSize("F").x + 1.0f; // We assume the font is mono-space
+	sizes.hex_cell_width    = std::floor(sizes.glyph_width * 2.5f); // "FF " we include trailing space in the width to easily catch clicks everywhere
 	sizes.col_group_spacing = std::floor(sizes.hex_cell_width * 0.25f); // Every column_group_size columns we add a bit of extra spacing
 
-	sizes.hex_offset_min = (sizes.address_digit_count + 2) * sizes.glyph_width;
+	sizes.hex_offset_min = (sizes.address_digit_count + 2) * sizes.glyph_width + sizes.glyph_width * 0.5f;
 	sizes.hex_offset_max = sizes.hex_offset_min + (sizes.hex_cell_width * settings.column_count);
 
 	sizes.ascii_offset_min = sizes.ascii_offset_max = sizes.hex_offset_max;
@@ -271,6 +271,7 @@ void MemoryEditor::render_memory_editor() {
 			);
 
 			auto address = std::size_t(line_i) * settings.column_count;
+			SetCursorPosX(GetCursorPosX() + sizes.glyph_width * 0.5f);
 			Text(format_data, sizes.address_digit_count, internals.base_display_address + address);
 
 			if (init_highlighting_once) {
