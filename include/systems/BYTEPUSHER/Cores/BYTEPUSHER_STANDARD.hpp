@@ -67,7 +67,7 @@ private:
 		return read_data<ByteSpan::TRIPLE>(2);
 	}
 
-	void instruction_loop() noexcept override;
+	void handle_cycle_loop() noexcept override final;
 	void push_audio_data() noexcept override;
 	void push_video_data() noexcept override;
 

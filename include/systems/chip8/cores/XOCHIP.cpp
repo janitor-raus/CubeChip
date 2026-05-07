@@ -19,7 +19,7 @@ void XOCHIP::initialize_system() noexcept {
 	copy_file_image_to(m_memory, c_game_load_pos);
 	copy_font_data_to(m_memory, 80);
 
-	set_base_system_framerate(c_sys_refresh_rate);
+	m_base_system_framerate = c_sys_refresh_rate;
 
 	m_memory_editor.set_memory_range(m_memory.data(), m_memory.size());
 
@@ -29,7 +29,7 @@ void XOCHIP::initialize_system() noexcept {
 	m_voices[VOICE::BUZZER].userdata = &m_audio_timers[VOICE::BUZZER];
 
 	m_current_pc = c_sys_boot_pos;
-	m_target_cpf = c_sys_speed_lo;
+	m_standard_cpf = c_sys_speed_lo;
 	m_bit_colors = s_bit_colors;
 
 	auto meta = m_display_device.edit_metadata();
@@ -40,12 +40,12 @@ void XOCHIP::initialize_system() noexcept {
 	meta->enabled = true;
 }
 
-void XOCHIP::handle_cycle_loop() noexcept
-	{ LOOP_DISPATCH(instruction_loop); }
-
-template <typename Lambda>
-void XOCHIP::instruction_loop(Lambda&& condition) noexcept {
-	for (m_cycle_count = 0; condition(); ++m_cycle_count) {
+void XOCHIP::instruction_loop() noexcept {
+	const auto target_cpf = has_cached_system_state(EmuState::BENCH)
+		&& m_debugger_cpf ? m_debugger_cpf : m_standard_cpf;
+	for (m_cycle_count = 0; m_interrupt == Interrupt::CLEAR
+		&& m_cycle_count < target_cpf; ++m_cycle_count)
+	{
 		const auto HI = m_memory[m_current_pc++];
 		const auto LO = m_memory[m_current_pc++];
 
@@ -303,7 +303,7 @@ void XOCHIP::push_video_data() noexcept {
 void XOCHIP::set_pattern_pitch(s32 pitch) noexcept {
 	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
 		m_voices[VOICE::UNIQUE].set_step(std::bit_cast<f32>(
-			c_pitch_frequency_lut[pitch]) / stream->get_freq() * get_framerate_multiplier());
+			c_pitch_frequency_lut[pitch]) / stream->get_freq() * m_framerate_multiplier);
 	}
 }
 
@@ -371,7 +371,7 @@ void XOCHIP::scroll_display_rt() noexcept {
 		if (m_plane_mask & P3M) { m_display_map[P3].fill(); }
 	}
 	void XOCHIP::instruction_00EE() noexcept {
-		m_current_pc = m_stack_bank[--m_stack_head & 0xF];
+		m_current_pc = m_stack.pop();
 	}
 	void XOCHIP::instruction_00FB() noexcept {
 		scroll_display_rt();
@@ -416,7 +416,7 @@ void XOCHIP::scroll_display_rt() noexcept {
 	#pragma region 2 instruction branch
 
 	void XOCHIP::instruction_2NNN(u32 NNN) noexcept {
-		m_stack_bank[m_stack_head++ & 0xF] = m_current_pc;
+		m_stack.push(m_current_pc);
 		jump_program_to(NNN);
 	}
 

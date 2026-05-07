@@ -60,6 +60,22 @@ Vec4::operator ImVec4() const noexcept {
 }
 
 namespace ImGui {
+	bool DragUint(const char* label, unsigned* v, float v_speed, unsigned v_min, unsigned v_max, const char* format, int flags) {
+		return DragScalar(label, ImGuiDataType_U32, v, v_speed, &v_min, &v_max, format, ImGuiSliderFlags(flags));
+	}
+
+	bool DragUint2(const char* label, unsigned v[2], float v_speed, unsigned v_min, unsigned v_max, const char* format, int flags) {
+		return DragScalarN(label, ImGuiDataType_U32, v, 2, v_speed, &v_min, &v_max, format, ImGuiSliderFlags(flags));
+	}
+
+	bool DragUint3(const char* label, unsigned v[3], float v_speed, unsigned v_min, unsigned v_max, const char* format, int flags) {
+		return DragScalarN(label, ImGuiDataType_U32, v, 3, v_speed, &v_min, &v_max, format, ImGuiSliderFlags(flags));
+	}
+
+	bool DragUint4(const char* label, unsigned v[4], float v_speed, unsigned v_min, unsigned v_max, const char* format, int flags) {
+		return DragScalarN(label, ImGuiDataType_U32, v, 4, v_speed, &v_min, &v_max, format, ImGuiSliderFlags(flags));
+	}
+
 	void TextUnformatted(const char* text, unsigned color, const char* text_end) {
 		PushStyleColor(ImGuiCol_Text, color);
 		TextUnformatted(text, text_end);
@@ -335,8 +351,6 @@ namespace ImGui {
 		const std::function<void()>& background_children,
 		bool selected
 	) {
-		const auto& style = GetStyle();
-
 		const bool pressed = InvisibleButton(id, size);
 		const bool hovered = IsItemHovered();
 		const bool active  = IsItemActive();
@@ -344,6 +358,8 @@ namespace ImGui {
 
 		const auto button_TL = GetItemRectMin();
 		const auto button_BR = GetItemRectMax();
+
+		const auto& style = GetStyle();
 
 		RenderFrame(button_TL, button_BR, GetColorU32(
 			active   ? ImGuiCol_ButtonActive  :
@@ -353,14 +369,14 @@ namespace ImGui {
 
 		RenderNavCursor(ImRect(button_TL, button_BR), item_id);
 
-		const auto backup_cursor = GetCursorScreenPos();
-
 		SetCursorScreenPos(button_TL);
 
 		PushClipRect(button_TL, button_BR, true);
 		BeginGroup();
 		PushItemFlag(ImGuiItemFlags_Disabled, true);
-		background_children();
+		if (background_children) {
+			background_children();
+		}
 		PopItemFlag();
 		EndGroup();
 		PopClipRect();
@@ -372,15 +388,14 @@ namespace ImGui {
 
 		PushClipRect(content_TL, content_BR, true);
 		BeginGroup();
-		foreground_children();
+		if (foreground_children) {
+			foreground_children();
+		}
 		EndGroup();
 		PopClipRect();
 
-		SetCursorScreenPos(backup_cursor);
-
-		// reassure imgui our layout is correct
-		// since we restored the cursor position
-		ItemSize(ImVec2());
+		SetCursorScreenPos(button_TL);
+		ItemSize(size);
 
 		return pressed;
 	}

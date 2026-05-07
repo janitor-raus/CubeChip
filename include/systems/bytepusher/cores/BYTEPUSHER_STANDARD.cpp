@@ -17,12 +17,9 @@ REGISTER_SYSTEM_CORE(BYTEPUSHER_STANDARD)
 void BYTEPUSHER_STANDARD::initialize_system() noexcept {
 	copy_file_image_to(m_memory, 0);
 
-	set_base_system_framerate(c_sys_refresh_rate);
+	m_base_system_framerate = c_sys_refresh_rate;
 
 	m_memory_editor.set_memory_range(m_memory.data(), m_memory.size());
-
-	m_audio_device.add_audio_stream(STREAM::MAIN, u32(get_real_system_framerate() * 256));
-	m_audio_device.resume_streams();
 
 	auto meta = m_display_device.edit_metadata();
 
@@ -34,9 +31,9 @@ void BYTEPUSHER_STANDARD::initialize_system() noexcept {
 
 /*==================================================================*/
 
-void BYTEPUSHER_STANDARD::instruction_loop() noexcept {
+void BYTEPUSHER_STANDARD::handle_cycle_loop() noexcept {
 	const auto input_states = get_key_states();
-	      auto prog_pointer = get_program_counter();
+	/***/ auto prog_pointer = get_program_counter();
 
 	::assign_cast(m_memory[0], input_states >> 0x8);
 	::assign_cast(m_memory[1], input_states & 0xFF);
@@ -50,11 +47,12 @@ void BYTEPUSHER_STANDARD::instruction_loop() noexcept {
 
 void BYTEPUSHER_STANDARD::push_audio_data() noexcept {
 	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
-		auto buffer = ::allocate_n<f32>(stream->get_next_buffer_size(get_real_system_framerate()))
+		auto buffer = ::allocate_n<f32>
+			(stream->get_next_buffer_size(get_real_system_framerate()))
 			.as_value().release_as_container();
 
-		if (!has_system_state(EmuState::IS_PAUSED)) {
-			static constexpr auto master_gain = 0.22f;
+		if (!has_cached_system_state(EmuState::ANY_PAUSE)) {
+			static constexpr auto master_gain = 0.25f;
 
 			const auto samples = std::span(m_memory.data()
 				+ (read_data<ByteSpan::DOUBLE>(6) << 8), 256);

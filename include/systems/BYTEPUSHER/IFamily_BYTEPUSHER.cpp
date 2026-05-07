@@ -22,6 +22,11 @@ IFamily_BYTEPUSHER::IFamily_BYTEPUSHER(std::size_t W, std::size_t H) noexcept
 	prepare_user_interface();
 	load_preset_binds();
 
+	// XXX - placeholder logic -- must refactor audio code to allow runtime
+	//       adjustment of input frequency to match system framerate changes
+	m_audio_device.add_audio_stream(STREAM::MAIN, u32(60 * 256));
+	m_audio_device.resume_streams();
+
 	if (calc_file_image_sha1()) {
 		if (auto* path = add_system_path("savestate", family_name)) {
 			s_savestate_path = (fs::Path(*path) / m_file_sha1_hash).string();
@@ -36,12 +41,12 @@ IFamily_BYTEPUSHER::IFamily_BYTEPUSHER(std::size_t W, std::size_t H) noexcept
 /*==================================================================*/
 
 void IFamily_BYTEPUSHER::main_system_loop() {
-	if (has_system_state(EmuState::IS_PAUSED)) {
+	if (has_cached_system_state(EmuState::ANY_PAUSE)) {
 		push_audio_data();
 		return;
 	}
 
-	instruction_loop();
+	handle_cycle_loop();
 	push_audio_data();
 	push_video_data();
 	create_statistics_data();

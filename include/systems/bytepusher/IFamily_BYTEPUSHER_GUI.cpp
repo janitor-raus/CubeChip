@@ -13,6 +13,8 @@
 /*==================================================================*/
 
 void IFamily_BYTEPUSHER::prepare_user_interface() noexcept {
+	using namespace ImGui;
+
 	m_display_window.set_window_focused_output(&m_is_viewport_focused);
 	m_display_window.set_parent(&m_workspace_host);
 	m_display_window.allow_fullscreen(true);
@@ -24,9 +26,9 @@ void IFamily_BYTEPUSHER::prepare_user_interface() noexcept {
 		window_class.ClassId = window_id;
 		window_class.DockingAllowUnclassed = false;
 
-		ImGui::SetNextWindowClass(&window_class);
-		ImGui::DockNextWindowTo(window_class.ClassId, true);
-		ImGui::SetNextWindowMinClientSize(ImVec2(480.0f, 360.0f)
+		SetNextWindowClass(&window_class);
+		DockNextWindowTo(window_class.ClassId, true);
+		SetNextWindowMinClientSize(ImVec2(480.0f, 360.0f)
 			* UserInterface::get_ui_total_scaling());
 
 		flags |= ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollWithMouse
@@ -39,7 +41,7 @@ void IFamily_BYTEPUSHER::prepare_user_interface() noexcept {
 	};
 
 	m_display_device.set_osd_callable([&]() noexcept {
-		if (!has_system_state(EmuState::STATS)) { return; }
+		if (!has_cached_system_state(EmuState::STATS)) { return; }
 		osd::simple_text_overlay(copy_statistics_string());
 	});
 
@@ -55,6 +57,32 @@ void IFamily_BYTEPUSHER::prepare_user_interface() noexcept {
 			m_memory_editor.follow_address(get_program_counter(), 3);
 		}
 	};
+
+	m_frontend_hooks.emplace_back(UserInterface::register_menu(
+	m_workspace_host.get_window_label(), { 60, "System" }, [&]() noexcept {
+		if (BeginMenu("Emulation")) {
+			const auto widget_width = CalcTextSize("F").x * 28.0f;
+			const bool is_benching = has_cached_system_state(EmuState::BENCH);
+
+			BeginDisabled(has_system_state(EmuState::ANY_STOP));
+
+			SeparatorText("Framerate");
+
+			SetNextItemWidth(widget_width);
+			DragFloat("##framerate_multiplier", &*m_framerate_multiplier, 0.01f,
+				m_framerate_multiplier.min, m_framerate_multiplier.max,
+				"Multiplier: %4.1fx", ImGuiSliderFlags_AlwaysClamp);
+
+			SeparatorText("CPU Control");
+
+			if (MenuItem("Enable Delimiter", "F10", is_benching, false)) {
+				xor_system_state(EmuState::BENCH);
+			}
+
+			EndDisabled();
+			EndMenu();
+		}
+	}));
 }
 
 #endif

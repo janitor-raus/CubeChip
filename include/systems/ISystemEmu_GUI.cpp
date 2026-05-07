@@ -65,6 +65,22 @@ void ISystemEmu::prepare_user_interface() noexcept {
 		}
 	));
 
+	m_frontend_hooks.emplace_back(UserInterface::register_menu(
+		m_workspace_host.get_window_label(), { 59, "System" },
+		[&]() noexcept {
+			//if (BeginMenu("OSD Stats", has_cached_system_state(EmuState::STATS))) {
+			//	// XXX - later we should have better customization options for OSD
+			//}
+
+			if (MenuItem("Show OSD Stats", "F11",
+				has_cached_system_state(EmuState::STATS),
+				!has_cached_system_state(EmuState::ANY_STOP)))
+			{
+				xor_system_state(EmuState::STATS);
+			}
+		}
+	));
+
 	m_memview_window.set_window_visible_output(&m_memory_editor.settings.window_visible_out);
 	m_memview_window.set_window_focused_output(&m_is_viewport_focused);
 

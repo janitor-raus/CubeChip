@@ -240,10 +240,7 @@ public:
 
 private:
 	void initialize_system() noexcept override;
-	void handle_cycle_loop() noexcept override;
-
-	template <typename Lambda>
-	void instruction_loop(Lambda&& condition) noexcept;
+	void instruction_loop() noexcept override final;
 
 	void push_audio_data() noexcept override;
 	void push_video_data() noexcept override;

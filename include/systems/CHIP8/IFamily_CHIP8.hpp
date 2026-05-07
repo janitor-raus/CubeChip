@@ -81,8 +81,6 @@ protected:
 
 /*==================================================================*/
 
-	std::vector<SimpleKeyMapping> m_custom_binds;
-
 private:
 	u32  m_tick_last{};
 	u32  m_tick_span{};
@@ -116,6 +114,9 @@ protected:
 	WindowHost    m_display_window;
 	DisplayDevice m_display_device;
 
+private:
+	ez::EMA m_mips_ema;
+
 /*==================================================================*/
 
 protected:
@@ -132,11 +133,10 @@ protected:
 
 /*==================================================================*/
 
-	struct alignas(int) PlatformTraits final {
+	struct PlatformTraits final {
 		bool use_hires_screen{};
 		bool use_manual_vsync{};
 		bool use_pixel_trails{};
-		bool : 8;
 	} Trait;
 
 	bool use_hires_screen()     const noexcept { return Trait.use_hires_screen; }
@@ -148,18 +148,16 @@ protected:
 
 /*==================================================================*/
 
-	enum class Interrupt {
+	enum class Interrupt : u8 {
 		CLEAR, // no interrupt
-		FRAME, // single-frame
-		SOUND, // wait for sound and stop
-		DELAY, // wait for delay and proceed
-		INPUT, // wait for input and proceed
-		WAIT1, // intermediate wait state towards FINAL
-		FINAL, // end state, all is well
-		ERROR, // end state, error occured
-	};
-
-	bool has_interrupt() const noexcept { return m_interrupt != Interrupt::CLEAR; }
+		FRAME, // single-frame pause, then CLEAR
+		SOUND, // wait for sound timer to decay, then WAIT1
+		DELAY, // wait for delay timer to decay, then CLEAR
+		INPUT, // wait for key press, then CLEAR
+		WAIT1, // single-frame pause, then FINAL
+		FINAL, // terminal state, emulator exited normally
+		ERROR, // terminal state, emulator exited abnormally
+	} m_interrupt{};
 
 	enum class Resolution {
 		ERROR,
@@ -172,33 +170,40 @@ protected:
 
 /*==================================================================*/
 
-	u32 m_target_cpf{};
+	u32 m_standard_cpf{};
+	u32 m_debugger_cpf{};
+
 	u32 m_cycle_count{};
-	Interrupt m_interrupt{};
 
 	u32 m_current_pc{};
 	u32 m_register_I{};
 
 	u32 m_delay_timer{};
 
-	u32 m_stack_head{};
-
-	static inline
+	static inline // XXX - conflict with multi-instance
 	std::array<u8, 16>
 		s_permaregs_V{};
+
+	class Stack {
+		u32 m_head{};
+		std::array<u32, 16> m_data{};
+
+	public:
+		constexpr u32  head()          const noexcept { return m_head & 0xF; }
+		constexpr u32  peek(u32 index) const noexcept { return m_data[index & 0xF]; }
+
+		constexpr void push(u32 value) noexcept { m_data[m_head++ & 0xF] = value; }
+		constexpr u32  pop()           noexcept { return m_data[--m_head & 0xF]; }
+	} m_stack;
 
 	std::array<u8, 16>
 		m_registers_V{};
 
-	//alignas(sizeof(u32) * 16)
-	std::array<u32, 16>
-		m_stack_bank{};
-
 /*==================================================================*/
 
 	void instruction_error(u32 HI, u32 LO) noexcept;
-	void trigger_interrupt(Interrupt type) noexcept;
-	void trigger_interrupt(Interrupt type, bool cond) noexcept;
+	void trigger_interrupt(Interrupt type, bool cond = true) noexcept
+		{ if (cond) [[unlikely]] { m_interrupt = type; } }
 
 private:
 	void set_file_permaregs(u32 X) noexcept;
@@ -214,7 +219,7 @@ protected:
 	/*   */ void handle_post_work_interrupts() noexcept;
 
 	/*   */ void handle_timer_ticks() noexcept;
-	virtual void handle_cycle_loop() noexcept = 0;
+	virtual void instruction_loop()   noexcept = 0;
 
 	virtual void skip_instruction() noexcept;
 	/*   */ void jump_program_to(u32 next) noexcept;
@@ -222,13 +227,7 @@ protected:
 	virtual void push_audio_data() = 0;
 	virtual void push_video_data() = 0;
 
-#define LOOP_DISPATCH(LOOP_FUNCTION)					\
-	if (has_system_state(EmuState::BENCH)) [[likely]] {	\
-		set_frame_stop_flag(has_interrupt());			\
-		LOOP_FUNCTION([&]() noexcept { return !get_frame_stop_flag(); }); \
-	} else {											\
-		LOOP_FUNCTION([&]() noexcept { return !has_interrupt() && m_cycle_count < m_target_cpf; }); \
-	}
+	void handle_cycle_loop() noexcept;
 
 protected:
 	IFamily_CHIP8(std::size_t W, std::size_t H) noexcept;

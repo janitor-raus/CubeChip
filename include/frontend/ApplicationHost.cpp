@@ -49,6 +49,8 @@ void ApplicationHost::set_open_file_dialog_result(std::string_view file) noexcep
 
 /*==================================================================*/
 
+static bool s_application_minimized{};
+
 ApplicationHost::ApplicationHost() noexcept {
 	BVS->set_window_title(c_app_name);
 	CoreRegistry::load_game_database();
@@ -222,11 +224,11 @@ int ApplicationHost::handle_client_events(void* event) noexcept {
 				break;
 
 			case SDL_EVENT_WINDOW_MINIMIZED:
-				m_application_minimized = true;
+				s_application_minimized = true;
 				break;
 
 			case SDL_EVENT_WINDOW_RESTORED:
-				m_application_minimized = false;
+				s_application_minimized = false;
 				break;
 		}
 	} else {
@@ -244,9 +246,17 @@ int ApplicationHost::handle_client_events(void* event) noexcept {
 int ApplicationHost::process_client_frame() {
 	handle_main_hotkeys();
 
+	static auto toggle_system_runtime = [](SystemInstance& system, bool state) noexcept {
+		if (state) {
+			if (system) { system->add_system_state(EmuState::HIDDEN); }
+		} else {
+			if (system) { system->sub_system_state(EmuState::HIDDEN); }
+		}
+	};
+
 	for (auto& [id, system] : m_systems) {
-		set_system_hidden_status(system, id == m_focus_mru.front()
-			? m_application_minimized : true);
+		toggle_system_runtime(system, id == m_focus_mru.front()
+			? s_application_minimized : true);
 	}
 
 	const auto dialog_result = ::get_open_file_dialog_result();
@@ -299,36 +309,10 @@ void ApplicationHost::handle_main_hotkeys() noexcept {
 			}
 		}
 		if (s_input.is_pressed(KEY(F11))) {
-			system.statistics = !system.statistics;
-			toggle_system_statistics(system);
+			system->xor_system_state(EmuState::STATS);
 		}
 		if (s_input.is_pressed(KEY(F10))) {
-			system.delimiters = !system.delimiters;
-			toggle_system_delimiters(system);
+			system->xor_system_state(EmuState::BENCH);
 		}
-	}
-}
-
-void ApplicationHost::toggle_system_delimiters(SystemInstance& system) noexcept {
-	if (system.delimiters) {
-		if (system) { system->add_system_state(EmuState::BENCH); }
-	} else {
-		if (system) { system->sub_system_state(EmuState::BENCH); }
-	}
-}
-
-void ApplicationHost::toggle_system_statistics(SystemInstance& system) noexcept {
-	if (system.statistics) {
-		if (system) { system->add_system_state(EmuState::STATS); }
-	} else {
-		if (system) { system->sub_system_state(EmuState::STATS); }
-	}
-}
-
-void ApplicationHost::set_system_hidden_status(SystemInstance& system, bool state) noexcept {
-	if (state) {
-		if (system) { system->add_system_state(EmuState::HIDDEN); }
-	} else {
-		if (system) { system->sub_system_state(EmuState::HIDDEN); }
 	}
 }

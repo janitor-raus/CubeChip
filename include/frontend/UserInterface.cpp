@@ -132,6 +132,8 @@ static void setup_default_theme() noexcept {
 	s_default_style.DockingNodeHasCloseButton = false;
 	s_default_style.DockingSeparatorSize      = 3.0f;
 
+	s_default_style.DisplaySafeAreaPadding = ImVec2(0.0f, 0.0f);
+
 	auto* colors = s_default_style.Colors;
 	colors[ImGuiCol_Text]                   = ImVec4(0.95f, 0.95f, 0.95f, 1.00f);
 	colors[ImGuiCol_TextDisabled]           = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);

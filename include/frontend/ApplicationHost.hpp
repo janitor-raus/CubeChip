@@ -124,9 +124,6 @@ private:
 	public:
 		SystemCore core;
 
-		bool delimiters{};
-		bool statistics{};
-
 		/***/ auto* operator->()       noexcept { return core.get(); }
 		const auto* operator->() const noexcept { return core.get(); }
 
@@ -145,12 +142,6 @@ private:
 
 	void unload_system_instance(SystemID system_id = 0) noexcept;
 	void insert_system_instance(ISystemEmu* system) noexcept;
-
-	void toggle_system_delimiters(SystemInstance& system) noexcept;
-	void toggle_system_statistics(SystemInstance& system) noexcept;
-
-	bool m_application_minimized{};
-	void set_system_hidden_status(SystemInstance& system, bool state) noexcept;
 
 /*==================================================================*/
 

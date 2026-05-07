@@ -17,7 +17,7 @@ void CHIP8_MODERN::initialize_system() noexcept {
 	copy_file_image_to(m_memory, c_game_load_pos);
 	copy_font_data_to(m_memory, 80);
 
-	set_base_system_framerate(c_sys_refresh_rate);
+	m_base_system_framerate = c_sys_refresh_rate;
 
 	m_memory_editor.set_memory_range(m_memory.data(), m_memory.size());
 
@@ -27,7 +27,6 @@ void CHIP8_MODERN::initialize_system() noexcept {
 	m_voices[VOICE::ID_3].userdata = &m_audio_timers[VOICE::ID_3];
 
 	m_current_pc = c_sys_boot_pos;
-	m_target_cpf = Quirk.await_vblank ? c_sys_speed_hi : c_sys_speed_lo;
 
 	auto meta = m_display_device.edit_metadata();
 
@@ -37,12 +36,13 @@ void CHIP8_MODERN::initialize_system() noexcept {
 	meta->enabled = true;
 }
 
-void CHIP8_MODERN::handle_cycle_loop() noexcept
-	{ LOOP_DISPATCH(instruction_loop); }
-
-template <typename Lambda>
-void CHIP8_MODERN::instruction_loop(Lambda&& condition) noexcept {
-	for (m_cycle_count = 0; condition(); ++m_cycle_count) {
+void CHIP8_MODERN::instruction_loop() noexcept {
+	m_standard_cpf = Quirk.await_vblank ? c_sys_speed_hi : c_sys_speed_lo;
+	const auto target_cpf = has_cached_system_state(EmuState::BENCH)
+		&& m_debugger_cpf ? m_debugger_cpf : m_standard_cpf;
+	for (m_cycle_count = 0; m_interrupt == Interrupt::CLEAR
+		&& m_cycle_count < target_cpf; ++m_cycle_count)
+	{
 		const auto HI = m_memory[m_current_pc++];
 		const auto LO = m_memory[m_current_pc++];
 
@@ -226,7 +226,7 @@ void CHIP8_MODERN::push_video_data() noexcept {
 		trigger_interrupt(Interrupt::FRAME, Quirk.await_vblank);
 	}
 	void CHIP8_MODERN::instruction_00EE() noexcept {
-		m_current_pc = m_stack_bank[--m_stack_head & 0xF];
+		m_current_pc = m_stack.pop();
 	}
 
 	#pragma endregion
@@ -246,7 +246,7 @@ void CHIP8_MODERN::push_video_data() noexcept {
 	#pragma region 2 instruction branch
 
 	void CHIP8_MODERN::instruction_2NNN(u32 NNN) noexcept {
-		m_stack_bank[m_stack_head++ & 0xF] = m_current_pc;
+		m_stack.push(m_current_pc);
 		jump_program_to(NNN);
 	}
 

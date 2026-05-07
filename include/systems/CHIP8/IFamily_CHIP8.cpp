@@ -10,6 +10,7 @@
 
 #include "BasicLogger.hpp"
 #include "SimpleFileIO.hpp"
+#include "SimpleTimer.hpp"
 
 /*==================================================================*/
 
@@ -106,9 +107,6 @@ bool IFamily_CHIP8::is_key_held_P2(u32 key_index) const noexcept {
 void IFamily_CHIP8::handle_pre_work_interrupts() noexcept {
 	switch (m_interrupt)
 	{
-		case Interrupt::CLEAR:
-			return;
-
 		case Interrupt::FRAME:
 			m_interrupt = Interrupt::CLEAR;
 			return;
@@ -117,7 +115,7 @@ void IFamily_CHIP8::handle_pre_work_interrupts() noexcept {
 			for (auto& timer : m_audio_timers)
 				{ if (timer.get()) { return; } }
 			m_interrupt = Interrupt::WAIT1;
-			m_target_cpf = 0;
+			m_standard_cpf = 0;
 			return;
 
 		case Interrupt::DELAY:
@@ -125,6 +123,7 @@ void IFamily_CHIP8::handle_pre_work_interrupts() noexcept {
 			m_interrupt = Interrupt::CLEAR;
 			return;
 
+		case Interrupt::CLEAR:
 		default:
 			return;
 	}
@@ -146,12 +145,12 @@ void IFamily_CHIP8::handle_post_work_interrupts() noexcept {
 
 		case Interrupt::ERROR:
 			add_system_state(EmuState::FATAL);
-			m_target_cpf = 0;
+			m_standard_cpf = 0;
 			return;
 
 		case Interrupt::FINAL:
 			add_system_state(EmuState::HALTED);
-			m_target_cpf = 0;
+			m_standard_cpf = 0;
 			return;
 
 		default:
@@ -177,10 +176,33 @@ void IFamily_CHIP8::jump_program_to(u32 next) noexcept {
 		{ trigger_interrupt(Interrupt::SOUND); }
 }
 
+void IFamily_CHIP8::handle_cycle_loop() noexcept {
+	if (has_cached_system_state(EmuState::BENCH)) {
+		ez::EMA frametime_ema;
+		SimpleTimer slice_timer;
+		u32 total_cycles = 0;
+
+		frametime_ema.set_alpha(get_real_system_framerate());
+		slice_timer.start();
+
+		do {
+			instruction_loop();
+			total_cycles += m_cycle_count;
+			if (m_interrupt != Interrupt::CLEAR) { break; }
+			frametime_ema.add(slice_timer.lap_millis());
+		}
+		while (frametime_ema.avg() < m_pacer.get_period_remaining());
+		m_cycle_count = total_cycles;
+		return;
+	} else {
+		instruction_loop();
+	}
+}
+
 /*==================================================================*/
 
 void IFamily_CHIP8::main_system_loop() {
-	if (has_system_state(EmuState::IS_PAUSED)) {
+	if (has_cached_system_state(EmuState::ANY_PAUSE)) {
 		push_audio_data();
 		return;
 	}
@@ -198,14 +220,14 @@ void IFamily_CHIP8::main_system_loop() {
 }
 
 void IFamily_CHIP8::append_statistics_data() noexcept {
-	if (has_system_state(EmuState::BENCH)) {
-		static thread_local ez::EMA suavemente{};
+	if (has_cached_system_state(EmuState::BENCH)) {
+		auto& mips_ema = m_mips_ema; // msvc likes this
 
-		suavemente.set_alpha(get_real_system_framerate());
-		suavemente.add(m_cycle_count * get_real_system_framerate() / 1e6f);
+		mips_ema.set_alpha(get_real_system_framerate());
+		mips_ema.add(m_cycle_count * get_real_system_framerate() / 1e6f);
 
-		format_statistics_data(" ::  MIPS:{:8.2f} (frame: {})\n",
-			suavemente.avg(), m_benched_frames);
+		format_statistics_data("> MIPS:{:8.2f} avg over {} frames\n",
+			mips_ema.avg(), m_benched_frames);
 	}
 
 	ISystemEmu::append_statistics_data();
@@ -223,8 +245,8 @@ void IFamily_CHIP8::start_voice_at(u32 voice_index, u32 duration, u32 tone) noex
 	m_audio_timers[voice_index].set(duration);
 	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
 		m_voices[voice_index].set_step((c_tonal_offset + (tone ? tone : 8 \
-			* (((m_current_pc >> 1) + m_stack_head + 1) & 0x3E) \
-		)) / stream->get_freq() * get_framerate_multiplier());
+			* (((m_current_pc >> 1) + m_stack.head() + 1) & 0x3E) \
+		)) / stream->get_freq() * m_framerate_multiplier);
 	}
 }
 
@@ -235,7 +257,7 @@ void IFamily_CHIP8::mix_audio_data(VoiceGenerators processors) noexcept {
 			(stream->get_next_buffer_size(get_real_system_framerate()))
 			.as_value().release_as_container();
 
-		if (!has_system_state(EmuState::IS_PAUSED)) {
+		if (!has_cached_system_state(EmuState::ANY_PAUSE)) {
 			for (auto& bundle : processors) { bundle.run(buffer, stream); }
 			for (auto& sample : buffer) { sample = ez::fast_tanh(sample); }
 		}
@@ -248,7 +270,7 @@ void IFamily_CHIP8::make_pulse_wave(f32* data, u32 size, Voice* voice, Stream*) 
 	if (!voice || !voice->userdata) [[unlikely]] { return; }
 	auto* timer = static_cast<AudioTimer*>(voice->userdata);
 
-	for (auto i{ 0u }; i < size; ++i) {
+	for (auto i = 0u; i < size; ++i) {
 		if (const auto gain = voice->get_level(i, *timer)) {
 			::assign_cast_add(data[i], \
 				WaveForms::pulse(voice->peek_phase(i)) * gain);
@@ -260,15 +282,6 @@ void IFamily_CHIP8::make_pulse_wave(f32* data, u32 size, Voice* voice, Stream*) 
 void IFamily_CHIP8::instruction_error(u32 HI, u32 LO) noexcept {
 	blog.info("Unknown instruction: 0x{:04X}", (HI << 8) | LO);
 	trigger_interrupt(Interrupt::ERROR);
-}
-
-void IFamily_CHIP8::trigger_interrupt(Interrupt type) noexcept {
-	set_frame_stop_flag(true);
-	m_interrupt = type;
-}
-
-void IFamily_CHIP8::trigger_interrupt(Interrupt type, bool cond) noexcept {
-	if (cond) [[unlikely]] { trigger_interrupt(type); }
 }
 
 /*==================================================================*/

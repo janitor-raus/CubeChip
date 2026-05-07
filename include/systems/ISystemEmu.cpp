@@ -43,41 +43,26 @@ void ISystemEmu::start_workers() noexcept {
 			thread_affinity::set_affinity(~0b11ull);
 			ScopedLogSource s(get_system_id());
 
-			do {
-				await_next_frame(false);
-				const auto state = EmuState(get_system_state());
-
-				m_timer.start();
-				main_system_loop();
-
-				if (!test_emu_state(state, EmuState::NOT_RUNNING)) {
-					m_elapsed_frames += 1;
-					m_benched_frames = test_emu_state(state, EmuState::BENCH)
-						? m_benched_frames + 1 : 0;
-				}
-			} while (!token.stop_requested());
-		});
-	}
-	if (!m_timing_thread.joinable()) {
-		m_timing_thread = Thread([&](StopToken token) noexcept {
-			SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
-			thread_affinity::set_affinity(0b11ull);
-
-			FrameLimiter pacer(get_real_system_framerate());
-			bool is_bench   = false;
-			bool is_paused  = false;
+			bool is_bench  = false;
+			bool is_paused = false;
 
 			do {
-				if (pacer.is_frame_ready(is_paused || !is_bench)) {
-					const auto state = EmuState(get_system_state());
-					is_bench   = test_emu_state(state, EmuState::BENCH);
-					is_paused  = test_emu_state(state, EmuState::IS_PAUSED);
+				if (m_pacer.is_frame_ready(is_paused || !is_bench)) {
+					m_cached_system_state = EmuState(get_system_state());
+					is_bench   = has_cached_system_state(EmuState::BENCH);
+					is_paused  = has_cached_system_state(EmuState::ANY_PAUSE);
 
-					if (test_emu_state(state, EmuState::IS_STOPPED)) [[unlikely]] { continue; }
-					if (!is_paused) { pacer.set_limiter_props(get_real_system_framerate()); }
+					if (has_cached_system_state(EmuState::ANY_STOP)) [[unlikely]] { continue; }
+					m_cached_real_framerate = m_base_system_framerate * m_framerate_multiplier;
+					if (!is_paused) { m_pacer.set_limiter_props(get_real_system_framerate()); }
 
-					set_frame_stop_flag(true);
-					notify_next_frame(true);
+					main_system_loop();
+
+					if (!has_cached_system_state(EmuState::NOT_RUNNING)) {
+						m_elapsed_frames += 1;
+						m_benched_frames = is_bench
+							? m_benched_frames + 1 : 0;
+					}
 				}
 			} while (!token.stop_requested());
 		});
@@ -87,12 +72,7 @@ void ISystemEmu::start_workers() noexcept {
 void ISystemEmu::stop_workers() noexcept {
 	if (m_system_thread.joinable()) {
 		m_system_thread.request_stop();
-		notify_next_frame(true);
 		m_system_thread.join();
-	}
-	if (m_timing_thread.joinable()) {
-		m_timing_thread.request_stop();
-		m_timing_thread.join();
 	}
 }
 
@@ -155,38 +135,21 @@ auto ISystemEmu::add_system_path(
 
 /*==================================================================*/
 
-f32 ISystemEmu::get_base_system_framerate() const noexcept
-	{ return m_base_system_framerate.load(mo::relaxed); }
-
-f32 ISystemEmu::get_framerate_multiplier() const noexcept
-	{ return m_framerate_multiplier.load(mo::relaxed); }
-
-f32 ISystemEmu::get_real_system_framerate() const noexcept
-	{ return get_base_system_framerate() * get_framerate_multiplier(); }
-
-void ISystemEmu::set_base_system_framerate(f32 value) noexcept
-	{ m_base_system_framerate.store(std::clamp(value, 24.0f, 100.0f), mo::relaxed); }
-
-void ISystemEmu::set_framerate_multiplier(f32 value) noexcept
-	{ m_framerate_multiplier.store(std::clamp(value, 0.10f, 10.00f), mo::relaxed); }
-
-/*==================================================================*/
-
 void ISystemEmu::append_statistics_data() noexcept {
 	const auto framerate = get_real_system_framerate();
-	const auto frametime = m_timer.get_elapsed_millis();
+	const auto frametime = m_pacer.get_elapsed_millis_since();
 	const auto framespan = 1000.0f / framerate;
 
 	format_statistics_data(
-		"Framerate:{:9.3f} fps |{:9.3f}ms\n"
-		"Frametime:{:9.3f} ms ({:>6.2f}%)\n",
+		"Target:{:9.3f} fps |{:9.3f}ms\n"
+		"Render:{:9.3f} ms ({:>6.2f}%)\n",
 		framerate, framespan, frametime,
 		frametime / framespan * 100.0f
 	);
 }
 
 void ISystemEmu::create_statistics_data() noexcept {
-	if (!has_system_state(EmuState::STATS)) { return; }
+	if (!has_cached_system_state(EmuState::STATS)) { return; }
 	append_statistics_data();
 
 	m_statistics_data.store(std::make_shared<std::string>(

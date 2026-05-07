@@ -20,7 +20,7 @@ void CHIP8X::initialize_system() noexcept {
 	copy_file_image_to(m_memory, c_game_load_pos);
 	copy_font_data_to(m_memory, 80);
 
-	set_base_system_framerate(c_sys_refresh_rate);
+	m_base_system_framerate = c_sys_refresh_rate;
 
 	m_memory_editor.set_memory_range(m_memory.data(), m_memory.size(), 0x8000);
 
@@ -28,7 +28,7 @@ void CHIP8X::initialize_system() noexcept {
 	m_voices[VOICE::BUZZER].userdata = &m_audio_timers[VOICE::BUZZER];
 
 	m_current_pc = c_sys_boot_pos;
-	m_target_cpf = c_sys_speed_hi;
+	m_standard_cpf = c_sys_speed_hi;
 
 	// test first color rect as the original hardware did
 	m_colored_map(0, 0) = c_fore_colors[2];
@@ -41,12 +41,12 @@ void CHIP8X::initialize_system() noexcept {
 	meta->enabled = true;
 }
 
-void CHIP8X::handle_cycle_loop() noexcept
-	{ LOOP_DISPATCH(instruction_loop); }
-
-template <typename Lambda>
-void CHIP8X::instruction_loop(Lambda&& condition) noexcept {
-	for (m_cycle_count = 0; condition(); ++m_cycle_count) {
+void CHIP8X::instruction_loop() noexcept {
+	const auto target_cpf = has_cached_system_state(EmuState::BENCH)
+		&& m_debugger_cpf ? m_debugger_cpf : m_standard_cpf;
+	for (m_cycle_count = 0; m_interrupt == Interrupt::CLEAR
+		&& m_cycle_count < target_cpf; ++m_cycle_count)
+	{
 		const auto HI = m_memory[m_current_pc++];
 		const auto LO = m_memory[m_current_pc++];
 
@@ -276,7 +276,7 @@ void CHIP8X::set_pulse_pitch(u32 pitch) noexcept {
 	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
 		m_voices[VOICE::UNIQUE].set_step((c_tonal_offset + (
 			(0xFF - (pitch ? pitch : 0x80)) >> 3 << 4)
-		) / stream->get_freq() * get_framerate_multiplier());
+		) / stream->get_freq() * m_framerate_multiplier);
 	}
 }
 
@@ -304,7 +304,7 @@ void CHIP8X::color_hires_zone(u32 X, u32 Y, u32 idx, u32 N) noexcept {
 		trigger_interrupt(Interrupt::FRAME);
 	}
 	void CHIP8X::instruction_00EE() noexcept {
-		m_current_pc = m_stack_bank[--m_stack_head & 0xF];
+		m_current_pc = m_stack.pop();
 	}
 	void CHIP8X::instruction_02A0() noexcept {
 		m_display_device.edit_metadata()->texture_tint
@@ -328,7 +328,7 @@ void CHIP8X::color_hires_zone(u32 X, u32 Y, u32 idx, u32 N) noexcept {
 	#pragma region 2 instruction branch
 
 	void CHIP8X::instruction_2NNN(u32 NNN) noexcept {
-		m_stack_bank[m_stack_head++ & 0xF] = m_current_pc;
+		m_stack.push(m_current_pc);
 		jump_program_to(NNN);
 	}
 

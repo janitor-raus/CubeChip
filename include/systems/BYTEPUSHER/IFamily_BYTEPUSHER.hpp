@@ -40,8 +40,6 @@ protected:
 	AudioDevice   m_audio_device;
 
 protected:
-	std::vector<SimpleKeyMapping> m_custom_binds;
-
 	u32  get_key_states() noexcept;
 	void load_preset_binds() noexcept;
 
@@ -51,7 +49,7 @@ protected:
 		m_custom_binds.assign(std::begin(binds), std::end(binds));
 	}
 
-	virtual void instruction_loop() noexcept = 0;
+	virtual void handle_cycle_loop() noexcept = 0;
 	virtual void push_audio_data() noexcept = 0;
 	virtual void push_video_data() noexcept = 0;
 

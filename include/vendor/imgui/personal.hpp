@@ -43,6 +43,11 @@ namespace ImGui {
 	ImVec2 min  (const ImVec2& value, const ImVec2& min) noexcept;
 	ImVec2 max  (const ImVec2& value, const ImVec2& max) noexcept;
 
+	bool DragUint (const char* label, unsigned* v,   float v_speed, unsigned v_min, unsigned v_max, const char* format, int flags);
+	bool DragUint2(const char* label, unsigned v[2], float v_speed, unsigned v_min, unsigned v_max, const char* format, int flags);
+	bool DragUint3(const char* label, unsigned v[3], float v_speed, unsigned v_min, unsigned v_max, const char* format, int flags);
+	bool DragUint4(const char* label, unsigned v[4], float v_speed, unsigned v_min, unsigned v_max, const char* format, int flags);
+
 	void TextUnformatted(const char* text, unsigned color, const char* text_end = nullptr);
 
 	void AddCursorPos(const ImVec2& delta);

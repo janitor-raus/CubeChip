@@ -17,7 +17,7 @@ void MEGACHIP::initialize_system() noexcept {
 	copy_file_image_to(m_memory, c_game_load_pos);
 	copy_font_data_to(m_memory, 180);
 
-	set_base_system_framerate(c_sys_refresh_rate);
+	m_base_system_framerate = c_sys_refresh_rate;
 
 	m_memory_editor.set_memory_range(m_memory.data(), m_memory.size());
 
@@ -35,12 +35,12 @@ void MEGACHIP::initialize_system() noexcept {
 	meta->enabled = true;
 }
 
-void MEGACHIP::handle_cycle_loop() noexcept
-	{ LOOP_DISPATCH(instruction_loop); }
-
-template <typename Lambda>
-void MEGACHIP::instruction_loop(Lambda&& condition) noexcept {
-	for (m_cycle_count = 0; condition(); ++m_cycle_count) {
+void MEGACHIP::instruction_loop() noexcept {
+	const auto target_cpf = has_cached_system_state(EmuState::BENCH)
+		&& m_debugger_cpf ? m_debugger_cpf : m_standard_cpf;
+	for (m_cycle_count = 0; m_interrupt == Interrupt::CLEAR
+		&& m_cycle_count < target_cpf; ++m_cycle_count)
+	{
 		const auto HI = m_memory[m_current_pc++];
 		const auto LO = m_memory[m_current_pc++];
 
@@ -342,7 +342,7 @@ void MEGACHIP::set_display_properties(Resolution mode) noexcept {
 		meta->texture_tint = RGBA::Black;
 
 		Quirk.await_vblank = false;
-		m_target_cpf = c_sys_speed_lo * 100;
+		m_standard_cpf = c_sys_speed_lo * 100;
 	}
 	else {
 		meta->set_viewport(c_sys_screen_W, c_sys_screen_W/2);
@@ -351,11 +351,11 @@ void MEGACHIP::set_display_properties(Resolution mode) noexcept {
 		if (mode == Resolution::LO) {
 			use_hires_screen(false);
 			Quirk.await_vblank = true;
-			m_target_cpf = c_sys_speed_hi;
+			m_standard_cpf = c_sys_speed_hi;
 		} else {
 			use_hires_screen(true);
 			Quirk.await_vblank = false;
-			m_target_cpf = c_sys_speed_lo;
+			m_standard_cpf = c_sys_speed_lo;
 		}
 	}
 };
@@ -449,7 +449,7 @@ void MEGACHIP::start_audio_track(bool repeat) noexcept {
 		const bool oob = m_track.data + m_track.size > &m_memory.back();
 		if (!m_track.size || oob) { m_track.reset(); }
 		else {
-			m_voices[VOICE::UNIQUE].set_phase(0.0).set_step(get_framerate_multiplier() * (
+			m_voices[VOICE::UNIQUE].set_phase(0.0).set_step(m_framerate_multiplier * (
 				(m_memory[m_register_I + 0] << 8 | m_memory[m_register_I + 1]) \
 				/ f64(m_track.size) / stream->get_freq())).userdata = &m_track;
 		}
@@ -517,7 +517,7 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 		trigger_interrupt(Interrupt::FRAME);
 	}
 	void MEGACHIP::instruction_00EE() noexcept {
-		m_current_pc = m_stack_bank[--m_stack_head & 0xF];
+		m_current_pc = m_stack.pop();
 	}
 	void MEGACHIP::instruction_00FB() noexcept {
 		if (use_manual_vsync()) {
@@ -617,7 +617,7 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 	#pragma region 2 instruction branch
 
 	void MEGACHIP::instruction_2NNN(u32 NNN) noexcept {
-		m_stack_bank[m_stack_head++ & 0xF] = m_current_pc;
+		m_stack.push(m_current_pc);
 		jump_program_to(NNN);
 	}
 

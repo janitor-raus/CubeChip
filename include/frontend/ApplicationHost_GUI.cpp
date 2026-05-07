@@ -84,23 +84,6 @@ void ApplicationHost::setup_gui_callables() noexcept {
 
 /*==================================================================*/
 
-	static auto s_menu_system__resume_pause = UserInterface::register_menu("",
-	{50, "Toggles?"}, [&]() noexcept {
-		if (m_systems.empty()) {
-			MenuItem("No Active System", "", false, false);
-		} else {
-			auto& system = m_systems[m_focus_mru.front()];
-			if (MenuItem("Toggle Delimiter", "F10", &system.delimiters)) {
-				toggle_system_delimiters(system);
-			}
-			if (MenuItem("Toggle Statistics", "F11", &system.statistics)) {
-				toggle_system_statistics(system);
-			}
-		}
-	});
-
-/*==================================================================*/
-
 	static bool s_show_window_demo{};
 	static auto s_menu_debug__imgui_demo = UserInterface::register_menu("",
 	{ 10, "Debug" }, [&]() noexcept {
@@ -405,11 +388,10 @@ void ApplicationHost::setup_gui_callables() noexcept {
 				PopFont();
 			}
 
-			Separator(2.0f);
+			Separator();
 			Checkbox("Replace last system instance?", &s_replace_last_system);
 			SameLine();
 			Dummy(ImVec2());
-			DummyY(1.0f);
 
 			{
 				const auto scroll_size = ImVec2(
@@ -423,8 +405,8 @@ void ApplicationHost::setup_gui_callables() noexcept {
 						* UserInterface::get_ui_zoom_scaling()
 						* UserInterface::get_ui_text_scaling());
 				const auto button_fg_size = ImVec2(
-					button_bg_size.x - GetStyle().FrameRounding,
-					button_bg_size.y - GetStyle().FrameRounding
+					button_bg_size.x - GetStyle().FramePadding.x,
+					button_bg_size.y - GetStyle().FramePadding.y
 				);
 
 				for (auto& group : s_families) {
@@ -464,6 +446,7 @@ void ApplicationHost::setup_gui_callables() noexcept {
 									GetColorU32(ImGuiCol_TextDisabled));
 							}
 
+							PushStyleVarY(ImGuiStyleVar_ItemSpacing, 0.0f);
 							// System name segment
 							{
 								const auto system_name = std::string(
@@ -483,6 +466,7 @@ void ApplicationHost::setup_gui_callables() noexcept {
 								AddCursorPosY(GetTextLineHeight() * -0.2f);
 								TextWrapped("%s", candidate.error_message);
 							}
+							PopStyleVar();
 
 							if (!candidate.eligible()) {
 								PopStyleColor();
@@ -515,7 +499,6 @@ void ApplicationHost::setup_gui_callables() noexcept {
 				EndChild();
 			}
 
-			DummyY(1.0f);
 			const auto button_width = (GetContentRegionAvail().x
 				- GetStyle().ItemSpacing.x) / 2.0f;
 
