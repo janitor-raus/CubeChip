@@ -54,12 +54,12 @@ bool FrameLimiter::is_frame_ready_no_block() noexcept {
 	return has_target_period_elapsed();
 }
 
-auto FrameLimiter::get_elapsed_millis_since() const noexcept {
+float FrameLimiter::get_elapsed_millis_since() const noexcept {
 	return std::chrono::duration_cast<std::chrono::microseconds>
 		(::current_time() - m_last_period_origin).count() / 1e3f;
 }
 
-auto FrameLimiter::get_elapsed_micros_since() const noexcept {
+float FrameLimiter::get_elapsed_micros_since() const noexcept {
 	return std::chrono::duration_cast<std::chrono::nanoseconds>
 		(::current_time() - m_last_period_origin).count() / 1e3f;
 }

@@ -56,8 +56,8 @@ public:
 	// Check if a new frame is ready, without blocking the thread.
 	bool is_frame_ready_no_block() noexcept;
 
-	auto get_elapsed_millis_since() const noexcept;
-	auto get_elapsed_micros_since() const noexcept;
+	float get_elapsed_millis_since() const noexcept;
+	float get_elapsed_micros_since() const noexcept;
 
 /*==================================================================*/
 
@@ -68,6 +68,6 @@ public:
 	auto get_target_time_period() const noexcept { return m_target_time_period; }
 	auto get_time_yield_accrued() const noexcept { return m_time_yield_accrued; }
 
-	auto get_period_remaining() const noexcept { return m_target_time_period - m_time_elapsed_since; }
-	auto get_period_fraction()  const noexcept { return m_time_elapsed_since / m_target_time_period; }
+	auto get_period_remaining() const noexcept { return m_target_time_period - get_elapsed_millis_since(); }
+	auto get_period_fraction()  const noexcept { return get_elapsed_millis_since() / m_target_time_period; }
 };
