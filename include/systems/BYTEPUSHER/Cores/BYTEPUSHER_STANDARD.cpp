@@ -48,7 +48,8 @@ void BYTEPUSHER_STANDARD::handle_cycle_loop() noexcept {
 void BYTEPUSHER_STANDARD::push_audio_data() noexcept {
 	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
 		auto buffer = ::allocate_n<f32>
-			(stream->get_next_buffer_size(get_real_system_framerate()))
+			//(stream->get_next_buffer_size(get_real_system_framerate()))
+			(stream->get_next_buffer_size(60)) // XXX - placeholder until we fix audio format input freq
 			.as_value().release_as_container();
 
 		if (!has_cached_system_state(EmuState::ANY_PAUSE)) {
@@ -59,7 +60,9 @@ void BYTEPUSHER_STANDARD::push_audio_data() noexcept {
 
 			std::transform(EXEC_POLICY(unseq)
 				samples.begin(), samples.end(), buffer.data(),
-				[](const auto sample) noexcept { return s8(sample) * (master_gain / 127.0f); }
+				[](const auto sample) noexcept {
+					return s8(sample) * (master_gain / 127.0f);
+				}
 			);
 		}
 
