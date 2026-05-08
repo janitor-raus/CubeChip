@@ -12,8 +12,6 @@
 #include "HomeDirManager.hpp"
 #include "BasicVideoSpec.hpp"
 #include "GlobalAudioBase.hpp"
-#include "DefaultConfig.hpp"
-#include "ISystemEmu.hpp"
 #include "SystemDescriptor.hpp"
 #include "SystemStaging.hpp"
 #include "CoreRegistry.hpp"
@@ -24,7 +22,6 @@
 #include "SHA1.hpp"
 
 #include <imgui.h>
-#include <ranges>
 #include <filesystem>
 
 /*==================================================================*/
@@ -217,8 +214,6 @@ void ApplicationHost::setup_gui_callables() noexcept {
 			}
 			EndDisabled();
 
-			DummyY(1.0f);
-
 			if (BeginTable("LogTable", 6, ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_RowBg
 				| ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY
 			)) {
@@ -231,17 +226,20 @@ void ApplicationHost::setup_gui_callables() noexcept {
 				TableSetupColumn("Message",  ImGuiTableColumnFlags_NoSort);
 				TableHeadersRow();
 
-				const auto snapshot = blog->snapshot(0).fast();
+				const auto head  = blog->head();
+				const auto total = head ? std::min(head + 1, blog->size()) : 0;
+
 				static bool s_sort_descending{};
 
 				if (auto* sort = TableGetSortSpecs()) {
 					if (sort->SpecsCount > 0 && sort->SpecsDirty) {
 						s_sort_descending = sort->Specs[0].SortDirection
 							== ImGuiSortDirection_Descending;
+						sort->SpecsDirty = false;
 					}
 				}
 
-				static auto renderTable = [](auto& entry) {
+				static auto render_log_table = [](const auto& entry) {
 					TableNextRow();
 
 					TableSetColumnIndex(0);
@@ -265,12 +263,14 @@ void ApplicationHost::setup_gui_callables() noexcept {
 					TextUnformatted(entry.message.c_str());
 				};
 
-				if (s_sort_descending) {
-					namespace rv = std::ranges::views;
-					for (auto& entry : rv::reverse(snapshot)) { renderTable(entry); }
-				} else {
-					for (auto& entry : snapshot) { renderTable(entry); }
+				ImGuiListClipper clipper;
+				clipper.Begin(int(total));
+				while (clipper.Step()) {
+					for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
+						render_log_table(blog->at(s_sort_descending ? i : total - 1 - i));
+					}
 				}
+				clipper.End();
 
 				s_is_bottomed = GetScrollY() >= GetScrollMaxY();
 
