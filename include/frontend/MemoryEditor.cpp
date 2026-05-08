@@ -194,6 +194,7 @@ void MemoryEditor::render_memory_editor() {
 
 	const auto rounding = GetStyle().FrameRounding;
 
+	bool cache_memory_for_reads = true;
 	bool advance_editing_cursor = false;
 	bool init_highlighting_once = true;
 	auto data_editing_addr_next = c_max_addr;
@@ -262,17 +263,32 @@ void MemoryEditor::render_memory_editor() {
 	auto curr_highlight_type = HighlightInfo();
 
 	while (clipper.Step()) {
-		// Line Render: only render lines visible in the current clip region
-		for (auto line_i = clipper.DisplayStart; line_i < clipper.DisplayEnd; ++line_i) {
-			// Segment: display the address offset of each memory line
-			const auto line_origin = GetCursorScreenPos();
-			draw_list->AddRectFilled(line_origin, line_origin + ImVec2(9999, line_height),
-				GetColorU32((line_i & 1) ? ImGuiCol_TableRowBgAlt : ImGuiCol_TableRowBg)
-			);
+		if (cache_memory_for_reads) {
+			cache_memory_for_reads = false;
+			const auto lines_count = clipper.DisplayEnd - clipper.DisplayStart;
+			const auto addr_offset = clipper.DisplayStart * settings.column_count;
+			internals.read_cache.resize(settings.column_count * lines_count);
 
-			auto address = std::size_t(line_i) * settings.column_count;
-			SetCursorPosX(GetCursorPosX() + sizes.glyph_width * 0.5f);
-			Text(format_data, sizes.address_digit_count, internals.base_display_address + address);
+			read_bytes(
+				std::span(internals.memory_data, internals.memory_size),
+				std::span(internals.read_cache), addr_offset); // cache once per line
+		}
+
+		// Line Render: only render lines visible in the current clip region
+		for (auto line = clipper.DisplayStart, i = 0; line < clipper.DisplayEnd; ++line, ++i) {
+			auto address = std::size_t(line) * settings.column_count;
+			const auto row_cache_offset = settings.column_count * i;
+
+			// Segment: display the address offset of each memory line
+			{
+				const auto data_line_pos = GetCursorScreenPos();
+				draw_list->AddRectFilled(data_line_pos, data_line_pos + ImVec2(9999, line_height),
+					GetColorU32((line & 1) ? ImGuiCol_TableRowBgAlt : ImGuiCol_TableRowBg)
+				);
+
+				SetCursorPosX(GetCursorPosX() + sizes.glyph_width * 0.5f);
+				Text(format_data, sizes.address_digit_count, internals.base_display_address + address);
+			}
 
 			if (init_highlighting_once) {
 				prev_highlight_type = get_highlight_type(address - 1);
@@ -335,9 +351,7 @@ void MemoryEditor::render_memory_editor() {
 				prev_highlight_type = curr_highlight_type;
 				curr_highlight_type = next_highlight_type;
 
-				const auto cell_byte = callbacks.read
-					? callbacks.read(internals.memory_data, address)
-					: internals.memory_data[address];
+				const auto cell_byte = internals.read_cache[row_cache_offset + n];
 
 				// Display text input on current byte ...
 				if (internals.data_editing_address == address) {
@@ -478,13 +492,13 @@ void MemoryEditor::render_memory_editor() {
 			if (settings.toggle_ascii_view) {
 				SameLine(sizes.ascii_offset_min);
 				auto pos = GetCursorScreenPos();
-				address = std::size_t(line_i) * settings.column_count;
+				address = std::size_t(line) * settings.column_count;
 
 				const auto mouse_off_x = GetIO().MousePos.x - pos.x;
 				const auto mouse_addr = (mouse_off_x >= 0.0f && mouse_off_x < sizes.ascii_offset_max - sizes.ascii_offset_min)
 					? address + std::size_t(mouse_off_x / sizes.glyph_width) : c_max_addr;
 
-				PushID(line_i);
+				PushID(line);
 				if (InvisibleButton("ascii", ImVec2(
 					sizes.ascii_offset_max - sizes.ascii_offset_min, line_height)
 				)) {
@@ -504,9 +518,7 @@ void MemoryEditor::render_memory_editor() {
 						), callbacks.bg_color(internals.memory_data, address), rounding);
 					}
 
-					auto v = callbacks.read
-						? callbacks.read(internals.memory_data, address)
-						: internals.memory_data[address];
+					const auto v = internals.read_cache[row_cache_offset + n];
 
 					char display_c = (v < 32 || v >= 128) ? '.' : v;
 					draw_list->AddText(pos, (display_c == v)

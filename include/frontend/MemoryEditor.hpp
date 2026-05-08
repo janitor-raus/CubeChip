@@ -13,6 +13,7 @@
 
 #include <type_traits>
 #include <array>
+#include <vector>
 #include <functional>
 #include <span>
 #include <cstdio>
@@ -43,34 +44,6 @@ struct MemoryEditor {
 	enum Endian {
 		LE, BE,
 	};
-
-	struct Settings {
-		bool window_visible_out = false; // Can be used externally to toggle window visibility, has no effect on rendering the widget itself.
-		bool show_options_menu  = true;  // Enable options button/context menu. When disabled, options will be locked unless you provide your own UI for them.
-		bool show_data_preview  = false; // Enable a footer area previewing the decimal/binary/hex/float representation of the currently selected bytes.
-
-		bool toggle_const_view  = false; // Prevent editing of the memory contents, ensuring constness.
-		bool toggle_hexii_view  = false; // Display values in HexII representation instead of regular hexadecimal: hide null/zero bytes, ascii values as ".X".
-		bool toggle_ascii_view  = true;  // Display ASCII representation on the right side of the Memory Viewer.
-		bool toggle_grey_zeroes = true;  // Grey-out null/zero bytes using the TextDisabled color.
-		bool toggle_capital_hex = false; // Present hexadecimal values as "FF" instead of "ff".
-
-		BoundedParam<u32(8), 4, 32> column_count;      // Number of columns to display.
-		BoundedParam<u32(8), 0, 16> column_group_size; // Insert spacing between N columns to separate groups. Use 0 to disable.
-		u32  address_digit_count = 0;                  // Maximum number of address digits to display (minimum enforced automatically to cover memory range).
-		f32  footer_area_height  = 0.0f;               // Space in px to reserve at the bottom of the widget to add custom widgets.
-		RGBA cell_emphasis_color = RGBA();             // Background color of highlighted bytes.
-	} settings;
-
-	void goto_address(std::size_t min, std::size_t len = 0) noexcept {
-		internals.goto_address = internals.highlight_min = min;
-		internals.highlight_max = min + (len ? len : 1);
-	}
-	void follow_address(std::size_t min, std::size_t len = 1, bool scroll = true) noexcept {
-		internals.highlight_min = min;
-		internals.highlight_max = min + (len ? len : 1);
-		internals.follow_address = scroll ? min : c_max_addr;
-	}
 
 	struct Callbacks {
 		std::function<  u8(const u8* mem, std::size_t pos /********/)> read = nullptr;  // Optional handler to read bytes.
@@ -106,11 +79,6 @@ private:
 
 private:
 	struct Internals {
-		using CharBuffer = std::array<char, 32>;
-
-		CharBuffer  cell_input_buffer{};
-		CharBuffer  goto_input_buffer{};
-
 		std::size_t data_preview_address = c_max_addr;
 		std::size_t data_editing_address = c_max_addr;
 
@@ -123,9 +91,14 @@ private:
 		std::size_t memory_size = 0;
 		std::size_t base_display_address = 0;
 
-		Endian      preview_endianness = Endian::LE;
-		DataType    preview_data_type  = DataType::S32;
-		bool        acquire_edit_focus = false;
+		Endian   preview_endianness = Endian::LE;
+		DataType preview_data_type  = DataType::S32;
+		bool     acquire_edit_focus = false;
+
+		std::vector<u8> read_cache;
+
+		std::array<char, 32> cell_input_buffer{};
+		std::array<char, 32> goto_input_buffer{};
 	} internals;
 
 public:
@@ -166,6 +139,34 @@ private:
 
 public:
 	MemoryEditor() noexcept = default;
+
+	struct Settings {
+		bool window_visible_out = false; // Can be used externally to toggle window visibility, has no effect on rendering the widget itself.
+		bool show_options_menu = true;  // Enable options button/context menu. When disabled, options will be locked unless you provide your own UI for them.
+		bool show_data_preview = false; // Enable a footer area previewing the decimal/binary/hex/float representation of the currently selected bytes.
+
+		bool toggle_const_view = false; // Prevent editing of the memory contents, ensuring constness.
+		bool toggle_hexii_view = false; // Display values in HexII representation instead of regular hexadecimal: hide null/zero bytes, ascii values as ".X".
+		bool toggle_ascii_view = true;  // Display ASCII representation on the right side of the Memory Viewer.
+		bool toggle_grey_zeroes = true;  // Grey-out null/zero bytes using the TextDisabled color.
+		bool toggle_capital_hex = false; // Present hexadecimal values as "FF" instead of "ff".
+
+		BoundedParam<u32(8), 4, 32> column_count;      // Number of columns to display.
+		BoundedParam<u32(8), 0, 16> column_group_size; // Insert spacing between N columns to separate groups. Use 0 to disable.
+		u32  address_digit_count = 0;                  // Maximum number of address digits to display (minimum enforced automatically to cover memory range).
+		f32  footer_area_height = 0.0f;               // Space in px to reserve at the bottom of the widget to add custom widgets.
+		RGBA cell_emphasis_color = RGBA();             // Background color of highlighted bytes.
+	} settings;
+
+	void goto_address(std::size_t min, std::size_t len = 0) noexcept {
+		internals.goto_address = internals.highlight_min = min;
+		internals.highlight_max = min + (len ? len : 1);
+	}
+	void follow_address(std::size_t min, std::size_t len = 1, bool scroll = true) noexcept {
+		internals.highlight_min = min;
+		internals.highlight_max = min + (len ? len : 1);
+		internals.follow_address = scroll ? min : c_max_addr;
+	}
 
 	/**
 	 * @brief Sets the memory range to display/edit. Must be called at least once before drawing the widget, and must be called again if the memory range, its size or base display address changes.
