@@ -45,6 +45,7 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 	setlocale(LC_CTYPE, ".UTF-8");
 	SetConsoleOutputCP(CP_UTF8);
 	SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
+	SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
 #endif
 
 	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");

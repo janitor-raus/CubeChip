@@ -16,83 +16,22 @@
 #include <SDL3/SDL_timer.h>
 #include <SDL3/SDL_render.h>
 
-/*==================================================================*/
+#if defined(_WIN32) && defined(WINDOWS_NO_ROUNDED_CORNERS)
+	#include <sdkddkver.h>
 
-#ifdef _WIN32
-	#ifndef NOMINMAX
-		#define NOMINMAX
-	#endif
+	#if (NTDDI_VERSION < NTDDI_WIN10_CO)
+		#define OLD_WINDOWS_SDK
+	#else
+		#ifndef NOMINMAX
+			#define NOMINMAX
+		#endif
 
-	#pragma warning(push)
+		#pragma warning(push)
 		#pragma warning(disable : 5039)
 		#include <dwmapi.h>
 		#pragma comment(lib, "Dwmapi")
-	#pragma warning(pop)
-
-	#ifdef WINDOWS_NO_ROUNDED_CORNERS
-		#include <sdkddkver.h>
-
-		#if (NTDDI_VERSION < NTDDI_WIN10_CO)
-			#define OLD_WINDOWS_SDK
-		#endif
+		#pragma warning(pop)
 	#endif
-#endif
-
-#ifdef _WIN32
-	static WNDPROC s_original_wndproc = nullptr;
-
-	static Uint64 s_dwm_flush_disabled_at = 0;
-	static constexpr Uint64 s_dwm_flush_retry_ms = 30000;
-
-	static void safe_dwm_flush() {
-		if (s_dwm_flush_disabled_at != 0) {
-			if (SDL_GetTicks() - s_dwm_flush_disabled_at < s_dwm_flush_retry_ms) { return; }
-			blog.info("Re-enabling DwmFlush() workaround after cooldown.");
-			s_dwm_flush_disabled_at = 0;
-		}
-
-		LARGE_INTEGER start, end, freq;
-		QueryPerformanceCounter(&start);
-		DwmFlush();
-		QueryPerformanceCounter(&end);
-		QueryPerformanceFrequency(&freq);
-
-		const auto elapsed_ms = (end.QuadPart - start.QuadPart)
-			* 1000 / freq.QuadPart;
-
-		if (elapsed_ms > 100) {
-			s_dwm_flush_disabled_at = SDL_GetTicks();
-			blog.warn("DwmFlush() took {}ms, disabling workaround for {}ms.",
-				elapsed_ms, s_dwm_flush_retry_ms);
-		}
-	}
-
-
-	static LRESULT CALLBACK DWMFlushWndProc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
-		const auto result = CallWindowProcW(
-			s_original_wndproc, hwnd, msg, w_param, l_param);
-
-		switch (msg) {
-			case WM_MOVING:
-			case WM_TIMER:
-				safe_dwm_flush();
-				break;
-		}
-		return result;
-	}
-
-	static void install_dwm_flush(SDL_Window* window) {
-		const auto hwnd = static_cast<HWND>(SDL_GetPointerProperty(
-			SDL_GetWindowProperties(window),
-			SDL_PROP_WINDOW_WIN32_HWND_POINTER,
-			nullptr
-		));
-		if (!hwnd) { return; }
-
-		s_original_wndproc = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(
-			hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(DWMFlushWndProc)));
-		SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(s_original_wndproc));
-	}
 #endif
 
 /*==================================================================*/
@@ -184,9 +123,6 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 		if (!s_main_renderer) { throw_fatal_error(__LINE__, __func__); }
 
 		SDL_ShowWindow(s_main_window);
-		#ifdef _WIN32
-		install_dwm_flush(s_main_window);
-		#endif
 		SDL_RaiseWindow(s_main_window);
 	}
 	catch (const FatalError&) {
