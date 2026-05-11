@@ -14,6 +14,7 @@ endif()
 # ==================================================================================== #
 
 project("CubeChip" LANGUAGES CXX)
+option(WINDOWS_NO_ROUNDED_CORNERS "Windows only: disable rounded window corners (requires Windows 11 22H2 / Build 22621 or newer to take effect)" OFF)
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -69,6 +70,12 @@ target_compile_definitions(
 	FMT_HEADER_ONLY
 	PROJECT_NAME="${PROJECT_NAME}"
 )
+if(WIN32 AND WINDOWS_NO_ROUNDED_CORNERS)
+    target_compile_definitions(
+		${PROJECT_NAME} PRIVATE
+		WINDOWS_NO_ROUNDED_CORNERS
+	)
+endif()
 
 target_include_directories(
 	"${PROJECT_NAME}" PRIVATE
@@ -93,7 +100,7 @@ target_link_libraries(
 	imgui
 )
 
-if (UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE)
     find_package(TBB QUIET)
 
     if (NOT TBB_FOUND)
