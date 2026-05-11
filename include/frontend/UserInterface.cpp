@@ -202,6 +202,7 @@ static void setup_default_theme() noexcept {
 /*==================================================================*/
 
 void UserInterface::register_window_impl(const Hook& shared_func) noexcept {
+	if (!s_gui_hooks) { return; }
 	if (s_gui_hooks->windows.registry_lock.try_lock()) { // may fail spuriously (fine)
 		s_gui_hooks->windows.registry.buffer.push_back(shared_func);
 		s_gui_hooks->windows.registry_lock.unlock();
@@ -212,6 +213,7 @@ void UserInterface::register_window_impl(const Hook& shared_func) noexcept {
 }
 
 void UserInterface::register_menu_impl(LabelKey window_tag, OrderKey menu_title, const Hook& shared_func) noexcept {
+	if (!s_gui_hooks) { return; }
 	if (s_gui_hooks->menus.registry_lock.try_lock()) { // may fail spuriously (fine)
 		s_gui_hooks->menus.registry[window_tag.get_id_or_label()] \
 			[std::move(menu_title)].buffer.push_back(shared_func);
