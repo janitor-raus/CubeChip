@@ -1,5 +1,5 @@
 diff --git a/imgui_widgets.cpp b/imgui_widgets.cpp
-index abcb02f2b..6d44d9cbf 100644
+index c255b5d6a..ed2230d42 100644
 --- a/imgui_widgets.cpp
 +++ b/imgui_widgets.cpp
 @@ -925,7 +925,7 @@ bool ImGui::CloseButton(ImGuiID id, const ImVec2& pos)
@@ -20,7 +20,7 @@ index abcb02f2b..6d44d9cbf 100644
      RenderNavCursor(bb, id, ImGuiNavRenderCursorFlags_Compact);
  
      if (dock_node)
-@@ -7113,7 +7113,7 @@ bool ImGui::TreeNodeBehavior(ImGuiID id, ImGuiTreeNodeFlags flags, const char* l
+@@ -7121,7 +7121,7 @@ bool ImGui::TreeNodeBehavior(ImGuiID id, ImGuiTreeNodeFlags flags, const char* l
              if (hovered || selected)
              {
                  const ImU32 bg_col = GetColorU32((held && hovered) ? ImGuiCol_HeaderActive : hovered ? ImGuiCol_HeaderHovered : ImGuiCol_Header);
@@ -29,7 +29,7 @@ index abcb02f2b..6d44d9cbf 100644
              }
              RenderNavCursor(frame_bb, id, nav_render_cursor_flags);
              if (span_all_columns && !span_all_columns_label)
-@@ -7495,11 +7495,11 @@ bool ImGui::Selectable(const char* label, bool selected, ImGuiSelectableFlags fl
+@@ -7503,11 +7503,11 @@ bool ImGui::Selectable(const char* label, bool selected, ImGuiSelectableFlags fl
          {
              // Between 1.91.0 and 1.91.4 we made selected Selectable use an arbitrary lerp between _Header and _HeaderHovered. Removed that now. (#8106)
              ImU32 col = GetColorU32((held && highlighted) ? ImGuiCol_HeaderActive : highlighted ? ImGuiCol_HeaderHovered : ImGuiCol_Header);

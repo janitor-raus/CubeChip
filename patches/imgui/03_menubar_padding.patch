@@ -1,8 +1,8 @@
 diff --git a/imgui.cpp b/imgui.cpp
-index cb73b8dcb..8743dcf22 100644
+index 09971db0e..5e96070e1 100644
 --- a/imgui.cpp
 +++ b/imgui.cpp
-@@ -8108,7 +8108,7 @@ bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
+@@ -8131,7 +8131,7 @@ bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
          window->DC.MenuBarOffset.x = ImMax(ImMax(window->WindowPadding.x, style.ItemSpacing.x), g.NextWindowData.MenuBarOffsetMinVal.x);
          window->DC.MenuBarOffset.y = g.NextWindowData.MenuBarOffsetMinVal.y;
          window->TitleBarHeight = (flags & ImGuiWindowFlags_NoTitleBar) ? 0.0f : g.FontSize + g.Style.FramePadding.y * 2.0f;
@@ -11,7 +11,7 @@ index cb73b8dcb..8743dcf22 100644
          window->FontRefSize = g.FontSize; // Lock this to discourage calling window->CalcFontSize() outside of current window.
  
          // Depending on condition we use previous or current window size to compare against contents size to decide if a scrollbar should be visible.
-@@ -19528,7 +19528,7 @@ static void ImGui::DockNodeUpdateTabBar(ImGuiDockNode* node, ImGuiWindow* host_w
+@@ -19573,7 +19573,7 @@ static void ImGui::DockNodeUpdateTabBar(ImGuiDockNode* node, ImGuiWindow* host_w
          node->LastFrameFocused = g.FrameCount;
      ImU32 title_bar_col = GetColorU32(host_window->Collapsed ? ImGuiCol_TitleBgCollapsed : is_focused ? ImGuiCol_TitleBgActive : ImGuiCol_TitleBg);
      ImDrawFlags rounding_flags = CalcRoundingFlagsForRectInRect(title_bar_rect, host_window->Rect(), g.Style.DockingSeparatorSize);
@@ -20,9 +20,11 @@ index cb73b8dcb..8743dcf22 100644
  
      // Docking/Collapse button
      if (has_window_menu_button)
+diff --git a/imgui_widgets.cpp b/imgui_widgets.cpp
+index c255b5d6a..2cf3519a9 100644
 --- a/imgui_widgets.cpp
 +++ b/imgui_widgets.cpp
-@@ -9158,7 +9158,7 @@ bool ImGui::BeginMenuBar()
+@@ -9178,7 +9178,7 @@ bool ImGui::BeginMenuBar()
      PushClipRect(clip_rect.Min, clip_rect.Max, false);
  
      // We overwrite CursorMaxPos because BeginGroup sets it to CursorPos (essentially the .EmitItem hack in EndMenuBar() would need something analogous here, maybe a BeginGroupEx() with flags).
@@ -31,7 +33,7 @@ index cb73b8dcb..8743dcf22 100644
      window->DC.LayoutType = ImGuiLayoutType_Horizontal;
      window->DC.IsSameLine = false;
      window->DC.NavLayerCurrent = ImGuiNavLayer_Menu;
-@@ -9278,7 +9278,7 @@ bool ImGui::BeginMainMenuBar()
+@@ -9298,7 +9298,7 @@ bool ImGui::BeginMainMenuBar()
      // FIXME: Consider removing support for safe area down the line... it's messy. Nowadays consoles have support for TV calibration in OS settings.
      g.NextWindowData.MenuBarOffsetMinVal = ImVec2(g.Style.DisplaySafeAreaPadding.x, ImMax(g.Style.DisplaySafeAreaPadding.y - g.Style.FramePadding.y, 0.0f));
      ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar;

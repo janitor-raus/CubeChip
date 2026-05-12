@@ -4,7 +4,7 @@ set(IMCONFIG_PATH "${PROJECT_INCLUDE_DIR}/vendor/imgui")
 
 fetch_and_vendor(
 	"https://github.com/ocornut/imgui.git"
-	"docking" TRUE
+	"v1.92.8-docking" TRUE
 	"${VENDOR_DIR}" FALSE
 )
 

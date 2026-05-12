@@ -154,6 +154,7 @@ static void setup_default_theme() noexcept {
 	colors[ImGuiCol_ScrollbarGrabHovered]   = ImVec4(0.77f, 0.50f, 1.00f, 0.50f);
 	colors[ImGuiCol_ScrollbarGrabActive]    = ImVec4(0.77f, 0.50f, 1.00f, 0.75f);
 	colors[ImGuiCol_CheckMark]              = ImVec4(0.77f, 0.50f, 1.00f, 0.75f);
+	colors[ImGuiCol_CheckboxSelectedBg]     = colors[ImGuiCol_FrameBg];
 	colors[ImGuiCol_SliderGrab]             = ImVec4(0.77f, 0.50f, 1.00f, 0.50f);
 	colors[ImGuiCol_SliderGrabActive]       = ImVec4(0.77f, 0.50f, 1.00f, 0.75f);
 	colors[ImGuiCol_Button]                 = ImVec4(0.21f, 0.21f, 0.25f, 1.00f);
