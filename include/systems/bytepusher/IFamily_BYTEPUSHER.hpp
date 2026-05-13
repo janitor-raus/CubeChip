@@ -27,7 +27,7 @@ protected:
 	static constexpr std::string_view family_desc = "BytePusher family line.";
 	using Family = IFamily_BYTEPUSHER;
 
-	static inline std::string s_savestate_path{};
+	std::string m_savestate_path{};
 
 	enum STREAM { MAIN };
 	enum VOICE { ID_0, COUNT };

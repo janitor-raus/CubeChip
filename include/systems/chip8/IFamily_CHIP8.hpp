@@ -38,14 +38,15 @@ protected:
 			? nullptr : "file too large";
 	}
 
-	enum STREAM : u32 { MAIN };
-	enum VOICE : u32 {
+	enum STREAM { MAIN };
+	enum VOICE {
 		ID_0, ID_1, ID_2, ID_3, COUNT,
 		BUZZER = ID_3, UNIQUE = ID_0,
 	};
 
 	std::string m_permaregs_path{};
 	std::string m_savestate_path{};
+
 	static constexpr f32 c_tonal_offset = 160.0f;
 
 	struct TriBCD final {

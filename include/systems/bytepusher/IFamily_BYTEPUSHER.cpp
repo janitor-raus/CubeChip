@@ -29,9 +29,8 @@ IFamily_BYTEPUSHER::IFamily_BYTEPUSHER(std::size_t W, std::size_t H) noexcept
 
 	if (calc_file_image_sha1()) {
 		if (auto* path = add_system_path("savestate", family_name)) {
-			s_savestate_path = (fs::Path(*path) / m_file_sha1_hash).string();
-		}
-		else {
+			m_savestate_path = (fs::Path(*path) / m_file_sha1_hash).string();
+		} else {
 			blog.error("Unable to create savestate directory for system '{}', "
 				"savestates will be unavailable!", family_pretty_name);
 		}
