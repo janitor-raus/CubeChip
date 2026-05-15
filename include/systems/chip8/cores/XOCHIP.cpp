@@ -25,7 +25,7 @@ void XOCHIP::initialize_system() noexcept {
 
 	set_pattern_pitch(64);
 
-	m_voices[VOICE::UNIQUE].userdata = &m_audio_timers[VOICE::UNIQUE];
+	m_voices[VOICE::UNIQUE].userdata = this; // XXX - this is a bit hacky
 	m_voices[VOICE::BUZZER].userdata = &m_audio_timers[VOICE::BUZZER];
 
 	m_current_pc = c_sys_boot_pos;
@@ -309,14 +309,17 @@ void XOCHIP::set_pattern_pitch(s32 pitch) noexcept {
 
 void XOCHIP::make_pattern_wave(f32* data, u32 size, Voice* voice, Stream*) noexcept {
 	if (!voice || !voice->userdata) [[unlikely]] { return; }
-	auto* timer = static_cast<AudioTimer*>(voice->userdata);
+
+	// XXX -- this is a bit hacky, will be refactored in the future
+	auto& instance = *static_cast<XOCHIP*>(voice->userdata);
+	auto& timer = instance.m_audio_timers[VOICE::UNIQUE];
 
 	for (auto i = 0u; i < size; ++i) {
-		if (const auto gain = voice->get_level(i, *timer)) {
+		if (const auto gain = voice->get_level(i, timer)) {
 			const auto bit_step = s32(voice->peek_phase(i) * 128.0f);
 			const auto bit_mask = 1 << (0x7 ^ (bit_step & 0x7));
 			::assign_cast_add(data[i], \
-				(pulse_pattern_data()[bit_step >> 3] & bit_mask) ? gain : -gain);
+				(instance.m_pulse_pattern_data[bit_step >> 3] & bit_mask) ? gain : -gain);
 		} else break;
 	}
 	voice->step_phase(size);
@@ -451,34 +454,34 @@ void XOCHIP::scroll_display_rt() noexcept {
 	}
 	void XOCHIP::instruction_5xy2(u32 X, u32 Y) noexcept {
 		if (X < Y) {
-			for (auto i = X; i <= Y; ++i) {
-				m_memory[m_register_I + i - X] = m_registers_V[i];
+			for (auto i = s32(X); i <= s32(Y); ++i) {
+				m_memory[m_register_I + (i - X)] = m_registers_V[i];
 			}
 		} else {
-			for (auto i = X; i >= Y; --i) {
-				m_memory[m_register_I + X - i] = m_registers_V[i];
+			for (auto i = s32(X); i >= s32(Y); --i) {
+				m_memory[m_register_I + (X - i)] = m_registers_V[i];
 			}
 		}
 	}
 	void XOCHIP::instruction_5xy3(u32 X, u32 Y) noexcept {
 		if (X < Y) {
-			for (auto i = X; i <= Y; ++i) {
-				m_registers_V[i] = m_memory[m_register_I + i - X];
+			for (auto i = s32(X); i <= s32(Y); ++i) {
+				m_registers_V[i] = m_memory[m_register_I + (i - X)];
 			}
 		} else {
-			for (auto i = X; i >= Y; --i) {
-				m_registers_V[i] = m_memory[m_register_I + X - i];
+			for (auto i = s32(X); i >= s32(Y); --i) {
+				m_registers_V[i] = m_memory[m_register_I + (X - i)];
 			}
 		}
 	}
 	void XOCHIP::instruction_5xy4(u32 X, u32 Y) noexcept {
 		if (X < Y) {
-			for (auto i = X; i <= Y; ++i) {
-				m_bit_colors[i] = c_color_palette[m_memory[m_register_I + i - X]];
+			for (auto i = s32(X); i <= s32(Y); ++i) {
+				m_bit_colors[i] = c_color_palette[m_memory[m_register_I + (i - X)]];
 			}
 		} else {
-			for (auto i = X; i >= Y; --i) {
-				m_bit_colors[i] = c_color_palette[m_memory[m_register_I + X - i]];
+			for (auto i = s32(X); i >= s32(Y); --i) {
+				m_bit_colors[i] = c_color_palette[m_memory[m_register_I + (X - i)]];
 			}
 		}
 	}
@@ -628,14 +631,14 @@ void XOCHIP::scroll_display_rt() noexcept {
 
 	template <std::size_t P>
 	void XOCHIP::draw_single_row(u32 X, u32 Y) noexcept {
-		const auto I = m_register_I + s_plane_mask[P][m_plane_mask];
+		const auto I = m_register_I + c_plane_mask[P][m_plane_mask];
 
 		draw_byte(X, Y, P, m_memory[I]);
 	}
 
 	template <std::size_t P>
 	void XOCHIP::draw_double_row(u32 X, u32 Y) noexcept {
-		const auto I = m_register_I + s_plane_mask[P][m_plane_mask] * 32;
+		const auto I = m_register_I + c_plane_mask[P][m_plane_mask] * 32;
 
 		for (auto H = 0u; H < 16u; ++H) {
 			draw_byte(X + 0, Y, P, m_memory[I + H * 2 + 0]);
@@ -648,7 +651,7 @@ void XOCHIP::scroll_display_rt() noexcept {
 
 	template <std::size_t P>
 	void XOCHIP::draw_n_rows(u32 X, u32 Y, u32 N) noexcept {
-		const auto I = m_register_I + s_plane_mask[P][m_plane_mask] * N;
+		const auto I = m_register_I + c_plane_mask[P][m_plane_mask] * N;
 
 		for (auto H = 0u; H < N; ++H) {
 			draw_byte(X, Y, P, m_memory[I + H]);
@@ -713,7 +716,7 @@ void XOCHIP::scroll_display_rt() noexcept {
 	}
 	void XOCHIP::instruction_F002() noexcept {
 		for (auto i = 0u; i < 16u; ++i) {
-			pulse_pattern_data()[i] = m_memory[m_register_I + i];
+			m_pulse_pattern_data[i] = m_memory[m_register_I + i];
 		}
 	}
 	void XOCHIP::instruction_FN01(u32 N) noexcept {

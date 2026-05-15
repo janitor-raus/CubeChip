@@ -208,14 +208,10 @@ private:
 	};
 
 	using PatternData = std::array<u8, 16>;
-
-	static auto& pulse_pattern_data() noexcept {
-		static thread_local PatternData s_pattern = {
-			0x0F, 0x00,	0x0F, 0x00, 0x0F, 0x00, 0x0F, 0x00,
-			0x0F, 0x00,	0x0F, 0x00, 0x0F, 0x00, 0x0F, 0x00,
-		};
-		return s_pattern;
-	}
+	PatternData m_pulse_pattern_data = {
+		0x0F, 0x00,	0x0F, 0x00, 0x0F, 0x00, 0x0F, 0x00,
+		0x0F, 0x00,	0x0F, 0x00, 0x0F, 0x00, 0x0F, 0x00,
+	};
 
 	void set_pattern_pitch(s32 pitch) noexcept;
 
@@ -422,7 +418,7 @@ private:
 
 	// For planar mask N (0000 to 1111), count set bits
 	// to the right of bit (currently drawn plane) 0..3
-	static constexpr u8 s_plane_mask[4][16] = {
+	static constexpr u8 c_plane_mask[4][16] = {
 		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, // Plane 0
 		{0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1}, // Plane 1
 		{0,1,1,2,0,1,1,2,0,1,1,2,0,1,1,2}, // Plane 2
