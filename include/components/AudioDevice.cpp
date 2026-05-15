@@ -15,13 +15,6 @@
 
 /*==================================================================*/
 
-static float calculate_gain(float stream_gain) noexcept {
-	return stream_gain * (GlobalAudioBase::is_muted()
-		? 0.0f : GlobalAudioBase::get_global_gain());
-}
-
-/*==================================================================*/
-
 auto AudioDevice::insert_audio_stream(signed stream_id, SDL_AudioStream* device_ptr) noexcept -> Stream* {
 	if (auto slot = at(stream_id)) {
 		blog.warn("Audio stream with ID '{}' already exists!", stream_id);
@@ -190,6 +183,7 @@ void AudioDevice::Stream::push_raw_audio_data(void* sample_data,
 ) const {
 	if (is_paused() || buffer_size == 0u) { return; }
 
-	SDL_SetAudioDeviceGain(SDL_GetAudioStreamDevice(m_ptr), ::calculate_gain(get_gain()));
+	SDL_SetAudioDeviceGain(SDL_GetAudioStreamDevice(m_ptr),
+		GlobalAudioBase::is_muted() ? 0.0f : GlobalAudioBase::get_global_gain());
 	SDL_PutAudioStreamData(m_ptr, sample_data, signed(buffer_size * sample_size));
 }
