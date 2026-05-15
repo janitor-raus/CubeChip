@@ -21,7 +21,7 @@ public:
 		SDL_Unique<SDL_AudioStream> m_ptr;
 		signed m_freq{}, m_channels{};
 		float m_last_buffer_framerate{};
-		float m_last_freq_ratio{};
+		float m_last_freq_ratio = 1.0f;
 		unsigned long long m_accumulator{};
 
 	public:

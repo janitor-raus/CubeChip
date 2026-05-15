@@ -61,15 +61,15 @@ Some extension combinations aren't possible, see footnotes for now. Due to major
 - [x] Provide flexible audio with easily manageable streams, voices, and mastering for each.
 - [x] Provide command-line arguments for those who enjoy them, and to facilitate headless runs in the future (for the likes of unit tests, etc).
 - [x] Implement more color types, conversions between them, lerps, waveforms, and other color/math related features for general use.
+- [X] Similarly, add further GUI controls for standard actions, such as pausing a system, toggling OSD, etc.
+- [X] Modify the audio backend to allow for streams with differing stream io formats, rather than being restricted to having the same on both ends. Required for BytePusher running under custom framerate.
 - [ ] Start and maintain a JSON (or TOML??) database, keyed by SHA1 hashes for system families lacking a concrete identifier mark, as well as to define defaults/overrides on a per-entry basis.
 - [ ] Redesign the SDL input to allow for more forms of input (mouse, gamepads, etc) and binding control beyond a "X = Y or Z". This will require interaction with ImGUI to allow live mapping and feedback.
 - [ ] By extension, also need to implement a hotkey manager that will be remappable live, and allow for hot-swapping new entries depending on which system family is currently active.
 - [ ] Implement stepping framework for debugging, initially limited to simple full-frame and per-instruction stepping, for the system families/cores already implemented.
 - [ ] Add configuration ImGUI panels for each family, extended optionally by each system core, to allow for live adjustment of various properties/quirks.
-- [ ] Similarly, add further GUI controls for standard actions, such as pausing a system, toggling OSD, etc.
 - [ ] Further, design standard ImGUI widgets to recycle for various uses, particularly in debugging tools, such as wave/pattern visualizers, memory viewers, disasm viewers, etc.
 - [ ] Start work on supporting initializing system instances and feeding them custom data, and controlling exact runtime parameters to allow for actual support of single-step-tests later.
 - [ ] Figure out a good way to serialize, version, and differentiate the full state of different systems for savestate support, with modular assembly of each eligible component of a system at the lower end, and also the inheritance layers at the high end.
-- [ ] Modify the audio backend to allow for streams with differing stream io formats, rather than being restricted to having the same on both ends. Required for BytePusher running under custom framerate.
 - [ ] Figure out a decent way to capture internal/output screenshots from a system, probably through SDL.
 - [ ] Find time to focus entirely on progressing the Gameboy (Color) family interface and system cores.

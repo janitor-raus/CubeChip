@@ -125,7 +125,8 @@ bool AudioDevice::Stream::set_spec(signed freq, signed channels) noexcept {
 }
 
 bool AudioDevice::Stream::set_freq_ratio(float ratio) noexcept {
-	if (SDL_SetAudioStreamFrequencyRatio(m_ptr, std::clamp(ratio, 0.01f, 100.0f))) {
+	ratio = std::clamp(ratio, 0.01f, 100.0f);
+	if (SDL_SetAudioStreamFrequencyRatio(m_ptr, ratio)) {
 		m_last_freq_ratio = ratio;
 		return true;
 	} else {
