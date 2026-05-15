@@ -14,13 +14,13 @@
 /*==================================================================*/
 
 class AudioDevice {
-	using self = AudioDevice;
+	using StreamID = signed int;
 
 public:
 	class Stream {
 		SDL_Unique<SDL_AudioStream> m_ptr;
 		signed m_freq{}, m_channels{};
-		float m_last_buffer_framerate{};
+		float m_last_target_framerate{};
 		float m_last_freq_ratio = 1.0f;
 		unsigned long long m_accumulator{};
 
@@ -32,7 +32,9 @@ public:
 		void update_cached_spec() noexcept;
 
 	public:
-		// Sets the stream's audio spec. May reset the internal accumulator.
+		// Sets the stream's audio spec. Zero/invalid values fall back to the physical
+		// device's default respectively. If a change in spec was applied, the internal
+		// accumulator for next_frame_sample_count() will be reset to prevent drift.
 		bool set_spec(signed frequency = 0, signed channels = 0) noexcept;
 
 		auto get_freq()      const noexcept { return m_freq; }
@@ -77,51 +79,51 @@ public:
 		/**
 		 * @brief Pushes buffer of audio samples to SDL device/stream.
 		 * @param[in] index :: the device/stream to push audio to.
-		 * @param[in] sampleData :: pointer to audio samples buffer.
-		 * @param[in] bufferSize :: size of buffer in bytes.
+		 * @param[in] sample_data :: pointer to audio samples buffer.
+		 * @param[in] buffer_size :: size of buffer in bytes.
 		 */
 		template <IsPlainOldData T>
-		void push_audio_data(T* sampleData, std::size_t bufferSize) const {
-			push_raw_audio_data(sampleData, bufferSize, sizeof(T));
+		void push_audio_data(T* sample_data, std::size_t buffer_size) const {
+			push_raw_audio_data(sample_data, buffer_size, sizeof(T));
 		}
 
 		/**
 		 * @brief Pushes buffer of audio samples to SDL device/stream.
 		 * @param[in] index :: the device/stream to push audio to.
-		 * @param[in] samplesBuffer :: audio samples buffer (C style).
+		 * @param[in] samples_buffer :: audio samples buffer (C style).
 		 */
 		template <IsPlainOldData T, std::size_t N>
-		void push_audio_data(T(&samplesBuffer)[N]) const {
-			push_raw_audio_data(samplesBuffer, N, sizeof(T));
+		void push_audio_data(T(&samples_buffer)[N]) const {
+			push_raw_audio_data(samples_buffer, N, sizeof(T));
 		}
 
 		/**
 		 * @brief Pushes buffer of audio samples to SDL device/stream.
 		 * @param[in] index :: the device/stream to push audio to.
-		 * @param[in] samplesBuffer :: audio samples buffer (C++ style).
+		 * @param[in] samples_buffer :: audio samples buffer (C++ style).
 		 */
 		template <IsContiguousContainer T> requires(IsPlainOldData<ValueType<T>>)
-		void push_audio_data(T& samplesBuffer) const {
-			push_raw_audio_data(std::data(samplesBuffer), std::size(samplesBuffer), sizeof(ValueType<T>));
+		void push_audio_data(T& samples_buffer) const {
+			push_raw_audio_data(std::data(samples_buffer), std::size(samples_buffer), sizeof(ValueType<T>));
 		}
 	};
 
 private:
-	std::unordered_map<signed, Stream>
+	std::unordered_map<StreamID, Stream>
 		m_audio_streams{};
 
 public:
 	AudioDevice() noexcept = default;
 
-	AudioDevice(const self&)  = delete;
-	self& operator=(const self&) = delete;
+	AudioDevice(const AudioDevice&) = delete;
+	AudioDevice& operator=(const AudioDevice&) = delete;
 
 private:
-	auto insert_audio_stream(signed stream_id, SDL_AudioStream* stream_ptr) noexcept -> Stream*;
+	auto insert_audio_stream(StreamID stream_id, SDL_AudioStream* stream_ptr) noexcept -> Stream*;
 
 public:
-	void add_playback_stream(signed stream_id, signed freq = 0, signed channels = 0);
-	void add_recording_stream(signed stream_id, signed freq = 0, signed channels = 0);
+	void add_playback_stream(StreamID stream_id, signed freq = 0, signed channels = 0);
+	void add_recording_stream(StreamID stream_id, signed freq = 0, signed channels = 0);
 
 	auto get_stream_count() const noexcept { return m_audio_streams.size(); }
 
@@ -129,12 +131,12 @@ public:
 	void resume_all_streams() noexcept;
 
 	[[nodiscard]]
-	Stream& operator[](signed key) noexcept {
+	Stream& operator[](StreamID key) noexcept {
 		return m_audio_streams.at(key);
 	}
 
 	[[nodiscard]]
-	Stream* at(signed key) noexcept {
+	Stream* at(StreamID key) noexcept {
 		auto it = m_audio_streams.find(key);
 		return it != m_audio_streams.end() ? &it->second : nullptr;
 	}

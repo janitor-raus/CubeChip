@@ -15,7 +15,7 @@
 
 /*==================================================================*/
 
-auto AudioDevice::insert_audio_stream(signed stream_id, SDL_AudioStream* device_ptr) noexcept -> Stream* {
+auto AudioDevice::insert_audio_stream(StreamID stream_id, SDL_AudioStream* device_ptr) noexcept -> Stream* {
 	if (auto slot = at(stream_id)) {
 		blog.warn("Audio stream with ID '{}' already exists!", stream_id);
 		*slot = Stream(device_ptr);
@@ -32,7 +32,7 @@ auto AudioDevice::insert_audio_stream(signed stream_id, SDL_AudioStream* device_
 	}
 }
 
-void AudioDevice::add_playback_stream(signed stream_id, signed freq, signed channels) {
+void AudioDevice::add_playback_stream(StreamID stream_id, signed freq, signed channels) {
 	if (auto* device_ptr = SDL_OpenAudioDeviceStream(
 		SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,
 		nullptr, nullptr, nullptr
@@ -48,7 +48,7 @@ void AudioDevice::add_playback_stream(signed stream_id, signed freq, signed chan
 	}
 }
 
-void AudioDevice::add_recording_stream(signed stream_id, signed freq, signed channels) {
+void AudioDevice::add_recording_stream(StreamID stream_id, signed freq, signed channels) {
 	if (auto* device_ptr = SDL_OpenAudioDeviceStream(
 		SDL_AUDIO_DEVICE_DEFAULT_RECORDING,
 		nullptr, nullptr, nullptr
@@ -129,6 +129,9 @@ bool AudioDevice::Stream::set_freq_ratio(float ratio) noexcept {
 }
 
 bool AudioDevice::Stream::is_paused() const noexcept {
+	// We're gating with the device's ID first, as it allows us to
+	// check for an orphaned stream (one whose device was closed)
+	// and thus implicitly report "paused" to gate other operations.
 	const auto device_id = SDL_GetAudioStreamDevice(m_ptr);
 	return device_id ? SDL_AudioDevicePaused(device_id) : true;
 }
@@ -137,21 +140,22 @@ bool AudioDevice::Stream::is_playback() const noexcept {
 	return SDL_IsAudioDevicePlayback(SDL_GetAudioStreamDevice(m_ptr));
 }
 
-float AudioDevice::Stream::get_samples_per_frame(float framerate) const noexcept {
-	if (framerate < 1.0) { return 0.0; }
-	return m_freq / framerate * m_channels;
+float AudioDevice::Stream::get_samples_per_frame(float target_framerate) const noexcept {
+	if (target_framerate < 0.1f) { return 0.0f; }
+	return m_freq * m_last_freq_ratio / target_framerate * m_channels;
 }
 
-auto AudioDevice::Stream::next_frame_sample_count(float framerate) noexcept -> std::size_t {
-	if (framerate < 1.0f) { return 0u; }
+auto AudioDevice::Stream::next_frame_sample_count(float target_framerate) noexcept -> std::size_t {
+	if (target_framerate < 0.1f) { return 0; }
 
-	if (framerate != m_last_buffer_framerate) {
-		m_last_buffer_framerate = framerate;
-		m_accumulator = 0ull;
+	if (target_framerate != m_last_target_framerate) {
+		m_last_target_framerate = target_framerate;
+		m_accumulator = 0;
 	}
 
 	static constexpr auto c_scale_factor = 1ull << 24;
-	::assign_cast_add(m_accumulator, m_freq * m_last_freq_ratio / framerate * c_scale_factor);
+	::assign_cast_add(m_accumulator, m_freq * m_last_freq_ratio
+		/ target_framerate * c_scale_factor);
 	const auto sample_amount = m_accumulator >> 24;
 	::assign_cast_and(m_accumulator, c_scale_factor - 1);
 
