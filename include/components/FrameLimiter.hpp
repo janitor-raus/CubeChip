@@ -56,11 +56,9 @@ public:
 	// Check if a new frame is ready, without blocking the thread.
 	bool is_frame_ready_no_block() noexcept;
 
-	float get_elapsed_millis_since() const noexcept;
-	float get_elapsed_micros_since() const noexcept;
-
 /*==================================================================*/
 
+	// These getters are snapshot-based off the last valid limiter check!
 public:
 	bool has_missed_last_period() const noexcept { return m_missed_last_period; }
 	auto get_valid_period_count() const noexcept { return m_valid_period_count; }
@@ -68,6 +66,15 @@ public:
 	auto get_target_time_period() const noexcept { return m_target_time_period; }
 	auto get_time_yield_accrued() const noexcept { return m_time_yield_accrued; }
 
-	auto get_period_remaining() const noexcept { return m_target_time_period - get_elapsed_millis_since(); }
-	auto get_period_fraction()  const noexcept { return get_elapsed_millis_since() / m_target_time_period; }
+	// These getters calculate live values based on current time!
+public:
+	// Get elapsed time in millis since the last period boundary
+	float get_elapsed_millis_since() const noexcept;
+	// Get elapsed time in micros since the last period boundary
+	float get_elapsed_micros_since() const noexcept;
+
+	// Get remaining time in millis until the next period boundary
+	float get_period_remaining() const noexcept { return m_target_time_period - get_elapsed_millis_since(); }
+	// Get the fraction of the current period that has elapsed, in range of [0..1]
+	float get_period_fraction()  const noexcept { return get_elapsed_millis_since() / m_target_time_period; }
 };

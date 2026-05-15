@@ -54,16 +54,6 @@ bool FrameLimiter::is_frame_ready_no_block() noexcept {
 	return has_target_period_elapsed();
 }
 
-float FrameLimiter::get_elapsed_millis_since() const noexcept {
-	return std::chrono::duration_cast<std::chrono::microseconds>
-		(::current_time() - m_last_period_origin).count() / 1e3f;
-}
-
-float FrameLimiter::get_elapsed_micros_since() const noexcept {
-	return std::chrono::duration_cast<std::chrono::nanoseconds>
-		(::current_time() - m_last_period_origin).count() / 1e3f;
-}
-
 /*==================================================================*/
 
 bool FrameLimiter::has_target_period_elapsed() noexcept {
@@ -97,4 +87,18 @@ bool FrameLimiter::has_target_period_elapsed() noexcept {
 	m_last_period_origin = current_time_point;
 	++m_valid_period_count;
 	return true;
+}
+
+/*==================================================================*/
+
+float FrameLimiter::get_elapsed_millis_since() const noexcept {
+	return std::chrono::duration_cast<std::chrono::microseconds>
+		(::current_time() - m_last_period_origin).count() / 1e3f
+		+ m_time_yield_accrued;
+}
+
+float FrameLimiter::get_elapsed_micros_since() const noexcept {
+	return std::chrono::duration_cast<std::chrono::nanoseconds>
+		(::current_time() - m_last_period_origin).count() / 1e3f
+		+ m_time_yield_accrued * 1e3f;
 }
