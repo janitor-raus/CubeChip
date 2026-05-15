@@ -22,8 +22,8 @@ IFamily_CHIP8::IFamily_CHIP8(std::size_t W, std::size_t H) noexcept
 	prepare_user_interface();
 	load_preset_binds();
 
-	m_audio_device.add_audio_stream(STREAM::MAIN, 48'000);
-	m_audio_device.resume_streams();
+	m_audio_device.add_playback_stream(STREAM::MAIN, 0, 1);
+	m_audio_device.resume_all_streams();
 
 	if (calc_file_image_sha1()) {
 		if (auto* path = add_system_path("savestate", family_name)) {
@@ -178,6 +178,9 @@ void IFamily_CHIP8::jump_program_to(u32 next) noexcept {
 
 void IFamily_CHIP8::handle_cycle_loop() noexcept {
 	if (has_cached_system_state(EmuState::BENCH)) {
+		// avg time multiplier to cushion against slice jitter
+		static constexpr auto c_jitter_multiplier = 1.1f;
+
 		ez::EMA frametime_ema;
 		SimpleTimer slice_timer;
 		u32 total_cycles = 0;
@@ -191,7 +194,7 @@ void IFamily_CHIP8::handle_cycle_loop() noexcept {
 			if (m_interrupt != Interrupt::CLEAR) { break; }
 			frametime_ema.add(slice_timer.lap_millis());
 		}
-		while (frametime_ema.avg() < m_pacer.get_period_remaining());
+		while (frametime_ema.avg() * c_jitter_multiplier < m_pacer.get_period_remaining());
 		m_cycle_count = total_cycles;
 		return;
 	} else {
@@ -246,16 +249,17 @@ void IFamily_CHIP8::start_voice_at(u32 voice_index, u32 duration, u32 tone) noex
 	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
 		m_voices[voice_index].set_step((c_tonal_offset + (tone ? tone : 8 \
 			* (((m_current_pc >> 1) + m_stack.head() + 1) & 0x3E) \
-		)) / stream->get_freq() * m_framerate_multiplier);
+		)) / stream->get_freq());
 	}
 }
 
 void IFamily_CHIP8::mix_audio_data(VoiceGenerators processors) noexcept {
 	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
 
-		auto buffer = ::allocate_n<f32>
-			(stream->get_next_buffer_size(get_real_system_framerate()))
-			.as_value().release_as_container();
+		stream->set_freq_ratio(m_framerate_multiplier);
+		auto buffer = ::allocate_n<f32>(
+			stream->next_frame_sample_count(get_real_system_framerate())
+		).as_value().release_as_container();
 
 		if (!has_cached_system_state(EmuState::ANY_PAUSE)) {
 			for (auto& bundle : processors) { bundle.run(buffer, stream); }

@@ -449,9 +449,9 @@ void MEGACHIP::start_audio_track(bool repeat) noexcept {
 		const bool oob = m_track.data + m_track.size > &m_memory.back();
 		if (!m_track.size || oob) { m_track.reset(); }
 		else {
-			m_voices[VOICE::UNIQUE].set_phase(0.0).set_step(m_framerate_multiplier * (
+			m_voices[VOICE::UNIQUE].set_phase(0.0).set_step(
 				(m_memory[m_register_I + 0] << 8 | m_memory[m_register_I + 1]) \
-				/ f64(m_track.size) / stream->get_freq())).userdata = &m_track;
+				/ f64(m_track.size) / stream->get_freq()).userdata = &m_track;
 		}
 	}
 }

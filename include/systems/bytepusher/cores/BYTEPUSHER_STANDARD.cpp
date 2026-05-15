@@ -19,6 +19,10 @@ void BYTEPUSHER_STANDARD::initialize_system() noexcept {
 
 	m_base_system_framerate = c_sys_refresh_rate;
 
+	m_audio_device.add_playback_stream(STREAM::MAIN,
+		s32(c_sys_refresh_rate) * c_sys_audio_sample_total, 1);
+	m_audio_device.resume_all_streams();
+
 	m_memory_editor.set_memory_range(m_memory.data(), m_memory.size());
 
 	auto meta = m_display_device.edit_metadata();
@@ -47,26 +51,25 @@ void BYTEPUSHER_STANDARD::handle_cycle_loop() noexcept {
 
 void BYTEPUSHER_STANDARD::push_audio_data() noexcept {
 	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
-		auto buffer = ::allocate_n<f32>
-			//(stream->get_next_buffer_size(get_real_system_framerate()))
-			(stream->get_next_buffer_size(60)) // XXX - placeholder until we fix audio format input freq
-			.as_value().release_as_container();
+		stream->set_freq_ratio(m_framerate_multiplier);
+
+		float buffer[c_sys_audio_sample_total]{};
 
 		if (!has_cached_system_state(EmuState::ANY_PAUSE)) {
-			static constexpr auto master_gain = 0.25f;
+			static constexpr auto c_master_gain = 0.25f;
 
 			const auto samples = std::span(m_memory.data()
 				+ (read_data<ByteSpan::DOUBLE>(6) << 8), 256);
 
 			std::transform(EXEC_POLICY(unseq)
-				samples.begin(), samples.end(), buffer.data(),
+				samples.begin(), samples.end(), buffer,
 				[](const auto sample) noexcept {
-					return s8(sample) * (master_gain / 127.0f);
+					return s8(sample) * (c_master_gain / 127.0f);
 				}
 			);
 		}
 
-		m_audio_device[STREAM::MAIN].push_audio_data(buffer);
+		stream->push_audio_data(buffer);
 	}
 }
 

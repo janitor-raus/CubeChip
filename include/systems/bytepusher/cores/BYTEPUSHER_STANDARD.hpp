@@ -20,6 +20,8 @@ class BYTEPUSHER_STANDARD final : public IFamily_BYTEPUSHER {
 	static constexpr u64 c_sys_memory_size  = 16_MiB;
 	static constexpr f32 c_sys_refresh_rate = 60.0f;
 
+	static constexpr u32 c_sys_audio_sample_total = 256;
+
 	static constexpr u32 c_sys_screen_W = 256;
 	static constexpr u32 c_sys_screen_H = 256;
 

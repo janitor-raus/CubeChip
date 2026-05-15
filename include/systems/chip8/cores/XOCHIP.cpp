@@ -303,7 +303,7 @@ void XOCHIP::push_video_data() noexcept {
 void XOCHIP::set_pattern_pitch(s32 pitch) noexcept {
 	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
 		m_voices[VOICE::UNIQUE].set_step(std::bit_cast<f32>(
-			c_pitch_frequency_lut[pitch]) / stream->get_freq() * m_framerate_multiplier);
+			c_pitch_frequency_lut[pitch]) / stream->get_freq());
 	}
 }
 

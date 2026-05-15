@@ -69,9 +69,9 @@ void IFamily_BYTEPUSHER::prepare_user_interface() noexcept {
 			SeparatorText("Framerate");
 
 			SetNextItemWidth(widget_width);
-			DragFloat("##framerate_multiplier", &*m_framerate_multiplier, 0.01f,
+			DragFloat("##framerate_multiplier", &*m_framerate_multiplier, 0.001f,
 				m_framerate_multiplier.min, m_framerate_multiplier.max,
-				"Multiplier: %4.1fx", ImGuiSliderFlags_AlwaysClamp);
+				"Multiplier: %5.2fx", ImGuiSliderFlags_AlwaysClamp);
 
 			SeparatorText("CPU Control");
 

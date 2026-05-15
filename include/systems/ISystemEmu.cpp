@@ -137,13 +137,13 @@ auto ISystemEmu::add_system_path(
 
 void ISystemEmu::append_statistics_data() noexcept {
 	const auto framerate = get_real_system_framerate();
-	const auto frametime = m_pacer.get_elapsed_millis_since();
-	const auto framespan = 1000.0f / framerate;
+	const auto frametime = m_pacer.get_elapsed_millis_since() - m_pacer.get_time_yield_accrued();
+	const auto framespan = m_pacer.get_target_time_period();
 
 	format_statistics_data(
-		"Target:{:9.3f} fps |{:9.3f}ms\n"
-		"Render:{:9.3f} ms ({:>6.2f}%)\n",
-		framerate, framespan, frametime,
+		"Target:{:8.3f}ms | {:7.3f}hz\n"
+		"Render:{:8.3f}ms ({:>6.2f}%)\n",
+		framespan, framerate, frametime,
 		frametime / framespan * 100.0f
 	);
 }

@@ -9,7 +9,6 @@
 #include "AssignCast.hpp"
 #include "GlobalAudioBase.hpp"
 #include "AudioDevice.hpp"
-#include "LifetimeWrapperSDL.hpp"
 #include "BasicLogger.hpp"
 
 #include <SDL3/SDL_audio.h>
@@ -22,64 +21,117 @@ static float calculate_gain(float stream_gain) noexcept {
 }
 
 /*==================================================================*/
-	#pragma region AudioDevice Class
 
-bool AudioDevice::add_audio_stream(
-	unsigned streamID, unsigned frequency,
-	unsigned channels, unsigned device
-) {
-	SDL_AudioSpec spec{ SDL_AUDIO_F32, signed(channels), signed(frequency) };
-
-	auto* ptr = SDL_OpenAudioDeviceStream(
-		device ? device : SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr);
-
-	if (!ptr) {
-		blog.warn("Failed to open audio stream: {}", SDL_GetError());
-		return false;
-	}
-
-	if (auto slot = at(streamID)) {
-		*slot = Stream(ptr, spec.format, spec.freq, spec.channels);
-		return true;
+auto AudioDevice::insert_audio_stream(signed stream_id, SDL_AudioStream* device_ptr) noexcept -> Stream* {
+	if (auto slot = at(stream_id)) {
+		blog.warn("Audio stream with ID '{}' already exists!", stream_id);
+		*slot = Stream(device_ptr);
+		return slot;
 	} else {
-		return (m_audio_streams.try_emplace(streamID, ptr,
-			spec.format, spec.freq, spec.channels)).second;
+		auto [it, inserted] = m_audio_streams.try_emplace(stream_id, device_ptr);
+		if (inserted) {
+			return &it->second;
+		} else {
+			blog.error("Failed to insert audio stream with ID '{}'!", stream_id);
+			(void) sdl::make_unique<SDL_AudioStream>(device_ptr); // auto cleanup!
+			return nullptr;
+		}
+	}
+}
+
+void AudioDevice::add_playback_stream(signed stream_id, signed freq, signed channels) {
+	if (auto* device_ptr = SDL_OpenAudioDeviceStream(
+		SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,
+		nullptr, nullptr, nullptr
+	)) {
+		const bool new_freq = freq > 0;
+		const bool new_channels = channels >= 1 && channels <= 8;
+
+		if (auto stream_ptr = insert_audio_stream(stream_id, device_ptr)) {
+			stream_ptr->set_spec(new_freq ? freq : 0, new_channels ? channels : 0);
+		}
+	} else {
+		blog.error("Failed to open audio playback stream: {}", SDL_GetError());
+	}
+}
+
+void AudioDevice::add_recording_stream(signed stream_id, signed freq, signed channels) {
+	if (auto* device_ptr = SDL_OpenAudioDeviceStream(
+		SDL_AUDIO_DEVICE_DEFAULT_RECORDING,
+		nullptr, nullptr, nullptr
+	)) {
+		const bool new_freq = freq > 0;
+		const bool new_channels = channels >= 1 && channels <= 8;
+
+		if (auto stream_ptr = insert_audio_stream(stream_id, device_ptr)) {
+			stream_ptr->set_spec(new_freq ? freq : 0, new_channels ? channels : 0);
+		}
+	} else {
+		blog.error("Failed to open audio recording stream: {}", SDL_GetError());
 	}
 }
 
 /*==================================================================*/
 
-unsigned AudioDevice::get_stream_count() const noexcept {
-	return unsigned(m_audio_streams.size());
-}
-
-void AudioDevice::pause_streams() noexcept {
+void AudioDevice::pause_all_streams() noexcept {
 	for (auto& stream : m_audio_streams) {
 		SDL_PauseAudioStreamDevice(stream.second);
 	}
 }
 
-void AudioDevice::resume_streams() noexcept {
+void AudioDevice::resume_all_streams() noexcept {
 	for (auto& stream : m_audio_streams) {
 		SDL_ResumeAudioStreamDevice(stream.second);
 	}
 }
 
-	#pragma endregion
-/*VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
+/*==================================================================*/
 
-AudioDevice::Stream::Stream(
-	SDL_AudioStream* ptr,
-	unsigned format, unsigned freq, unsigned channels
-) noexcept
-	: m_ptr     (ptr     )
-	, m_format  (format  )
-	, m_freq    (freq    )
-	, m_channels(channels)
-{}
+void AudioDevice::Stream::update_cached_spec() noexcept {
+	SDL_AudioSpec actual;
 
-auto AudioDevice::Stream::get_spec() const noexcept -> SDL_AudioSpec {
-	return { SDL_AudioFormat(m_format), signed(m_freq), signed(m_channels) };
+	if (is_playback()) {
+		SDL_GetAudioStreamFormat(m_ptr, &actual, nullptr);
+	} else {
+		SDL_GetAudioStreamFormat(m_ptr, nullptr, &actual);
+	}
+
+	m_freq = actual.freq; m_channels = actual.channels;
+}
+
+bool AudioDevice::Stream::set_spec(signed freq, signed channels) noexcept {
+	const bool needs_default_freq = freq <= 0;
+	const bool needs_default_channels = channels < 1 || channels > 8;
+
+	signed new_freq = freq, new_channels = channels;
+
+	if (needs_default_freq || needs_default_channels) {
+		update_cached_spec();
+		if (needs_default_freq)     { new_freq = m_freq; }
+		if (needs_default_channels) { new_channels = m_channels; }
+	}
+
+	// return early if spec is unchanged, avoid needless calls and accumulator reset
+	if (new_freq == m_freq && new_channels == m_channels) { return true; }
+	const SDL_AudioSpec spec{ SDL_AUDIO_F32, new_channels, new_freq };
+
+	if (SDL_SetAudioStreamFormat(m_ptr, &spec, &spec)) {
+		update_cached_spec(); m_accumulator = 0;
+		return true;
+	} else {
+		blog.warn("Failed to update audio stream spec: {}", SDL_GetError());
+		return false;
+	}
+}
+
+bool AudioDevice::Stream::set_freq_ratio(float ratio) noexcept {
+	if (SDL_SetAudioStreamFrequencyRatio(m_ptr, std::clamp(ratio, 0.01f, 100.0f))) {
+		m_last_freq_ratio = ratio;
+		return true;
+	} else {
+		blog.warn("Failed to set audio stream frequency ratio: {}", SDL_GetError());
+		return false;
+	}
 }
 
 bool AudioDevice::Stream::is_paused() const noexcept {
@@ -91,20 +143,25 @@ bool AudioDevice::Stream::is_playback() const noexcept {
 	return SDL_IsAudioDevicePlayback(SDL_GetAudioStreamDevice(m_ptr));
 }
 
-float AudioDevice::Stream::get_raw_sample_rate(float framerate) const noexcept {
+float AudioDevice::Stream::get_samples_per_frame(float framerate) const noexcept {
 	if (framerate < 1.0) { return 0.0; }
 	return m_freq / framerate * m_channels;
 }
 
-unsigned AudioDevice::Stream::get_next_buffer_size(float framerate) noexcept {
+auto AudioDevice::Stream::next_frame_sample_count(float framerate) noexcept -> std::size_t {
 	if (framerate < 1.0f) { return 0u; }
 
-	static constexpr auto scale_factor = 1ull << 24;
-	::assign_cast_add(m_accumulator, m_freq / framerate * scale_factor);
-	const auto sample_amount = m_accumulator >> 24;
-	::assign_cast_and(m_accumulator, scale_factor - 1);
+	if (framerate != m_last_buffer_framerate) {
+		m_last_buffer_framerate = framerate;
+		m_accumulator = 0ull;
+	}
 
-	return unsigned(sample_amount * m_channels);
+	static constexpr auto c_scale_factor = 1ull << 24;
+	::assign_cast_add(m_accumulator, m_freq * m_last_freq_ratio / framerate * c_scale_factor);
+	const auto sample_amount = m_accumulator >> 24;
+	::assign_cast_and(m_accumulator, c_scale_factor - 1);
+
+	return sample_amount * m_channels;
 }
 
 void AudioDevice::Stream::pause() noexcept {
