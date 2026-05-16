@@ -76,9 +76,10 @@ public:
 /*==================================================================*/
 
 /**
- * @brief The Voice class represents a single audio voice with phase, step, and volume control.
- * It provides methods to manage phase progression and volume levels, and is suitable for
- * voice synthesis and audio processing.
+ * @brief The Voice class represents a single audio voice with phase, step, volume control
+ * and a built-in AudioTimer. It provides methods to manage phase progression and volume levels, and is suitable for
+ * voice synthesis and audio processing. Implicitly converts to the current timer value to
+ * allow easy gauging of the voice's active state and duration remaining.
  */
 class Voice {
 	using self = Voice;
@@ -90,12 +91,14 @@ protected:
 	float  m_master_gain{}; // Mastering volume control to manually balance against other voices.
 
 public:
-	// Pass along additional data to a voice processor, if needed.
-	void* userdata{};
+	AudioTimer timer{};
 
 	Voice(float master_gain = 0.2f) noexcept : m_volume_gain(1.0f) {
 		set_master_gain(master_gain);
 	}
+
+	// When accessed directly, implicitly forward along to the timer member.
+	constexpr operator unsigned() const noexcept { return timer.get(); }
 
 	// Get the volume of the voice, in range of: [0..1]
 	constexpr float get_volume()     const noexcept { return m_volume_gain; }
@@ -136,22 +139,8 @@ public:
 
 /*==================================================================*/
 
-using Stream = AudioDevice::Stream;
+#include <span>
+using SampleBuffer = std::span<float>;
 
-using SampleGenerator = void (*)(float*, unsigned, Voice*, Stream*) noexcept;
-
-struct GeneratorBundle {
-	SampleGenerator functor;
-	Voice* voice;
-
-	GeneratorBundle(SampleGenerator p, Voice* v) noexcept
-		: functor(p), voice(v)
-	{}
-
-	template <IsContiguousContainerOf<float> T>
-	constexpr void run(T& buffer, Stream* stream) const noexcept {
-		functor(std::data(buffer), unsigned(std::size(buffer)), voice, stream);
-	}
-};
-
-using VoiceGenerators = std::initializer_list<GeneratorBundle>;
+template <typename T>
+concept IsSampleGenerator = std::is_nothrow_invocable_r_v<void, T, SampleBuffer>;

@@ -71,14 +71,29 @@ protected:
 	std::array<Voice, VOICE::COUNT>
 		m_voices{};
 
-	std::array<AudioTimer, VOICE::COUNT>
-		m_audio_timers{};
-
 	void start_voice(u32 duration, u32 tone = 0) noexcept;
 	void start_voice_at(u32 voice_index, u32 duration, u32 tone = 0) noexcept;
 
-	void mix_audio_data(VoiceGenerators processors) noexcept;
-	static void make_pulse_wave(f32* data, u32 size, Voice* voice, Stream* stream) noexcept;
+	template <typename... Generator>
+		requires ((IsSampleGenerator<Generator> && ...))
+	void mix_audio_data(Generator&&... generators) noexcept {
+		if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
+			stream->set_freq_ratio(m_framerate_multiplier);
+
+			auto buffer = allocate_n<f32>(
+				stream->next_frame_sample_count(get_real_system_framerate())
+			).as_value().release_as_container();
+
+			if (!has_cached_system_state(EmuState::ANY_PAUSE)) {
+				(std::forward<Generator>(generators)(buffer.span()), ...);
+				for (auto& sample : buffer) { sample = ez::fast_tanh(sample); }
+			}
+
+			stream->push_audio_data(buffer);
+		}
+	}
+
+	static void make_pulse_wave(SampleBuffer buffer, Voice& voice) noexcept;
 
 /*==================================================================*/
 

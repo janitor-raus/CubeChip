@@ -24,9 +24,6 @@ void CHIP8X::initialize_system() noexcept {
 
 	m_memory_editor.set_memory_range(m_memory.data(), m_memory.size(), 0x8000);
 
-	m_voices[VOICE::UNIQUE].userdata = &m_audio_timers[VOICE::UNIQUE];
-	m_voices[VOICE::BUZZER].userdata = &m_audio_timers[VOICE::BUZZER];
-
 	m_current_pc = c_sys_boot_pos;
 	m_standard_cpf = c_sys_speed_hi;
 
@@ -223,14 +220,14 @@ void CHIP8X::instruction_loop() noexcept {
 }
 
 void CHIP8X::push_audio_data() noexcept {
-	mix_audio_data({
-		{ make_pulse_wave, &m_voices[VOICE::UNIQUE] },
-		{ make_pulse_wave, &m_voices[VOICE::BUZZER] },
-	});
+	mix_audio_data(
+		[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::UNIQUE]); },
+		[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::BUZZER]); }
+	);
 
 	static constexpr u32 idx[]{ 2, 7, 4, 1 };
 	m_display_device.edit_metadata()->set_border_color_if(
-		!!::accumulate(m_audio_timers, 0), c_fore_colors[idx[m_background_color]]);
+		!!::accumulate(m_voices, 0), c_fore_colors[idx[m_background_color]]);
 }
 
 void CHIP8X::push_video_data() noexcept {
@@ -570,7 +567,7 @@ void CHIP8X::color_hires_zone(u32 X, u32 Y, u32 idx, u32 N) noexcept {
 		::assign_cast(m_delay_timer, m_registers_V[X]);
 	}
 	void CHIP8X::instruction_Fx18(u32 X) noexcept {
-		m_audio_timers[VOICE::UNIQUE].set(m_registers_V[X] + (m_registers_V[X] == 1));
+		m_voices[VOICE::UNIQUE].timer.set(m_registers_V[X] + (m_registers_V[X] == 1));
 	}
 	void CHIP8X::instruction_Fx1E(u32 X) noexcept {
 		::assign_cast_add(m_register_I, m_registers_V[X]);

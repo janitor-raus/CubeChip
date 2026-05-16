@@ -112,8 +112,9 @@ void IFamily_CHIP8::handle_pre_work_interrupts() noexcept {
 			return;
 
 		case Interrupt::SOUND:
-			for (auto& timer : m_audio_timers)
-				{ if (timer.get()) { return; } }
+			for (auto& voice : m_voices) {
+				if (voice.timer.get()) { return; }
+			}
 			m_interrupt = Interrupt::WAIT1;
 			m_standard_cpf = 0;
 			return;
@@ -161,8 +162,8 @@ void IFamily_CHIP8::handle_post_work_interrupts() noexcept {
 void IFamily_CHIP8::handle_timer_ticks() noexcept {
 	if (m_delay_timer) { --m_delay_timer; }
 
-	for (auto& timer : m_audio_timers)
-		{ timer.dec(); }
+	for (auto& voice : m_voices)
+		{ voice.timer.dec(); }
 }
 
 void IFamily_CHIP8::skip_instruction() noexcept {
@@ -245,7 +246,7 @@ void IFamily_CHIP8::start_voice(u32 duration, u32 tone) noexcept {
 }
 
 void IFamily_CHIP8::start_voice_at(u32 voice_index, u32 duration, u32 tone) noexcept {
-	m_audio_timers[voice_index].set(duration);
+	m_voices[voice_index].timer.set(duration);
 	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
 		m_voices[voice_index].set_step((c_tonal_offset + (tone ? tone : 8 \
 			* (((m_current_pc >> 1) + m_stack.head() + 1) & 0x3E) \
@@ -253,34 +254,17 @@ void IFamily_CHIP8::start_voice_at(u32 voice_index, u32 duration, u32 tone) noex
 	}
 }
 
-void IFamily_CHIP8::mix_audio_data(VoiceGenerators processors) noexcept {
-	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
+void IFamily_CHIP8::make_pulse_wave(SampleBuffer buffer, Voice& voice) noexcept {
+	const auto buffer_size = u32(buffer.size());
+	if (buffer_size == 0) { return; }
 
-		stream->set_freq_ratio(m_framerate_multiplier);
-		auto buffer = ::allocate_n<f32>(
-			stream->next_frame_sample_count(get_real_system_framerate())
-		).as_value().release_as_container();
-
-		if (!has_cached_system_state(EmuState::ANY_PAUSE)) {
-			for (auto& bundle : processors) { bundle.run(buffer, stream); }
-			for (auto& sample : buffer) { sample = ez::fast_tanh(sample); }
-		}
-
-		stream->push_audio_data(buffer);
-	}
-}
-
-void IFamily_CHIP8::make_pulse_wave(f32* data, u32 size, Voice* voice, Stream*) noexcept {
-	if (!voice || !voice->userdata) [[unlikely]] { return; }
-	auto* timer = static_cast<AudioTimer*>(voice->userdata);
-
-	for (auto i = 0u; i < size; ++i) {
-		if (const auto gain = voice->get_level(i, *timer)) {
-			::assign_cast_add(data[i], \
-				WaveForms::pulse(voice->peek_phase(i)) * gain);
+	for (auto i = 0u; i < buffer_size; ++i) {
+		if (const auto gain = voice.get_level(i, voice.timer)) {
+			::assign_cast_add(buffer[i], \
+				WaveForms::pulse(voice.peek_phase(i)) * gain);
 		} else break;
 	}
-	voice->step_phase(size);
+	voice.step_phase(buffer_size);
 }
 
 void IFamily_CHIP8::instruction_error(u32 HI, u32 LO) noexcept {

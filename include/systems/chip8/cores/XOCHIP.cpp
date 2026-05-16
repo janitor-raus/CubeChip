@@ -25,9 +25,6 @@ void XOCHIP::initialize_system() noexcept {
 
 	set_pattern_pitch(64);
 
-	m_voices[VOICE::UNIQUE].userdata = this; // XXX - this is a bit hacky
-	m_voices[VOICE::BUZZER].userdata = &m_audio_timers[VOICE::BUZZER];
-
 	m_current_pc = c_sys_boot_pos;
 	m_standard_cpf = c_sys_speed_lo;
 	m_bit_colors = s_bit_colors;
@@ -252,13 +249,13 @@ void XOCHIP::instruction_loop() noexcept {
 }
 
 void XOCHIP::push_audio_data() noexcept {
-	mix_audio_data({
-		{ make_pattern_wave, &m_voices[VOICE::UNIQUE] },
-		{ make_pulse_wave,   &m_voices[VOICE::BUZZER] },
-	});
+	mix_audio_data(
+		[&](auto buffer) noexcept { make_pattern_wave(buffer, m_voices[VOICE::UNIQUE], m_pulse_pattern_data); },
+		[&](auto buffer) noexcept { make_pulse_wave  (buffer, m_voices[VOICE::BUZZER]); }
+	);
 
 	m_display_device.edit_metadata()->set_border_color_if(
-		!!m_audio_timers[VOICE::BUZZER], m_bit_colors[1]);
+		!!m_voices[VOICE::BUZZER], m_bit_colors[1]);
 }
 
 void XOCHIP::push_video_data() noexcept {
@@ -307,22 +304,22 @@ void XOCHIP::set_pattern_pitch(s32 pitch) noexcept {
 	}
 }
 
-void XOCHIP::make_pattern_wave(f32* data, u32 size, Voice* voice, Stream*) noexcept {
-	if (!voice || !voice->userdata) [[unlikely]] { return; }
+void XOCHIP::make_pattern_wave(
+	SampleBuffer buffer, Voice& voice,
+	const PatternData& pattern_data
+) noexcept {
+	const auto buffer_size = u32(buffer.size());
+	if (buffer_size == 0) { return; }
 
-	// XXX -- this is a bit hacky, will be refactored in the future
-	auto& instance = *static_cast<XOCHIP*>(voice->userdata);
-	auto& timer = instance.m_audio_timers[VOICE::UNIQUE];
-
-	for (auto i = 0u; i < size; ++i) {
-		if (const auto gain = voice->get_level(i, timer)) {
-			const auto bit_step = s32(voice->peek_phase(i) * 128.0f);
+	for (auto i = 0u; i < buffer_size; ++i) {
+		if (const auto gain = voice.get_level(i, voice.timer)) {
+			const auto bit_step = s32(voice.peek_phase(i) * 128.0f);
 			const auto bit_mask = 1 << (0x7 ^ (bit_step & 0x7));
-			::assign_cast_add(data[i], \
-				(instance.m_pulse_pattern_data[bit_step >> 3] & bit_mask) ? gain : -gain);
+			::assign_cast_add(buffer[i], \
+				(pattern_data[bit_step >> 3] & bit_mask) ? gain : -gain);
 		} else break;
 	}
-	voice->step_phase(size);
+	voice.step_phase(buffer_size);
 }
 
 /*==================================================================*/
@@ -733,7 +730,7 @@ void XOCHIP::scroll_display_rt() noexcept {
 		::assign_cast(m_delay_timer, m_registers_V[X]);
 	}
 	void XOCHIP::instruction_Fx18(u32 X) noexcept {
-		m_audio_timers[VOICE::UNIQUE].set(m_registers_V[X] + (m_registers_V[X] == 1));
+		m_voices[VOICE::UNIQUE].timer.set(m_registers_V[X] + (m_registers_V[X] == 1));
 	}
 	void XOCHIP::instruction_Fx1E(u32 X) noexcept {
 		::assign_cast_add(m_register_I, m_registers_V[X]);

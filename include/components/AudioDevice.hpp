@@ -74,7 +74,7 @@ public:
 
 		operator SDL_AudioStream*() const noexcept { return m_ptr.get(); }
 
-		void push_raw_audio_data(void* sample_data, std::size_t buffer_size, std::size_t sample_size) const;
+		void push_raw_audio_data(void* sample_data, std::size_t buffer_size, std::size_t sample_size) noexcept;
 
 		/**
 		 * @brief Pushes buffer of audio samples to SDL device/stream.
@@ -83,7 +83,7 @@ public:
 		 * @param[in] buffer_size :: size of buffer in bytes.
 		 */
 		template <IsPlainOldData T>
-		void push_audio_data(T* sample_data, std::size_t buffer_size) const {
+		void push_audio_data(T* sample_data, std::size_t buffer_size) noexcept {
 			push_raw_audio_data(sample_data, buffer_size, sizeof(T));
 		}
 
@@ -93,7 +93,7 @@ public:
 		 * @param[in] samples_buffer :: audio samples buffer (C style).
 		 */
 		template <IsPlainOldData T, std::size_t N>
-		void push_audio_data(T(&samples_buffer)[N]) const {
+		void push_audio_data(T(&samples_buffer)[N]) noexcept {
 			push_raw_audio_data(samples_buffer, N, sizeof(T));
 		}
 
@@ -103,7 +103,7 @@ public:
 		 * @param[in] samples_buffer :: audio samples buffer (C++ style).
 		 */
 		template <IsContiguousContainer T> requires(IsPlainOldData<ValueType<T>>)
-		void push_audio_data(T& samples_buffer) const {
+		void push_audio_data(T& samples_buffer) noexcept {
 			push_raw_audio_data(std::data(samples_buffer), std::size(samples_buffer), sizeof(ValueType<T>));
 		}
 	};
@@ -122,8 +122,8 @@ private:
 	auto insert_audio_stream(StreamID stream_id, SDL_AudioStream* stream_ptr) noexcept -> Stream*;
 
 public:
-	void add_playback_stream(StreamID stream_id, signed freq = 0, signed channels = 0);
-	void add_recording_stream(StreamID stream_id, signed freq = 0, signed channels = 0);
+	void add_playback_stream(StreamID stream_id, signed freq = 0, signed channels = 0) noexcept;
+	void add_recording_stream(StreamID stream_id, signed freq = 0, signed channels = 0) noexcept;
 
 	auto get_stream_count() const noexcept { return m_audio_streams.size(); }
 
@@ -131,7 +131,7 @@ public:
 	void resume_all_streams() noexcept;
 
 	[[nodiscard]]
-	Stream& operator[](StreamID key) noexcept {
+	Stream& operator[](StreamID key) {
 		return m_audio_streams.at(key);
 	}
 

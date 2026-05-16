@@ -135,7 +135,9 @@ public:
 	constexpr size_type size()       const noexcept { return m_size; }
 	constexpr size_type size_bytes() const noexcept { return size() * sizeof(T); }
 	constexpr bool      empty()      const noexcept { return size() == 0; }
-	constexpr auto      span()       const noexcept { return std::span(data(), size()); }
+
+	constexpr auto span() /***/ noexcept { return std::span(data(), size()); }
+	constexpr auto span() const noexcept { return std::span(data(), size()); }
 
 	constexpr pointer   data()  { return m_data.get(); }
 	constexpr reference front() { return data()[0]; }

@@ -215,7 +215,10 @@ private:
 
 	void set_pattern_pitch(s32 pitch) noexcept;
 
-	static void make_pattern_wave(f32* data, u32 size, Voice* voice, Stream*) noexcept;
+	static void make_pattern_wave(
+		SampleBuffer buffer, Voice& voice,
+		const PatternData& pattern_data
+	) noexcept;
 
 /*==================================================================*/
 

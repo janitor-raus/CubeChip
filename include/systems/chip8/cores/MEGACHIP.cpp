@@ -21,9 +21,6 @@ void MEGACHIP::initialize_system() noexcept {
 
 	m_memory_editor.set_memory_range(m_memory.data(), m_memory.size());
 
-	m_voices[VOICE::UNIQUE].userdata = &m_audio_timers[VOICE::UNIQUE];
-	m_voices[VOICE::BUZZER].userdata = &m_audio_timers[VOICE::BUZZER];
-
 	m_current_pc = c_sys_boot_pos;
 
 	set_display_properties(Resolution::LO);
@@ -289,24 +286,24 @@ void MEGACHIP::instruction_loop() noexcept {
 
 void MEGACHIP::push_audio_data() noexcept {
 	if (use_manual_vsync()) {
-		mix_audio_data({
-			{ make_stream_wave, &m_voices[VOICE::UNIQUE] },
-			{ make_pulse_wave,  &m_voices[VOICE::BUZZER] },
-		});
+		mix_audio_data(
+			[&](auto buffer) noexcept { make_stream_wave(buffer, m_voices[VOICE::UNIQUE], m_track); },
+			[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::BUZZER]); }
+		);
 
 		m_display_device.edit_metadata()->set_border_color_if(
-			!!m_audio_timers[VOICE::BUZZER], s_bit_colors[1]);
+			!!m_voices[VOICE::BUZZER].timer, s_bit_colors[1]);
 	}
 	else {
-		mix_audio_data({
-			{ make_pulse_wave, &m_voices[VOICE::ID_0] },
-			{ make_pulse_wave, &m_voices[VOICE::ID_1] },
-			{ make_pulse_wave, &m_voices[VOICE::ID_2] },
-			{ make_pulse_wave, &m_voices[VOICE::BUZZER] },
-		});
+		mix_audio_data(
+			[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::ID_0]); },
+			[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::ID_1]); },
+			[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::ID_2]); },
+			[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::BUZZER]); }
+		);
 
 		m_display_device.edit_metadata()->set_border_color_if(
-			!!::accumulate(m_audio_timers, 0), s_bit_colors[1]);
+			!!::accumulate(m_voices, 0), s_bit_colors[1]);
 	}
 }
 
@@ -451,27 +448,25 @@ void MEGACHIP::start_audio_track(bool repeat) noexcept {
 		else {
 			m_voices[VOICE::UNIQUE].set_phase(0.0).set_step(
 				(m_memory[m_register_I + 0] << 8 | m_memory[m_register_I + 1]) \
-				/ f64(m_track.size) / stream->get_freq()).userdata = &m_track;
+				/ f64(m_track.size) / stream->get_freq());
 		}
 	}
 }
 
-void MEGACHIP::make_stream_wave(f32* data, u32 size, Voice* voice, Stream*) noexcept {
-	if (!voice || !voice->userdata) [[unlikely]] { return; }
-	if (auto* track = static_cast<TrackData*>(voice->userdata)) {
-		if (!track->enabled()) { return; }
+void MEGACHIP::make_stream_wave(SampleBuffer buffer, Voice& voice, TrackData& track) noexcept {
+	const auto buffer_size = u32(buffer.size());
+	if (buffer_size == 0 || !track.enabled()) { return; }
 
-		for (auto i = 0u; i < size; ++i) {
-			const auto head = voice->peek_raw_phase(i);
-			if (!track->loop && head >= 1.0) {
-				track->reset(); return;
-			} else {
-				::assign_cast_add(data[i], (1.0 / 128) * \
-					track->pos(head));
-			}
+	for (auto i = 0u; i < buffer_size; ++i) {
+		const auto head = voice.peek_raw_phase(i);
+		if (!track.loop && head >= 1.0) {
+			track.reset(); return;
+		} else {
+			::assign_cast_add(buffer[i], (1.0 / 128) * \
+				track.pos(head));
 		}
-		voice->step_phase(size);
 	}
+	voice.step_phase(buffer_size);
 }
 
 void MEGACHIP::scroll_buffers_up(u32 N) noexcept {

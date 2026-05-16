@@ -32,7 +32,7 @@ auto AudioDevice::insert_audio_stream(StreamID stream_id, SDL_AudioStream* devic
 	}
 }
 
-void AudioDevice::add_playback_stream(StreamID stream_id, signed freq, signed channels) {
+void AudioDevice::add_playback_stream(StreamID stream_id, signed freq, signed channels) noexcept {
 	if (auto* device_ptr = SDL_OpenAudioDeviceStream(
 		SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,
 		nullptr, nullptr, nullptr
@@ -48,7 +48,7 @@ void AudioDevice::add_playback_stream(StreamID stream_id, signed freq, signed ch
 	}
 }
 
-void AudioDevice::add_recording_stream(StreamID stream_id, signed freq, signed channels) {
+void AudioDevice::add_recording_stream(StreamID stream_id, signed freq, signed channels) noexcept {
 	if (auto* device_ptr = SDL_OpenAudioDeviceStream(
 		SDL_AUDIO_DEVICE_DEFAULT_RECORDING,
 		nullptr, nullptr, nullptr
@@ -184,8 +184,8 @@ void AudioDevice::Stream::add_gain(float add_gain) noexcept {
 
 void AudioDevice::Stream::push_raw_audio_data(void* sample_data,
 	std::size_t buffer_size, std::size_t sample_size
-) const {
-	if (is_paused() || buffer_size == 0u) { return; }
+) noexcept {
+	if (is_paused() || buffer_size == 0) { return; }
 
 	SDL_SetAudioDeviceGain(SDL_GetAudioStreamDevice(m_ptr),
 		GlobalAudioBase::is_muted() ? 0.0f : GlobalAudioBase::get_global_gain());

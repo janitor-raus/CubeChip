@@ -24,11 +24,6 @@ void SCHIP_LEGACY::initialize_system() noexcept {
 
 	m_memory_editor.set_memory_range(m_memory.data(), m_memory.size(), 0x8000);
 
-	m_voices[VOICE::ID_0].userdata = &m_audio_timers[VOICE::ID_0];
-	m_voices[VOICE::ID_1].userdata = &m_audio_timers[VOICE::ID_1];
-	m_voices[VOICE::ID_2].userdata = &m_audio_timers[VOICE::ID_2];
-	m_voices[VOICE::ID_3].userdata = &m_audio_timers[VOICE::ID_3];
-
 	m_current_pc = c_sys_boot_pos;
 	m_standard_cpf = c_sys_speed_hi;
 
@@ -224,15 +219,15 @@ void SCHIP_LEGACY::instruction_loop() noexcept {
 }
 
 void SCHIP_LEGACY::push_audio_data() noexcept {
-	mix_audio_data({
-		{ make_pulse_wave, &m_voices[VOICE::ID_0] },
-		{ make_pulse_wave, &m_voices[VOICE::ID_1] },
-		{ make_pulse_wave, &m_voices[VOICE::ID_2] },
-		{ make_pulse_wave, &m_voices[VOICE::BUZZER] },
-	});
+	mix_audio_data(
+		[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::ID_0]); },
+		[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::ID_1]); },
+		[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::ID_2]); },
+		[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::BUZZER]); }
+	);
 
 	m_display_device.edit_metadata()->set_border_color_if(
-		!!::accumulate(m_audio_timers, 0), s_bit_colors[1]);
+		!!::accumulate(m_voices, 0), s_bit_colors[1]);
 }
 
 void SCHIP_LEGACY::push_video_data() noexcept {

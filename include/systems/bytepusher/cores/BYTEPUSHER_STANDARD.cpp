@@ -56,7 +56,7 @@ void BYTEPUSHER_STANDARD::push_audio_data() noexcept {
 		float buffer[c_sys_audio_sample_total]{};
 
 		if (!has_cached_system_state(EmuState::ANY_PAUSE)) {
-			static constexpr auto c_master_gain = 0.25f;
+			static constexpr auto c_master_gain = 0.5f;
 
 			const auto samples = std::span(m_memory.data()
 				+ (read_data<ByteSpan::DOUBLE>(6) << 8), 256);

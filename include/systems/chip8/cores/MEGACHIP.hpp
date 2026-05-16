@@ -114,7 +114,7 @@ public:
 
 	void start_audio_track(bool repeat) noexcept;
 
-	static void make_stream_wave(f32* data, u32 size, Voice* voice, Stream*) noexcept;
+	static void make_stream_wave(SampleBuffer buffer, Voice& voice, TrackData& track) noexcept;
 
 /*==================================================================*/
 
