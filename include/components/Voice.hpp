@@ -14,7 +14,7 @@
 
 inline constexpr auto c_envelope_default_step = 0.01f;
 
-inline constexpr float transient_gain(unsigned iter, float step = c_envelope_default_step) noexcept {
+inline constexpr float transient_rise(unsigned iter, float step = c_envelope_default_step) noexcept {
 	return std::min(0.0f + step * (iter + 1), 1.0f);
 }
 
@@ -39,7 +39,7 @@ struct FadeEnvelope {
 	{}
 
 	constexpr auto calculate(unsigned sample_idx, float step = default_step) const noexcept {
-		return  intro ? ::transient_gain(sample_idx, step) :
+		return  intro ? ::transient_rise(sample_idx, step) :
 				outro ? ::transient_fall(sample_idx, step) : float(fallback);
 	}
 };
