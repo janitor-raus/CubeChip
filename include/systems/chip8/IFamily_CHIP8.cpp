@@ -255,16 +255,18 @@ void IFamily_CHIP8::start_voice_at(u32 voice_index, u32 duration, u32 tone) noex
 }
 
 void IFamily_CHIP8::make_pulse_wave(SampleBuffer buffer, Voice& voice) noexcept {
-	const auto buffer_size = u32(buffer.size());
-	if (buffer_size == 0) { return; }
+	if (const auto sample_count = u32(buffer.size())) {
+		const auto fade_step = ::calc_fade_step(sample_count);
 
-	for (auto i = 0u; i < buffer_size; ++i) {
-		if (const auto gain = voice.get_level(i, voice.timer)) {
-			::assign_cast_add(buffer[i], \
-				WaveForms::pulse(voice.peek_phase(i)) * gain);
-		} else break;
+		for (auto i = 0u; i < sample_count; ++i) {
+			if (const auto gain = voice.get_level(i, voice.timer, fade_step)) {
+				::assign_cast_add(buffer[i], \
+					WaveForms::pulse(voice.peek_phase(i)) * gain);
+			}
+			else break;
+		}
+		voice.step_phase(sample_count);
 	}
-	voice.step_phase(buffer_size);
 }
 
 void IFamily_CHIP8::instruction_error(u32 HI, u32 LO) noexcept {

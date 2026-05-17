@@ -8,41 +8,45 @@
 
 #include <algorithm>
 
-#include "Concepts.hpp"
 #include "Waveforms.hpp"
-#include "AudioDevice.hpp"
 
 /*==================================================================*/
 
-constexpr inline float transient_gain(unsigned iter, float step = 0.01f) noexcept {
+inline constexpr auto c_envelope_default_step = 0.01f;
+
+inline constexpr float transient_gain(unsigned iter, float step = c_envelope_default_step) noexcept {
 	return std::min(0.0f + step * (iter + 1), 1.0f);
 }
 
-constexpr inline float transient_fall(unsigned iter, float step = 0.01f) noexcept {
+inline constexpr float transient_fall(unsigned iter, float step = c_envelope_default_step) noexcept {
 	return std::max(1.0f - step * (iter + 1), 0.0f);
 }
 
-/*==================================================================*/
-
 /**
-* @brief The TransienceGain struct is used to calculate and return gain for a fade-in/out period.
+* @brief The FadeEnvelope struct is used to adjust sample strength for a fade-in/out period.
 * Usually constructed from an AudioTimer instance, but can be operated independently too.
 */
-struct TransienceGain {
+struct FadeEnvelope {
 	bool intro    : 1 = false;
 	bool outro    : 1 = false;
 	bool fallback : 1 = true;
 
-	constexpr TransienceGain() noexcept = default;
-	constexpr TransienceGain(bool intro, bool outro, bool fallback) noexcept
+	static constexpr auto default_step = c_envelope_default_step;
+
+	constexpr FadeEnvelope() noexcept = default;
+	constexpr FadeEnvelope(bool intro, bool outro, bool fallback) noexcept
 		: intro(intro), outro(outro), fallback(fallback)
 	{}
 
-	constexpr auto calculate(unsigned sample_idx, float step = 0.01f) const noexcept {
+	constexpr auto calculate(unsigned sample_idx, float step = default_step) const noexcept {
 		return  intro ? ::transient_gain(sample_idx, step) :
-				outro ? ::transient_fall(sample_idx, step) : fallback;
+				outro ? ::transient_fall(sample_idx, step) : float(fallback);
 	}
 };
+
+inline constexpr float calc_fade_step(std::size_t sample_count, float fade_divisor = 2.0f) noexcept {
+	return sample_count ? std::max(c_envelope_default_step, fade_divisor / float(sample_count)) : 0.0f;
+}
 
 /*==================================================================*/
 
@@ -68,8 +72,8 @@ public:
 
 	constexpr operator unsigned() const noexcept { return m_timer_new; }
 
-	constexpr operator TransienceGain() const noexcept {
-		return TransienceGain{ intro(), outro(), !!m_timer_new };
+	constexpr operator FadeEnvelope () const noexcept {
+		return FadeEnvelope{ intro(), outro(), !!m_timer_new };
 	}
 };
 
@@ -131,9 +135,14 @@ public:
 		m_phase = peek_phase(steps); return *this;
 	}
 
-	// Get the current level of the voice sample, optionally with transience gain calculation.
-	constexpr float get_level(unsigned sample_idx, TransienceGain transience = {}) const noexcept {
-		return transience.calculate(sample_idx) * get_volume() * get_master_gain();
+	// Get the current level of the voice sample, optionally with fade envelope calculation.
+	constexpr float get_level(unsigned sample_idx, FadeEnvelope envelope = {}) const noexcept {
+		return envelope.calculate(sample_idx) * get_volume() * get_master_gain();
+	}
+
+	// Get the current level of the voice sample with fade envelope calculation and optional custom step.
+	constexpr float get_level(unsigned sample_idx, FadeEnvelope envelope, float fade_step) const noexcept {
+		return envelope.calculate(sample_idx, fade_step) * get_volume() * get_master_gain();
 	}
 };
 

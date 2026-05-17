@@ -36,6 +36,8 @@ public:
 	constexpr operator Float_T() const noexcept { return m_phase; }
 };
 
+/*==================================================================*/
+
 class WaveForms {
 	using Millis  = u32;
 	using Byte_T  = Phase::Byte_T;

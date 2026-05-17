@@ -13,13 +13,13 @@
 /*==================================================================*/
 
 class GlobalAudioBase final {
-	static inline std::atomic<float> m_global_gain{};
-	static inline std::atomic<bool>  m_is_muted{};
+	static inline std::atomic<float> s_global_gain{};
+	static inline std::atomic<bool>  s_is_muted{};
 
-	static inline bool m_has_audio_output{};
+	static inline bool s_has_audio_output{};
 
 public:
-	static bool has_audio_output() noexcept { return m_has_audio_output; }
+	static bool has_audio_output() noexcept { return s_has_audio_output; }
 
 public:
 	struct Settings {

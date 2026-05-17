@@ -308,18 +308,20 @@ void XOCHIP::make_pattern_wave(
 	SampleBuffer buffer, Voice& voice,
 	const PatternData& pattern_data
 ) noexcept {
-	const auto buffer_size = u32(buffer.size());
-	if (buffer_size == 0) { return; }
+	if (const auto sample_count = u32(buffer.size())) {
+		const auto fade_step = ::calc_fade_step(sample_count);
 
-	for (auto i = 0u; i < buffer_size; ++i) {
-		if (const auto gain = voice.get_level(i, voice.timer)) {
-			const auto bit_step = s32(voice.peek_phase(i) * 128.0f);
-			const auto bit_mask = 1 << (0x7 ^ (bit_step & 0x7));
-			::assign_cast_add(buffer[i], \
-				(pattern_data[bit_step >> 3] & bit_mask) ? gain : -gain);
-		} else break;
+		for (auto i = 0u; i < sample_count; ++i) {
+			if (const auto gain = voice.get_level(i, voice.timer)) {
+				const auto bit_step = s32(voice.peek_phase(i) * 128.0f);
+				const auto bit_mask = 1 << (0x7 ^ (bit_step & 0x7));
+				::assign_cast_add(buffer[i], \
+					(pattern_data[bit_step >> 3] & bit_mask) ? gain : -gain);
+			}
+			else break;
+		}
+		voice.step_phase(sample_count);
 	}
-	voice.step_phase(buffer_size);
 }
 
 /*==================================================================*/

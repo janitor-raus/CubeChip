@@ -23,8 +23,8 @@ SettingsMap GlobalAudioBase::Settings::map() noexcept {
 auto GlobalAudioBase::export_settings() const noexcept -> Settings {
 	Settings out;
 
-	out.volume = m_global_gain.load(std::memory_order::relaxed);
-	out.muted = m_is_muted.load(std::memory_order::relaxed);
+	out.volume = s_global_gain.load(std::memory_order::relaxed);
+	out.muted = s_is_muted.load(std::memory_order::relaxed);
 
 	return out;
 }
@@ -32,7 +32,7 @@ auto GlobalAudioBase::export_settings() const noexcept -> Settings {
 /*==================================================================*/
 
 GlobalAudioBase::GlobalAudioBase(const Settings& settings) noexcept {
-	m_has_audio_output = SDL_InitSubSystem(SDL_INIT_AUDIO);
+	s_has_audio_output = SDL_InitSubSystem(SDL_INIT_AUDIO);
 
 	set_glogal_gain(settings.volume);
 	is_muted(settings.muted);
@@ -45,25 +45,25 @@ GlobalAudioBase::~GlobalAudioBase() noexcept {
 /*==================================================================*/
 
 bool GlobalAudioBase::is_muted()           noexcept {
-	return m_is_muted.load(std::memory_order::relaxed);
+	return s_is_muted.load(std::memory_order::relaxed);
 }
 
 void GlobalAudioBase::is_muted(bool state) noexcept {
-	m_is_muted.store(state, std::memory_order::relaxed);
+	s_is_muted.store(state, std::memory_order::relaxed);
 }
 
 void GlobalAudioBase::toggle_mute()       noexcept {
-	m_is_muted.store(is_muted(), std::memory_order::relaxed);
+	s_is_muted.store(is_muted(), std::memory_order::relaxed);
 }
 
 /*==================================================================*/
 
 float GlobalAudioBase::get_global_gain() noexcept {
-	return m_global_gain.load(std::memory_order::relaxed);
+	return s_global_gain.load(std::memory_order::relaxed);
 }
 
 void GlobalAudioBase::set_glogal_gain(float gain) noexcept {
-	m_global_gain.store(std::clamp(gain, 0.0f, 1.0f), std::memory_order::relaxed);
+	s_global_gain.store(std::clamp(gain, 0.0f, 1.0f), std::memory_order::relaxed);
 }
 
 void GlobalAudioBase::add_global_gain(float gain) noexcept {
@@ -71,19 +71,19 @@ void GlobalAudioBase::add_global_gain(float gain) noexcept {
 }
 
 int GlobalAudioBase::get_playback_device_count() noexcept {
-	auto deviceCount = 0;
+	auto device_count = 0;
 	if (has_audio_output()) {
 		SDL_Unique<SDL_AudioDeviceID> devices =
-			SDL_GetAudioPlaybackDevices(&deviceCount);
+			SDL_GetAudioPlaybackDevices(&device_count);
 	}
-	return deviceCount;
+	return device_count;
 }
 
 int GlobalAudioBase::get_recording_device_count() noexcept {
-	auto deviceCount = 0;
+	auto device_count = 0;
 	if (has_audio_output()) {
 		SDL_Unique<SDL_AudioDeviceID> devices =
-			SDL_GetAudioRecordingDevices(&deviceCount);
+			SDL_GetAudioRecordingDevices(&device_count);
 	}
-	return deviceCount;
+	return device_count;
 }

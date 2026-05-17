@@ -454,19 +454,18 @@ void MEGACHIP::start_audio_track(bool repeat) noexcept {
 }
 
 void MEGACHIP::make_stream_wave(SampleBuffer buffer, Voice& voice, TrackData& track) noexcept {
-	const auto buffer_size = u32(buffer.size());
-	if (buffer_size == 0 || !track.enabled()) { return; }
-
-	for (auto i = 0u; i < buffer_size; ++i) {
-		const auto head = voice.peek_raw_phase(i);
-		if (!track.loop && head >= 1.0) {
-			track.reset(); return;
-		} else {
-			::assign_cast_add(buffer[i], (1.0 / 128) * \
-				track.pos(head));
+	if (const auto sample_count = u32(buffer.size() * track.enabled())) {
+		for (auto i = 0u; i < sample_count; ++i) {
+			const auto head = voice.peek_raw_phase(i);
+			if (!track.loop && head >= 1.0) {
+				track.reset(); return;
+			} else {
+				::assign_cast_add(buffer[i],
+					(1.0 / 128) * track.pos(head));
+			}
 		}
+		voice.step_phase(sample_count);
 	}
-	voice.step_phase(buffer_size);
 }
 
 void MEGACHIP::scroll_buffers_up(u32 N) noexcept {
