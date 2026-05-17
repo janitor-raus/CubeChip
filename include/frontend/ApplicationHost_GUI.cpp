@@ -162,7 +162,7 @@ void ApplicationHost::setup_gui_callables() noexcept {
 	{ 20, "Settings" }, [&]() noexcept {
 		auto global_gain = int(GAB->get_global_gain() * 100);
 		if (SliderInt("Master Volume", &global_gain, 0, 100, "%d%%"))
-			{ GAB->set_glogal_gain(global_gain * 0.01f); }
+			{ GAB->set_global_gain(global_gain * 0.01f); }
 	});
 
 /*==================================================================*/
