@@ -50,7 +50,7 @@ public:
 	static void toggle_mute()        noexcept;
 
 	static float get_global_gain()           noexcept;
-	static void  set_glogal_gain(float gain) noexcept;
+	static void  set_global_gain(float gain) noexcept;
 	static void  add_global_gain(float gain) noexcept;
 
 	static int get_playback_device_count() noexcept;

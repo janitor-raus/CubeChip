@@ -312,7 +312,7 @@ void XOCHIP::make_pattern_wave(
 		const auto fade_step = ::calc_fade_step(sample_count);
 
 		for (auto i = 0u; i < sample_count; ++i) {
-			if (const auto gain = voice.get_level(i, voice.timer)) {
+			if (const auto gain = voice.get_level(i, voice.timer, fade_step)) {
 				const auto bit_step = s32(voice.peek_phase(i) * 128.0f);
 				const auto bit_mask = 1 << (0x7 ^ (bit_step & 0x7));
 				::assign_cast_add(buffer[i], \
