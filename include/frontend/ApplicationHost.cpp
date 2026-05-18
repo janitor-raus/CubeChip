@@ -285,6 +285,11 @@ void ApplicationHost::handle_main_hotkeys() noexcept {
 		CoreRegistry::load_game_database();
 	}
 
+	if (s_input.is_pressed(KEY(F1))) {
+		static bool s_fullscreen = false;
+		s_fullscreen ^= BVS->set_fullscreen(!s_fullscreen);
+	}
+
 	if (!m_focus_mru.empty()) {
 		auto& system = m_systems[m_focus_mru.front()];
 		const auto& descriptor = system->get_descriptor();
@@ -293,7 +298,7 @@ void ApplicationHost::handle_main_hotkeys() noexcept {
 			&& s_input.is_pressed(KEY(ESCAPE))
 		) {
 			blog.info("System '{}' ({}) terminated by hotkey.",
-				descriptor.system_name, m_focus_mru.front());
+				descriptor.system_pretty_name, m_focus_mru.front());
 			unload_system_instance(); return;
 		}
 		//if (s_input.is_pressed(KEY(BACKSPACE))) {
@@ -304,7 +309,7 @@ void ApplicationHost::handle_main_hotkeys() noexcept {
 		if (s_input.is_pressed(KEY(F9))) {
 			if (auto paused = system->try_pause_system()) {
 				blog.info("System '{}' ({}) {} by hotkey!",
-					descriptor.system_name, m_focus_mru.front(),
+					descriptor.system_pretty_name, m_focus_mru.front(),
 					*paused ? "paused" : "unpaused");
 			}
 		}

@@ -73,10 +73,17 @@ public:
 	static void write_stream_texture(SDL_Renderer* renderer,
 		SDL_Texture* dst_texture, SDL_Texture* src_texture) noexcept;
 
+/*==================================================================*/
+
 public:
-	bool  set_window_title(const std::string& title, SDL_Window* window = nullptr) noexcept;
-	bool  is_main_window_id(unsigned id) const noexcept;
-	bool  raise_window(SDL_Window* window = nullptr) noexcept;
+	bool set_fullscreen(bool enabled, SDL_Window* window = nullptr) noexcept;
+
+/*==================================================================*/
+
+public:
+	bool set_window_title(const std::string& title, SDL_Window* window = nullptr) noexcept;
+	bool is_main_window_id(unsigned id) const noexcept;
+	bool raise_window(SDL_Window* window = nullptr) noexcept;
 
 	template <typename Fn> requires(std::is_invocable_r_v<void, Fn>)
 	bool render_present(Fn&& render_callable) noexcept(

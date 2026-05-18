@@ -18,23 +18,23 @@
 
 #ifdef _WIN32
 	#ifdef WINDOWS_NO_ROUNDED_CORNERS
-	#include <sdkddkver.h>
+		#include <sdkddkver.h>
 
-	#if (NTDDI_VERSION < NTDDI_WIN10_CO)
-		#define OLD_WINDOWS_SDK
-	#else
-		#ifndef NOMINMAX
-			#define NOMINMAX
-		#endif
+		#if (NTDDI_VERSION < NTDDI_WIN10_CO)
+			#define OLD_WINDOWS_SDK
+		#else
+			#ifndef NOMINMAX
+				#define NOMINMAX
+			#endif
 		#endif
 	#endif
 
-		#pragma warning(push)
-		#pragma warning(disable : 5039)
-		#include <dwmapi.h>
-		#pragma comment(lib, "Dwmapi")
-		#pragma warning(pop)
-	#endif
+	#pragma warning(push)
+	#pragma warning(disable : 5039)
+	#include <dwmapi.h>
+	#pragma comment(lib, "Dwmapi")
+	#pragma warning(pop)
+#endif
 
 /*==================================================================*/
 
@@ -72,14 +72,14 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 			SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY); \
 		if (!s_main_window) { throw_fatal_error(__LINE__, __func__); }
 
-		#if defined(_WIN32) && defined(WINDOWS_NO_ROUNDED_CORNERS)
-			#ifdef OLD_WINDOWS_SDK
+#if defined(_WIN32) && defined(WINDOWS_NO_ROUNDED_CORNERS)
+	#ifdef OLD_WINDOWS_SDK
 				static constexpr auto NTDDI_MAJOR{ ((NTDDI_VERSION >> 24) & 0x00FF) };
 				static constexpr auto NTDDI_MINOR{ ((NTDDI_VERSION >> 16) & 0x00FF) };
 				static constexpr auto NTDDI_BUILD{ ( NTDDI_VERSION        & 0xFFFF) };
 				blog.newEntry<BLOG::DEBUG>("Unable to adjust Main Window corner style, "
 					"Windows SDK is too old: {}.{}.{}", NTDDI_MAJOR, NTDDI_MINOR, NTDDI_BUILD);
-			#else
+	#else
 				else {
 					const auto window_handle = SDL_GetPointerProperty(
 						SDL_GetWindowProperties(m_main_window),
@@ -96,18 +96,18 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 						);
 					}
 				}
-			#endif
-		#endif
+	#endif
+#endif
 
 		ez::Rect deco{};
 
 		if (auto dummy = sdl::make_unique(SDL_CreateWindow(
 			nullptr, 64, 64, SDL_WINDOW_UTILITY | SDL_WINDOW_HIDDEN
 		))) {
-			#ifndef __APPLE__
+#ifndef __APPLE__
 			constexpr auto away = -(1 << 15);
 			SDL_SetWindowPosition(dummy, away, away);
-			#endif
+#endif
 			SDL_ShowWindow(dummy);
 			SDL_SyncWindow(dummy);
 			SDL_RenderPresent(s_main_renderer);
@@ -316,6 +316,12 @@ void BasicVideoSpec::write_stream_texture(
 	SDL_SetRenderTarget(renderer, dst_texture);
 	SDL_RenderTexture(renderer, src_texture, nullptr, &dest_frect);
 	SDL_SetRenderTarget(renderer, nullptr);
+}
+
+/*==================================================================*/
+
+bool BasicVideoSpec::set_fullscreen(bool enabled, SDL_Window* window) noexcept {
+	return SDL_SetWindowFullscreen(window ? window : s_main_window.get(), enabled);
 }
 
 /*==================================================================*/
