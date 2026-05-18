@@ -16,7 +16,8 @@
 #include <SDL3/SDL_timer.h>
 #include <SDL3/SDL_render.h>
 
-#if defined(_WIN32) && defined(WINDOWS_NO_ROUNDED_CORNERS)
+#ifdef _WIN32
+	#ifdef WINDOWS_NO_ROUNDED_CORNERS
 	#include <sdkddkver.h>
 
 	#if (NTDDI_VERSION < NTDDI_WIN10_CO)
@@ -25,6 +26,8 @@
 		#ifndef NOMINMAX
 			#define NOMINMAX
 		#endif
+		#endif
+	#endif
 
 		#pragma warning(push)
 		#pragma warning(disable : 5039)
@@ -32,7 +35,6 @@
 		#pragma comment(lib, "Dwmapi")
 		#pragma warning(pop)
 	#endif
-#endif
 
 /*==================================================================*/
 
@@ -342,6 +344,11 @@ bool BasicVideoSpec::try_render_present() noexcept {
 		if (!SDL_RenderPresent(s_main_renderer)) { \
 			throw_fatal_error(__LINE__, __func__);
 		}
+#ifdef _WIN32
+		BOOL dwm_enabled = FALSE;
+		DwmIsCompositionEnabled(&dwm_enabled);
+		if (dwm_enabled) { DwmFlush(); }
+#endif
 
 		return true;
 	}
