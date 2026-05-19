@@ -42,14 +42,90 @@ struct FatalError : public std::runtime_error {
 	using std::runtime_error::runtime_error;
 };
 
-[[noreturn]] static
-void throw_fatal_error(unsigned line, const char* function) noexcept(false) {
+[[noreturn]]
+static void throw_fatal_error(unsigned line, const char* function) noexcept(false) {
 	blog.fatal("L{} : {}(): {}", line, function, SDL_GetError());
 
 	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,
 		"Fatal SDL Error", SDL_GetError(), nullptr);
 
 	throw FatalError("Fatal SDL Error");
+}
+
+static void normalize_rect_to_display(ez::Rect& rect, ez::Rect& deco, bool first_run) noexcept {
+	auto num_displays =  0; // count of displays SDL found
+	auto best_display = -1; // index of display our window will use
+	bool rect_intersects_display{};
+
+	// 1: fetch all eligible display IDs
+	const auto displays = sdl::make_unique(SDL_GetDisplays(&num_displays));
+	if (!displays || num_displays <= 0) {
+		rect = BasicVideoSpec::Settings::defaults;
+		return;
+	}
+
+	// 2: fill vector with usable display bounds rects
+	std::vector<ez::Rect> display_bounds;
+	display_bounds.reserve(num_displays);
+
+	for (auto i = 0; i < num_displays; ++i) {
+		if (displays[i] == SDL_GetPrimaryDisplay()) { best_display = i; }
+		SDL_Rect display;
+		if (SDL_GetDisplayUsableBounds(displays[i], &display)) {
+			display_bounds.push_back(ez::Rect{
+				display.x, display.y,
+				display.w, display.h
+			});
+		}
+	}
+	if (display_bounds.empty()) {
+		rect = BasicVideoSpec::Settings::defaults;
+		return;
+	}
+
+	// 3: validate rect w/h, use fallbacks if needed
+	rect.w = std::max(rect.w, BasicVideoSpec::Settings::defaults.w);
+	rect.h = std::max(rect.h, BasicVideoSpec::Settings::defaults.h);
+
+	if (!first_run) {
+		// 4: find largest window/display overlap, if any
+		auto best_overlap = 0ull;
+		for (auto i = 0u; i < display_bounds.size(); ++i) {
+			const auto overlap_area = ez::intersect(rect, display_bounds[i]).area();
+			if (overlap_area > best_overlap) { best_overlap = overlap_area; best_display = i; }
+		}
+
+		// 5: fall back to searching for closest display
+		if ((rect_intersects_display = !!best_overlap) == false) {
+			auto best_distance = ~0ull;
+			const auto current_center = rect.center();
+
+			for (auto i = 0u; i < display_bounds.size(); ++i) {
+				const auto display_center = display_bounds[i].center();
+				const auto distance = ez::distance(current_center, display_center);
+				if (distance < best_distance) { best_distance = distance; best_display = i; }
+			}
+		}
+	}
+
+	// 6: shrink window to best fit chosen display
+	const auto& target = display_bounds[best_display];
+
+	const auto up = deco.x, lt = deco.y;
+	const auto dn = deco.w, rt = deco.h;
+
+	rect.w = std::min(rect.w, target.w - lt - rt);
+	rect.h = std::min(rect.h, target.h - up - dn);
+
+	if (!rect_intersects_display) {
+		// 7a: if we didn't overlap before, center to display
+		rect.x = target.x + (target.w - lt - rt - rect.w) / 2 + lt;
+		rect.y = target.y + (target.h - up - dn - rect.h) / 2 + up;
+	} else {
+		// 7b: otherwise, clamp origin to lie within display bounds
+		rect.x = std::clamp(rect.x, target.x + lt, target.x + target.w - rt - rect.w);
+		rect.y = std::clamp(rect.y, target.y + up, target.y + target.h - dn - rect.h);
+	}
 }
 
 /*==================================================================*/
@@ -165,78 +241,6 @@ auto BasicVideoSpec::export_settings() const noexcept -> Settings {
 	out.first_run = false;
 
 	return out;
-}
-
-/*==================================================================*/
-
-void BasicVideoSpec::normalize_rect_to_display(ez::Rect& rect, ez::Rect& deco, bool first_run) noexcept {
-	auto num_displays =  0; // count of displays SDL found
-	auto best_display = -1; // index of display our window will use
-	bool rect_intersects_display{};
-
-	// 1: fetch all eligible display IDs
-	const auto displays = sdl::make_unique(SDL_GetDisplays(&num_displays));
-	if (!displays || num_displays <= 0) { rect = Settings::defaults; return; }
-
-	// 2: fill vector with usable display bounds rects
-	std::vector<ez::Rect> display_bounds;
-	display_bounds.reserve(num_displays);
-
-	for (auto i = 0; i < num_displays; ++i) {
-		if (displays[i] == SDL_GetPrimaryDisplay()) { best_display = i; }
-		SDL_Rect display;
-		if (SDL_GetDisplayUsableBounds(displays[i], &display)) {
-			display_bounds.push_back(ez::Rect{
-				display.x, display.y,
-				display.w, display.h
-			});
-		}
-	}
-	if (display_bounds.empty()) { rect = Settings::defaults; return; }
-
-	// 3: validate rect w/h, use fallbacks if needed
-	rect.w = std::max(rect.w, Settings::defaults.w);
-	rect.h = std::max(rect.h, Settings::defaults.h);
-
-	if (!first_run) {
-		// 4: find largest window/display overlap, if any
-		auto best_overlap = 0ull;
-		for (auto i = 0u; i < display_bounds.size(); ++i) {
-			const auto overlap_area = ez::intersect(rect, display_bounds[i]).area();
-			if (overlap_area > best_overlap) { best_overlap = overlap_area; best_display = i; }
-		}
-
-		// 5: fall back to searching for closest display
-		if ((rect_intersects_display = !!best_overlap) == false) {
-			auto best_distance = ~0ull;
-			const auto current_center = rect.center();
-
-			for (auto i = 0u; i < display_bounds.size(); ++i) {
-				const auto display_center = display_bounds[i].center();
-				const auto distance = ez::distance(current_center, display_center);
-				if (distance < best_distance) { best_distance = distance; best_display = i; }
-			}
-		}
-	}
-
-	// 6: shrink window to best fit chosen display
-	const auto& target = display_bounds[best_display];
-
-	const auto up = deco.x, lt = deco.y;
-	const auto dn = deco.w, rt = deco.h;
-
-	rect.w = std::min(rect.w, target.w - lt - rt);
-	rect.h = std::min(rect.h, target.h - up - dn);
-
-	if (!rect_intersects_display) {
-		// 7a: if we didn't overlap before, center to display
-		rect.x = target.x + (target.w - lt - rt - rect.w) / 2 + lt;
-		rect.y = target.y + (target.h - up - dn - rect.h) / 2 + up;
-	} else {
-		// 7b: otherwise, clamp origin to lie within display bounds
-		rect.x = std::clamp(rect.x, target.x + lt, target.x + target.w - rt - rect.w);
-		rect.y = std::clamp(rect.y, target.y + up, target.y + target.h - dn - rect.h);
-	}
 }
 
 /*==================================================================*/

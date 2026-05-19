@@ -47,11 +47,6 @@ public:
 
 /*==================================================================*/
 
-private:
-	void normalize_rect_to_display(ez::Rect& rect, ez::Rect& deco, bool first_run) noexcept;
-
-/*==================================================================*/
-
 public:
 	SDL_Window*   get_main_window()   const noexcept;
 	SDL_Renderer* get_main_renderer() const noexcept;
