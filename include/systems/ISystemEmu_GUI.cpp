@@ -20,10 +20,10 @@ void ISystemEmu::prepare_user_interface() noexcept {
 	m_workspace_host.set_window_focused_output(&m_is_viewport_focused);
 
 	m_workspace_host.edit_callbacks().window_init =
-	[](auto& flags, auto& window_tidy) noexcept {
-		flags |= ImGuiWindowFlags_NoCollapse  | ImGuiWindowFlags_NoScrollWithMouse
-			  |  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings
-			  |  ImGuiWindowFlags_MenuBar;
+	[](auto& window_flags, auto& window_tidy, bool) noexcept {
+		window_flags |= ImGuiWindowFlags_NoCollapse  | ImGuiWindowFlags_NoScrollWithMouse
+					 |  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings
+					 |  ImGuiWindowFlags_MenuBar;
 
 		DockNextWindowTo(UserInterface::get_main_dockspace_id(), true);
 
@@ -87,7 +87,7 @@ void ISystemEmu::prepare_user_interface() noexcept {
 	m_memview_window.edit_callbacks().window_init = [
 		window_id = m_workspace_host.get_window_id(),
 		window_class = ImGuiWindowClass()
-	](auto& window_flags, auto&) mutable noexcept {
+	](auto& window_flags, auto&, bool) mutable noexcept {
 		window_class.ClassId = window_id;
 		window_class.DockingAllowUnclassed = false;
 

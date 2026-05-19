@@ -70,6 +70,7 @@ SettingsMap ApplicationHost::Settings::map() noexcept {
 	return {
 		::make_setting_link("Frontend.Interface.Scale.Zoom", &ui_zoom_scale),
 		::make_setting_link("Frontend.Interface.Scale.Text", &ui_text_scale),
+		::make_setting_link("Frontend.Display.BorderlessView", &borderless_view_mode),
 		::make_setting_link("Frontend.Interface.FileMRU", file_mru_cache, s_mru_limit),
 	};
 }
@@ -79,6 +80,7 @@ auto ApplicationHost::export_settings() const noexcept -> Settings {
 
 	out.ui_zoom_scale = UserInterface::get_ui_zoom_scaling();
 	out.ui_text_scale = UserInterface::get_ui_text_scaling();
+	out.borderless_view_mode = UserInterface::get_borderless_view_mode();
 	ApplicationHost::export_mru(out.file_mru_cache);
 
 	return out;
@@ -165,12 +167,12 @@ ApplicationHost* ApplicationHost::init_application(
 
 	GlobalAudioBase::Settings GAB_settings;
 	BasicVideoSpec ::Settings BVS_settings;
-	ApplicationHost::Settings FEH_settings;
+	ApplicationHost::Settings AUI_settings;
 
 	HDM->parse_app_config_file(
 		GAB_settings.map(),
 		BVS_settings.map(),
-		FEH_settings.map()
+		AUI_settings.map()
 	);
 
 	GAB = GlobalAudioBase::initialize(GAB_settings);
@@ -182,10 +184,11 @@ ApplicationHost* ApplicationHost::init_application(
 	if (!BVS) { return nullptr; }
 
 	UserInterface::init_video(BVS->get_main_window(), BVS->get_main_renderer());
-	UserInterface::set_ui_zoom_scaling(FEH_settings.ui_zoom_scale);
-	UserInterface::set_ui_text_scaling(FEH_settings.ui_text_scale);
+	UserInterface::set_ui_zoom_scaling(AUI_settings.ui_zoom_scale);
+	UserInterface::set_ui_text_scaling(AUI_settings.ui_text_scale);
+	UserInterface::set_borderless_view_mode(AUI_settings.borderless_view_mode);
 
-	ApplicationHost::import_mru(FEH_settings.file_mru_cache);
+	ApplicationHost::import_mru(AUI_settings.file_mru_cache);
 
 	::append_pending_file_drops(game_file_path);
 	thread_affinity::set_affinity(0b11ull);

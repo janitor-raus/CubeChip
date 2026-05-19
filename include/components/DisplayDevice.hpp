@@ -14,6 +14,8 @@
 
 /*==================================================================*/
 
+struct SDL_Renderer;
+
 class DisplayDevice {
 	using ScopedRead = AtomicBox<FramePacket::Metadata>::ScopedRead;
 	using ScopedEdit = AtomicBox<FramePacket::Metadata>::ScopedEdit;
@@ -44,7 +46,7 @@ public:
 	auto edit_metadata() noexcept -> ScopedEdit;
 
 public:
-	DisplayDevice(std::size_t W, std::size_t H, void* sdl_renderer) noexcept;
+	DisplayDevice(std::size_t W, std::size_t H, SDL_Renderer* sdl_renderer) noexcept;
 
 	~DisplayDevice() noexcept;
 
@@ -55,13 +57,18 @@ public:
 	int  get_screen_rotation() const noexcept;
 	void set_screen_rotation(int rotation) noexcept;
 
-	bool get_integer_scaling() const noexcept;
+	bool has_integer_scaling() const noexcept;
 	void set_integer_scaling(bool enable) noexcept;
 
-	bool get_utilize_shaders() const noexcept;
-	void set_utilize_shaders(bool enable) noexcept;
+	bool has_shaders_enabled() const noexcept;
+	void set_shaders_enabled(bool enable) noexcept;
+
+	void set_borderless_view_input(const bool* input = nullptr) noexcept;
+	bool has_borderless_view() const noexcept;
+	void set_borderless_view(bool enable) noexcept;
 
 	void set_osd_callable(Callable callable) noexcept;
+
 	void render_display() noexcept;
 	void render_settings_menu() noexcept;
 };

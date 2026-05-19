@@ -165,6 +165,16 @@ void ApplicationHost::setup_gui_callables() noexcept {
 			{ GAB->set_global_gain(global_gain * 0.01f); }
 	});
 
+	static auto s_menu_settings__borderless_view = UserInterface::register_menu("",
+	{ 21, "Settings" }, [&]() noexcept {
+		Separator();
+		Checkbox("Borderless View Mode", &UserInterface::borderless_view_mode);
+		if (IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+			SetTooltip("Removes all decorations and margins from a System's "
+				"display window(s) for a flush fit.");
+		}
+	});
+
 /*==================================================================*/
 
 	static auto s_window_none__imgui_demo = UserInterface::register_window(

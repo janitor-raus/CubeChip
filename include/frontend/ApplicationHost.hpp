@@ -154,6 +154,7 @@ public:
 	struct Settings {
 		float ui_zoom_scale = 1.0f;
 		float ui_text_scale = 1.0f;
+		bool  borderless_view_mode = false;
 
 		std::string file_mru_cache[s_mru_limit];
 

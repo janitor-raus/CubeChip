@@ -20,20 +20,35 @@ void IFamily_CHIP8::prepare_user_interface() noexcept {
 	m_display_window.set_parent(&m_workspace_host);
 	m_display_window.allow_fullscreen(true);
 
+	m_display_device.set_borderless_view_input(
+		&UserInterface::get_borderless_view_mode_hook());
+
 	m_display_window.edit_callbacks().window_init = [
 		window_id = m_workspace_host.get_window_id(),
 		window_class = ImGuiWindowClass()
-	](auto& window_flags, auto&) mutable noexcept {
-		window_flags |= ImGuiWindowFlags_NoCollapse  | ImGuiWindowFlags_NoScrollWithMouse
-					 |  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
+	](auto& window_flags, auto& out_callable, bool fullscreen) mutable noexcept {
+		if (!fullscreen) {
+			window_flags |= ImGuiWindowFlags_NoCollapse  | ImGuiWindowFlags_NoScrollWithMouse
+						 |  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
 
-		window_class.ClassId = window_id;
-		window_class.DockingAllowUnclassed = false;
+			window_class.ClassId = window_id;
+			window_class.DockingAllowUnclassed = false;
 
-		SetNextWindowClass(&window_class);
-		DockNextWindowTo(window_class.ClassId, true);
-		SetNextWindowMinClientSize(ImVec2(480.0f, 360.0f)
-			* UserInterface::get_ui_total_scaling());
+			SetNextWindowClass(&window_class);
+			DockNextWindowTo(window_class.ClassId, true);
+			SetNextWindowMinClientSize(ImVec2(480.0f, 360.0f)
+				* UserInterface::get_ui_total_scaling());
+		}
+
+		const bool borderless = UserInterface::get_borderless_view_mode();
+
+		if (fullscreen) { PushStyleColor(ImGuiCol_WindowBg, IM_COL32_BLACK); }
+		if (borderless) { PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2()); }
+
+		out_callable = [fullscreen, borderless]() noexcept {
+			if (borderless) { PopStyleVar(1); }
+			if (fullscreen) { PopStyleColor(1); }
+		};
 	};
 
 	m_display_window.edit_callbacks().window_body =

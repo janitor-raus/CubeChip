@@ -92,6 +92,22 @@ public:
 	static float get_ui_total_scaling() noexcept;
 
 public:
+	static inline bool borderless_view_mode = false;
+
+	static void toggle_borderless_view_mode() noexcept {
+		borderless_view_mode = !borderless_view_mode;
+	}
+	static void set_borderless_view_mode(bool enabled) noexcept {
+		borderless_view_mode = enabled;
+	}
+	static bool get_borderless_view_mode() noexcept {
+		return borderless_view_mode;
+	}
+	static const bool& get_borderless_view_mode_hook() noexcept {
+		return borderless_view_mode;
+	}
+
+public:
 	static void process_event(void* event);
 	static void begin_new_frame();
 	static void render_frame(SDL_Renderer* = nullptr);

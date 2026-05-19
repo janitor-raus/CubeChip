@@ -82,7 +82,9 @@ private:
 			* (m_fullscreen_mode && !m_disable_menubar);
 
 		std::function<void()> window_tidy = nullptr;
-		if (m_callbacks.window_init) { m_callbacks.window_init(window_flags, window_tidy); }
+		if (m_callbacks.window_init) {
+			m_callbacks.window_init(window_flags, window_tidy, false);
+		}
 
 		const bool window_open = ImGui::Begin(*window_label,
 			m_window_visible_out, ImGuiWindowFlags(window_flags));
@@ -119,20 +121,36 @@ private:
 				ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove;
 
 			ImGui::PushID(c_window_id);
-			if (ImGui::Begin("##fullscreen", nullptr, window_flags | full_flags)) {
-				if (m_window_focused_out) { *m_window_focused_out |= true; }
+
+			if (m_callbacks.window_init) {
+				m_callbacks.window_init(window_flags, window_tidy, true);
+			}
+
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+
+			const bool fullscreen_open = ImGui::Begin("##fullscreen",
+				nullptr, window_flags | full_flags);
+
+			ImGui::PopStyleVar(2);
+
+			if (m_window_focused_out) { *m_window_focused_out |= true; }
+
+			if (window_tidy) { window_tidy(); }
+			if (fullscreen_open) {
 				UserInterface::call_autohide_menubar(m_parent
 					? m_parent->get_window_label()
 					: *window_label, m_disable_menubar);
-
-				if (m_callbacks.window_body) { m_callbacks.window_body(true, true); }
-
-				if (m_callbacks.toggle_fullscreen) {
-					m_callbacks.toggle_fullscreen(m_fullscreen_mode);
-				} else {
-					default_toggle_fullscreen_callback(m_fullscreen_mode);
-				}
 			}
+
+			if (m_callbacks.window_body) { m_callbacks.window_body(fullscreen_open, true); }
+
+			if (m_callbacks.toggle_fullscreen) {
+				m_callbacks.toggle_fullscreen(m_fullscreen_mode);
+			} else {
+				default_toggle_fullscreen_callback(m_fullscreen_mode);
+			}
+
 			ImGui::End();
 			ImGui::PopID();
 		}

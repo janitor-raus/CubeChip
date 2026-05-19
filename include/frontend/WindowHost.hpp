@@ -26,7 +26,7 @@ public:
 		 *        Provides references to window_flags for modification and an optional
 		 *        single-call `out_callable` reference called immediately post-Begin().
 		 */
-		std::function<void(int& window_flags, std::function<void()>& out_callable)>
+		std::function<void(int& window_flags, std::function<void()>& out_callable, bool fullscreen)>
 			window_init{};
 
 		/**
