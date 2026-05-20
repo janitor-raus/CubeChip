@@ -12,6 +12,7 @@ source_group("shims" FILES ${SHIMS_HEADERS})
 
 set(FRONTEND_HEADERS
 	"${PROJECT_INCLUDE_DIR}/frontend/ApplicationHost.hpp"
+	"${PROJECT_INCLUDE_DIR}/frontend/ImGuiStackGuard.hpp"
 	"${PROJECT_INCLUDE_DIR}/frontend/MemoryEditor.hpp"
 	"${PROJECT_INCLUDE_DIR}/frontend/UserInterface.hpp"
 	"${PROJECT_INCLUDE_DIR}/frontend/WindowHost.hpp"
@@ -20,6 +21,7 @@ set(FRONTEND_SOURCES
 	"${PROJECT_INCLUDE_DIR}/frontend/CubeChip.cpp" # main
 	"${PROJECT_INCLUDE_DIR}/frontend/ApplicationHost.cpp"
 	"${PROJECT_INCLUDE_DIR}/frontend/ApplicationHost_GUI.cpp"
+	"${PROJECT_INCLUDE_DIR}/frontend/ImGuiStackGuard.cpp"
 	"${PROJECT_INCLUDE_DIR}/frontend/MemoryEditor.cpp"
 	"${PROJECT_INCLUDE_DIR}/frontend/UserInterface.cpp"
 	"${PROJECT_INCLUDE_DIR}/frontend/WindowHost.cpp"

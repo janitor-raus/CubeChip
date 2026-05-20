@@ -20,15 +20,14 @@ void ISystemEmu::prepare_user_interface() noexcept {
 	m_workspace_host.set_window_focused_output(&m_is_viewport_focused);
 
 	m_workspace_host.edit_callbacks().window_init =
-	[](auto& window_flags, auto& window_tidy, bool) noexcept {
+	[](auto& window_flags, auto& pusher, bool) noexcept {
 		window_flags |= ImGuiWindowFlags_NoCollapse  | ImGuiWindowFlags_NoScrollWithMouse
 					 |  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings
 					 |  ImGuiWindowFlags_MenuBar;
 
 		DockNextWindowTo(UserInterface::get_main_dockspace_id(), true);
 
-		PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2());
-		window_tidy = []() noexcept { PopStyleVar(1); };
+		pusher.push_style_var(ImGuiStyleVar_WindowPadding, ImVec2());
 	};
 
 	m_workspace_host.edit_callbacks().window_dock =

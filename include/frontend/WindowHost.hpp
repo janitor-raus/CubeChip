@@ -10,6 +10,7 @@
 #include <functional>
 
 #include "ImLabel.hpp"
+#include "ImGuiStackGuard.hpp"
 
 /*==================================================================*/
 
@@ -21,12 +22,17 @@ class WindowHost {
 
 public:
 	struct Callbacks {
+		using Pusher = ImGuiStackGuard::Pusher;
+		using ImGuiWindowFlags = int;
+
 		/**
 		 * @brief Callback for window initialization, executed before ImGui::Begin().
-		 *        Provides references to window_flags for modification and an optional
-		 *        single-call `out_callable` reference called immediately post-Begin().
+		 *        Provides references to window_flags for modification, a 'pusher' object
+		 *        to allow for easy color/style/font pushes with automatic popping, and a
+		 *        'fullscreen' state to indicate whether the callback is currently invoked
+		 *        in a fullscreen-window context.
 		 */
-		std::function<void(int& window_flags, std::function<void()>& out_callable, bool fullscreen)>
+		std::function<void(ImGuiWindowFlags& window_flags, Pusher& pusher, bool fullscreen)>
 			window_init{};
 
 		/**
@@ -40,10 +46,8 @@ public:
 		/**
 		 * @brief Callback for window body rendering, executed after ImGui::Begin()
 		 *        and the window_dock() callback. Provides the `window_open` state and
-		 *        the `fullscreen` state, which indicates whether the window is currently
-		 *        rendering in a fullscreen context. This callback is shared between the
-		 *        two window modes, so care should be taken to ensure the callback logic
-		 *        accounts properly for what should be rendered in each mode, if important.
+		 *        the `fullscreen` state, which indicates whether the callback is
+		 *        currently invoked in a fullscreen-window context.
 		 */
 		std::function<void(bool window_open, bool fullscreen)>
 			window_body{};

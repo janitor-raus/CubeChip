@@ -26,7 +26,7 @@ void IFamily_BYTEPUSHER::prepare_user_interface() noexcept {
 	m_display_window.edit_callbacks().window_init = [
 		window_id = m_workspace_host.get_window_id(),
 		window_class = ImGuiWindowClass()
-	](auto& window_flags, auto& out_callable, bool fullscreen) mutable noexcept {
+	](auto& window_flags, auto& pusher, bool fullscreen) mutable noexcept {
 		if (!fullscreen) {
 			window_flags |= ImGuiWindowFlags_NoCollapse  | ImGuiWindowFlags_NoScrollWithMouse
 						 |  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
@@ -42,13 +42,8 @@ void IFamily_BYTEPUSHER::prepare_user_interface() noexcept {
 
 		const bool borderless = UserInterface::get_borderless_view_mode();
 
-		if (fullscreen) { PushStyleColor(ImGuiCol_WindowBg, IM_COL32_BLACK); }
-		if (borderless) { PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2()); }
-
-		out_callable = [fullscreen, borderless]() noexcept {
-			if (borderless) { PopStyleVar(1); }
-			if (fullscreen) { PopStyleColor(1); }
-		};
+		if (fullscreen) { pusher.push_style_color(ImGuiCol_WindowBg, IM_COL32_BLACK); }
+		if (borderless) { pusher.push_style_var(ImGuiStyleVar_WindowPadding, ImVec2()); }
 	};
 
 	m_display_window.edit_callbacks().window_body =

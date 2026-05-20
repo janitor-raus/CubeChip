@@ -77,24 +77,26 @@ private:
 		if (m_window_visible_out && !*m_window_visible_out) { return; }
 
 		const auto window_label = get_window_label();
+		auto stack_guard  = ImGuiStackGuard();
+		auto stack_pusher = stack_guard.make_pusher();
 
-		int window_flags = ImGuiWindowFlags_MenuBar
+		ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar
 			* (m_fullscreen_mode && !m_disable_menubar);
 
-		std::function<void()> window_tidy = nullptr;
 		if (m_callbacks.window_init) {
-			m_callbacks.window_init(window_flags, window_tidy, false);
+			m_callbacks.window_init(window_flags, stack_pusher, false);
 		}
 
 		const bool window_open = ImGui::Begin(*window_label,
-			m_window_visible_out, ImGuiWindowFlags(window_flags));
+			m_window_visible_out, window_flags);
+
+		stack_guard.unwind_all();
 
 		if (m_window_focused_out) {
 			*m_window_focused_out |= ImGui::IsWindowFocused(
 				ImGuiFocusedFlags_RootAndChildWindows);
 		}
 
-		if (window_tidy) { window_tidy(); }
 		if (window_open && !m_fullscreen_mode) { UserInterface::call_menubar(*window_label); }
 
 		if (m_callbacks.window_dock) { m_callbacks.window_dock(window_open, c_window_id); }
@@ -117,26 +119,25 @@ private:
 			ImGui::SetNextWindowPos(viewport->Pos);
 			ImGui::SetNextWindowSize(viewport->Size);
 
-			static constexpr auto full_flags =
+			static constexpr ImGuiWindowFlags full_flags =
 				ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove;
 
 			ImGui::PushID(c_window_id);
 
 			if (m_callbacks.window_init) {
-				m_callbacks.window_init(window_flags, window_tidy, true);
+				m_callbacks.window_init(window_flags, stack_pusher, true);
 			}
 
-			ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+			stack_guard.push_style_var(ImGuiStyleVar_WindowRounding, 0.0f);
+			stack_guard.push_style_var(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
 			const bool fullscreen_open = ImGui::Begin("##fullscreen",
 				nullptr, window_flags | full_flags);
 
-			ImGui::PopStyleVar(2);
+			stack_guard.unwind_all();
 
 			if (m_window_focused_out) { *m_window_focused_out |= true; }
 
-			if (window_tidy) { window_tidy(); }
 			if (fullscreen_open) {
 				UserInterface::call_autohide_menubar(m_parent
 					? m_parent->get_window_label()
