@@ -354,6 +354,7 @@ bool BasicVideoSpec::try_render_present() noexcept {
 		if (!SDL_RenderPresent(s_main_renderer)) { \
 			throw_fatal_error(__LINE__, __func__);
 		}
+
 #ifdef _WIN32
 		BOOL dwm_enabled = FALSE;
 		DwmIsCompositionEnabled(&dwm_enabled);
