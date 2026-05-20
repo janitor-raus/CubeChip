@@ -226,6 +226,14 @@ int ApplicationHost::handle_client_events(void* event) noexcept {
 				::append_pending_file_drops(sdl_event->drop.data);
 				break;
 
+			case SDL_EVENT_WINDOW_FOCUS_GAINED:
+				GAB->toggle_background_volume(false);
+				break;
+
+			case SDL_EVENT_WINDOW_FOCUS_LOST:
+				GAB->toggle_background_volume(true);
+				break;
+
 			case SDL_EVENT_WINDOW_MINIMIZED:
 				s_application_minimized = true;
 				break;

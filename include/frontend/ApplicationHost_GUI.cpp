@@ -58,9 +58,9 @@ void ApplicationHost::setup_gui_callables() noexcept {
 	});
 
 	static auto s_menu_file__recent_files = UserInterface::register_menu("",
-	{ 0, "File" }, [&]() noexcept {
+	{ 5, "File" }, [&]() noexcept {
 		if (!s_file_mru.size()) { return; }
-		Separator(1.0f);
+		Separator();
 		TextUnformatted("Recently opened:");
 		DummyY(2.0f);
 
@@ -159,14 +159,22 @@ void ApplicationHost::setup_gui_callables() noexcept {
 	});
 
 	static auto s_menu_settings__master_vol = UserInterface::register_menu("",
-	{ 20, "Settings" }, [&]() noexcept {
-		auto global_gain = int(GAB->get_global_gain() * 100);
-		if (SliderInt("Master Volume", &global_gain, 0, 100, "%d%%"))
-			{ GAB->set_global_gain(global_gain * 0.01f); }
+	{ 25, "Settings" }, [&]() noexcept {
+		Separator();
+		auto master_volume = int(GAB->get_master_volume() * 100);
+		if (SliderInt("Master Volume", &master_volume, 0, 100, "%d%%"))
+			{ GAB->set_master_volume(master_volume * 0.01f); }
+	});
+
+	static auto s_menu_settings__focus_vol = UserInterface::register_menu("",
+	{ 25, "Settings" }, [&]() noexcept {
+		auto focus_volume = int(GAB->get_background_volume() * 100);
+		if (SliderInt("Background Volume", &focus_volume, 0, 100, "%d%%"))
+			{ GAB->set_background_volume(focus_volume * 0.01f); }
 	});
 
 	static auto s_menu_settings__borderless_view = UserInterface::register_menu("",
-	{ 21, "Settings" }, [&]() noexcept {
+	{ 30, "Settings" }, [&]() noexcept {
 		Separator();
 		Checkbox("Borderless View Mode", &UserInterface::borderless_view_mode);
 		if (IsItemHovered(ImGuiHoveredFlags_DelayShort)) {

@@ -188,6 +188,6 @@ void AudioDevice::Stream::push_raw_audio_data(void* sample_data,
 	if (is_paused() || buffer_size == 0) { return; }
 
 	SDL_SetAudioDeviceGain(SDL_GetAudioStreamDevice(m_ptr),
-		GlobalAudioBase::is_muted() ? 0.0f : GlobalAudioBase::get_global_gain());
+		GlobalAudioBase::get_final_volume());
 	SDL_PutAudioStreamData(m_ptr, sample_data, signed(buffer_size * sample_size));
 }

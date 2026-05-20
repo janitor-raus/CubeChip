@@ -13,18 +13,22 @@
 /*==================================================================*/
 
 class GlobalAudioBase final {
-	static inline std::atomic<float> s_global_gain{};
-	static inline std::atomic<bool>  s_is_muted{};
+	static inline std::atomic<float> s_master_volume = 1.0f;
+	static inline std::atomic<bool>  s_all_audio_muted = false;
 
-	static inline bool s_has_audio_output{};
+	static inline float s_passive_background_volume = 0.25f;
+	static inline float s_active_background_volume = 1.0f;
+
+	static inline bool  s_has_audio_output = false;
 
 public:
 	static bool has_audio_output() noexcept { return s_has_audio_output; }
 
 public:
 	struct Settings {
-		float volume = 0.75f;
-		bool  muted  = false;
+		float master_volume     = 0.7f;
+		float background_volume = 1.0f;
+		bool  all_audio_muted   = false;
 
 		SettingsMap map() noexcept;
 	};
@@ -45,13 +49,27 @@ public:
 		return &self;
 	}
 
+	static void toggle_background_volume(bool enable) noexcept {
+		s_active_background_volume = enable
+			? s_passive_background_volume : 1.0f;
+	}
+
+	static void set_background_volume(float volume) noexcept {
+		s_passive_background_volume = volume;
+	}
+	static float get_background_volume() noexcept {
+		return s_passive_background_volume;
+	}
+
+	static float get_final_volume() noexcept;
+
 	static bool is_muted()           noexcept;
 	static void is_muted(bool state) noexcept;
 	static void toggle_mute()        noexcept;
 
-	static float get_global_gain()           noexcept;
-	static void  set_global_gain(float gain) noexcept;
-	static void  add_global_gain(float gain) noexcept;
+	static float get_master_volume()             noexcept;
+	static void  set_master_volume(float volume) noexcept;
+	static void  add_master_volume(float volume) noexcept;
 
 	static int get_playback_device_count() noexcept;
 	static int get_recording_device_count() noexcept;
