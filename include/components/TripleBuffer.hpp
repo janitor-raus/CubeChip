@@ -50,6 +50,8 @@
  *
  * @warning Returning references or pointers into the provided Buffer via the
  *          'present()' or 'acquire()' methods is undefined behavior.
+ * @warning Exceptions thrown by callables provided to 'present()' or 'acquire()' are
+ *          not handled internally. See documentation of methods for exact effects.
  */
 template <class Buffer>
 class TripleBuffer {
@@ -63,20 +65,65 @@ class TripleBuffer {
 #ifdef TRIPLE_BUFFER_ENFORCE_SPSC
 		alignas(HDIS) mutable std::mutex m_reader_lock;
 		mutable std::atomic_size_t m_present_count{};
-		alignas(HDIS) mutable std::mutex m_writer_lock;
-		mutable std::atomic_size_t m_acquire_count{};
+		alignas(HDIS) /*****/ std::mutex m_writer_lock;
+		/*****/ std::atomic_size_t m_acquire_count{};
 #else
 		alignas(HDIS)
 	#if !defined(NDEBUG) || defined(DEBUG)
 		mutable std::atomic_flag m_reader_used{};
-		mutable std::atomic_flag m_writer_used{};
+		/*****/ std::atomic_flag m_writer_used{};
 	#endif
 		mutable std::atomic_size_t m_present_count{};
-		mutable std::atomic_size_t m_acquire_count{};
+		/*****/ std::atomic_size_t m_acquire_count{};
 #endif
 
-		alignas(HDIS) mutable Buffer* m_work_ptr = &m_writer_buffer;
-		alignas(HDIS) mutable AtomBuf m_read_ptr = &m_reader_buffer;
+		/*
+		 * Synchronization model - single atomic handoff via m_swap_ptr
+		 * ============================================================
+		 *
+		 * At all times, ownership of the three Buffer slots is partitioned as follows:
+		 *
+		 *   m_work_ptr - exclusively owned by the writer thread
+		 *   m_read_ptr - exclusively owned by the reader thread
+		 *   m_swap_ptr - the shared handoff slot; owned by neither thread exclusively
+		 *
+		 * The LSB of 'm_swap_ptr' is used as a dirty flag (pointer tagging), indicating
+		 * that the writer has published a new buffer that the reader has not yet consumed.
+		 *
+		 * Writer path (acquire):
+		 *   1. Writes freely into '*m_work_ptr' (exclusive ownership, no sync needed)
+		 *   2. Publishes via: `m_work_ptr = sub_dirty(m_swap_ptr.exchange(
+		 *                          add_dirty(m_work_ptr), acq_rel))`
+		 *      - The 'release' side ensures all writes to '*m_work_ptr' are visible
+		 *        before the pointer is installed into 'm_swap_ptr'.
+		 *      - The returned pointer (the previous swap slot) becomes the new writer
+		 *        buffer; 'sub_dirty()' strips any residual dirty tag left by a prior cycle.
+		 *
+		 * Reader path (present):
+		 *   1. Checks `m_swap_ptr.load(acquire)` for the dirty flag.
+		 *      - If clean, no exchange is performed; the reader continues with its
+		 *        existing m_read_ptr at the cost of a single atomic load. This is the
+		 *        fast path for a reader that is polling faster than the writer publishes.
+		 *      - The 'acquire' ensures that if a dirty pointer is observed, all writes
+		 *        the producer made before its 'release' exchange are now visible.
+		 *   2. If dirty: swaps 'm_read_ptr' in via `m_swap_ptr.exchange(m_read_ptr, acq_rel)`,
+		 *      taking ownership of the freshly published buffer.
+		 *   3. Reads freely from '*m_read_ptr' (exclusive ownership after swap, no sync needed)
+		 *
+		 * Ownership invariant:
+		 *   Each buffer slot is pointed to by exactly one of {m_work_ptr, m_read_ptr,
+		 *   m_swap_ptr} at any given time. The exchange operations are the only moments
+		 *   where a slot transitions between owners, and 'acq_rel' on both sides ensures
+		 *   a happens-before edge is established across the producer/consumer boundary.
+		 *
+		 * Consequence for 'm_read_ptr' and 'm_work_ptr':
+		 *   Neither pointer is shared between threads. 'm_work_ptr' is writer-only,
+		 *   'm_read_ptr' is reader-only. Plain (non-atomic) reads/writes to both are
+		 *   safe under the SPSC guarantee.
+		 */
+
+		alignas(HDIS) /*****/ Buffer* m_work_ptr = &m_writer_buffer;
+		alignas(HDIS) mutable Buffer* m_read_ptr = &m_reader_buffer;
 		alignas(HDIS) mutable AtomBuf m_swap_ptr = &m_middle_buffer;
 
 		template <typename... Args>
@@ -119,8 +166,9 @@ public:
 		: m_context(std::make_unique<TripleBufferContext>(std::forward<Args>(args)...))
 	{}
 
-	auto get_present_count() const noexcept { return m_context->m_present_count.load(std::memory_order::acquire); }
-	auto get_acquire_count() const noexcept { return m_context->m_acquire_count.load(std::memory_order::acquire); }
+	auto get_present_count() const noexcept { return m_context->m_present_count.load(std::memory_order::relaxed); }
+	auto get_acquire_count() const noexcept { return m_context->m_acquire_count.load(std::memory_order::relaxed); }
+
 
 private:
 	template <bool DIRTY>
@@ -163,6 +211,10 @@ public:
 	 * @param function  The callable to invoke.
 	 *
 	 * @return decltype(auto) - forwards anything the callable returns.
+	 * @warning In case of an exception thrown during invocation of the callable,
+	 *          the 'present_count' is incremented and the reader Buffer is swapped.
+	 *          If the Buffer was dirty, the dirty tag is also consumed. The callable
+	 *          will not return a value, if it was meant to do so.
 	 *
 	 * Thread-safety: See notes from the class description.
 	 */
@@ -182,14 +234,14 @@ public:
 		m_context->m_present_count.fetch_add(1, std::memory_order::relaxed);
 
 		if (get_dirty(m_context->m_swap_ptr.load(std::memory_order::acquire))) {
-			m_context->m_read_ptr.store(sub_dirty(m_context->m_swap_ptr.exchange(
-				m_context->m_read_ptr, std::memory_order::acq_rel)), std::memory_order::release);
+			m_context->m_read_ptr = sub_dirty(m_context->m_swap_ptr.exchange(
+				m_context->m_read_ptr, std::memory_order::acq_rel));
 
 			return std::forward<Fn>(function)(
-				BufferView<true>{ *m_context->m_read_ptr.load(std::memory_order::acquire) });
+				BufferView<true>{ *m_context->m_read_ptr });
 		} else {
 			return std::forward<Fn>(function)(
-				BufferView<false>{ *m_context->m_read_ptr.load(std::memory_order::acquire) });
+				BufferView<false>{ *m_context->m_read_ptr });
 		}
 	}
 
@@ -208,6 +260,9 @@ public:
 	 * @param function  The callable to invoke.
 	 *
 	 * @return decltype(auto) - forwards anything the callable returns.
+	 * @warning In case of an exception thrown during invocation of the callable,
+	 *          only the 'acquire_count' is incremented. No Buffer swap occurs,
+	 *          nor does the callable return a value, if it was meant to do so.
 	 *
 	 * Thread-safety: See notes from the class description.
 	 */
