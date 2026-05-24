@@ -12,7 +12,7 @@
 
 /*==================================================================*/
 
-static auto default_toggle_fullscreen_callback = [](bool& out_state) {
+static auto default_toggle_fullscreen_callback(bool& out_state) noexcept {
 	if (out_state && ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::IsAnyItemActive()
 		&& !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId)
 	) {

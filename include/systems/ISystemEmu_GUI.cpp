@@ -194,8 +194,7 @@ namespace osd {
 		const auto text_zone = CalcTextSize(overlay_data.c_str())
 			+ GetStyle().WindowPadding * 2.0f;
 
-		SetCursorPos(GetCursorPos()
-			+ (GetContentRegionAvail() - text_zone) * ImVec2(0.0f, 1.0f));
+		AddCursorPos((GetContentRegionAvail() - text_zone) * ImVec2(0.0f, 1.0f));
 
 		if (BeginChild("##text_overlay", text_zone, ImGuiChildFlags_Borders | ImGuiChildFlags_NavFlattened,
 			ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoNav
@@ -210,8 +209,7 @@ namespace osd {
 		const auto size = ImVec2(text_height * 0.8f, text_height);
 		const auto widget_zone = size + GetStyle().WindowPadding * 2.0f;
 
-		SetCursorPos(GetCursorPos()
-			+ (GetContentRegionAvail() - widget_zone) * ImVec2(0.0f, 0.0f));
+		AddCursorPos((GetContentRegionAvail() - widget_zone) * ImVec2(0.0f, 0.0f));
 
 		if (BeginChild("##key_indicator", widget_zone, ImGuiChildFlags_Borders | ImGuiChildFlags_NavFlattened,
 			ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoNav

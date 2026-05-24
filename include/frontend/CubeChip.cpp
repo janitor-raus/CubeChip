@@ -57,8 +57,8 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 	// As an additional benefit, when in exclusive fullscreen (as provided by SDL),
 	// syncing via DwmFlush() appears to reduce our present-to-display latency down
 	// to an average of 2.5ms, compared to around 50ms when relying on SDL's vsync.
-	// No tearing or jittering has been visually observed thus far, but it's not yet
-	// tested whether this behavior can be relied upon beyond Windows 11.
+	// Tearing exists at a nearly-fixed phase around 1/3 off the top of the monitor
+	// in my testing, and no method so far has mitigated it while under OpenGL.
 	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
 #else
 	// For all other systems/cases, we'll just rely on SDL's vsync implementation.
