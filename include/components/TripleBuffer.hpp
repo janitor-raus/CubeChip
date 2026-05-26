@@ -8,6 +8,7 @@
 
 #include <atomic>
 #include <memory>
+#include <utility>
 #include <type_traits>
 
 #include "HDIS_HCIS.hpp"
@@ -208,7 +209,7 @@ public:
 	 * @tparam Fn  A callable that can be invoked with 'auto' and may return
 	 *             any type (including 'void').
 	 *
-	 * @param function  The callable to invoke.
+	 * @param callable  The callable to invoke.
 	 *
 	 * @return decltype(auto) - forwards anything the callable returns.
 	 * @warning In case of an exception thrown during invocation of the callable,
@@ -222,7 +223,7 @@ public:
 		std::is_invocable_v<Fn, BufferView<true>> &&
 		std::is_invocable_v<Fn, BufferView<false>>
 	)
-	decltype(auto) present(Fn&& function) const noexcept(
+	decltype(auto) present(Fn&& callable) const noexcept(
 		std::is_nothrow_invocable_v<Fn, BufferView<true>> &&
 		std::is_nothrow_invocable_v<Fn, BufferView<false>>
 	) {
@@ -237,11 +238,9 @@ public:
 			m_context->m_read_ptr = sub_dirty(m_context->m_swap_ptr.exchange(
 				m_context->m_read_ptr, std::memory_order::acq_rel));
 
-			return std::forward<Fn>(function)(
-				BufferView<true>{ *m_context->m_read_ptr });
+			return callable(BufferView<true>{ *m_context->m_read_ptr });
 		} else {
-			return std::forward<Fn>(function)(
-				BufferView<false>{ *m_context->m_read_ptr });
+			return callable(BufferView<false>{ *m_context->m_read_ptr });
 		}
 	}
 
@@ -257,7 +256,7 @@ public:
 	 * @tparam Fn  A callable that can be invoked with 'auto&' and may return
 	 *             any type (including 'void').
 	 *
-	 * @param function  The callable to invoke.
+	 * @param callable  The callable to invoke.
 	 *
 	 * @return decltype(auto) - forwards anything the callable returns.
 	 * @warning In case of an exception thrown during invocation of the callable,
@@ -267,7 +266,7 @@ public:
 	 * Thread-safety: See notes from the class description.
 	 */
 	template <typename Fn> requires (std::is_invocable_v<Fn, Buffer&>)
-	decltype(auto) acquire(Fn&& function) noexcept(
+	decltype(auto) acquire(Fn&& callable) noexcept(
 		std::is_nothrow_invocable_v<Fn, Buffer&>
 	) {
 #ifdef TRIPLE_BUFFER_ENFORCE_SPSC
@@ -278,12 +277,12 @@ public:
 		m_context->m_acquire_count.fetch_add(1, std::memory_order::relaxed);
 
 		if constexpr (std::is_void_v<std::invoke_result_t<Fn, Buffer&>>) {
-			std::forward<Fn>(function)(*m_context->m_work_ptr);
+			callable(*m_context->m_work_ptr);
 			m_context->m_work_ptr = sub_dirty(m_context->m_swap_ptr.exchange(
 				add_dirty(m_context->m_work_ptr), std::memory_order::acq_rel));
 		}
 		else {
-			decltype(auto) result = std::forward<Fn>(function)(*m_context->m_work_ptr);
+			decltype(auto) result = callable(*m_context->m_work_ptr);
 			m_context->m_work_ptr = sub_dirty(m_context->m_swap_ptr.exchange(
 				add_dirty(m_context->m_work_ptr), std::memory_order::acq_rel));
 			return result;
