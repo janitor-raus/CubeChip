@@ -345,16 +345,14 @@ namespace ImGui {
 		}
 	}
 
-	bool ButtonContainer(
+	void detail::ButtonContainerBegin(
 		const char* id, const ImVec2& size,
-		const std::function<void()>& foreground_children,
-		const std::function<void()>& background_children,
-		bool selected
+		ButtonContainerState& state, bool selected
 	) {
-		const bool pressed = InvisibleButton(id, size);
+		state.pressed = InvisibleButton(id, size, ImGuiButtonFlags_EnableNav);
+
 		const bool hovered = IsItemHovered();
-		const bool active  = IsItemActive();
-		const auto item_id = GetItemID();
+		const bool active = IsItemActive();
 
 		const auto button_TL = GetItemRectMin();
 		const auto button_BR = GetItemRectMax();
@@ -364,39 +362,31 @@ namespace ImGui {
 		RenderFrame(button_TL, button_BR, GetColorU32(
 			active   ? ImGuiCol_ButtonActive  :
 			hovered  ? ImGuiCol_ButtonHovered :
-			selected ? ImGuiCol_Header        : ImGuiCol_Button
+			selected ? ImGuiCol_Header : ImGuiCol_Button
 		), style.FrameBorderSize >= 1.0f, style.FrameRounding);
 
-		RenderNavCursor(ImRect(button_TL, button_BR), item_id);
+		RenderNavCursor(ImRect(button_TL, button_BR), GetItemID());
+
+		state.tl_x = button_TL.x;
+		state.tl_y = button_TL.y;
 
 		SetCursorScreenPos(button_TL);
-
 		PushClipRect(button_TL, button_BR, true);
-		BeginGroup();
-		PushItemFlag(ImGuiItemFlags_Disabled, true);
-		if (background_children) {
-			background_children();
-		}
-		PopItemFlag();
-		EndGroup();
+	}
+
+	void detail::ButtonContainerEnd(const ButtonContainerState& state, const ImVec2& size) {
 		PopClipRect();
-
-		const auto content_TL = button_TL + style.FramePadding;
-		const auto content_BR = button_BR - style.FramePadding;
-
-		SetCursorScreenPos(content_TL);
-
-		PushClipRect(content_TL, content_BR, true);
-		BeginGroup();
-		if (foreground_children) {
-			foreground_children();
-		}
-		EndGroup();
-		PopClipRect();
-
-		SetCursorScreenPos(button_TL);
+		SetCursorScreenPos(ImVec2(state.tl_x, state.tl_y));
 		ItemSize(size);
+	}
 
-		return pressed;
+	bool BeginInertChild(const char* id, const ImVec2& size) {
+		return BeginChild(id, size, ImGuiChildFlags_None,
+			ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoBackground);
+	}
+
+	ImVec2 CalcTextSizeAs(float size, ImFont* font) {
+		return (font ? font : GetFont())
+			->CalcTextSizeA(size ? size : GetFontSize(), FLT_MAX, 0.0f, "X");
 	}
 }

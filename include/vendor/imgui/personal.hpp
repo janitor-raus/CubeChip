@@ -14,6 +14,7 @@
 
 struct ImVec2;
 struct ImVec4;
+struct ImFont;
 
 struct Vec2 {
 	float x{}, y{};
@@ -38,12 +39,12 @@ struct Vec4 {
 namespace ImGui {
 	ImVec2 clamp(const ImVec2& value, const ImVec2& min, const ImVec2& max) noexcept;
 	ImVec2 floor(const ImVec2& value) noexcept;
-	ImVec2 ceil (const ImVec2& value) noexcept;
-	ImVec2 abs  (const ImVec2& value) noexcept;
-	ImVec2 min  (const ImVec2& value, const ImVec2& min) noexcept;
-	ImVec2 max  (const ImVec2& value, const ImVec2& max) noexcept;
+	ImVec2 ceil(const ImVec2& value) noexcept;
+	ImVec2 abs(const ImVec2& value) noexcept;
+	ImVec2 min(const ImVec2& value, const ImVec2& min) noexcept;
+	ImVec2 max(const ImVec2& value, const ImVec2& max) noexcept;
 
-	bool DragUint (const char* label, unsigned* v,   float v_speed, unsigned v_min, unsigned v_max, const char* format, int flags);
+	bool DragUint(const char* label, unsigned* v, float v_speed, unsigned v_min, unsigned v_max, const char* format, int flags);
 	bool DragUint2(const char* label, unsigned v[2], float v_speed, unsigned v_min, unsigned v_max, const char* format, int flags);
 	bool DragUint3(const char* label, unsigned v[3], float v_speed, unsigned v_min, unsigned v_max, const char* format, int flags);
 	bool DragUint4(const char* label, unsigned v[4], float v_speed, unsigned v_min, unsigned v_max, const char* format, int flags);
@@ -75,17 +76,17 @@ namespace ImGui {
 
 	void WriteText(
 		const char* textString,
-		unsigned textColor   = 0xFFFFFFFF,
-		Vec2 textAlign   = Vec2{ 0.5f, 0.5f },
+		unsigned textColor = 0xFFFFFFFF,
+		Vec2 textAlign = Vec2{ 0.5f, 0.5f },
 		Vec2 textPadding = Vec2{ 6.0f, 6.0f }
 	);
 
 	void WriteShadowedText(
 		const char* textString,
-		unsigned textColor   = 0xFFFFFFFF,
-		Vec2 textAlign   = Vec2{ 0.5f, 0.5f },
+		unsigned textColor = 0xFFFFFFFF,
+		Vec2 textAlign = Vec2{ 0.5f, 0.5f },
 		Vec2 textPadding = Vec2{ 6.0f, 6.0f },
-		Vec2 shadowDist  = Vec2{ 2.0f, 2.0f }
+		Vec2 shadowDist = Vec2{ 2.0f, 2.0f }
 	);
 
 	void DrawRotatedImage(
@@ -142,10 +143,36 @@ namespace ImGui {
 		float thickness = 1.0f
 	);
 
+	namespace detail {
+		struct ButtonContainerState {
+			bool pressed = false;
+			float tl_x = 0.0f, tl_y = 0.0f;
+		};
+
+		void ButtonContainerBegin(
+			const char* id, const ImVec2& size,
+			ButtonContainerState& state, bool selected
+		);
+		void ButtonContainerEnd(const ButtonContainerState& state, const ImVec2& size);
+	}
+
+	template <std::invocable Fn>
 	bool ButtonContainer(
 		const char* id, const ImVec2& size,
-		const std::function<void()>& foreground_children,
-		const std::function<void()>& background_children,
-		bool selected = false
-	);
+		Fn&& body_callable, bool selected = false
+	) {
+		auto state = detail::ButtonContainerState();
+		detail::ButtonContainerBegin(id, size, state, selected);
+		body_callable();
+		detail::ButtonContainerEnd(state, size);
+		return state.pressed;
+	}
+
+	/**
+	 * @brief BeginChild() with pre-applied flags for no inputs and no background,
+	 *        primarily meant for inert grouping of items (e.g. in a button)
+	 */
+	bool BeginInertChild(const char* id, const ImVec2& size);
+
+	ImVec2 CalcTextSizeAs(float size, ImFont* font = nullptr);
 }
