@@ -6,11 +6,28 @@
 
 #pragma once
 
+#include <concepts>
+#include <utility>
 #include <numbers>
 #include <cmath>
 #include <bit>
 
 #include "EzMaths.hpp"
+
+/*==================================================================*/
+
+static_assert(std::endian::native == std::endian::little,
+	"This library is designed for little-endian only!");
+
+// Fast path - must have static ::impl
+template <typename T>
+concept IsBlendMode = requires(u8 a, u8 b) {
+	{ T::impl(a, b) } noexcept -> std::same_as<u8>;
+};
+
+// Flexible path - must be nothrow invocable
+template <typename T>
+concept IsBlendCallable = std::is_nothrow_invocable_r_v<u8, T, u8, u8>;
 
 /*==================================================================*/
 
@@ -30,7 +47,7 @@ inline CONSTEXPR_MATH RGBA  to_RGBA (OKLCH in) noexcept;
 
 /*==================================================================*/
 
-struct alignas(4) RGBA {
+struct alignas(sizeof(u8) * 4) RGBA {
 	using Packed = u32;
 
 	static constexpr u8 Opaque_A      = 0xFF;
@@ -121,91 +138,140 @@ public:
 		static constexpr auto MAX = 255;
 
 	public:
-		[[nodiscard]] static constexpr
-		u8 None(u8 src, u8) noexcept
-			{ return src; }
+		struct None {
+			[[nodiscard]] static constexpr
+			u8 impl(u8 src, u8) noexcept
+				{ return src; }
+		};
 
 		/*------------------------ LIGHTENING MODES ------------------------*/
 
-		[[nodiscard]] static constexpr
-		u8 Lighten(u8 src, u8 dst) noexcept
-			{ return std::max(src, dst); }
+		struct Lighten {
+			[[nodiscard]] static constexpr
+			u8 impl(u8 src, u8 dst) noexcept
+				{ return std::max(src, dst); }
+		};
 
-		[[nodiscard]] static constexpr
-		u8 Screen(u8 src, u8 dst) noexcept
-			{ return x8(ez::fixed_mul8(x8(src), x8(dst))); }
+		struct Screen {
+			[[nodiscard]] static constexpr
+			u8 impl(u8 src, u8 dst) noexcept
+				{ return x8(ez::fixed_mul8(x8(src), x8(dst))); }
+		};
 
-		[[nodiscard]] static constexpr
-		u8 ColorDodge(u8 src, u8 dst) noexcept
-			{ return u8(src == MAX ? MAX : std::min((dst * MAX) / x8(src), MAX)); }
+		struct ColorDodge {
+			[[nodiscard]] static constexpr
+			u8 impl(u8 src, u8 dst) noexcept
+				{ return u8(src == MAX ? MAX : std::min((dst * MAX) / x8(src), MAX)); }
+		};
 
-		[[nodiscard]] static constexpr
-		u8 LinearDodge(u8 src, u8 dst) noexcept
-			{ return u8(std::min(src + dst, MAX)); }
+		struct LinearDodge {
+			[[nodiscard]] static constexpr
+			u8 impl(u8 src, u8 dst) noexcept
+				{ return u8(std::min(src + dst, MAX)); }
+		};
 
 		/*------------------------ DARKENING MODES -------------------------*/
 
-		[[nodiscard]] static constexpr
-		u8 Darken(u8 src, u8 dst) noexcept
-			{ return std::min(src, dst); }
+		struct Darken {
+			[[nodiscard]] static constexpr
+			u8 impl(u8 src, u8 dst) noexcept
+				{ return std::min(src, dst); }
+		};
 
-		[[nodiscard]] static constexpr
-		u8 Multiply(u8 src, u8 dst) noexcept
-			{ return ez::fixed_mul8(src, dst); }
+		struct Multiply {
+			[[nodiscard]] static constexpr
+			u8 impl(u8 src, u8 dst) noexcept
+				{ return ez::fixed_mul8(src, dst); }
+		};
 
-		[[nodiscard]] static constexpr
-		u8 ColorBurn(u8 src, u8 dst) noexcept
-			{ return u8(src == MIN ? MIN : std::max(((src + dst - MAX) * MAX) / src, MIN)); }
+		struct ColorBurn {
+			[[nodiscard]] static constexpr
+			u8 impl(u8 src, u8 dst) noexcept
+				{ return u8(src == MIN ? MIN : std::max(((src + dst - MAX) * MAX) / src, MIN)); }
+		};
 
-		[[nodiscard]] static constexpr
-		u8 LinearBurn(u8 src, u8 dst) noexcept
-			{ return u8(std::max(src + dst - MAX, MIN)); }
+		struct LinearBurn {
+			[[nodiscard]] static constexpr
+			u8 impl(u8 src, u8 dst) noexcept
+				{ return u8(std::max(src + dst - MAX, MIN)); }
+		};
 
 		/*-------------------------- OTHER MODES ---------------------------*/
 
-		[[nodiscard]] static constexpr
-		u8 Average(u8 src, u8 dst) noexcept
-			{ return u8((src + dst + 1) >> 1); }
+		struct Average {
+			[[nodiscard]] static constexpr
+			u8 impl(u8 src, u8 dst) noexcept
+				{ return u8((src + dst + 1) >> 1); }
+		};
 
-		[[nodiscard]] static constexpr
-		u8 Difference(u8 src, u8 dst) noexcept
-			{ return u8(ez::abs(src - dst)); }
+		struct Difference {
+			[[nodiscard]] static constexpr
+			u8 impl(u8 src, u8 dst) noexcept
+				{ return u8(ez::abs(src - dst)); }
+		};
 
-		[[nodiscard]] static constexpr
-		u8 Negation(u8 src, u8 dst) noexcept
-			{ return x8(ez::abs(MAX - (src + dst))); }
+		struct Negation {
+			[[nodiscard]] static constexpr
+			u8 impl(u8 src, u8 dst) noexcept
+				{ return x8(ez::abs(MAX - (src + dst))); }
+		};
 
-		[[nodiscard]] static constexpr
-		u8 Overlay(u8 src, u8 dst) noexcept {
-			return src < 128
-				? u8(ez::fixed_mul8(   src,     dst)  * 2)
-				: x8(ez::fixed_mul8(x8(src), x8(dst)) * 2);
-		}
+		struct Overlay {
+			[[nodiscard]] static constexpr
+			u8 impl(u8 src, u8 dst) noexcept {
+				return src < 128
+					? u8(ez::fixed_mul8(   src,     dst)  * 2)
+					: x8(ez::fixed_mul8(x8(src), x8(dst)) * 2);
+			}
+		};
 
-		[[nodiscard]] static constexpr
-		u8 Glow(u8 src, u8 dst) noexcept
-			{ return u8(dst == MAX ? MAX : std::min((ez::fixed_mul8(src, dst) * MAX) / x8(dst), MAX)); }
+		struct Glow {
+			[[nodiscard]] static constexpr
+			u8 impl(u8 src, u8 dst) noexcept
+				{ return u8(dst == MAX ? MAX : std::min((ez::fixed_mul8(src, dst) * MAX) / x8(dst), MAX)); }
+		};
 
-		[[nodiscard]] static constexpr
-		u8 Reflect(u8 src, u8 dst) noexcept
-			{ return Glow(dst, src); }
+		struct Reflect {
+			[[nodiscard]] static constexpr
+			u8 impl(u8 src, u8 dst) noexcept
+				{ return Glow::impl(dst, src); }
+		};
 	};
 
-	// Channel blend function type alias
-	using BlendFunc = u8(*)(u8 src, u8 dst) noexcept;
+	// Channel blend callable signature alias
+	using BlendCallableSig = u8(*)(u8 src, u8 dst) noexcept;
 
 	/**
-	 * @brief Blends two RGBA colors together using the provided BlendFunc().
-	 * @param[in] src :: Source color.
-	 * @param[in] dst :: Destination color.
-	 * @param[in] func :: Function to blend each channel, but not alpha.
+	 * @brief Blends two RGBA colors together using the provided callable.
+	 * @param[in] src :: Source RGBA color.
+	 * @param[in] dst :: Destination RGBA color.
+	 * @param[in] callable :: BlendCallable to blend each color channel pair.
+	 *                        Will not be applied to alpha channel.
 	 */
+	template <IsBlendCallable BlendCallable>
 	[[nodiscard]] static constexpr
-	RGBA channel_blend(RGBA src, RGBA dst, BlendFunc func) noexcept {
+	RGBA channel_blend(RGBA src, RGBA dst, BlendCallable&& callable) noexcept {
 		return RGBA(
-			func(src.R, dst.R),
-			func(src.G, dst.G),
-			func(src.B, dst.B)
+			callable(src.R, dst.R),
+			callable(src.G, dst.G),
+			callable(src.B, dst.B)
+		);
+	}
+
+	/**
+	 * @brief Blends two RGBA colors together using the templated BlendMode.
+	 * @param[in] src :: Source RGBA color.
+	 * @param[in] dst :: Destination RGBA color.
+	 * @tparam BlendMode :: Blend mode to blend each color channel pair with.
+	 *                        Will not be applied to alpha channel.
+	 */
+	template <IsBlendMode BlendMode>
+	[[nodiscard]] static constexpr
+	RGBA channel_blend(RGBA src, RGBA dst) noexcept {
+		return RGBA(
+			BlendMode::impl(src.R, dst.R),
+			BlendMode::impl(src.G, dst.G),
+			BlendMode::impl(src.B, dst.B)
 		);
 	}
 
@@ -225,8 +291,8 @@ public:
 
 	/**
 	 * @brief Alpha blends two RGBA colors together with custom source weight.
-	 * @param[in] src :: Source color.
-	 * @param[in] dst :: Destination color.
+	 * @param[in] src :: Source RGBA color.
+	 * @param[in] dst :: Destination RGBA color.
 	 * @param[in] weight :: Custom source weight bias.
 	 */
 	[[nodiscard]] static constexpr
@@ -239,23 +305,43 @@ public:
 	}
 
 	/**
-	 * @brief Blends two RGBA colors together using the provided BlendFunc(), then applies alpha_blend().
-	 * @param[in] src :: Source color.
-	 * @param[in] dst :: Destination color.
-	 * @param[in] func :: Function to blend each channel, but not alpha.
+	 * @brief Blends two RGBA colors together using the provided callable, then performs alpha blending.
+	 * @param[in] src :: Source RGBA color.
+	 * @param[in] dst :: Destination RGBA color.
+	 * @param[in] callable :: BlendCallable to blend each color channel pair.
+	 *                        Will not be applied to alpha channel.
 	 * @param[in] weight :: Custom source weight bias. If 0, default to source alpha.
 	 */
+	template <IsBlendCallable BlendCallable>
 	[[nodiscard]] static constexpr
-	RGBA composite_blend(RGBA src, RGBA dst, BlendFunc func, ez::Weight weight = Opaque_A) noexcept {
+	RGBA composite_blend(RGBA src, RGBA dst, BlendCallable&& callable, ez::Weight weight = Opaque_A) noexcept {
 		if (auto alpha = ez::fixed_mul8(src.A, weight)) [[likely]] {
-			return weighted_alpha_blend(channel_blend(src, dst, func), dst, alpha);
+			return weighted_alpha_blend(channel_blend(src, dst,
+				std::forward<BlendCallable>(callable)), dst, alpha);
 		}
 		return dst;
 	}
 
 	/**
-	 * @brief Pre-multiplies an RGBA color by a given weight.
-	 * @param[in] src :: Source color (alpha is ignored).
+	 * @brief Blends two RGBA colors together using the templated BlendMode, then performs alpha blending.
+	 * @param[in] src :: Source RGBA color.
+	 * @param[in] dst :: Destination RGBA color.
+	 * @param[in] weight :: Custom source weight bias. If 0, default to source alpha.
+	 * @tparam BlendMode :: Blend mode to blend each color channel pair with.
+	 */
+	template <IsBlendMode BlendMode>
+	[[nodiscard]] static constexpr
+	RGBA composite_blend(RGBA src, RGBA dst, ez::Weight weight = Opaque_A) noexcept {
+		if (auto alpha = ez::fixed_mul8(src.A, weight)) [[likely]] {
+			return weighted_alpha_blend(channel_blend<BlendMode>(src, dst), dst, alpha);
+		}
+		return dst;
+	}
+
+	/**
+	 * @brief Pre-multiplies an RGBA color by a given alpha weight.
+	 *        The resulting color will keep the same alpha value as the weight.
+	 * @param[in] src :: Source RGBA color (alpha is ignored).
 	 * @param[in] weight :: ez::Weight to pre-multiply by.
 	 */
 	[[nodiscard]] static constexpr
@@ -270,7 +356,8 @@ public:
 
 	/**
 	 * @brief Pre-multiplies an RGBA color with its own alpha as weight.
-	 * @param[in] src :: Source color with alpha.
+	 *        The resulting color will keep the same alpha value as the source color.
+	 * @param[in] src :: Source RGBA color with alpha.
 	 */
 	[[nodiscard]] static constexpr
 	RGBA premul(RGBA src) noexcept {
@@ -290,7 +377,7 @@ constexpr RGBA operator""_rgb(unsigned long long value) noexcept
 
 /*==================================================================*/
 
-struct alignas(4) HSV {
+struct alignas(sizeof(u8) * 4) HSV {
 	using Type_H = s16;
 	using Type_S = u8;
 	using Type_V = Type_S;
