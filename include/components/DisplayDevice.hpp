@@ -17,15 +17,13 @@
 struct SDL_Renderer;
 
 class DisplayDevice {
-	using ScopedRead = AtomicBox<FramePacket::Metadata>::ScopedRead;
-	using ScopedEdit = AtomicBox<FramePacket::Metadata>::ScopedEdit;
-
 	struct DisplayContext;
 	std::unique_ptr<DisplayContext> m_context;
 
 public:
 	using Callable  = std::function<void()>;
 	using Swapchain = TripleBuffer<FramePacket>;
+	using Metadata  = FramePacket::Metadata;
 
 public:
 	/**
@@ -33,20 +31,21 @@ public:
 	 * an instance of metadata to propagate both data and state. Refer
 	 * to the 'acquire()' and 'present()' member methods for use info.
 	 */
-	auto swapchain()       noexcept ->       Swapchain&;
+	auto swapchain() /***/ noexcept -> /***/ Swapchain&;
 	auto swapchain() const noexcept -> const Swapchain&;
 
 public:
 	/**
-	 * @brief Staging area for metadata, serving both as persistent
-	 * storage, as well as for writing to the swapchain's internal
-	 * metadata instance to propagate state changes atomically.
+	 * @brief Staging area for metadata, serving both as persistent storage,
+	 *        as well as for writing to the swapchain's internal metadata
+	 *        instance to propagate state changes per acquire() call.
 	**/
-	auto read_metadata() noexcept -> ScopedRead;
-	auto edit_metadata() noexcept -> ScopedEdit;
+	auto metadata() /***/ noexcept -> /***/ AtomicBox<Metadata>&;
+	auto metadata() const noexcept -> const AtomicBox<Metadata>&;
 
 public:
-	DisplayDevice(std::size_t W, std::size_t H, SDL_Renderer* sdl_renderer) noexcept;
+	DisplayDevice(std::size_t W, std::size_t H,
+		SDL_Renderer* const& sdl_renderer_ptr) noexcept;
 
 	~DisplayDevice() noexcept;
 
