@@ -7,6 +7,7 @@
 #pragma once
 
 #include "ImLabel.hpp"
+#include "WindowHost.hpp"
 
 #include <utility>
 #include <memory>
@@ -61,6 +62,10 @@ public:
 		register_menu_impl(std::move(window_tag), std::move(menu_title), shared_func);
 		return shared_func;
 	}
+	template <VoidInvocable Fn> [[nodiscard]]
+	static Hook register_menu(const WindowHost& window, OrderKey menu_title, Fn&& fn) noexcept {
+		return register_menu(window.get_window_label(), std::move(menu_title), std::forward<Fn>(fn));
+	}
 
 private:
 	static void register_menu_impl(LabelKey window_tag, OrderKey menu_title, const Hook& shared_func) noexcept;
@@ -80,8 +85,8 @@ public:
 	static void quit_video();
 
 public:
-	static SDL_Renderer* get_current_renderer()  noexcept;
-	static unsigned      get_main_dockspace_id() noexcept;
+	static SDL_Renderer* const& get_current_renderer()  noexcept;
+	static unsigned int         get_main_dockspace_id() noexcept;
 
 public:
 	static void  set_ui_zoom_scaling(float scale) noexcept;

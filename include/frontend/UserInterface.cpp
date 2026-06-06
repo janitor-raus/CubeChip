@@ -349,8 +349,8 @@ bool UserInterface::invoke_registered_menus(const LabelKey& window_key) noexcept
 
 /*==================================================================*/
 
-SDL_Renderer* UserInterface::get_current_renderer()  noexcept { return s_current_renderer; }
-unsigned      UserInterface::get_main_dockspace_id() noexcept { return s_main_dock_id; }
+SDL_Renderer* const& UserInterface::get_current_renderer()  noexcept { return s_current_renderer; }
+unsigned int         UserInterface::get_main_dockspace_id() noexcept { return s_main_dock_id; }
 
 void UserInterface::set_ui_zoom_scaling(float scale) noexcept {
 	s_zoom_scaling = std::clamp(scale, 1.0f, 4.0f);
