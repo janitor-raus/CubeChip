@@ -50,7 +50,6 @@ void ApplicationHost::set_open_file_dialog_result(std::string_view file) noexcep
 /*==================================================================*/
 
 static bool s_application_minimized{};
-static bool s_application_focused{};
 
 ApplicationHost::ApplicationHost() noexcept {
 	BVS->set_window_title(c_app_name);
@@ -227,13 +226,15 @@ int ApplicationHost::handle_client_events(void* event) noexcept {
 				::append_pending_file_drops(sdl_event->drop.data);
 				break;
 
+			case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
+				BVS->notify_display_change();
+				break;
+
 			case SDL_EVENT_WINDOW_FOCUS_GAINED:
-				s_application_focused = true;
 				GAB->toggle_background_volume(false);
 				break;
 
 			case SDL_EVENT_WINDOW_FOCUS_LOST:
-				s_application_focused = false;
 				GAB->toggle_background_volume(true);
 				break;
 

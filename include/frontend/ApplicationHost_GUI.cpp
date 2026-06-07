@@ -26,6 +26,205 @@
 
 /*==================================================================*/
 
+// Tearing Demo: shows a full-screen canvas with horizontally-scrolling
+// vertical bars. This is useful for testing tearing and refresh rates.
+// An interactive divider bar appears when you click and drag, so you
+// can check for input lag in windowed/exclusive fullscreen modes.
+
+namespace {
+	static float s_scroll_x = 0.f;
+	static float s_scroll_spd = 120.f;
+	static bool  s_paused = false;
+	static float s_bar_y = -1.f;
+	static bool  s_dragging = false;
+}
+
+static void ShowTearingTest(bool* p_open = nullptr) {
+	if (p_open && !*p_open) return;
+
+	ImGuiIO& io = ImGui::GetIO();
+	const float dt = s_paused ? 0.f : io.DeltaTime;
+	const float scr_w = io.DisplaySize.x;
+	const float scr_h = io.DisplaySize.y;
+	const float bar_w = 60.f;
+
+	if (s_bar_y < 0.f) s_bar_y = scr_h * 0.5f;
+
+	const bool  dragging = ImGui::IsMouseDown(ImGuiMouseButton_Left);
+	const float mouse_y = io.MousePos.y;
+
+	if (dragging) {
+		// Clamp to screen
+		s_bar_y = mouse_y < 0.f ? 0.f : mouse_y > scr_h ? scr_h : mouse_y;
+	}
+	else {
+		s_scroll_x = std::fmod(s_scroll_x + s_scroll_spd * dt, bar_w * 2.f);
+	}
+
+	if (s_bar_y < 0.f) s_bar_y = scr_h * 0.5f;
+
+	// -----------------------------------------------------------------------
+	// Full-screen canvas
+	// -----------------------------------------------------------------------
+	ImGui::SetNextWindowPos({ 0, 0 });
+	ImGui::SetNextWindowSize(io.DisplaySize);
+	ImGui::SetNextWindowBgAlpha(1.f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0, 0 });
+	ImGui::Begin("##tear_bg", nullptr,
+		ImGuiWindowFlags_NoDecoration |
+		ImGuiWindowFlags_NoInputs |
+		ImGuiWindowFlags_NoNav |
+		ImGuiWindowFlags_NoSavedSettings
+	);
+
+	ImDrawList* dl = ImGui::GetWindowDrawList();
+
+	if (!dragging) {
+	// --- Scrolling bars ---
+		int   n_bars = (int)(scr_w / bar_w) + 3;
+		float x0 = -bar_w + std::fmod(s_scroll_x, bar_w * 2.f) - bar_w;
+
+		for (int i = 0; i < n_bars; ++i) {
+			float bx = x0 + i * bar_w;
+			float cx = (bx + bar_w * 0.5f) / scr_w;
+			cx = cx < 0.f ? 0.f : cx > 1.f ? 1.f : cx;
+
+			ImU32 col;
+			if (i & 1) {
+				col = IM_COL32(
+					(int)(220 - cx * 160),
+					(int)(80 + cx * 80),
+					(int)(30 + cx * 170), 255);
+			}
+			else {
+				col = IM_COL32(
+					(int)(30 + cx * 20),
+					(int)(20 + cx * 40),
+					(int)(50 + cx * 60), 255);
+			}
+			dl->AddRectFilled({ bx, 0.f }, { bx + bar_w, scr_h }, col);
+		}
+	}
+	else {
+	 // --- Split view ---
+	 // Top half: warm
+		dl->AddRectFilled({ 0.f, 0.f }, { scr_w, s_bar_y }, IM_COL32(210, 80, 40, 255));
+		// Bottom half: cool
+		dl->AddRectFilled({ 0.f, s_bar_y }, { scr_w, scr_h }, IM_COL32(40, 90, 190, 255));
+
+		// Divider bar — 3px bright line so you can see exactly where it is
+		dl->AddRectFilled(
+			{ 0.f,   s_bar_y - 1.5f },
+			{ scr_w, s_bar_y + 1.5f },
+			IM_COL32(255, 255, 255, 220)
+		);
+	}
+
+	ImGui::End();
+	ImGui::PopStyleVar();
+
+	// -----------------------------------------------------------------------
+	// HUD
+	// -----------------------------------------------------------------------
+	ImGui::SetNextWindowSize({ 340, 0 });
+	ImGui::SetNextWindowBgAlpha(0.70f);
+	ImGui::Begin("Tear Test", p_open,
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoSavedSettings |
+		ImGuiWindowFlags_NoDocking
+	);
+
+	char buf[64];
+	std::snprintf(buf, sizeof(buf), "%.3f FPS  (%.3f ms)",
+		io.Framerate, 1000.f / io.Framerate);
+	ImGui::TextUnformatted(buf);
+	ImGui::Spacing();
+	ImGui::SetNextItemWidth(-1);
+	ImGui::SliderFloat("##spd", &s_scroll_spd, 20.f, 800.f, "speed %.0f px/s");
+	if (ImGui::Button(s_paused ? "Resume" : "Pause", { -1, 0 }))
+		s_paused = !s_paused;
+
+	ImGui::End();
+}
+
+/*==================================================================*/
+
+namespace CandidateList {
+	struct System {
+		using Hook = CoreRegistry::LiveHook;
+		Hook        system_hook{};
+		const char* error_message{};
+
+		System(const Hook& entry, std::span<const char> file) noexcept
+			: system_hook(entry)
+			, error_message(entry->descriptor->validate_program(file))
+		{}
+
+		auto& get_descriptor() const noexcept { return system_hook->descriptor; }
+		bool  eligible()        const noexcept { return error_message == nullptr; }
+	};
+
+	struct Family {
+		std::string_view    family_name{};
+		std::size_t         total_eligible{};
+		std::vector<System> systems{};
+
+		Family(std::string_view name) noexcept
+			: family_name(name) {}
+	};
+
+	struct ListState {
+		std::vector<Family>   families{};
+		std::size_t           extension_match_count{};
+		const System*         best_match{};
+		std::filesystem::path file_image{};
+		static constexpr auto c_highlight_color = 0xF5A30CFF_bgr;
+
+		void refresh_candidates() {
+			families.clear();
+			extension_match_count = 0;
+			best_match = nullptr;
+			file_image = SystemStaging::file_image.path();
+
+			for (Family* current_group = nullptr;
+				const auto& hook : CoreRegistry::get_candidate_core_span()
+			) {
+				if (!current_group || current_group->family_name
+					!= hook->descriptor->family_pretty_name
+				) {
+					families.emplace_back(hook->descriptor->family_pretty_name);
+					current_group = &families.back();
+				}
+				current_group->systems.emplace_back(hook, SystemStaging::file_image.span());
+			}
+
+			const System* best_guess = nullptr;
+
+			for (auto& group : families) {
+				std::stable_partition(group.systems.begin(), group.systems.end(),
+					[](const auto& system) { return system.eligible(); });
+
+				for (const auto& candidate : group.systems) {
+					if (!candidate.eligible()) { continue; }
+					++group.total_eligible;
+
+					const auto& exts = candidate.get_descriptor()->known_extensions;
+					if (std::any_of(exts.begin(), exts.end(), [&](const auto& ext) {
+						return ext == file_image.extension();
+					})) {
+						best_guess = &candidate;
+						++extension_match_count;
+					}
+				}
+			}
+
+			if (best_guess && extension_match_count == 1) {
+				best_match = best_guess;
+			}
+		}
+	};
+}
+
 void ApplicationHost::setup_gui_callables() noexcept {
 	using namespace ImGui;
 
@@ -89,6 +288,14 @@ void ApplicationHost::setup_gui_callables() noexcept {
 		}
 	});
 
+	static bool s_show_tearing_demo{};
+	static auto s_menu_debug__tearing_demo = UserInterface::register_menu("",
+	{ 10, "Debug" }, [&]() noexcept {
+		if (MenuItem("Tearing Demo...", nullptr, s_show_tearing_demo)) {
+			s_show_tearing_demo = !s_show_tearing_demo;
+		}
+	});
+
 	static bool s_show_window_logger{};
 	static auto s_menu_debug__show_logs = UserInterface::register_menu("",
 	{ 10, "Debug" }, [&]() noexcept {
@@ -108,7 +315,7 @@ void ApplicationHost::setup_gui_callables() noexcept {
 		#endif
 			PopFont();
 
-			Separator(2.0f);
+			Separator();
 
 			TextUnformatted("Version: ");
 			SameLine();
@@ -189,6 +396,12 @@ void ApplicationHost::setup_gui_callables() noexcept {
 	[&]() noexcept {
 		if (!s_show_window_demo) { return; }
 		ShowDemoWindow(&s_show_window_demo);
+	});
+
+	static auto s_window_none__tearing_demo = UserInterface::register_window(
+	[&]() noexcept {
+		if (!s_show_tearing_demo) { return; }
+		ShowTearingTest(&s_show_tearing_demo);
 	});
 
 	static auto s_window_none__log_viewer = UserInterface::register_window(

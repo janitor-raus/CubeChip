@@ -32,8 +32,60 @@
 	#pragma warning(push)
 	#pragma warning(disable : 5039)
 	#include <dwmapi.h>
+	#include <dxgi.h>
 	#pragma comment(lib, "Dwmapi")
+	#pragma comment(lib, "dxgi.lib")
 	#pragma warning(pop)
+#endif
+
+/*==================================================================*/
+
+#ifdef _WIN32
+static IDXGIOutput* s_dxgi_output = nullptr;
+
+static void UpdateDXGIOutput(SDL_Window* window) {
+	auto hwnd = HWND(SDL_GetPointerProperty(
+		SDL_GetWindowProperties(window),
+		SDL_PROP_WINDOW_WIN32_HWND_POINTER,
+		nullptr
+	));
+	if (!hwnd) { return; }
+
+	const auto target = MonitorFromWindow(
+		hwnd, MONITOR_DEFAULTTONEAREST);
+
+	IDXGIFactory1* factory = nullptr;
+	if (FAILED(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&factory)))
+		return;
+
+	IDXGIAdapter1* adapter = nullptr;
+	for (UINT i = 0; factory->EnumAdapters1(i, &adapter) != DXGI_ERROR_NOT_FOUND; ++i) {
+		IDXGIOutput* output = nullptr;
+		for (UINT j = 0; adapter->EnumOutputs(j, &output) != DXGI_ERROR_NOT_FOUND; ++j) {
+			DXGI_OUTPUT_DESC desc = {};
+			output->GetDesc(&desc);
+			if (desc.Monitor == target) {
+				if (s_dxgi_output) { s_dxgi_output->Release(); }
+				s_dxgi_output = output;
+				adapter->Release();
+				factory->Release();
+				return;
+			}
+			output->Release();
+		}
+		adapter->Release();
+	}
+
+	// No match found - leave g_dxgi_output unchanged
+	factory->Release();
+}
+
+static void ReleaseDXGIOutput() {
+	if (s_dxgi_output) {
+		s_dxgi_output->Release();
+		s_dxgi_output = nullptr;
+	}
+}
 #endif
 
 /*==================================================================*/
@@ -148,6 +200,10 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 			SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY); \
 		if (!s_main_window) { throw_fatal_error(__LINE__, __func__); }
 
+#ifdef _WIN32
+		UpdateDXGIOutput(s_main_window);
+#endif
+
 #if defined(_WIN32) && defined(WINDOWS_NO_ROUNDED_CORNERS)
 	#ifdef OLD_WINDOWS_SDK
 				static constexpr auto NTDDI_MAJOR{ ((NTDDI_VERSION >> 24) & 0x00FF) };
@@ -197,7 +253,16 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 		SDL_SetWindowSize(s_main_window, window.w, window.h);
 		SDL_SetWindowMinimumSize(s_main_window, 960, 780);
 
-		s_main_renderer = SDL_CreateRenderer(s_main_window, nullptr); \
+#ifdef _WIN32
+		// Under Windows' DWM, the default SDL render driver (direct3d11) misses the
+		// timing window for presenting frames when the window is moved or being resized,
+		// falling to a lower vsync bracket. OpenGL appears to be unaffected by this,
+		// most likely due to a different pipeline, as opposed to DXGI's flip model.
+		static constexpr const char* renderer_name = "opengl";
+#else
+		static constexpr const char* renderer_name = nullptr;
+#endif
+		s_main_renderer = SDL_CreateRenderer(s_main_window, renderer_name); \
 		if (!s_main_renderer) { throw_fatal_error(__LINE__, __func__); }
 
 		SDL_ShowWindow(s_main_window);
@@ -213,6 +278,9 @@ BasicVideoSpec::BasicVideoSpec(const Settings& settings, bool& success) noexcept
 }
 
 BasicVideoSpec::~BasicVideoSpec() noexcept {
+#ifdef _WIN32
+	ReleaseDXGIOutput();
+#endif
 	SDL_QuitSubSystem(SDL_INIT_VIDEO);
 }
 
@@ -342,6 +410,12 @@ bool BasicVideoSpec::raise_window(SDL_Window* window) noexcept {
 	return SDL_RaiseWindow(window ? window : s_main_window.get());
 }
 
+void BasicVideoSpec::notify_display_change() noexcept {
+#ifdef _WIN32
+	UpdateDXGIOutput(s_main_window);
+#endif
+}
+
 /*==================================================================*/
 
 void BasicVideoSpec::set_automatic_render_scale_for_renderer() noexcept {
@@ -351,15 +425,41 @@ void BasicVideoSpec::set_automatic_render_scale_for_renderer() noexcept {
 
 bool BasicVideoSpec::try_render_present() noexcept {
 	try {
+		static constexpr auto c_exclusive_mask =
+			SDL_WINDOW_FULLSCREEN | SDL_WINDOW_INPUT_FOCUS;
+
+		[[maybe_unused]] const auto flags = SDL_GetWindowFlags(s_main_window);
+		[[maybe_unused]] const bool exclusive = (flags & c_exclusive_mask) == c_exclusive_mask;
+
+#ifdef _WIN32
+		// We disable vsync here, because we rely on DwmFlush() before the call to
+		// SDL_RenderPresent() to be our primary sync mechanism.
+		// When windowed, this ensures that window moving/resizing remains smooth without
+		// artifacts under the OpenGL renderer, unlike D3D which fights the timing.
+		// In exclusive fullscreen (as provided by SDL), with the OpenGL renderer, WGL
+		// shenanigans result in missing the proper vblank timing and having consistent
+		// tearing, despite the ~2.5ms average presentation-to-display time, as opposed
+		// to SDL's ~50ms vsync approach.
+		// Might have to dynamically switch to d3d when in exclusive fullscreen to
+		// actually meet the vblank timing without WGL screwing up the timing.
+		if (exclusive) {
+			if (s_dxgi_output) {
+				s_dxgi_output->WaitForVBlank();
+			}
+		} else {
+			BOOL dwm_enabled = FALSE;
+			DwmIsCompositionEnabled(&dwm_enabled);
+			if (dwm_enabled == TRUE) { DwmFlush(); }
+			else { SDL_SetRenderVSync(s_main_renderer, 1); }
+		}
+#else
+		// For all other systems/cases, we'll just rely on SDL's vsync implementation.
+		SDL_SetRenderVSync(s_main_renderer, 1);
+#endif
+
 		if (!SDL_RenderPresent(s_main_renderer)) { \
 			throw_fatal_error(__LINE__, __func__);
 		}
-
-#ifdef _WIN32
-		BOOL dwm_enabled = FALSE;
-		DwmIsCompositionEnabled(&dwm_enabled);
-		if (dwm_enabled) { DwmFlush(); }
-#endif
 
 		return true;
 	}

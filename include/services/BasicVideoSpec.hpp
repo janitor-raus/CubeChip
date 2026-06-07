@@ -80,6 +80,8 @@ public:
 	bool is_main_window_id(unsigned id) const noexcept;
 	bool raise_window(SDL_Window* window = nullptr) noexcept;
 
+	void notify_display_change() noexcept;
+
 	template <typename Fn> requires(std::is_invocable_r_v<void, Fn>)
 	bool render_present(Fn&& render_callable) noexcept(
 		std::is_nothrow_invocable_r_v<void, Fn>

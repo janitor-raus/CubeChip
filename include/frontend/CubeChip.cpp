@@ -45,24 +45,6 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 	setlocale(LC_CTYPE, ".UTF-8");
 	SetConsoleOutputCP(CP_UTF8);
 	SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
-
-	// Under Windows' DWM, the default SDL render driver (direct3d11) misses the
-	// timing window for presenting frames when the window is moved or being resized,
-	// falling to a lower vsync bracket. OpenGL appears to be unaffected by this,
-	// most likely due to a different pipeline, as opposed to DXGI's flip model.
-	SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
-	// We disable vsync enforcement here, because we rely on DwmFlush() after the
-	// call to SDL_RenderPresent() to be our primary sync mechanism. When windowed,
-	// this ensures that window moving/resizing remains smooth without artifacts.
-	// As an additional benefit, when in exclusive fullscreen (as provided by SDL),
-	// syncing via DwmFlush() appears to reduce our present-to-display latency down
-	// to an average of 2.5ms, compared to around 50ms when relying on SDL's vsync.
-	// Tearing exists at a nearly-fixed phase around 1/3 off the top of the monitor
-	// in my testing, and no method so far has mitigated it while under OpenGL.
-	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
-#else
-	// For all other systems/cases, we'll just rely on SDL's vsync implementation.
-	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
 #endif
 
 	SDL_SetHint(SDL_HINT_APP_NAME, c_app_name);
