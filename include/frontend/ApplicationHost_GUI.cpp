@@ -520,250 +520,221 @@ void ApplicationHost::setup_gui_callables() noexcept {
 	[&]() noexcept {
 		if (!SystemStaging::file_image.valid()) { return; }
 
-		struct CandidateSystem {
-			using Hook = CoreRegistry::LiveHook;
-			Hook  system_hook{};
-			const char* error_message{};
+		static bool s_render_modal = false;
+		static std::atomic_bool s_calculating_sha1{};
 
-			CandidateSystem(const Hook& entry, std::span<const char> file) noexcept
-				: system_hook(entry)
-				, error_message(entry->descriptor->validate_program(file))
-			{}
+		static CandidateList::ListState s_list_state;
+		static const CandidateList::System* chosen_system = nullptr;
+		static const CandidateList::System* pending_system = nullptr;
+		static ScrollingTextState s_scroll_state;
 
-			auto& get_descriptor() const noexcept { return system_hook->descriptor; }
-			bool  eligible() const noexcept { return error_message == nullptr; }
-		};
+		const auto scaling = UserInterface::get_ui_total_scaling();
 
-		struct FamilyGroup {
-			std::size_t total_eligible{};
-			std::string_view family_name{};
-			std::vector<CandidateSystem> systems;
-
-			FamilyGroup(std::string_view name) noexcept
-				: family_name(name) {}
-		};
-
-		static bool s_render_modal_window = false;
-		static bool s_replace_last_system = false;
-
-		static RGBA s_highlight_color = 0xF5A30CFF;
-
-		static std::vector<FamilyGroup> s_families{};
-		static std::size_t s_extension_match_count{};
-		static const CandidateSystem* s_chosen_candidate{};
-		static std::filesystem::path s_file_image{};
-
-		const auto s_close_modal_window = [&]() noexcept {
+		static auto s_close_modal = []() noexcept {
 			SystemStaging::clear();
 			CloseCurrentPopup();
-			s_render_modal_window = false;
+			s_render_modal = false;
 		};
 
-		if (!s_render_modal_window) {
-			s_render_modal_window = true;
+		if (!s_render_modal) {
+			s_render_modal = true;
+			s_list_state.refresh_candidates();
+
+			s_scroll_state.set_speed(128.0f * scaling);
+
+			pending_system = s_list_state.best_match;
 			OpenPopup("FileImageModal");
-
-			s_families.clear();
-			s_extension_match_count = 0u;
-			s_chosen_candidate = nullptr;
-			s_file_image = SystemStaging::file_image.path();
-
-			for (FamilyGroup* current_group = nullptr;
-				auto& hook : CoreRegistry::get_candidate_core_span()
-			) {
-				if (!current_group || current_group->family_name
-					!= hook->descriptor->family_pretty_name
-				) {
-					s_families.emplace_back(hook->descriptor->family_pretty_name);
-					current_group = &s_families.back();
-				}
-				current_group->systems.emplace_back(hook, SystemStaging::file_image.span());
-			}
-
-			for (auto& group : s_families) {
-				std::stable_partition(group.systems.begin(), group.systems.end(),
-					[](const auto& candidate) { return candidate.eligible(); });
-
-				for (const auto& candidate : group.systems) {
-					if (candidate.eligible()) {
-						++group.total_eligible;
-
-						const auto& exts = candidate.get_descriptor()->known_extensions;
-
-						if (std::any_of(exts.begin(), exts.end(), [&](const auto& ext) noexcept {
-							return ext == s_file_image.extension();
-						})) {
-							s_chosen_candidate = &candidate;
-							++s_extension_match_count;
-						}
-					}
-				}
-			}
 		}
 
-		const auto center = GetMainViewport()->GetCenter();
-		SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+		const auto viewport_mid = GetMainViewport()->GetCenter();
+		SetNextWindowPos(viewport_mid, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+		SetNextWindowMinClientSize(ImVec2(540.0f, 420.0f) * scaling);
 
-		if (BeginPopupModal("FileImageModal", nullptr, ImGuiWindowFlags_NoMove
-			| ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize
-			| ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking
-			| ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize
+		if (BeginPopupModal("FileImageModal", nullptr,
+			ImGuiWindowFlags_NoMove    | ImGuiWindowFlags_NoTitleBar  |
+			ImGuiWindowFlags_NoResize  | ImGuiWindowFlags_NoCollapse  |
+			ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings |
+			ImGuiWindowFlags_AlwaysAutoResize
 		)) {
-			// filename title segment
-			{
-				PushFont(nullptr, 26.0f);
-				const auto file_name = s_file_image.filename().string();
-				const auto text_width = CalcTextSize(file_name.c_str()).x;
-				AddCursorPosX((GetContentRegionAvail().x - text_width) * 0.5f);
-				TextUnformatted(file_name.c_str(), s_highlight_color.ABGR());
-				PopFont();
+			const auto padding = GetStyle().WindowPadding;
+			const auto spacing = GetStyle().ItemSpacing;
+			const auto scroll_area = ImVec2(GetContentRegionAvail().x, 420.0f * scaling);
+
+			// filename title
+			PushFont(nullptr, 26.0f);
+			const auto file_name = s_list_state.file_image.filename().string();
+			const auto filename_text_width = CalcTextSize(file_name.c_str()).x;
+
+			PushStyleColor(ImGuiCol_Text, s_list_state.c_highlight_color);
+			if (filename_text_width > scroll_area.x) {
+				ScrollingText(file_name.c_str(), scroll_area.x, &s_scroll_state);
+			} else {
+				AddCursorPosX((scroll_area.x - filename_text_width) * 0.5f);
+				TextUnformatted(file_name.c_str());
 			}
 
+			PopStyleColor();
+			PopFont();
 			Separator();
-			Checkbox("Replace last system instance?", &s_replace_last_system);
-			SameLine();
-			Dummy(ImVec2());
 
-			{
-				const auto scroll_size = ImVec2(
-					GetContentRegionAvail().x, 420.0f
-					* UserInterface::get_ui_zoom_scaling()
-					* UserInterface::get_ui_text_scaling());
-				BeginChild("##candidate_scroll_region", scroll_size, true);
+			if (SystemStaging::sha1_hash.empty()) {
+				BeginDisabled(s_calculating_sha1.load(mo::acquire));
+				if (Button("Calculate SHA1", ImVec2(scroll_area.x, 0.0f))) {
+					s_calculating_sha1.store(true, mo::release);
 
-				const auto button_bg_size = ImVec2(
-					GetContentRegionAvail().x, 56.0f
-						* UserInterface::get_ui_zoom_scaling()
-						* UserInterface::get_ui_text_scaling());
-				const auto button_fg_size = ImVec2(
-					button_bg_size.x - GetStyle().FramePadding.x,
-					button_bg_size.y - GetStyle().FramePadding.y
-				);
+					// XXX - This could very well be a huge issue if attempted on large files.
+					//       Since we don't have a progress tracker or a way to stop an
+					//       ongoing hash, we could easily freeze the thread for a long time!
+					Thread([]() noexcept {
+						SystemStaging::sha1_hash = SHA1::from_span(SystemStaging::file_image);
+						blog.info("SHA1: {}", SystemStaging::sha1_hash);
+						s_calculating_sha1.store(false, mo::release);
+					}).detach();
+				}
+				EndDisabled();
+			} else {
+				AlignTextToFramePadding();
+				AddCursorPosX((scroll_area.x - CalcTextSize(
+					SystemStaging::sha1_hash.c_str()).x) * 0.5f);
+				Text("‹%s›", SystemStaging::sha1_hash.c_str());
+			}
 
-				for (auto& group : s_families) {
-					// Family name segment
-					{
-						DummyY(2.0f);
-						PushFont(nullptr, 24.0f);
-						const auto family_name = group.family_name.data();
-						const auto text_width = CalcTextSize(family_name).x;
-						AddCursorPosX((button_bg_size.x - text_width) * 0.5f);
-						TextUnformatted(family_name);
-						PopFont();
-					}
-					// Eligibility count segment
-					{
-						PushFont(nullptr, 16.0f);
-						const auto eligibility_counter = fmt::format("({}/{})",
-							group.total_eligible, group.systems.size());
-						const auto text_width = CalcTextSize(eligibility_counter.c_str()).x;
-						AddCursorPosX((button_bg_size.x - text_width) * 0.5f);
-						AddCursorPosY(GetTextLineHeight() * -0.3f);
-						BeginDisabled();
-						TextUnformatted(eligibility_counter.c_str());
-						EndDisabled();
-						PopFont();
-					}
+			// Candidate scroll region
+			BeginChild("##candidate_scroll_region", scroll_area, true);
 
-					DummyY(1.0f);
+			static constexpr auto system_name_font_size = 20.0f;
+			static constexpr auto half_button_font_size = 18.0f;
 
-					for (auto& candidate : group.systems) {
-						PushID(candidate.system_hook.get());
+			const auto scroll_avail_width  = GetContentRegionAvail().x;
+			const auto system_name_height  = CalcFontHeight(system_name_font_size);
 
-						if (ButtonContainer("##btn", button_bg_size,
-						[&]() noexcept {
-							if (!candidate.eligible()) {
-								PushStyleColor(ImGuiCol_Text,
-									GetColorU32(ImGuiCol_TextDisabled));
-							}
+			const auto base_button_size = ImVec2(scroll_avail_width,
+				system_name_height + padding.y * 2.0f);
 
-							PushStyleVarY(ImGuiStyleVar_ItemSpacing, 0.0f);
-							// System name segment
-							{
-								const auto system_name = std::string(
-									candidate.get_descriptor()->system_pretty_name);
+			const auto half_button_size = ImVec2(
+				(base_button_size.x - spacing.x) * 0.5f - padding.x,
+				CalcFontHeight(half_button_font_size) + padding.y * 2.0f
+			);
 
-								PushFont(nullptr, 22.0f);
-								const auto text_width = CalcTextSize(system_name.c_str()).x;
-								AddCursorPosX((button_fg_size.x - text_width) * 0.5f);
-								TextUnformatted(system_name.c_str());
-								PopFont();
-							}
+			for (auto& group : s_list_state.families) {
+				PushStyleVarY(ImGuiStyleVar_ItemSpacing, 0.0f);
+				// Family name
+				PushFont(nullptr, 24.0f);
+				PushStyleVarX(ImGuiStyleVar_SeparatorTextAlign, 0.5f);
+				SeparatorText(group.family_name.data());
+				PopStyleVar();
+				PopFont();
 
-							// Undernote segment
-							if (candidate.error_message) {
-								const auto text_width = CalcTextSize(candidate.error_message).x;
-								AddCursorPosX((button_fg_size.x - text_width) * 0.5f);
-								AddCursorPosY(GetTextLineHeight() * -0.2f);
-								TextWrapped("%s", candidate.error_message);
-							}
-							PopStyleVar();
+				// Eligibility count
+				PushFont(nullptr, 16.0f);
+				const auto counter = fmt::format("({}/{})",
+					group.total_eligible, group.systems.size());
+				const auto counter_text_width = CalcTextSize(counter.c_str()).x;
+				AddCursorPosX((scroll_avail_width - counter_text_width) * 0.5f);
+				TextUnformatted(counter.c_str(), GetColorU32(ImGuiCol_TextDisabled));
+				PopFont();
 
-							if (!candidate.eligible()) {
-								PopStyleColor();
-							}
-						},
-						[&]() noexcept {
-							if (s_chosen_candidate == &candidate && s_extension_match_count == 1) {
-								AddCursorPos(ImVec2(button_bg_size.y * 0.1f, button_bg_size.y * 0.025f));
-								PushFont(nullptr, 50.0f);
-								TextUnformatted("*", s_highlight_color.ABGR());
-								PopFont();
-							}
-						},
-						false)) {
-							s_file_mru.insert(SystemStaging::file_image.path());
+				DummyY(padding.y * 2.0f);
+				PopStyleVar();
 
-							if (auto* system = candidate.system_hook->construct_core()) {
-								if (s_replace_last_system) { unload_system_instance(); }
-								insert_system_instance(system); s_close_modal_window();
-							} else {
-								blog.error("Failed to construct instance for candidate system '{}'",
-									candidate.get_descriptor()->system_pretty_name);
-							}
-						}
-
-						PopID();
-					}
+				if (pending_system) {
+					chosen_system = pending_system;
+					pending_system = nullptr;
 				}
 
-				EndChild();
+				for (auto& candidate : group.systems) {
+					const bool is_expanded = chosen_system == &candidate;
+					const bool is_best_match = s_list_state.best_match == &candidate;
+
+					const auto full_button_size = ImVec2(base_button_size.x,
+						base_button_size.y + is_expanded * (half_button_size.y + padding.y));
+
+					PushID(candidate.system_hook.get());
+					if (ButtonContainer("##btn", full_button_size, [&]() noexcept {
+						PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2());
+
+						// System name, centered
+						const auto system_name_string = std::string(
+							candidate.get_descriptor()->system_pretty_name);
+
+						PushFont(nullptr, system_name_font_size);
+
+						const auto indicator_text_size = is_best_match
+							* 2.0f * CalcTextSize("‹‹››").x;
+
+						AddCursorPos(ImVec2((base_button_size.x - indicator_text_size
+							- CalcTextSize(system_name_string.c_str()).x) * 0.5f, padding.y));
+
+						if (is_best_match) {
+							TextUnformatted("››› ", s_list_state.c_highlight_color);
+							SameLine();
+						}
+
+						BeginDisabled(!candidate.eligible());
+						TextUnformatted(system_name_string.c_str());
+						EndDisabled();
+
+						if (is_best_match) {
+							SameLine();
+							TextUnformatted(" ‹‹‹", s_list_state.c_highlight_color);
+						}
+
+						PopFont();
+
+						PopStyleVar();
+						AddCursorPosY(padding.y);
+
+						const auto action_button = [&](
+							const char* label, const ImVec2& button_size, bool replace
+						) noexcept {
+							if (ButtonContainer(label, button_size, [&]() noexcept {
+								PushFont(nullptr, half_button_font_size);
+								AddCursorPos((button_size - CalcTextSize(label)) * 0.5f);
+								TextUnformatted(label);
+								PopFont();
+							}, false, true)) {
+								s_file_mru.insert(SystemStaging::file_image.path());
+								if (auto* system = candidate.system_hook->construct_core()) {
+									if (replace) { unload_system_instance(); }
+									insert_system_instance(system);
+									s_close_modal();
+								} else {
+									blog.error("Failed to construct instance for '{}'",
+										candidate.get_descriptor()->system_pretty_name);
+								}
+							}
+						};
+
+						if (is_expanded) {
+							AddCursorPosX(padding.x);
+							action_button("New Instance", half_button_size, false);
+							SameLine();
+							BeginDisabled(m_systems.empty());
+							action_button("Replace Instance", half_button_size, true);
+							EndDisabled();
+						}
+					}, is_expanded, !is_expanded)) {
+						pending_system = &candidate;
+					}
+					PopID();
+				}
 			}
 
-			const auto button_width = (GetContentRegionAvail().x
-				- GetStyle().ItemSpacing.x) / 2.0f;
-
-			if (Button("Calc SHA1", ImVec2(button_width, 0.0f))) {
-				SystemStaging::sha1_hash = SHA1::from_span(SystemStaging::file_image);
-				blog.info("SHA1: {}", SystemStaging::sha1_hash);
-
-				// XXX - later set up CoreRegistry to utilize the hash to attempt
-				//       autoloading the appropriate system core matching the hash
-			}
-			SameLine();
-			if (Button("Cancel", ImVec2(button_width, 0.0f))) {
-				s_close_modal_window();
-			}
-
+			EndChild();
 
 			if (IsKeyPressed(ImGuiKey_Escape)) {
-				s_close_modal_window();
+				s_close_modal();
 			} else {
 				const auto pos  = GetWindowPos();
 				const auto size = GetWindowSize();
 				if (IsMouseClicked(ImGuiMouseButton_Left) &&
 					!IsMouseHoveringRect(pos, pos + size))
 				{
-					s_close_modal_window();
+					s_close_modal();
 				}
 			}
 
 			EndPopup();
-		}
-
-		if (!s_render_modal_window) {
-			// Clear system staging data after modal is closed
-			SystemStaging::clear();
 		}
 	});
 }
