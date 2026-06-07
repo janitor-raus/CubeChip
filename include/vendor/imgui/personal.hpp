@@ -8,7 +8,7 @@
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 
-#include <functional>
+#include <algorithm>
 
 /*==================================================================*/
 
@@ -36,6 +36,8 @@ struct Vec4 {
 	operator ImVec4() const noexcept;
 };
 
+/*==================================================================*/
+
 namespace ImGui {
 	ImVec2 clamp(const ImVec2& value, const ImVec2& min, const ImVec2& max) noexcept;
 	ImVec2 floor(const ImVec2& value) noexcept;
@@ -57,15 +59,12 @@ namespace ImGui {
 
 	ImVec2 GetWindowDecoSize();
 
-	// Insert Dummy of proportions multiplicative of WindowPadding
-	void Dummy(float mult_w, float mult_h);
-	// Insert Dummy of proportions multiplicative of WindowPadding.x
-	void DummyX(float mult);
-	// Insert Dummy of proportions multiplicative of WindowPadding.y
-	void DummyY(float mult);
-
-	// Insert Separator with vertical padding multiplicative of WindowPadding.y
-	void Separator(float mult);
+	// Dummy helper with float args instead of ImVec2
+	void Dummy(float width, float height);
+	// Dummy helper for horizontal span only
+	void DummyX(float width);
+	// Dummy helper for vertical span only
+	void DummyY(float height);
 
 	void SetNextWindowMinClientSize(const ImVec2& min);
 
@@ -143,6 +142,13 @@ namespace ImGui {
 		float thickness = 1.0f
 	);
 
+	// Overload to provide explicit rounding flags
+	void RenderFrame(
+		const ImVec2& p_min, const ImVec2& p_max,
+		unsigned fill_col, bool borders,
+		float rounding, int draw_flags
+	);
+
 	namespace detail {
 		struct ButtonContainerState {
 			bool pressed = false;
@@ -151,7 +157,8 @@ namespace ImGui {
 
 		void ButtonContainerBegin(
 			const char* id, const ImVec2& size,
-			ButtonContainerState& state, bool selected
+			ButtonContainerState& state, bool selected,
+			bool interactive, int draw_flags
 		);
 		void ButtonContainerEnd(const ButtonContainerState& state, const ImVec2& size);
 	}
@@ -159,10 +166,11 @@ namespace ImGui {
 	template <std::invocable Fn>
 	bool ButtonContainer(
 		const char* id, const ImVec2& size,
-		Fn&& body_callable, bool selected = false
+		Fn&& body_callable, bool selected = false,
+		bool interactive = true, int draw_flags = 0
 	) {
 		auto state = detail::ButtonContainerState();
-		detail::ButtonContainerBegin(id, size, state, selected);
+		detail::ButtonContainerBegin(id, size, state, selected, interactive, draw_flags);
 		body_callable();
 		detail::ButtonContainerEnd(state, size);
 		return state.pressed;
@@ -174,5 +182,53 @@ namespace ImGui {
 	 */
 	bool BeginInertChild(const char* id, const ImVec2& size);
 
-	ImVec2 CalcTextSizeAs(float size, ImFont* font = nullptr);
+	float CalcFontHeight(float size, ImFont* font = nullptr);
+}
+
+/*==================================================================*/
+//  ScrollingText() and ScrollingTextState are used to implement a
+//  marquee-like effect for text that exceeds a given width.
+//
+//  The text will scroll horizontally until the end of the text is
+//  reached, then it will wait for a specified duration before
+//  scrolling back to the start. The ScrollingTextState struct
+//  manages the state of the scrolling effect, including the current
+//  offset and timing for the waiting phase.
+/*==================================================================*/
+
+namespace ImGui {
+	class ScrollingTextState {
+		enum class Phase : char { WAIT_LT, SCROLL, WAIT_RT };
+
+		float speed   = 32.0f;
+		float wait_lt = 1.0f;
+		float wait_rt = 2.0f;
+
+		float offset = 0.0f;
+		float timer  = 0.0f;
+		Phase phase  = Phase::WAIT_LT;
+
+	public:
+		bool enabled = true;
+
+		void set_speed(float v) noexcept   { speed = std::clamp(v, 1.0f, 1000.0f); }
+		float get_speed() const noexcept   { return speed; }
+
+		void set_wait_lt(float v) noexcept { wait_lt = std::max(0.0f, v); }
+		float get_wait_lt() const noexcept { return wait_lt; }
+
+		void set_wait_rt(float v) noexcept { wait_rt = std::max(0.0f, v); }
+		float get_wait_rt() const noexcept { return wait_rt; }
+
+		float get_offset() const noexcept  { return offset; }
+
+		void reset() noexcept {
+			offset = timer = 0.0f;
+			phase  = Phase::WAIT_LT;
+		}
+
+		void update(float text_w, float width) noexcept;
+	};
+
+	void ScrollingText(const char* text, float width, ScrollingTextState* state);
 }

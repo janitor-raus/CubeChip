@@ -101,26 +101,16 @@ namespace ImGui {
 			+ GetFontSize() + style.FramePadding.y * 2.0f);
 	}
 
-	void Dummy(float mult_w, float mult_h) {
-		const auto mult_vec2 = ImVec2(mult_w, mult_h);
-		Dummy(GetStyle().FramePadding * mult_vec2);
+	void Dummy(float width, float height) {
+		Dummy(ImVec2(width, height));
 	}
 
-	void DummyX(float mult) {
-		Dummy(ImVec2(mult * GetStyle().FramePadding.x, 0.0f));
+	void DummyX(float width) {
+		Dummy(ImVec2(width, 0.0f));
 	}
 
-	void DummyY(float mult) {
-		Dummy(ImVec2(0.0f, mult * GetStyle().FramePadding.y));
-	}
-
-	void Separator(float mult) {
-		mult *= 0.5f; // halve and add to both sides
-		if (GetCurrentWindow()->DC.LayoutType == ImGuiLayoutType_Horizontal) {
-			SameLine(0, mult); Separator(); SameLine(0, mult);
-		} else {
-			DummyY(mult); Separator(); DummyY(mult);
-		}
+	void DummyY(float height) {
+		Dummy(ImVec2(0.0f, height));
 	}
 
 	void SetNextWindowMinClientSize(const ImVec2& min) {
@@ -345,14 +335,35 @@ namespace ImGui {
 		}
 	}
 
+	void RenderFrame(
+		const ImVec2& p_min, const ImVec2& p_max,
+		unsigned fill_col, bool borders,
+		float rounding, int draw_flags
+	) {
+		ImGuiContext& g = *GImGui;
+		ImGuiWindow* window = g.CurrentWindow;
+		window->DrawList->AddRectFilled(p_min, p_max, fill_col, rounding, draw_flags);
+		const float border_size = g.Style.FrameBorderSize;
+		if (borders && border_size > 0.0f) {
+			window->DrawList->AddRect(p_min + ImVec2(1, 1), p_max + ImVec2(1, 1), GetColorU32(ImGuiCol_BorderShadow), rounding, border_size, draw_flags);
+			window->DrawList->AddRect(p_min, p_max, GetColorU32(ImGuiCol_Border), rounding, border_size, draw_flags);
+		}
+	}
+
 	void detail::ButtonContainerBegin(
 		const char* id, const ImVec2& size,
-		ButtonContainerState& state, bool selected
+		ButtonContainerState& state, bool selected,
+		bool interactive, int draw_flags
 	) {
-		state.pressed = InvisibleButton(id, size, ImGuiButtonFlags_EnableNav);
+		if (interactive) {
+			state.pressed = InvisibleButton(id, size, ImGuiButtonFlags_EnableNav);
+		} else {
+			Dummy(size);
+			state.pressed = false;
+		}
 
-		const bool hovered = IsItemHovered();
-		const bool active = IsItemActive();
+		const bool hovered = interactive && IsItemHovered();
+		const bool active  = interactive && IsItemActive();
 
 		const auto button_TL = GetItemRectMin();
 		const auto button_BR = GetItemRectMax();
@@ -363,7 +374,7 @@ namespace ImGui {
 			active   ? ImGuiCol_ButtonActive  :
 			hovered  ? ImGuiCol_ButtonHovered :
 			selected ? ImGuiCol_Header : ImGuiCol_Button
-		), style.FrameBorderSize >= 1.0f, style.FrameRounding);
+		), style.FrameBorderSize >= 1.0f, style.FrameRounding, draw_flags);
 
 		RenderNavCursor(ImRect(button_TL, button_BR), GetItemID());
 
@@ -385,8 +396,64 @@ namespace ImGui {
 			ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoBackground);
 	}
 
-	ImVec2 CalcTextSizeAs(float size, ImFont* font) {
-		return (font ? font : GetFont())
-			->CalcTextSizeA(size ? size : GetFontSize(), FLT_MAX, 0.0f, "X");
+	float CalcFontHeight(float size, ImFont* font) {
+		PushFont(font ? font : GetFont(), size);
+		const auto height = GetTextLineHeight();
+		PopFont(); return height;
+	}
+}
+
+/*==================================================================*/
+
+namespace ImGui {
+	void ScrollingTextState::update(float text_w, float width) noexcept {
+		if (!enabled) { return; }
+		const auto max_off = text_w - width;
+		if (max_off <= 0.0f) { reset(); return; }
+
+		const auto dt = GetIO().DeltaTime;
+		switch (phase) {
+			case Phase::WAIT_LT:
+				timer += dt;
+				if (timer >= wait_lt) {
+					timer = 0.0f;
+					phase = Phase::SCROLL;
+				}
+				break;
+
+			case Phase::SCROLL:
+				offset += speed * dt;
+				if (offset >= max_off) {
+					offset = max_off;
+					timer = 0.0f;
+					phase = Phase::WAIT_RT;
+				}
+				break;
+
+			case Phase::WAIT_RT:
+				timer += dt;
+				if (timer >= wait_rt) {
+					offset = timer = 0.0f;
+					phase = Phase::WAIT_LT;
+				}
+				break;
+		}
+	}
+
+	void ScrollingText(const char* text, float width, ScrollingTextState* state) {
+		const auto corner_TL = GetCursorScreenPos();
+		const auto text_size = CalcTextSize(text);
+
+		if (state) { state->update(text_size.x, width); }
+
+		PushClipRect(corner_TL, corner_TL + ImVec2(width, text_size.y), true);
+		GetWindowDrawList()->AddText(
+			GetFont(), GetFontSize(),
+			corner_TL - ImVec2(state ? std::round(state->get_offset()) : 0.0f, 0.0f),
+			GetColorU32(ImGuiCol_Text), text
+		);
+		PopClipRect();
+
+		Dummy(ImVec2(width, text_size.y));
 	}
 }
