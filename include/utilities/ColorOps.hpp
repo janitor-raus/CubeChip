@@ -374,6 +374,25 @@ public:
 constexpr RGBA operator""_rgb(unsigned long long value) noexcept
 	{ return RGBA::Packed(value << 8); }
 
+// Convert an (A)RGB color to XRBG color
+constexpr RGBA operator""_rbg(unsigned long long value) noexcept
+	{ return RGBA(RGBA::Packed(value)).XRBG(); }
+
+// Convert an (A)RGB color to XGRB color
+constexpr RGBA operator""_grb(unsigned long long value) noexcept
+	{ return RGBA(RGBA::Packed(value)).XGRB(); }
+
+// Convert an (A)RGB color to XGBR color
+constexpr RGBA operator""_gbr(unsigned long long value) noexcept
+	{ return RGBA(RGBA::Packed(value)).XGBR(); }
+
+// Convert an (A)RGB color to XBRG color
+constexpr RGBA operator""_brg(unsigned long long value) noexcept
+	{ return RGBA(RGBA::Packed(value)).XBRG(); }
+
+// Convert an (A)RGB color to XBGR color
+constexpr RGBA operator""_bgr(unsigned long long value) noexcept
+	{ return RGBA(RGBA::Packed(value)).XBGR(); }
 
 /*==================================================================*/
 
