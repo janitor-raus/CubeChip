@@ -46,6 +46,10 @@ public:
 		return descriptor;
 	}
 
+	u8 get_avail_quirks() const noexcept override {
+		return X1_INC_I_REG;
+	}
+
 /*==================================================================*/
 
 	MirroredMemory<c_sys_memory_size>

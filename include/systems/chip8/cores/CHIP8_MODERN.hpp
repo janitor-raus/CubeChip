@@ -35,6 +35,10 @@ class CHIP8_MODERN final : public IFamily_CHIP8 {
 		return Family::validate_program(file, c_game_load_pos, c_sys_memory_size);
 	}
 
+	u8 get_avail_quirks() const noexcept override {
+		return RESET_VF_REG | SHIFT_VX_REG | NO_INC_I_REG | AWAIT_VBLANK | WRAP_SPRITES;
+	}
+
 public:
 	static constexpr SystemDescriptor descriptor = {
 		0, Family::family_pretty_name, Family::family_name, Family::family_desc,

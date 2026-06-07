@@ -23,16 +23,16 @@ void CHIP8_MODERN::initialize_system() noexcept {
 
 	m_current_pc = c_sys_boot_pos;
 
-	auto meta = m_display_device.edit_metadata();
-
-	meta->minimum_zoom = 8;
-	meta->inner_margin = 4;
-	meta->texture_tint = s_bit_colors[0];
-	meta->enabled = true;
+	m_display_device.metadata().edit([](auto& meta) noexcept {
+		meta.minimum_zoom = 8;
+		meta.inner_margin = 4;
+		meta.texture_tint = s_bit_colors[0];
+		meta.enabled = true;
+	});
 }
 
 void CHIP8_MODERN::instruction_loop() noexcept {
-	m_standard_cpf = Quirk.await_vblank ? c_sys_speed_hi : c_sys_speed_lo;
+	m_standard_cpf = has_quirk(AWAIT_VBLANK) ? c_sys_speed_hi : c_sys_speed_lo;
 	const auto target_cpf = has_cached_system_state(EmuState::BENCH)
 		&& m_debugger_cpf ? m_debugger_cpf : m_standard_cpf;
 	for (m_cycle_count = 0; m_interrupt == Interrupt::CLEAR
@@ -193,13 +193,15 @@ void CHIP8_MODERN::push_audio_data() noexcept {
 		[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::BUZZER]); }
 	);
 
-	m_display_device.edit_metadata()->set_border_color_if(
-		!!::accumulate(m_voices, 0), s_bit_colors[1]);
+	if (has_cached_system_state(EmuState::ANY_PAUSE)) { return; }
+	m_display_device.metadata().edit([&](auto& meta) noexcept {
+		meta.set_border_color_if(!!::accumulate(m_voices, 0), s_bit_colors[1]);
+	});
 }
 
 void CHIP8_MODERN::push_video_data() noexcept {
 	m_display_device.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = *m_display_device.read_metadata();
+		frame.metadata = m_display_device.metadata().copy();
 		frame.copy_from(m_display_map, use_pixel_trails()
 			? [](u32 pixel) noexcept { return RGBA::premul(s_bit_colors[pixel != 0], c_bit_weight[pixel]); }
 			: [](u32 pixel) noexcept { return s_bit_colors[pixel >> 3]; }
@@ -218,7 +220,7 @@ void CHIP8_MODERN::push_video_data() noexcept {
 
 	void CHIP8_MODERN::instruction_00E0() noexcept {
 		m_display_map.fill();
-		trigger_interrupt(Interrupt::FRAME, Quirk.await_vblank);
+		trigger_interrupt(Interrupt::FRAME, has_quirk(AWAIT_VBLANK));
 	}
 	void CHIP8_MODERN::instruction_00EE() noexcept {
 		m_current_pc = m_stack.pop();
@@ -306,15 +308,15 @@ void CHIP8_MODERN::push_video_data() noexcept {
 	}
 	void CHIP8_MODERN::instruction_8xy1(u32 X, u32 Y) noexcept {
 		::assign_cast_or(m_registers_V[X], m_registers_V[Y]);
-		::assign_cast(m_registers_V[0xF], 0);
+		if (has_quirk(RESET_VF_REG)) { ::assign_cast(m_registers_V[0xF], 0); }
 	}
 	void CHIP8_MODERN::instruction_8xy2(u32 X, u32 Y) noexcept {
 		::assign_cast_and(m_registers_V[X], m_registers_V[Y]);
-		::assign_cast(m_registers_V[0xF], 0);
+		if (has_quirk(RESET_VF_REG)) { ::assign_cast(m_registers_V[0xF], 0); }
 	}
 	void CHIP8_MODERN::instruction_8xy3(u32 X, u32 Y) noexcept {
 		::assign_cast_xor(m_registers_V[X], m_registers_V[Y]);
-		::assign_cast(m_registers_V[0xF], 0);
+		if (has_quirk(RESET_VF_REG)) { ::assign_cast(m_registers_V[0xF], 0); }
 	}
 	void CHIP8_MODERN::instruction_8xy4(u32 X, u32 Y) noexcept {
 		const auto sum = m_registers_V[X] + m_registers_V[Y];
@@ -332,13 +334,13 @@ void CHIP8_MODERN::push_video_data() noexcept {
 		::assign_cast(m_registers_V[0xF], nborrow);
 	}
 	void CHIP8_MODERN::instruction_8xy6(u32 X, u32 Y) noexcept {
-		if (!Quirk.shift_vx_reg) { ::assign_cast(m_registers_V[X], m_registers_V[Y]); }
+		if (!has_quirk(SHIFT_VX_REG)) { ::assign_cast(m_registers_V[X], m_registers_V[Y]); }
 		const bool lsb = (m_registers_V[X] & 0x01) != 0;
 		::assign_cast_shr(m_registers_V[X], 1);
 		::assign_cast(m_registers_V[0xF], lsb);
 	}
 	void CHIP8_MODERN::instruction_8xyE(u32 X, u32 Y) noexcept {
-		if (!Quirk.shift_vx_reg) { ::assign_cast(m_registers_V[X], m_registers_V[Y]); }
+		if (!has_quirk(SHIFT_VX_REG)) { ::assign_cast(m_registers_V[X], m_registers_V[Y]); }
 		const bool msb = (m_registers_V[X] & 0x80) != 0;
 		::assign_cast_shl(m_registers_V[X], 1);
 		::assign_cast(m_registers_V[0xF], msb);
@@ -409,7 +411,7 @@ void CHIP8_MODERN::push_video_data() noexcept {
 						if (!((m_display_map(X, Y) ^= 0x8) & 0x8))
 							[[unlikely]] { m_registers_V[0xF] = 1; }
 					}
-					if (!Quirk.wrap_sprites && X == (c_sys_screen_W - 1)) { return; }
+					if (!has_quirk(WRAP_SPRITES) && X == (c_sys_screen_W - 1)) { return; }
 				}
 				return;
 		}
@@ -434,7 +436,7 @@ void CHIP8_MODERN::push_video_data() noexcept {
 					draw_byte(pX + 0, pY, m_memory[m_register_I + I++]);
 					draw_byte(pX + 8, pY, m_memory[m_register_I + I++]);
 
-					if (!Quirk.wrap_sprites && pY == (c_sys_screen_H - 1)) { break; }
+					if (!has_quirk(WRAP_SPRITES) && pY == (c_sys_screen_H - 1)) { break; }
 				}
 				break;
 
@@ -443,12 +445,12 @@ void CHIP8_MODERN::push_video_data() noexcept {
 				for (auto H = 0u; H < N; ++H, ++pY &= (c_sys_screen_H - 1))
 				{
 					draw_byte(pX, pY, m_memory[m_register_I + H]);
-					if (!Quirk.wrap_sprites && pY == (c_sys_screen_H - 1)) { break; }
+					if (!has_quirk(WRAP_SPRITES) && pY == (c_sys_screen_H - 1)) { break; }
 				}
 				break;
 		}
 
-		trigger_interrupt(Interrupt::FRAME, Quirk.await_vblank);
+		trigger_interrupt(Interrupt::FRAME, has_quirk(AWAIT_VBLANK));
 	}
 
 	#pragma endregion
@@ -498,11 +500,11 @@ void CHIP8_MODERN::push_video_data() noexcept {
 	}
 	void CHIP8_MODERN::instruction_FN55(u32 N) noexcept {
 		for (auto i = 0u; i <= N; ++i) { m_memory[m_register_I + i] = m_registers_V[i]; }
-		if (!Quirk.no_inc_i_reg) [[likely]] { ::assign_cast_add(m_register_I, N + 1); }
+		if (!has_quirk(NO_INC_I_REG)) [[likely]] { ::assign_cast_add(m_register_I, N + 1); }
 	}
 	void CHIP8_MODERN::instruction_FN65(u32 N) noexcept {
 		for (auto i = 0u; i <= N; ++i) { m_registers_V[i] = m_memory[m_register_I + i]; }
-		if (!Quirk.no_inc_i_reg) [[likely]] { ::assign_cast_add(m_register_I, N + 1); }
+		if (!has_quirk(NO_INC_I_REG)) [[likely]] { ::assign_cast_add(m_register_I, N + 1); }
 	}
 
 	#pragma endregion

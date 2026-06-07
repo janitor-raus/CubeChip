@@ -10,6 +10,7 @@
 
 #include "Millis.hpp"
 #include <imgui.h>
+#include <imgui_internal.h>
 
 /*==================================================================*/
 
@@ -60,10 +61,10 @@ void IFamily_CHIP8::prepare_user_interface() noexcept {
 		osd::simple_text_overlay(copy_statistics_string());
 	});
 
-	m_frontend_hooks.emplace_back(UserInterface::register_menu(
-		m_workspace_host.get_window_label(), { 9999, "Debug" },
-		[&]() noexcept { m_display_device.render_settings_menu(); }
-	));
+	m_frontend_hooks.emplace_back(UserInterface::register_menu(m_workspace_host,
+	{ 9999, "Debug" }, [&]() noexcept {
+		m_display_device.render_settings_menu();
+	}));
 
 	m_memory_editor.set_preview_endianness(MemoryEditor::Endian::BE);
 	m_memview_window.edit_callbacks().window_dock =
@@ -73,8 +74,8 @@ void IFamily_CHIP8::prepare_user_interface() noexcept {
 		}
 	};
 
-	m_frontend_hooks.emplace_back(UserInterface::register_menu(
-	m_workspace_host.get_window_label(), { 60, "System" }, [&]() noexcept {
+	m_frontend_hooks.emplace_back(UserInterface::register_menu(m_workspace_host,
+	{ 60, "System" }, [&]() noexcept {
 		if (BeginMenu("Emulation")) {
 			const auto widget_width = CalcTextSize("F").x * 28.0f;
 			const bool is_benching = has_cached_system_state(EmuState::BENCH);
@@ -101,6 +102,42 @@ void IFamily_CHIP8::prepare_user_interface() noexcept {
 			EndDisabled();
 
 			EndDisabled();
+			EndMenu();
+		}
+	}));
+
+	m_frontend_hooks.emplace_back(UserInterface::register_menu(m_workspace_host,
+	{ 50, "System" }, [&]() noexcept {
+		if (BeginMenu("Quirks", get_avail_quirks())) {
+			const auto& padding = GetStyle().WindowPadding;
+			const auto button_width = CalcTextSize("_").x * 38.0f;
+			const auto min_height = GetFrameHeightWithSpacing() + padding.y * 2.0f;
+
+			BeginDisabled(has_system_state(EmuState::ANY_STOP));
+			for (auto i = 0; i < QuirkFlag::TOTAL_QUIRKS; ++i) {
+				const auto flag = QuirkFlag(1 << i);
+				if (!(get_avail_quirks() & flag)) { continue; }
+
+				const auto button_height = min_height + CalcTextSize(get_quirk_desc(flag),
+					nullptr, false, button_width - padding.x * 2.0f).y;
+				const auto button_size = ImVec2(button_width, button_height);
+
+				PushID(i);
+				if (ButtonContainer("##btn", button_size, [&]() noexcept {
+					AddCursorPos(padding);
+					BeginInertChild("##inner", button_size - padding * 2.0f);
+
+					int quirk_flags = m_quirk_flags;
+					CheckboxFlags(get_quirk_name(flag), &quirk_flags, flag);
+					BeginDisabled();
+					TextWrapped(get_quirk_desc(flag));
+					EndDisabled();
+					EndChild();
+				}, has_quirk(flag))) { xor_quirk(flag); }
+				PopID();
+			}
+			EndDisabled();
+
 			EndMenu();
 		}
 	}));

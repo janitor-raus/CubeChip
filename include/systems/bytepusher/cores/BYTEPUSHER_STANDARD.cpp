@@ -19,18 +19,17 @@ void BYTEPUSHER_STANDARD::initialize_system() noexcept {
 
 	m_base_system_framerate = c_sys_refresh_rate;
 
-	m_audio_device.add_playback_stream(STREAM::MAIN,
-		s32(c_sys_refresh_rate) * c_sys_audio_sample_total, 1);
-	m_audio_device.resume_all_streams();
+	m_audio_device.init_stream(s32(c_sys_refresh_rate * c_sys_audio_sample_total), 1);
+	m_audio_device.resume();
 
 	m_memory_editor.set_memory_range(m_memory.data(), m_memory.size());
 
-	auto meta = m_display_device.edit_metadata();
-
-	meta->minimum_zoom = 2;
-	meta->inner_margin = 4;
-	meta->texture_tint = c_bit_colors[0];
-	meta->enabled = true;
+	m_display_device.metadata().edit([](auto& meta) noexcept {
+		meta.minimum_zoom = 2;
+		meta.inner_margin = 4;
+		meta.texture_tint = c_bit_colors[0];
+		meta.enabled = true;
+	});
 }
 
 /*==================================================================*/
@@ -50,8 +49,8 @@ void BYTEPUSHER_STANDARD::handle_cycle_loop() noexcept {
 }
 
 void BYTEPUSHER_STANDARD::push_audio_data() noexcept {
-	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
-		stream->set_freq_ratio(m_framerate_multiplier);
+	if (m_audio_device) {
+		m_audio_device.set_freq_ratio(m_framerate_multiplier);
 
 		float buffer[c_sys_audio_sample_total]{};
 
@@ -69,13 +68,13 @@ void BYTEPUSHER_STANDARD::push_audio_data() noexcept {
 			);
 		}
 
-		stream->push_audio_data(buffer);
+		m_audio_device.push_audio_data(buffer);
 	}
 }
 
 void BYTEPUSHER_STANDARD::push_video_data() noexcept {
 	m_display_device.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = *m_display_device.read_metadata();
+		frame.metadata = m_display_device.metadata().copy();
 		frame.copy_from(&m_memory[read_data<ByteSpan::SINGLE>(5) << 16],
 			c_sys_screen_W * c_sys_screen_H,
 			[](const auto pixel) noexcept { return c_bit_colors[pixel]; }

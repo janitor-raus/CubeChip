@@ -26,12 +26,12 @@ void SCHIP_MODERN::initialize_system() noexcept {
 
 	m_display_map.resize(c_sys_screen_W/2, c_sys_screen_H/2);
 
-	auto meta = m_display_device.edit_metadata();
-
-	meta->minimum_zoom = 4;
-	meta->inner_margin = 4;
-	meta->texture_tint = s_bit_colors[0];
-	meta->enabled = true;
+	m_display_device.metadata().edit([](auto& meta) noexcept {
+		meta.minimum_zoom = 4;
+		meta.inner_margin = 4;
+		meta.texture_tint = s_bit_colors[0];
+		meta.enabled = true;
+	});
 }
 
 void SCHIP_MODERN::instruction_loop() noexcept {
@@ -222,8 +222,10 @@ void SCHIP_MODERN::push_audio_data() noexcept {
 		[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::BUZZER]); }
 	);
 
-	m_display_device.edit_metadata()->set_border_color_if(
-		!!::accumulate(m_voices, 0), s_bit_colors[1]);
+	if (has_cached_system_state(EmuState::ANY_PAUSE)) { return; }
+	m_display_device.metadata().edit([&](auto& meta) noexcept {
+		meta.set_border_color_if(!!::accumulate(m_voices, 0), s_bit_colors[1]);
+	});
 }
 
 void SCHIP_MODERN::push_video_data() noexcept {
@@ -253,7 +255,7 @@ void SCHIP_MODERN::push_video_data() noexcept {
 	}
 
 	m_display_device.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = *m_display_device.read_metadata();
+		frame.metadata = m_display_device.metadata().copy();
 		frame.copy_from(composite_buffer, use_pixel_trails()
 			? [](u32 pixel) noexcept { return RGBA::premul(s_bit_colors[pixel != 0], c_bit_weight[pixel]); }
 			: [](u32 pixel) noexcept { return s_bit_colors[pixel >> 3]; }
@@ -287,22 +289,22 @@ void SCHIP_MODERN::scroll_display_rt() noexcept {
 
 	void SCHIP_MODERN::instruction_00CN(u32 N) noexcept {
 		if (N) { scroll_display_dn(N); }
-		trigger_interrupt(Interrupt::FRAME, Quirk.await_scroll);
+		trigger_interrupt(Interrupt::FRAME, has_quirk(AWAIT_SCROLL));
 	}
 	void SCHIP_MODERN::instruction_00E0() noexcept {
 		m_display_map.fill();
-		trigger_interrupt(Interrupt::FRAME, Quirk.await_vblank);
+		trigger_interrupt(Interrupt::FRAME, has_quirk(AWAIT_VBLANK));
 	}
 	void SCHIP_MODERN::instruction_00EE() noexcept {
 		m_current_pc = m_stack.pop();
 	}
 	void SCHIP_MODERN::instruction_00FB() noexcept {
 		scroll_display_rt();
-		trigger_interrupt(Interrupt::FRAME, Quirk.await_scroll);
+		trigger_interrupt(Interrupt::FRAME, has_quirk(AWAIT_SCROLL));
 	}
 	void SCHIP_MODERN::instruction_00FC() noexcept {
 		scroll_display_lt();
-		trigger_interrupt(Interrupt::FRAME, Quirk.await_scroll);
+		trigger_interrupt(Interrupt::FRAME, has_quirk(AWAIT_SCROLL));
 	}
 	void SCHIP_MODERN::instruction_00FD() noexcept {
 		trigger_interrupt(Interrupt::SOUND);
@@ -310,12 +312,12 @@ void SCHIP_MODERN::scroll_display_rt() noexcept {
 	void SCHIP_MODERN::instruction_00FE() noexcept {
 		use_hires_screen(false);
 		m_display_map.resize(c_sys_screen_W/2, c_sys_screen_H/2).fill();
-		trigger_interrupt(Interrupt::FRAME, Quirk.await_vblank);
+		trigger_interrupt(Interrupt::FRAME, has_quirk(AWAIT_VBLANK));
 	}
 	void SCHIP_MODERN::instruction_00FF() noexcept {
 		use_hires_screen(true);
 		m_display_map.resize(c_sys_screen_W, c_sys_screen_H).fill();
-		trigger_interrupt(Interrupt::FRAME, Quirk.await_vblank);
+		trigger_interrupt(Interrupt::FRAME, has_quirk(AWAIT_VBLANK));
 	}
 
 	#pragma endregion
@@ -397,12 +399,15 @@ void SCHIP_MODERN::scroll_display_rt() noexcept {
 
 	void SCHIP_MODERN::instruction_8xy0(u32 X, u32 Y) noexcept {
 		::assign_cast(m_registers_V[X], m_registers_V[Y]);
+		if (has_quirk(RESET_VF_REG)) { ::assign_cast(m_registers_V[0xF], 0); }
 	}
 	void SCHIP_MODERN::instruction_8xy1(u32 X, u32 Y) noexcept {
 		::assign_cast_or(m_registers_V[X], m_registers_V[Y]);
+		if (has_quirk(RESET_VF_REG)) { ::assign_cast(m_registers_V[0xF], 0); }
 	}
 	void SCHIP_MODERN::instruction_8xy2(u32 X, u32 Y) noexcept {
 		::assign_cast_and(m_registers_V[X], m_registers_V[Y]);
+		if (has_quirk(RESET_VF_REG)) { ::assign_cast(m_registers_V[0xF], 0); }
 	}
 	void SCHIP_MODERN::instruction_8xy3(u32 X, u32 Y) noexcept {
 		::assign_cast_xor(m_registers_V[X], m_registers_V[Y]);
@@ -423,13 +428,13 @@ void SCHIP_MODERN::scroll_display_rt() noexcept {
 		::assign_cast(m_registers_V[0xF], nborrow);
 	}
 	void SCHIP_MODERN::instruction_8xy6(u32 X, u32 Y) noexcept {
-		if (!Quirk.shift_vx_reg) { m_registers_V[X] = m_registers_V[Y]; }
+		if (!has_quirk(SHIFT_VX_REG)) { m_registers_V[X] = m_registers_V[Y]; }
 		const bool lsb = (m_registers_V[X] & 1) == 1;
 		::assign_cast_shr(m_registers_V[X], 1);
 		::assign_cast(m_registers_V[0xF], lsb);
 	}
 	void SCHIP_MODERN::instruction_8xyE(u32 X, u32 Y) noexcept {
-		if (!Quirk.shift_vx_reg) { m_registers_V[X] = m_registers_V[Y]; }
+		if (!has_quirk(SHIFT_VX_REG)) { m_registers_V[X] = m_registers_V[Y]; }
 		const bool msb = (m_registers_V[X] >> 7) == 1;
 		::assign_cast_shl(m_registers_V[X], 1);
 		::assign_cast(m_registers_V[0xF], msb);
@@ -489,7 +494,7 @@ void SCHIP_MODERN::scroll_display_rt() noexcept {
 
 			[[unlikely]]
 			case 0b10000000:
-				if (Quirk.wrap_sprites) { X &= (m_display_map.width() - 1); }
+				if (has_quirk(WRAP_SPRITES)) { X &= (m_display_map.width() - 1); }
 				if (X < m_display_map.width()) {
 					if (!((m_display_map(X, Y) ^= 0x8) & 0x8))
 						{ m_registers_V[0xF] = 1; }
@@ -498,7 +503,7 @@ void SCHIP_MODERN::scroll_display_rt() noexcept {
 
 			[[likely]]
 			default:
-				if (Quirk.wrap_sprites) { X &= (m_display_map.width() - 1); }
+				if (has_quirk(WRAP_SPRITES)) { X &= (m_display_map.width() - 1); }
 				else if (X >= m_display_map.width()) { return; }
 
 				for (auto B = 0; B < 8; ++B, ++X &= (m_display_map.width() - 1)) {
@@ -506,7 +511,7 @@ void SCHIP_MODERN::scroll_display_rt() noexcept {
 						if (!((m_display_map(X, Y) ^= 0x8) & 0x8))
 							{ m_registers_V[0xF] = 1; }
 					}
-					if (!Quirk.wrap_sprites && X == (m_display_map.width() - 1)) { return; }
+					if (!has_quirk(WRAP_SPRITES) && X == (m_display_map.width() - 1)) { return; }
 				}
 				return;
 		}
@@ -530,7 +535,7 @@ void SCHIP_MODERN::scroll_display_rt() noexcept {
 				{
 					draw_byte(pX + 0, tY, m_memory[m_register_I + tN + 0]);
 					draw_byte(pX + 8, tY, m_memory[m_register_I + tN + 1]);
-					if (!Quirk.wrap_sprites && tY == (m_display_map.height() - 1)) { break; }
+					if (!has_quirk(WRAP_SPRITES) && tY == (m_display_map.height() - 1)) { break; }
 					else { tN += 2; ++tY &= (m_display_map.height() - 1); }
 				}
 				break;
@@ -540,13 +545,13 @@ void SCHIP_MODERN::scroll_display_rt() noexcept {
 				for (auto tN = 0u, tY = pY; tN < N;)
 				{
 					draw_byte(pX, tY, m_memory[m_register_I + tN]);
-					if (!Quirk.wrap_sprites && tY == (m_display_map.height() - 1)) { break; }
+					if (!has_quirk(WRAP_SPRITES) && tY == (m_display_map.height() - 1)) { break; }
 					else { tN += 1; ++tY &= (m_display_map.height() - 1); }
 				}
 				break;
 		}
 
-		trigger_interrupt(Interrupt::FRAME, Quirk.await_vblank);
+		trigger_interrupt(Interrupt::FRAME, has_quirk(AWAIT_VBLANK));
 	}
 
 	#pragma endregion
@@ -599,11 +604,11 @@ void SCHIP_MODERN::scroll_display_rt() noexcept {
 	}
 	void SCHIP_MODERN::instruction_FN55(u32 N) noexcept {
 		for (auto i = 0u; i <= N; ++i) { m_memory[m_register_I + i] = m_registers_V[i]; }
-		if (!Quirk.no_inc_i_reg) [[likely]] { ::assign_cast_add(m_register_I, N + 1); }
+		if (!has_quirk(NO_INC_I_REG)) [[likely]] { ::assign_cast_add(m_register_I, N + 1); }
 	}
 	void SCHIP_MODERN::instruction_FN65(u32 N) noexcept {
 		for (auto i = 0u; i <= N; ++i) { m_registers_V[i] = m_memory[m_register_I + i]; }
-		if (!Quirk.no_inc_i_reg) [[likely]] { ::assign_cast_add(m_register_I, N + 1); }
+		if (!has_quirk(NO_INC_I_REG)) [[likely]] { ::assign_cast_add(m_register_I, N + 1); }
 	}
 	void SCHIP_MODERN::instruction_FN75(u32 N) noexcept {
 		set_permaregs(N + 1);

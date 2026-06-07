@@ -25,11 +25,11 @@ void MEGACHIP::initialize_system() noexcept {
 
 	set_display_properties(Resolution::LO);
 
-	auto meta = m_display_device.edit_metadata();
-
-	meta->minimum_zoom = 2;
-	meta->inner_margin = 4;
-	meta->enabled = true;
+	m_display_device.metadata().edit([](auto& meta) noexcept {
+		meta.minimum_zoom = 2;
+		meta.inner_margin = 4;
+		meta.enabled = true;
+	});
 }
 
 void MEGACHIP::instruction_loop() noexcept {
@@ -291,8 +291,10 @@ void MEGACHIP::push_audio_data() noexcept {
 			[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::BUZZER]); }
 		);
 
-		m_display_device.edit_metadata()->set_border_color_if(
-			!!m_voices[VOICE::BUZZER].timer, s_bit_colors[1]);
+		if (has_cached_system_state(EmuState::ANY_PAUSE)) { return; }
+		m_display_device.metadata().edit([&](auto& meta) noexcept {
+			meta.set_border_color_if(!!m_voices[VOICE::BUZZER].timer, s_bit_colors[1]);
+		});
 	}
 	else {
 		mix_audio_data(
@@ -302,13 +304,21 @@ void MEGACHIP::push_audio_data() noexcept {
 			[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::BUZZER]); }
 		);
 
-		m_display_device.edit_metadata()->set_border_color_if(
-			!!::accumulate(m_voices, 0), s_bit_colors[1]);
+		if (has_cached_system_state(EmuState::ANY_PAUSE)) { return; }
+		m_display_device.metadata().edit([&](auto& meta) noexcept {
+			meta.set_border_color_if(!!::accumulate(m_voices, 0), s_bit_colors[1]);
+		});
 	}
 }
 
 void MEGACHIP::push_video_data() noexcept {
-	if (!use_manual_vsync()) {
+	if (use_manual_vsync()) {
+		if (m_interrupt == Interrupt::INPUT) {
+			// During the INPUT interrupt, we want to keep the swapchain
+			// alive with updates, even if the background map is stale.
+			flush_all_video_buffers(false, false);
+		}
+	} else {
 		auto calc_color = use_pixel_trails()
 			? [](u8 pixel) { return RGBA::premul(s_bit_colors[pixel != 0], c_bit_weight[pixel]); }
 			: [](u8 pixel) { return s_bit_colors[pixel >> 3]; };
@@ -332,29 +342,30 @@ void MEGACHIP::push_video_data() noexcept {
 void MEGACHIP::set_display_properties(Resolution mode) noexcept {
 	use_manual_vsync(mode == Resolution::MC);
 
-	auto meta = m_display_device.edit_metadata();
+	m_display_device.metadata().edit(
+	[&](auto& meta) noexcept {
+		if (use_manual_vsync()) {
+			meta.set_viewport(c_sys_screen_W, c_sys_screen_H);
+			meta.texture_tint = RGBA::Black;
 
-	if (use_manual_vsync()) {
-		meta->set_viewport(c_sys_screen_W, c_sys_screen_H);
-		meta->texture_tint = RGBA::Black;
-
-		Quirk.await_vblank = false;
-		m_standard_cpf = c_sys_speed_lo * 100;
-	}
-	else {
-		meta->set_viewport(c_sys_screen_W, c_sys_screen_W/2);
-		meta->texture_tint = c_bit_colors[0];
-
-		if (mode == Resolution::LO) {
-			use_hires_screen(false);
-			Quirk.await_vblank = true;
-			m_standard_cpf = c_sys_speed_hi;
-		} else {
-			use_hires_screen(true);
-			Quirk.await_vblank = false;
-			m_standard_cpf = c_sys_speed_lo;
+			sub_quirk(AWAIT_VBLANK);
+			m_standard_cpf = c_sys_speed_lo * 100;
 		}
-	}
+		else {
+			meta.set_viewport(c_sys_screen_W, c_sys_screen_W/2);
+			meta.texture_tint = c_bit_colors[0];
+
+			if (mode == Resolution::LO) {
+				use_hires_screen(false);
+				add_quirk(AWAIT_VBLANK);
+				m_standard_cpf = c_sys_speed_hi;
+			} else {
+				use_hires_screen(true);
+				sub_quirk(AWAIT_VBLANK);
+				m_standard_cpf = c_sys_speed_lo;
+			}
+		}
+	});
 };
 
 /*==================================================================*/
@@ -393,16 +404,16 @@ void MEGACHIP::init_font_sprite_colors() noexcept {
 void MEGACHIP::set_blend_callable(u32 mode) noexcept {
 	switch (mode) {
 		case BlendMode::LINEAR_DODGE:
-			m_blend_callable = RGBA::Blend::LinearDodge;
+			m_blend_mode = BlendMode::LINEAR_DODGE;
 			break;
 
 		case BlendMode::MULTIPLY:
-			m_blend_callable = RGBA::Blend::Multiply;
+			m_blend_mode = BlendMode::MULTIPLY;
 			break;
 
 		default:
 		case BlendMode::ALPHA_BLEND:
-			m_blend_callable = RGBA::Blend::None;
+			m_blend_mode = BlendMode::ALPHA_BLEND;
 			break;
 	}
 }
@@ -415,7 +426,7 @@ void MEGACHIP::scrap_all_video_buffers() noexcept {
 
 void MEGACHIP::flush_all_video_buffers(bool by_blending, bool and_advance) noexcept {
 	m_display_device.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = *m_display_device.read_metadata();
+		frame.metadata = m_display_device.metadata().copy();
 		if (by_blending) {
 			frame.copy_from(m_old_render_map, m_background_map, RGBA::alpha_blend);
 		} else {
@@ -424,7 +435,6 @@ void MEGACHIP::flush_all_video_buffers(bool by_blending, bool and_advance) noexc
 	});
 
 	if (and_advance) {
-		//m_old_render_map = m_background_map; // XXX this doesn't copy!!!!
 		std::copy(EXEC_POLICY(unseq)
 			m_background_map.begin(), m_background_map.end(),
 			m_old_render_map.begin()
@@ -435,7 +445,7 @@ void MEGACHIP::flush_all_video_buffers(bool by_blending, bool and_advance) noexc
 }
 
 void MEGACHIP::start_audio_track(bool repeat) noexcept {
-	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
+	if (m_audio_device) {
 
 		m_track.loop = repeat;
 		m_track.data = &m_memory[m_register_I + 6];
@@ -448,7 +458,7 @@ void MEGACHIP::start_audio_track(bool repeat) noexcept {
 		else {
 			m_voices[VOICE::UNIQUE].set_phase(0.0).set_step(
 				(m_memory[m_register_I + 0] << 8 | m_memory[m_register_I + 1]) \
-				/ f64(m_track.size) / stream->get_freq());
+				/ f64(m_track.size) / m_audio_device.get_freq());
 		}
 	}
 }
@@ -577,7 +587,9 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 		m_texture.h = NN ? NN : 256u;
 	}
 	void MEGACHIP::instruction_05NN(u32 NN) noexcept {
-		m_display_device.edit_metadata()->texture_tint.set_A(NN & 0xFF);
+		m_display_device.metadata().edit([&](auto& meta) noexcept {
+			meta.texture_tint.set_A(NN & 0xFF);
+		});
 	}
 	void MEGACHIP::instruction_060N(u32 N) noexcept {
 		start_audio_track(N == 0u);
@@ -756,158 +768,197 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 	#pragma region D instruction branch
 
 	bool MEGACHIP::draw_single_byte(
-		u32 originX, u32 originY,
-		u32 WIDTH,   u32 DATA
+		u32 x_begin, u32 y_begin,
+		u32 byte_w,  u32 data
 	) noexcept {
-		if (!DATA) { return false; }
+		if (!data) { return false; }
 		bool collided = false;
 
-		for (auto B = 0u; B < WIDTH; ++B) {
-			const auto offsetX = originX + B;
+		for (auto pos = 0u; pos < byte_w; ++pos) {
+			const auto true_x = x_begin + pos;
 
-			if (DATA >> (WIDTH - 1 - B) & 0x1) {
-				auto& pixel = m_display_map(offsetX, originY);
+			if (data >> (byte_w - 1 - pos) & 0x1) {
+				auto& pixel = m_display_map(true_x, y_begin);
 				if (!((pixel ^= 0x8) & 0x8)) { collided = true; }
 			}
-			if (offsetX == c_sys_screen_W/2 - 1) { return collided; }
+			if (true_x == (c_sys_screen_W/2 - 1)) { return collided; }
 		}
 		return collided;
 	}
 
 	bool MEGACHIP::draw_double_byte(
-		u32 originX, u32 originY,
-		u32 WIDTH,   u32 DATA
+		u32 x_begin, u32 y_begin,
+		u32 byte_w,  u32 data
 	) noexcept {
-		if (!DATA) { return false; }
+		if (!data) { return false; }
 		bool collided = false;
 
-		for (auto B = 0u; B < WIDTH; ++B) {
-			const auto offsetX = originX + B;
+		for (auto pos = 0u; pos < byte_w; ++pos) {
+			const auto true_x = x_begin + pos;
 
-			auto& pixelHI = m_display_map(offsetX, originY + 0);
-			auto& pixelLO = m_display_map(offsetX, originY + 1);
+			auto& up_pixel = m_display_map(true_x, y_begin + 0);
+			auto& dn_pixel = m_display_map(true_x, y_begin + 1);
 
-			if (DATA >> (WIDTH - 1 - B) & 0x1) {
-				collided |= !!(pixelHI & 0x8);
-				pixelLO = pixelHI ^= 0x8;
+			if (data >> (byte_w - 1 - pos) & 0x1) {
+				collided |= !!(up_pixel & 0x8);
+				dn_pixel = up_pixel ^= 0x8;
 			} else {
-				pixelLO = pixelHI;
+				dn_pixel = up_pixel;
 			}
-			if (offsetX == c_sys_screen_W/2 - 1) { return collided; }
+			if (true_x == (c_sys_screen_W/2 - 1)) { return collided; }
 		}
 		return collided;
 	}
 
+	template <IsBlendMode BlendMode, bool wrap_sprites>
+	void MEGACHIP::draw_texture(u32 x_begin, u32 y_begin) noexcept {
+		if (m_register_I + m_texture.w * m_texture.h >= c_sys_memory_size)
+			[[unlikely]] { m_texture.reset(); return; }
+
+		for (auto row = 0u, true_y = y_begin; row < m_texture.h; ++row) {
+			if constexpr (wrap_sprites) {
+				// MEGACHIP preserves Y progression into hidden 192..255 space
+				// before wrapping back to 0. Drawing must continue to advance true_y
+				// even if it's out of bounds, but skip drawing until it wraps.
+				if (true_y >= c_sys_screen_H) { continue; }
+			}
+
+			auto* collision_row = &m_collision_map(0, true_y);
+			auto* bg_buffer_row = &m_background_map(0, true_y);
+			auto* data_line_row = &m_memory[m_register_I + row * m_texture.w];
+
+			for (auto col = 0u, true_x = x_begin; col < m_texture.w; ++col) {
+				if (const auto src_color_idx = data_line_row[col]) {
+					auto& collision_idx = collision_row[true_x];
+					auto& bg_buffer_idx = bg_buffer_row[true_x];
+
+					if (collision_idx == m_texture.collide)
+						[[unlikely]] { m_registers_V[0xF] = 1; }
+
+					collision_idx = src_color_idx;
+					bg_buffer_idx = RGBA::composite_blend<BlendMode>(
+						m_color_palette[src_color_idx],
+						bg_buffer_idx, u8(m_texture.opacity)
+					);
+				}
+
+				if constexpr (wrap_sprites) { ++true_x &= (c_sys_screen_W - 1); }
+				else { if (++true_x == c_sys_screen_W) { break; } }
+			}
+
+			if constexpr (wrap_sprites) { ++true_y %= c_sys_screen_H; }
+			else { if (++true_y == c_sys_screen_H) { break; } }
+		}
+	}
+
+	template void MEGACHIP::draw_texture<RGBA::Blend::None,  true>(u32, u32) noexcept;
+	template void MEGACHIP::draw_texture<RGBA::Blend::None, false>(u32, u32) noexcept;
+	template void MEGACHIP::draw_texture<RGBA::Blend::LinearDodge,  true>(u32, u32) noexcept;
+	template void MEGACHIP::draw_texture<RGBA::Blend::LinearDodge, false>(u32, u32) noexcept;
+	template void MEGACHIP::draw_texture<RGBA::Blend::Multiply,  true>(u32, u32) noexcept;
+	template void MEGACHIP::draw_texture<RGBA::Blend::Multiply, false>(u32, u32) noexcept;
+
 	void MEGACHIP::instruction_DxyN(u32 X, u32 Y, u32 N) noexcept {
 		if (use_manual_vsync()) {
-			const auto originX = u32(m_registers_V[X]);
-			const auto originY = u32(m_registers_V[Y]);
+			const auto x_begin = u32(m_registers_V[X]);
+			const auto y_begin = u32(m_registers_V[Y]);
 
 			m_registers_V[0xF] = 0;
 
-			if (!Quirk.wrap_sprites && originY >= c_sys_screen_H) { return; }
-			if (m_texture.font_pos != m_register_I) [[likely]] { goto paintTexture; }
+			if (!has_quirk(WRAP_SPRITES) && y_begin >= c_sys_screen_H) { return; }
+			if (m_texture.font_pos != m_register_I) [[likely]] { goto draw_texture_path; }
 
-			for (auto rowN = 0u, offsetY = originY; rowN < N; ++rowN)
-			{
-				if (Quirk.wrap_sprites && offsetY >= c_sys_screen_H) { continue; }
-				const auto octoPixelBatch = m_memory[m_register_I + rowN];
+			for (auto row = 0u, true_y = y_begin; row < N; ++row) {
+				if (has_quirk(WRAP_SPRITES) && true_y >= c_sys_screen_H) { continue; }
+				const auto pixel_data = m_memory[m_register_I + row];
 
-				for (auto colN = 0u, offsetX = originX; colN < 8u; ++colN)
+				for (auto col = 0u, true_x = x_begin; col < 8u; ++col)
 				{
-					if (octoPixelBatch << colN & 0x80) {
-						m_background_map(offsetX, offsetY) = m_font_colors[rowN];
+					if (pixel_data << col & 0x80) {
+						m_background_map(true_x, true_y) = m_font_colors[row];
 					}
 
-					if (!Quirk.wrap_sprites && offsetX == (c_sys_screen_W - 1))
-						{ break; } else { ++offsetX &= (c_sys_screen_W - 1); }
+					if (!has_quirk(WRAP_SPRITES) && true_x == (c_sys_screen_W - 1))
+						{ break; } else { ++true_x &= (c_sys_screen_W - 1); }
 				}
-				if (!Quirk.wrap_sprites && offsetY == (c_sys_screen_W - 1))
-					{ break; } else { ++offsetY &= (c_sys_screen_W - 1); }
+				if (!has_quirk(WRAP_SPRITES) && true_y == (c_sys_screen_W - 1))
+					{ break; } else { ++true_y &= (c_sys_screen_W - 1); }
 			}
 			return;
 
-		paintTexture:
-			if (m_register_I + m_texture.w * m_texture.h >= c_sys_memory_size)
-				[[unlikely]] { m_texture.reset(); return; }
-
-			for (auto rowN = 0u, offsetY = originY; rowN < m_texture.h; ++rowN)
-			{
-				if (Quirk.wrap_sprites && offsetY >= c_sys_screen_H) { continue; }
-				const auto offsetI = rowN * m_texture.w;
-
-				for (auto colN = 0u, offsetX = originX; colN < m_texture.w; ++colN)
-				{
-					if (const auto sourceColorIdx = m_memory[m_register_I + offsetI + colN])
-					{
-						auto& collideCoord = m_collision_map(offsetX, offsetY);
-						auto& backbufCoord = m_background_map(offsetX, offsetY);
-
-						if (collideCoord == m_texture.collide)
-							[[unlikely]] { m_registers_V[0xF] = 1; }
-
-						collideCoord = sourceColorIdx;
-						backbufCoord = RGBA::composite_blend(m_color_palette[sourceColorIdx], \
-							backbufCoord, m_blend_callable, u8(m_texture.opacity));
+		draw_texture_path:
+			switch (m_blend_mode) {
+				case BlendMode::LINEAR_DODGE:
+					if (has_quirk(WRAP_SPRITES)) {
+						draw_texture<RGBA::Blend::LinearDodge, true>(x_begin, y_begin);
+					} else {
+						draw_texture<RGBA::Blend::LinearDodge, false>(x_begin, y_begin);
 					}
-					if (!Quirk.wrap_sprites && offsetX == (c_sys_screen_W - 1))
-						{ break; } else { ++offsetX &= (c_sys_screen_W - 1); }
-				}
-				if (!Quirk.wrap_sprites && offsetY == (c_sys_screen_H - 1))
-					{ break; } else { ++offsetY %= c_sys_screen_H; }
+					break;
+
+				case BlendMode::MULTIPLY:
+					if (has_quirk(WRAP_SPRITES)) {
+						draw_texture<RGBA::Blend::Multiply, true>(x_begin, y_begin);
+					} else {
+						draw_texture<RGBA::Blend::Multiply, false>(x_begin, y_begin);
+					}
+					break;
+
+				default:
+				case BlendMode::ALPHA_BLEND:
+					if (has_quirk(WRAP_SPRITES)) {
+						draw_texture<RGBA::Blend::None, true>(x_begin, y_begin);
+					} else {
+						draw_texture<RGBA::Blend::None, false>(x_begin, y_begin);
+					}
+					break;
 			}
 		} else {
 			if (use_hires_screen()) {
-				const auto offsetX = 8u - (m_registers_V[X] & 7);
-				const auto originX = m_registers_V[X] & 0x78;
-				const auto originY = m_registers_V[Y] & 0x3F;
+				const auto x_shift = 8u - (m_registers_V[X] & 7);
+				const auto x_begin = m_registers_V[X] & 0x78u;
+				const auto y_begin = m_registers_V[Y] & 0x3Fu;
 
 				auto collisions = 0u;
 
 				if (N == 0u) {
-					for (auto rowN = 0u; rowN < 16u; ++rowN) {
-						const auto offsetY = originY + rowN;
+					for (auto row = 0u, true_y = y_begin; row < 16u; ++row) {
+						collisions += draw_single_byte(x_begin, true_y, x_shift ? 24 : 16, (
+							m_memory[m_register_I + 2 * row + 0] << 8 |
+							m_memory[m_register_I + 2 * row + 1] << 0
+						) << x_shift);
 
-						collisions += draw_single_byte(originX, offsetY, offsetX ? 24 : 16, (
-							m_memory[m_register_I + 2 * rowN + 0] << 8 |
-							m_memory[m_register_I + 2 * rowN + 1] << 0
-						) << offsetX);
-
-						if (offsetY == (c_sys_screen_H/3 - 1)) { break; }
+						if (++true_y == (c_sys_screen_H/3)) { break; }
 					}
 				} else {
-					for (auto rowN = 0u; rowN < N; ++rowN) {
-						const auto offsetY = originY + rowN;
+					for (auto row = 0u, true_y = y_begin; row < N; ++row) {
+						collisions += draw_single_byte(x_begin, true_y, x_shift ? 16 : 8,
+							m_memory[m_register_I + row] << x_shift);
 
-						collisions += draw_single_byte(originX, offsetY, offsetX ? 16 : 8,
-							m_memory[m_register_I + rowN] << offsetX);
-
-						if (offsetY == (c_sys_screen_H/3 - 1)) { break; }
+						if (++true_y == (c_sys_screen_H/3)) { break; }
 					}
 				}
 				::assign_cast(m_registers_V[0xF], collisions);
 			}
 			else {
-				const auto offsetX = 16u - 2u * (m_registers_V[X] & 0x07);
-				const auto originX = m_registers_V[X] * 2u & 0x70;
-				const auto originY = m_registers_V[Y] * 2u & 0x3F;
-				const auto lengthN = N == 0u ? 16u : N;
+				const auto x_shift = 16 - 2 * (m_registers_V[X] & 0x07u);
+				const auto x_begin = m_registers_V[X] * 2 & 0x70u;
+				const auto y_begin = m_registers_V[Y] * 2 & 0x3Eu;
+				const auto n_count = N == 0u ? 16u : N;
 
 				auto collisions = 0u;
 
-				for (auto rowN = 0u; rowN < lengthN; ++rowN) {
-					const auto offsetY = originY + rowN * 2u;
+				for (auto row = 0u, true_y = y_begin; row < n_count; ++row) {
+					collisions += draw_double_byte(x_begin, true_y, 0x20,
+						ez::bit_dup8(m_memory[m_register_I + row]) << x_shift);
 
-					collisions += draw_double_byte(originX, offsetY, 0x20,
-						ez::bit_dup8(m_memory[m_register_I + rowN]) << offsetX);
-
-					if (offsetY == (c_sys_screen_H/3 - 2)) { break; }
+					if ((true_y += 2) == (c_sys_screen_H/3)) { break; }
 				}
 				::assign_cast(m_registers_V[0xF], collisions != 0u);
 			}
 		}
 
-		trigger_interrupt(Interrupt::FRAME, Quirk.await_vblank);
+		trigger_interrupt(Interrupt::FRAME, has_quirk(AWAIT_VBLANK));
 	}
 
 	#pragma endregion
@@ -933,9 +984,6 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 		::assign_cast(m_registers_V[X], m_delay_timer);
 	}
 	void MEGACHIP::instruction_Fx0A(u32 X) noexcept {
-		if (use_manual_vsync()) [[unlikely]] {
-			flush_all_video_buffers(false, false);
-		}
 		m_key_reg_ref = &m_registers_V[X];
 		trigger_interrupt(Interrupt::INPUT);
 	}

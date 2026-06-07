@@ -22,8 +22,8 @@ IFamily_CHIP8::IFamily_CHIP8(std::size_t W, std::size_t H) noexcept
 	prepare_user_interface();
 	load_preset_binds();
 
-	m_audio_device.add_playback_stream(STREAM::MAIN, 0, 1);
-	m_audio_device.resume_all_streams();
+	m_audio_device.init_stream(0, 1);
+	m_audio_device.resume();
 
 	if (calc_file_image_sha1()) {
 		if (auto* path = add_system_path("savestate", family_name)) {
@@ -206,6 +206,9 @@ void IFamily_CHIP8::handle_cycle_loop() noexcept {
 /*==================================================================*/
 
 void IFamily_CHIP8::main_system_loop() {
+	// cache quirk flags every frame start
+	m_cached_quirk_flags = m_quirk_flags;
+
 	if (has_cached_system_state(EmuState::ANY_PAUSE)) {
 		push_audio_data();
 		return;
@@ -239,18 +242,17 @@ void IFamily_CHIP8::append_statistics_data() noexcept {
 
 /*==================================================================*/
 
-void IFamily_CHIP8::start_voice(u32 duration, u32 tone) noexcept {
-	auto voice_index = 0;
-	start_voice_at(voice_index, duration, tone);
-	if (duration) { ++voice_index %= VOICE::COUNT - 1; }
+void IFamily_CHIP8::start_voice(u32 duration) noexcept {
+	start_voice_at(m_last_voice_index, duration);
+	if (duration) { ++m_last_voice_index %= VOICE::COUNT - 1; }
 }
 
-void IFamily_CHIP8::start_voice_at(u32 voice_index, u32 duration, u32 tone) noexcept {
+void IFamily_CHIP8::start_voice_at(u32 voice_index, u32 duration) noexcept {
 	m_voices[voice_index].timer.set(duration);
-	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
-		m_voices[voice_index].set_step((c_tonal_offset + (tone ? tone : 8 \
-			* (((m_current_pc >> 1) + m_stack.head() + 1) & 0x3E) \
-		)) / stream->get_freq());
+	if (m_audio_device) {
+		m_voices[voice_index].set_step((c_tonal_offset + 8 *
+			(((m_current_pc >> 1) + m_stack.head() + 1) & 0x3E)
+		) / m_audio_device.get_freq());
 	}
 }
 

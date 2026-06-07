@@ -27,18 +27,18 @@ void SCHIP_LEGACY::initialize_system() noexcept {
 	m_current_pc = c_sys_boot_pos;
 	m_standard_cpf = c_sys_speed_hi;
 
-	Quirk.await_vblank = true;
+	add_quirk(AWAIT_VBLANK);
 
-	auto meta = m_display_device.edit_metadata();
-
-	meta->minimum_zoom = 4;
-	meta->inner_margin = 4;
-	meta->texture_tint = s_bit_colors[0];
-	meta->enabled = true;
+	m_display_device.metadata().edit([](auto& meta) noexcept {
+		meta.minimum_zoom = 4;
+		meta.inner_margin = 4;
+		meta.texture_tint = s_bit_colors[0];
+		meta.enabled = true;
+	});
 }
 
 void SCHIP_LEGACY::instruction_loop() noexcept {
-	m_standard_cpf = Quirk.await_vblank ? c_sys_speed_hi : c_sys_speed_lo;
+	m_standard_cpf = has_quirk(AWAIT_VBLANK) ? c_sys_speed_hi : c_sys_speed_lo;
 	const auto target_cpf = has_cached_system_state(EmuState::BENCH)
 		&& m_debugger_cpf ? m_debugger_cpf : m_standard_cpf;
 	for (m_cycle_count = 0; m_interrupt == Interrupt::CLEAR
@@ -226,13 +226,15 @@ void SCHIP_LEGACY::push_audio_data() noexcept {
 		[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::BUZZER]); }
 	);
 
-	m_display_device.edit_metadata()->set_border_color_if(
-		!!::accumulate(m_voices, 0), s_bit_colors[1]);
+	if (has_cached_system_state(EmuState::ANY_PAUSE)) { return; }
+	m_display_device.metadata().edit([&](auto& meta) noexcept {
+		meta.set_border_color_if(!!::accumulate(m_voices, 0), s_bit_colors[1]);
+	});
 }
 
 void SCHIP_LEGACY::push_video_data() noexcept {
 	m_display_device.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = *m_display_device.read_metadata();
+		frame.metadata = m_display_device.metadata().copy();
 		frame.copy_from(m_display_map, use_pixel_trails()
 			? [](u32 pixel) noexcept { return RGBA::premul(s_bit_colors[pixel != 0], c_bit_weight[pixel]); }
 			: [](u32 pixel) noexcept { return s_bit_colors[pixel >> 3]; }
@@ -285,12 +287,12 @@ void SCHIP_LEGACY::scroll_display_rt() noexcept {
 	}
 	void SCHIP_LEGACY::instruction_00FE() noexcept {
 		use_hires_screen(false);
-		Quirk.await_vblank = true;
+		add_quirk(AWAIT_VBLANK);
 		trigger_interrupt(Interrupt::FRAME);
 	}
 	void SCHIP_LEGACY::instruction_00FF() noexcept {
 		use_hires_screen(true);
-		Quirk.await_vblank = false;
+		sub_quirk(AWAIT_VBLANK);
 		trigger_interrupt(Interrupt::FRAME);
 	}
 
@@ -456,99 +458,93 @@ void SCHIP_LEGACY::scroll_display_rt() noexcept {
 	#pragma region D instruction branch
 
 	bool SCHIP_LEGACY::draw_single_byte(
-		u32 originX, u32 originY,
-		u32 WIDTH,   u32 DATA
+		u32 x_begin, u32 y_begin,
+		u32 byte_w,  u32 data
 	) noexcept {
-		if (!DATA) { return false; }
+		if (!data) { return false; }
 		bool collided = false;
 
-		for (auto B = 0u; B < WIDTH; ++B) {
-			const auto offsetX = originX + B;
+		for (auto pos = 0u; pos < byte_w; ++pos) {
+			const auto true_x = x_begin + pos;
 
-			if (DATA >> (WIDTH - 1 - B) & 0x1) {
-				auto& pixel = m_display_map(offsetX, originY);
+			if (data >> (byte_w - 1 - pos) & 0x1) {
+				auto& pixel = m_display_map(true_x, y_begin);
 				if (!((pixel ^= 0x8) & 0x8)) { collided = true; }
 			}
-			if (offsetX == (c_sys_screen_W - 1)) { return collided; }
+			if (true_x == (c_sys_screen_W - 1)) { return collided; }
 		}
 		return collided;
 	}
 
 	bool SCHIP_LEGACY::draw_double_byte(
-		u32 originX, u32 originY,
-		u32 WIDTH,   u32 DATA
+		u32 x_begin, u32 y_begin,
+		u32 byte_w,  u32 data
 	) noexcept {
-		if (!DATA) { return false; }
+		if (!data) { return false; }
 		bool collided = false;
 
-		for (auto B = 0u; B < WIDTH; ++B) {
-			const auto offsetX = originX + B;
+		for (auto pos = 0u; pos < byte_w; ++pos) {
+			const auto true_x = x_begin + pos;
 
-			auto& pixelHI = m_display_map(offsetX, originY + 0);
-			auto& pixelLO = m_display_map(offsetX, originY + 1);
+			auto& up_pixel = m_display_map(true_x, y_begin + 0);
+			auto& dn_pixel = m_display_map(true_x, y_begin + 1);
 
-			if (DATA >> (WIDTH - 1 - B) & 0x1) {
-				if (pixelHI & 0x8) { collided = true; }
-				pixelLO = pixelHI ^= 0x8;
+			if (data >> (byte_w - 1 - pos) & 0x1) {
+				collided |= !!(up_pixel & 0x8);
+				dn_pixel = up_pixel ^= 0x8;
 			} else {
-				pixelLO = pixelHI;
+				dn_pixel = up_pixel;
 			}
-			if (offsetX == (c_sys_screen_W - 1)) { return collided; }
+			if (true_x == (c_sys_screen_W - 1)) { return collided; }
 		}
 		return collided;
 	}
 
 	void SCHIP_LEGACY::instruction_DxyN(u32 X, u32 Y, u32 N) noexcept {
 		if (use_hires_screen()) {
-			const auto offsetX = 8 - (m_registers_V[X] & 7);
-			const auto originX = m_registers_V[X] & 0x78;
-			const auto originY = m_registers_V[Y] & 0x3F;
+			const auto x_shift = 8 - (m_registers_V[X] & 7);
+			const auto x_begin = m_registers_V[X] & 0x78u;
+			const auto y_begin = m_registers_V[Y] & 0x3Fu;
 
 			auto collisions = 0;
 
 			if (N == 0) {
-				for (auto rowN = 0u; rowN < 16u; ++rowN) {
-					const auto offsetY = originY + rowN;
+				for (auto row = 0u, true_y = y_begin; row < 16u; ++row) {
+					collisions += draw_single_byte(x_begin, true_y, x_shift ? 24 : 16, (
+						m_memory[m_register_I + 2 * row + 0] << 8 |
+						m_memory[m_register_I + 2 * row + 1] << 0
+					) << x_shift);
 
-					collisions += draw_single_byte(originX, offsetY, offsetX ? 24 : 16, (
-						m_memory[m_register_I + 2 * rowN + 0] << 8 |
-						m_memory[m_register_I + 2 * rowN + 1] << 0
-					) << offsetX);
-
-					if (offsetY == (c_sys_screen_H - 1)) { break; }
+					if (++true_y == c_sys_screen_H) { break; }
 				}
 			} else {
-				for (auto rowN = 0u; rowN < N; ++rowN) {
-					const auto offsetY = originY + rowN;
+				for (auto row = 0u, true_y = y_begin; row < N; ++row) {
+					collisions += draw_single_byte(x_begin, true_y, x_shift ? 16 : 8,
+						m_memory[m_register_I + row] << x_shift);
 
-					collisions += draw_single_byte(originX, offsetY, offsetX ? 16 : 8,
-						m_memory[m_register_I + rowN] << offsetX);
-
-					if (offsetY == (c_sys_screen_H - 1)) { break; }
+					if (++true_y == c_sys_screen_H) { break; }
 				}
 			}
 			::assign_cast(m_registers_V[0xF], collisions);
 		}
 		else {
-			const auto offsetX = 16 - 2 * (m_registers_V[X] & 0x07);
-			const auto originX = m_registers_V[X] * 2 & 0x70;
-			const auto originY = m_registers_V[Y] * 2 & 0x3F;
-			const auto lengthN = N == 0u ? 16u : N;
+			const auto x_shift = 16 - 2 * (m_registers_V[X] & 0x07u);
+			const auto x_begin = m_registers_V[X] * 2 & 0x70u;
+			const auto y_begin = m_registers_V[Y] * 2 & 0x3Eu;
+			const auto n_count = N == 0u ? 16u : N;
 
 			auto collisions = 0;
 
-			for (auto rowN = 0u; rowN < lengthN; ++rowN) {
-				const auto offsetY = originY + rowN * 2;
+			for (auto row = 0u, true_y = y_begin; row < n_count; ++row) {
+				collisions += draw_double_byte(x_begin, true_y, 0x20,
+					ez::bit_dup8(m_memory[m_register_I + row]) << x_shift);
 
-				collisions += draw_double_byte(originX, offsetY, 0x20,
-					ez::bit_dup8(m_memory[m_register_I + rowN]) << offsetX);
-
-				if (offsetY == (c_sys_screen_H - 2)) { break; }
+				if ((true_y += 2) == c_sys_screen_H) { break; }
 			}
 			::assign_cast(m_registers_V[0xF], collisions != 0);
 		}
 
-		trigger_interrupt(Interrupt::FRAME, Quirk.await_vblank);
+		trigger_interrupt(Interrupt::FRAME, has_quirk(AWAIT_VBLANK));
 	}
 
 	#pragma endregion
@@ -601,11 +597,11 @@ void SCHIP_LEGACY::scroll_display_rt() noexcept {
 	}
 	void SCHIP_LEGACY::instruction_FN55(u32 N) noexcept {
 		for (auto i = 0u; i <= N; ++i) { m_memory[m_register_I + i] = m_registers_V[i]; }
-		if (Quirk.x1_inc_i_reg) [[likely]] { ::assign_cast_add(m_register_I, N); }
+		if (has_quirk(X1_INC_I_REG)) [[likely]] { ::assign_cast_add(m_register_I, N); }
 	}
 	void SCHIP_LEGACY::instruction_FN65(u32 N) noexcept {
 		for (auto i = 0u; i <= N; ++i) { m_registers_V[i] = m_memory[m_register_I + i]; }
-		if (Quirk.x1_inc_i_reg) [[likely]] { ::assign_cast_add(m_register_I, N); }
+		if (has_quirk(X1_INC_I_REG)) [[likely]] { ::assign_cast_add(m_register_I, N); }
 	}
 	void SCHIP_LEGACY::instruction_FN75(u32 N) noexcept {
 		set_permaregs(std::min(N, 7u) + 1);

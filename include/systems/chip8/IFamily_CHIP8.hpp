@@ -23,6 +23,9 @@
 class IFamily_CHIP8 : public ISystemEmu {
 	void prepare_user_interface() noexcept;
 
+private:
+	ez::EMA m_mips_ema;
+
 protected:
 	static constexpr std::string_view family_pretty_name = "CHIP-8";
 	static constexpr std::string_view family_name = "chip8";
@@ -37,12 +40,6 @@ protected:
 		return (file.size() + load_position <= memory_size)
 			? nullptr : "file too large";
 	}
-
-	enum STREAM { MAIN };
-	enum VOICE {
-		ID_0, ID_1, ID_2, ID_3, COUNT,
-		BUZZER = ID_3, UNIQUE = ID_0,
-	};
 
 	std::string m_permaregs_path{};
 	std::string m_savestate_path{};
@@ -63,37 +60,6 @@ protected:
 	private:
 		u32 m_temp_val;
 	};
-
-/*==================================================================*/
-
-	AudioDevice m_audio_device;
-
-	std::array<Voice, VOICE::COUNT>
-		m_voices{};
-
-	void start_voice(u32 duration, u32 tone = 0) noexcept;
-	void start_voice_at(u32 voice_index, u32 duration, u32 tone = 0) noexcept;
-
-	template <typename... Generator>
-		requires ((IsSampleGenerator<Generator> && ...))
-	void mix_audio_data(Generator&&... generators) noexcept {
-		if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
-			stream->set_freq_ratio(m_framerate_multiplier);
-
-			auto buffer = allocate_n<f32>(
-				stream->next_frame_sample_count(get_real_system_framerate())
-			).as_value().release_as_container();
-
-			if (!has_cached_system_state(EmuState::ANY_PAUSE)) {
-				(std::forward<Generator>(generators)(buffer.span()), ...);
-				for (auto& sample : buffer) { sample = ez::fast_tanh(sample); }
-			}
-
-			stream->push_audio_data(buffer);
-		}
-	}
-
-	static void make_pulse_wave(SampleBuffer buffer, Voice& voice) noexcept;
 
 /*==================================================================*/
 
@@ -130,22 +96,103 @@ protected:
 	WindowHost    m_display_window;
 	DisplayDevice m_display_device;
 
-private:
-	ez::EMA m_mips_ema;
-
 /*==================================================================*/
 
 protected:
-	struct alignas(int) PlatformQuirks final {
-		bool reset_vf_reg{};
-		bool jump_with_vx{};
-		bool shift_vx_reg{};
-		bool no_inc_i_reg{};
-		bool x1_inc_i_reg{};
-		bool await_vblank{};
-		bool await_scroll{};
-		bool wrap_sprites{};
-	} Quirk;
+	enum VOICE {
+		ID_0, ID_1, ID_2, ID_3, COUNT,
+		BUZZER = ID_3, UNIQUE = ID_0,
+	};
+
+	AudioDevice m_audio_device;
+
+	std::array<Voice, VOICE::COUNT>
+		m_voices{};
+
+private:
+	u8 m_last_voice_index = 0;
+
+protected:
+	void start_voice(u32 duration) noexcept;
+	void start_voice_at(u32 voice_index, u32 duration) noexcept;
+
+	template <typename... Generator>
+		requires ((IsSampleGenerator<Generator> && ...))
+	void mix_audio_data(Generator&&... generators) noexcept {
+		if (m_audio_device) {
+			m_audio_device.set_freq_ratio(m_framerate_multiplier);
+
+			auto buffer = allocate_n<f32>(
+				m_audio_device.next_frame_sample_count(get_real_system_framerate())
+			).as_value().release_as_container();
+
+			if (!has_cached_system_state(EmuState::ANY_PAUSE)) {
+				(std::forward<Generator>(generators)(buffer.span()), ...);
+				for (auto& sample : buffer) { sample = ez::fast_tanh(sample); }
+			}
+
+			m_audio_device.push_audio_data(buffer);
+		}
+	}
+
+	static void make_pulse_wave(SampleBuffer buffer, Voice& voice) noexcept;
+
+/*==================================================================*/
+
+private:
+	u8 m_quirk_flags{};
+	u8 m_cached_quirk_flags = 0;
+
+	virtual u8 get_avail_quirks() const noexcept {
+		return QUIRK_UNUSED; // no quirks available by default
+	}
+
+protected:
+	enum QuirkFlag : u8 {
+		QUIRK_UNUSED = 0x00, // Sentinel value
+		RESET_VF_REG = 0x01,
+		JUMP_WITH_VX = 0x02,
+		SHIFT_VX_REG = 0x04,
+		NO_INC_I_REG = 0x08,
+		X1_INC_I_REG = 0x10,
+		AWAIT_VBLANK = 0x20,
+		AWAIT_SCROLL = 0x40,
+		WRAP_SPRITES = 0x80,
+		TOTAL_QUIRKS = 0x08, // used for validation and iteration
+	};
+
+	static constexpr const char* get_quirk_name(QuirkFlag flag) noexcept {
+		switch (flag) {
+			case RESET_VF_REG: return "VF Reset Quirk";
+			case JUMP_WITH_VX: return "Jump Quirk";
+			case SHIFT_VX_REG: return "Shift Quirk";
+			case NO_INC_I_REG: return "Memory Quirk";
+			case X1_INC_I_REG: return "Old Memory Quirk";
+			case AWAIT_VBLANK: return "Await Vblank";
+			case AWAIT_SCROLL: return "Await Scroll";
+			case WRAP_SPRITES: return "Wrap Sprites";
+			default:           return "INVALID";
+		}
+	}
+
+	static constexpr const char* get_quirk_desc(QuirkFlag flag) noexcept {
+		switch (flag) {
+			case RESET_VF_REG: return "Affects: 8xy1, 8xy2, 8xy3\nInstructions reset the VF register after the operation.";
+			case JUMP_WITH_VX: return "Affects: Bnnn\nInstruction jumps by adding VX to NNN instead of V0.";
+			case SHIFT_VX_REG: return "Affects: 8xy6, 8xyE\nInstructions shift VX in-place instead of VY.";
+			case NO_INC_I_REG: return "Affects: Fn55, Fn65\nInstructions do not increment the I register.";
+			case X1_INC_I_REG: return "Affects: Fn55, Fn65\nInstructions increment the I register by X only instead of X+1.";
+			case AWAIT_VBLANK: return "Affects: 00E0, Dxyn/?\nStaggers instruction execution to once per vblank.";
+			case AWAIT_SCROLL: return "Affects: 00FB, 00FC, 00Bn, 00Cn, 00Dn\nStaggers instruction execution to once per vblank.";
+			case WRAP_SPRITES: return "Affects: Dxy0, Dxyn\nSprite draws wrap around the screen edges instead of being clipped.";
+			default:           return "INVALID";
+		}
+	}
+
+	bool has_quirk(QuirkFlag flag) const noexcept { return !!(m_cached_quirk_flags & flag); }
+	void add_quirk(QuirkFlag flag) noexcept { m_quirk_flags |=  flag; }
+	void sub_quirk(QuirkFlag flag) noexcept { m_quirk_flags &= ~flag; }
+	void xor_quirk(QuirkFlag flag) noexcept { m_quirk_flags ^=  flag; }
 
 /*==================================================================*/
 

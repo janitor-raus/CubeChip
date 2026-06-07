@@ -30,12 +30,12 @@ void CHIP8X::initialize_system() noexcept {
 	// test first color rect as the original hardware did
 	m_colored_map(0, 0) = c_fore_colors[2];
 
-	auto meta = m_display_device.edit_metadata();
-
-	meta->minimum_zoom = 8;
-	meta->inner_margin = 4;
-	meta->texture_tint = c_back_colors[m_background_color];
-	meta->enabled = true;
+	m_display_device.metadata().edit([&](auto& meta) noexcept {
+		meta.minimum_zoom = 8;
+		meta.inner_margin = 4;
+		meta.texture_tint = c_back_colors[m_background_color];
+		meta.enabled = true;
+	});
 }
 
 void CHIP8X::instruction_loop() noexcept {
@@ -226,14 +226,18 @@ void CHIP8X::push_audio_data() noexcept {
 	);
 
 	static constexpr u32 idx[]{ 2, 7, 4, 1 };
-	m_display_device.edit_metadata()->set_border_color_if(
-		!!::accumulate(m_voices, 0), c_fore_colors[idx[m_background_color]]);
+
+	if (has_cached_system_state(EmuState::ANY_PAUSE)) { return; }
+	m_display_device.metadata().edit([&](auto& meta) noexcept {
+		meta.set_border_color_if(!!::accumulate(m_voices, 0),
+			c_fore_colors[idx[m_background_color]]);
+	});
 }
 
 void CHIP8X::push_video_data() noexcept {
 	if (use_pixel_trails()) {
 		m_display_device.swapchain().acquire([&](auto& frame) noexcept {
-			frame.metadata = *m_display_device.read_metadata();
+			frame.metadata = m_display_device.metadata().copy();
 			frame.copy_from(m_display_map, [&](auto& pixel) noexcept {
 				if (pixel == 0) {
 					return c_back_colors[m_background_color];
@@ -254,7 +258,7 @@ void CHIP8X::push_video_data() noexcept {
 		);
 	} else {
 		m_display_device.swapchain().acquire([&](auto& frame) noexcept {
-			frame.metadata = *m_display_device.read_metadata();
+			frame.metadata = m_display_device.metadata().copy();
 			frame.copy_from(m_display_map, [&](auto& pixel) noexcept {
 				if (pixel == 0) {
 					return c_back_colors[m_background_color];
@@ -270,10 +274,10 @@ void CHIP8X::push_video_data() noexcept {
 }
 
 void CHIP8X::set_pulse_pitch(u32 pitch) noexcept {
-	if (auto* stream = m_audio_device.at(STREAM::MAIN)) {
+	if (m_audio_device) {
 		m_voices[VOICE::UNIQUE].set_step((c_tonal_offset + (
 			(0xFF - (pitch ? pitch : 0x80)) >> 3 << 4)
-		) / stream->get_freq() * m_framerate_multiplier);
+		) / m_audio_device.get_freq());
 	}
 }
 
@@ -304,8 +308,9 @@ void CHIP8X::color_hires_zone(u32 X, u32 Y, u32 idx, u32 N) noexcept {
 		m_current_pc = m_stack.pop();
 	}
 	void CHIP8X::instruction_02A0() noexcept {
-		m_display_device.edit_metadata()->texture_tint
-			= c_back_colors[++m_background_color &= 0x3];
+		m_display_device.metadata().edit([&](auto& meta) noexcept {
+			meta.texture_tint = c_back_colors[++m_background_color &= 0x3];
+		});
 	}
 
 	#pragma endregion

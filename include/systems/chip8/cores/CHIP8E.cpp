@@ -27,12 +27,12 @@ void CHIP8E::initialize_system() noexcept {
 	m_current_pc = c_sys_boot_pos;
 	m_standard_cpf = c_sys_speed_hi;
 
-	auto meta = m_display_device.edit_metadata();
-
-	meta->minimum_zoom = 8;
-	meta->inner_margin = 4;
-	meta->texture_tint = s_bit_colors[0];
-	meta->enabled = true;
+	m_display_device.metadata().edit([](auto& meta) noexcept {
+		meta.minimum_zoom = 8;
+		meta.inner_margin = 4;
+		meta.texture_tint = s_bit_colors[0];
+		meta.enabled = true;
+	});
 }
 
 void CHIP8E::instruction_loop() noexcept {
@@ -240,13 +240,15 @@ void CHIP8E::push_audio_data() noexcept {
 		[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::BUZZER]); }
 	);
 
-	m_display_device.edit_metadata()->set_border_color_if(
-	!!::accumulate(m_voices, 0), s_bit_colors[1]);
+	if (has_cached_system_state(EmuState::ANY_PAUSE)) { return; }
+	m_display_device.metadata().edit([&](auto& meta) noexcept {
+		meta.set_border_color_if(!!::accumulate(m_voices, 0), s_bit_colors[1]);
+	});
 }
 
 void CHIP8E::push_video_data() noexcept {
 	m_display_device.swapchain().acquire([&](auto& frame) noexcept {
-		frame.metadata = *m_display_device.read_metadata();
+		frame.metadata = m_display_device.metadata().copy();
 		frame.copy_from(m_display_map, use_pixel_trails()
 			? [](u32 pixel) noexcept { return RGBA::premul(s_bit_colors[pixel != 0], c_bit_weight[pixel]); }
 			: [](u32 pixel) noexcept { return s_bit_colors[pixel >> 3]; }

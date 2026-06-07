@@ -46,6 +46,10 @@ public:
 		return descriptor;
 	}
 
+	u8 get_avail_quirks() const noexcept override {
+		return WRAP_SPRITES;
+	}
+
 /*==================================================================*/
 
 	MirroredMemory<c_sys_memory_size>
@@ -90,7 +94,7 @@ public:
 		MULTIPLY     = 5,
 	};
 
-	RGBA::BlendFunc m_blend_callable{};
+	BlendMode m_blend_mode = BlendMode::ALPHA_BLEND;
 
 	void set_blend_callable(u32 mode) noexcept;
 
@@ -326,8 +330,11 @@ private:
 /*==================================================================*/
 	#pragma region D instruction branch
 
-	bool draw_single_byte(u32 X, u32 Y, u32 WIDTH, u32 DATA) noexcept;
-	bool draw_double_byte(u32 X, u32 Y, u32 WIDTH, u32 DATA) noexcept;
+	bool draw_single_byte(u32 x_begin, u32 y_begin, u32 byte_w, u32 data) noexcept;
+	bool draw_double_byte(u32 x_begin, u32 y_begin, u32 byte_w, u32 data) noexcept;
+
+	template <IsBlendMode BlendMode, bool wrap_sprites>
+	void draw_texture(u32 x_begin, u32 y_begin) noexcept;
 
 	// DXYN - draw N sprite rows at VX and VY
 	void instruction_DxyN(u32 X, u32 Y, u32 N) noexcept;
