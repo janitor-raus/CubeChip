@@ -127,10 +127,17 @@ class SHA1_ThreadedWidget {
 	SHA1_Stream stream;
 	Thread      thread;
 
+	// Thread activity flag
+	std::atomic_bool busy = false;
+
+	static constexpr auto relaxed =
+		std::memory_order::relaxed;
+
 	void reset_thread() noexcept {
 		if (thread.joinable()) {
 			thread.request_stop();
 			thread.join();
+			busy.store(false, relaxed);
 		}
 	}
 
@@ -139,7 +146,7 @@ public:
 		: stream(size_in_bytes)
 	{}
 
-	bool  running()  const noexcept { return thread.joinable(); }
+	bool  running()  const noexcept { return busy.load(relaxed); }
 	float progress() const noexcept { return stream.progress(); }
 
 	/**
@@ -180,6 +187,8 @@ public:
 		std::invocable<float> OnStep
 	>
 	void start(const char* data, OnDone&& on_done, OnStep&& on_step) noexcept {
+		busy.store(true, relaxed);
+
 		thread = Thread([ this, data,
 			on_done = std::forward<OnDone>(on_done),
 			on_step = std::forward<OnStep>(on_step)
@@ -187,10 +196,12 @@ public:
 			while (!token.stop_requested()) {
 				if (auto hash = stream.advance(data)) {
 					on_done(std::move(*hash));
+					busy.store(false, relaxed);
 					return;
 				}
 				on_step(stream.progress());
 			}
+			busy.store(false, relaxed);
 		});
 	}
 
