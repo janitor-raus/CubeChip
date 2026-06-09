@@ -17,7 +17,7 @@ constexpr std::size_t view_size(const T& t) noexcept {
 	using U = std::remove_cvref_t<T>;
 	/****/ if constexpr (std::is_same_v<U, std::string> || std::is_same_v<U, std::string_view>) {
 		return t.size();
-	} else if constexpr (std::is_array_v<U> && std::is_same_v<std::remove_cv_t<std::remove_pointer_t<U>>, char>) {
+	} else if constexpr (std::is_array_v<U> && std::is_same_v<std::remove_cv_t<std::remove_extent_t<U>>, char>) {
 		return std::extent_v<U> -1; // C-style string literal: exclude null terminator
 	} else if constexpr (std::is_pointer_v<U> && std::is_same_v<std::remove_cv_t<std::remove_pointer_t<U>>, char>) {
 		return std::char_traits<char>::length(t); // const char* null-terminated
@@ -31,7 +31,7 @@ constexpr const char* view_data(const T& t) noexcept {
 	using U = std::remove_cvref_t<T>;
 	/****/ if constexpr (std::is_same_v<U, std::string> || std::is_same_v<U, std::string_view>) {
 		return t.data();
-	} else if constexpr (std::is_array_v<U> && std::is_same_v<std::remove_cv_t<std::remove_pointer_t<U>>, char>) {
+	} else if constexpr (std::is_array_v<U> && std::is_same_v<std::remove_cv_t<std::remove_extent_t<U>>, char>) {
 		return t;
 	} else if constexpr (std::is_pointer_v<U> && std::is_same_v<std::remove_cv_t<std::remove_pointer_t<U>>, char>) {
 		return t;
