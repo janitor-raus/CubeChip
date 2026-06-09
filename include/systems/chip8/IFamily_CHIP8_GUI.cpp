@@ -130,7 +130,7 @@ void IFamily_CHIP8::prepare_user_interface() noexcept {
 					int quirk_flags = m_quirk_flags;
 					CheckboxFlags(get_quirk_name(flag), &quirk_flags, flag);
 					BeginDisabled();
-					TextWrapped(get_quirk_desc(flag));
+					TextWrapped("%s", get_quirk_desc(flag));
 					EndDisabled();
 					EndChild();
 				}, has_quirk(flag))) { xor_quirk(flag); }
