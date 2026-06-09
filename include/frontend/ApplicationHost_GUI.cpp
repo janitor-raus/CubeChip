@@ -521,15 +521,14 @@ void ApplicationHost::setup_gui_callables() noexcept {
 		if (!SystemStaging::file_image.valid()) { return; }
 
 		static bool s_render_modal = false;
+		const auto  scaling = UserInterface::get_ui_total_scaling();
+
+		static CandidateList::ListState     s_list_state;
+		static const CandidateList::System* s_chosen_system  = nullptr;
+		static const CandidateList::System* s_pending_system = nullptr;
 
 		static SHA1_ThreadedWidget s_sha1_widget;
-
-		static CandidateList::ListState s_list_state;
-		static const CandidateList::System* chosen_system = nullptr;
-		static const CandidateList::System* pending_system = nullptr;
 		static ScrollingTextState s_scroll_state;
-
-		const auto scaling = UserInterface::get_ui_total_scaling();
 
 		static auto s_close_modal = []() noexcept {
 			s_sha1_widget.reset();
@@ -545,7 +544,7 @@ void ApplicationHost::setup_gui_callables() noexcept {
 			s_sha1_widget.setup(SystemStaging::file_image.size());
 			s_scroll_state.set_speed(128.0f * scaling);
 
-			pending_system = s_list_state.best_match;
+			s_pending_system = s_list_state.best_match;
 			OpenPopup("FileImageModal");
 		}
 
@@ -581,7 +580,6 @@ void ApplicationHost::setup_gui_callables() noexcept {
 			Separator();
 
 			if (SystemStaging::sha1_hash.empty()) {
-				const auto sha1_button_size = ImVec2(scroll_area.x, 0.0f);
 				if (s_sha1_widget.running()) {
 					const auto progress = s_sha1_widget.progress();
 					const auto percentage = fmt::format("{:.1f}%###pc", progress * 100.0f);
@@ -610,123 +608,128 @@ void ApplicationHost::setup_gui_callables() noexcept {
 			}
 
 			// Candidate scroll region
-			BeginChild("##candidate_scroll_region", scroll_area, true);
+			if (BeginChild("##candidate_scroll_region", scroll_area, true)) {
+				static constexpr auto system_name_font_size = 20.0f;
+				static constexpr auto half_button_font_size = 18.0f;
 
-			static constexpr auto system_name_font_size = 20.0f;
-			static constexpr auto half_button_font_size = 18.0f;
+				const auto sha1_thread_active = s_sha1_widget.running();
+				const auto scroll_avail_width = GetContentRegionAvail().x;
+				const auto system_name_height = CalcFontHeight(system_name_font_size);
 
-			const auto scroll_avail_width  = GetContentRegionAvail().x;
-			const auto system_name_height  = CalcFontHeight(system_name_font_size);
+				const auto base_button_size = ImVec2(scroll_avail_width,
+					system_name_height + padding.y * 2.0f);
 
-			const auto base_button_size = ImVec2(scroll_avail_width,
-				system_name_height + padding.y * 2.0f);
+				const auto half_button_size = ImVec2(
+					(base_button_size.x - spacing.x) * 0.5f - padding.x,
+					CalcFontHeight(half_button_font_size) + padding.y * 2.0f
+				);
 
-			const auto half_button_size = ImVec2(
-				(base_button_size.x - spacing.x) * 0.5f - padding.x,
-				CalcFontHeight(half_button_font_size) + padding.y * 2.0f
-			);
+				if (s_pending_system) {
+					s_chosen_system  = s_pending_system;
+					s_pending_system = nullptr;
+				}
 
-			if (pending_system) {
-				chosen_system = pending_system;
-				pending_system = nullptr;
-			}
+				for (auto& group : s_list_state.families) {
+					PushStyleVarY(ImGuiStyleVar_ItemSpacing, 0.0f);
+					// Family name
+					PushFont(nullptr, 24.0f);
+					PushStyleVarX(ImGuiStyleVar_SeparatorTextAlign, 0.5f);
+					SeparatorText(group.family_name.data());
+					PopStyleVar();
+					PopFont();
 
-			for (auto& group : s_list_state.families) {
-				PushStyleVarY(ImGuiStyleVar_ItemSpacing, 0.0f);
-				// Family name
-				PushFont(nullptr, 24.0f);
-				PushStyleVarX(ImGuiStyleVar_SeparatorTextAlign, 0.5f);
-				SeparatorText(group.family_name.data());
-				PopStyleVar();
-				PopFont();
+					// Eligibility count
+					PushFont(nullptr, 16.0f);
+					const auto counter = fmt::format("({}/{})",
+						group.total_eligible, group.systems.size());
+					const auto counter_text_width = CalcTextSize(counter.c_str()).x;
+					AddCursorPosX((scroll_avail_width - counter_text_width) * 0.5f);
+					TextUnformatted(counter.c_str(), GetColorU32(ImGuiCol_TextDisabled));
+					PopFont();
 
-				// Eligibility count
-				PushFont(nullptr, 16.0f);
-				const auto counter = fmt::format("({}/{})",
-					group.total_eligible, group.systems.size());
-				const auto counter_text_width = CalcTextSize(counter.c_str()).x;
-				AddCursorPosX((scroll_avail_width - counter_text_width) * 0.5f);
-				TextUnformatted(counter.c_str(), GetColorU32(ImGuiCol_TextDisabled));
-				PopFont();
+					DummyY(padding.y * 2.0f);
+					PopStyleVar();
 
-				DummyY(padding.y * 2.0f);
-				PopStyleVar();
+					for (auto& candidate : group.systems) {
+						const bool is_expanded = s_chosen_system == &candidate;
+						const bool is_best_match = s_list_state.best_match == &candidate;
 
-				for (auto& candidate : group.systems) {
-					const bool is_expanded = chosen_system == &candidate;
-					const bool is_best_match = s_list_state.best_match == &candidate;
+						const auto full_button_size = ImVec2(base_button_size.x,
+							base_button_size.y + is_expanded * (half_button_size.y + padding.y));
 
-					const auto full_button_size = ImVec2(base_button_size.x,
-						base_button_size.y + is_expanded * (half_button_size.y + padding.y));
+						PushID(candidate.system_hook.get());
+						if (ButtonContainer("##btn", full_button_size, [&]() noexcept {
+							PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2());
 
-					PushID(candidate.system_hook.get());
-					if (ButtonContainer("##btn", full_button_size, [&]() noexcept {
-						PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2());
+							// System name, centered
+							const auto system_name_string = std::string(
+								candidate.get_descriptor()->system_pretty_name);
 
-						// System name, centered
-						const auto system_name_string = std::string(
-							candidate.get_descriptor()->system_pretty_name);
+							PushFont(nullptr, system_name_font_size);
 
-						PushFont(nullptr, system_name_font_size);
+							const auto indicator_text_size = is_best_match
+								* 2.0f * CalcTextSize("‹‹››").x;
 
-						const auto indicator_text_size = is_best_match
-							* 2.0f * CalcTextSize("‹‹››").x;
+							AddCursorPos(ImVec2((base_button_size.x - indicator_text_size
+								- CalcTextSize(system_name_string.c_str()).x) * 0.5f, padding.y));
 
-						AddCursorPos(ImVec2((base_button_size.x - indicator_text_size
-							- CalcTextSize(system_name_string.c_str()).x) * 0.5f, padding.y));
-
-						if (is_best_match) {
-							TextUnformatted("››› ", s_list_state.c_highlight_color);
-							SameLine();
-						}
-
-						BeginDisabled(!candidate.eligible());
-						TextUnformatted(system_name_string.c_str());
-						EndDisabled();
-
-						if (is_best_match) {
-							SameLine();
-							TextUnformatted(" ‹‹‹", s_list_state.c_highlight_color);
-						}
-
-						PopFont();
-
-						PopStyleVar();
-						AddCursorPosY(padding.y);
-
-						const auto action_button = [&](
-							const char* label, const ImVec2& button_size, bool replace
-						) noexcept {
-							if (ButtonContainer(label, button_size, [&]() noexcept {
-								PushFont(nullptr, half_button_font_size);
-								AddCursorPos((button_size - CalcTextSize(label)) * 0.5f);
-								TextUnformatted(label);
-								PopFont();
-							}, false, true)) {
-								s_file_mru.insert(SystemStaging::file_image.path());
-								if (auto* system = candidate.system_hook->construct_core()) {
-									if (replace) { unload_system_instance(); }
-									insert_system_instance(system);
-									s_close_modal();
-								} else {
-									blog.error("Failed to construct instance for '{}'",
-										candidate.get_descriptor()->system_pretty_name);
-								}
+							if (is_best_match) {
+								TextUnformatted("››› ", s_list_state.c_highlight_color);
+								SameLine();
 							}
-						};
 
-						if (is_expanded) {
-							AddCursorPosX(padding.x);
-							action_button("New Instance", half_button_size, false);
-							SameLine();
-							BeginDisabled(m_systems.empty());
-							action_button("Replace Instance", half_button_size, true);
+							BeginDisabled(!candidate.eligible());
+							TextUnformatted(system_name_string.c_str());
 							EndDisabled();
+
+							if (is_best_match) {
+								SameLine();
+								TextUnformatted(" ‹‹‹", s_list_state.c_highlight_color);
+							}
+
+							PopFont();
+
+							PopStyleVar();
+							AddCursorPosY(padding.y);
+
+							const auto action_button = [&](
+								const char* label, const ImVec2& button_size, bool replace
+							) noexcept {
+								BeginDisabled(sha1_thread_active);
+								if (ButtonContainer(label, button_size, [&]() noexcept {
+									PushFont(nullptr, half_button_font_size);
+									AddCursorPos((button_size - CalcTextSize(label)) * 0.5f);
+									TextUnformatted(label);
+									PopFont();
+								}, false, true)) {
+									s_file_mru.insert(SystemStaging::file_image.path());
+									if (auto* system = candidate.system_hook->construct_core()) {
+										if (replace) { unload_system_instance(); }
+										insert_system_instance(system);
+										s_close_modal();
+									} else {
+										blog.error("Failed to construct instance for '{}'",
+											candidate.get_descriptor()->system_pretty_name);
+									}
+								}
+								EndDisabled();
+							};
+
+							if (is_expanded) {
+								AddCursorPosX(padding.x);
+								action_button("New Instance", half_button_size, false);
+								SameLine();
+								BeginDisabled(m_systems.empty());
+								action_button("Replace Instance", half_button_size, true);
+								EndDisabled();
+							}
+						}, is_expanded, !is_expanded)) {
+							s_pending_system = &candidate;
+							SetScrollFromPosY(GetItemRectMin().y
+								- GetWindowPos().y, 0.5f);
 						}
-					}, is_expanded, !is_expanded)) {
-						pending_system = &candidate;
+						PopID();
 					}
-					PopID();
 				}
 			}
 
