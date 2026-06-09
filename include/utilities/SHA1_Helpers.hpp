@@ -137,7 +137,6 @@ class SHA1_ThreadedWidget {
 		if (thread.joinable()) {
 			thread.request_stop();
 			thread.join();
-			busy.store(false, relaxed);
 		}
 	}
 
@@ -196,8 +195,7 @@ public:
 			while (!token.stop_requested()) {
 				if (auto hash = stream.advance(data)) {
 					on_done(std::move(*hash));
-					busy.store(false, relaxed);
-					return;
+					break;
 				}
 				on_step(stream.progress());
 			}
