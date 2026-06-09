@@ -401,6 +401,13 @@ namespace ImGui {
 		const auto height = GetTextLineHeight();
 		PopFont(); return height;
 	}
+
+	float GetFrameWidth(const char* text) {
+		return CalcTextSize(text).x + GetStyle().FramePadding.x * 2.0f;
+	}
+	float GetFrameWidthWithSpacing(const char* text) {
+		return GetFrameWidth(text) + GetStyle().ItemSpacing.x;
+	}
 }
 
 /*==================================================================*/

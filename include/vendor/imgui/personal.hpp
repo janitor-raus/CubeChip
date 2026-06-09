@@ -183,6 +183,9 @@ namespace ImGui {
 	bool BeginInertChild(const char* id, const ImVec2& size);
 
 	float CalcFontHeight(float size, ImFont* font = nullptr);
+
+	float GetFrameWidth(const char* text);
+	float GetFrameWidthWithSpacing(const char* text);
 }
 
 /*==================================================================*/
