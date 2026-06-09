@@ -24,7 +24,9 @@ IFamily_CHIP8::IFamily_CHIP8(std::size_t W, std::size_t H) noexcept
 
 	m_audio_device.init_stream(0, 1);
 	m_audio_device.resume();
+}
 
+void IFamily_CHIP8::initialize_family() noexcept {
 	if (calc_file_image_sha1()) {
 		if (auto* path = add_system_path("savestate", family_name)) {
 			m_savestate_path = (fs::Path(*path) / m_file_sha1_hash).string();

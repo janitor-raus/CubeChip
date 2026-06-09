@@ -57,6 +57,9 @@ protected:
 	IFamily_BYTEPUSHER(std::size_t W, std::size_t H) noexcept;
 	virtual u32 get_program_counter() const noexcept = 0;
 
+private:
+	void initialize_family() noexcept override final;
+
 public:
 	void main_system_loop() override;
 

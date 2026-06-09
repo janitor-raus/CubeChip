@@ -37,7 +37,9 @@ ISystemEmu::ISystemEmu(std::string_view window_name) noexcept
 
 void ISystemEmu::start_workers() noexcept {
 	if (!m_system_thread.joinable()) {
+		initialize_family();
 		initialize_system();
+
 		m_system_thread = Thread([&](StopToken token) noexcept {
 			SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 			thread_affinity::set_affinity(~0b11ull);
@@ -99,7 +101,7 @@ bool ISystemEmu::calc_file_image_sha1() noexcept {
 		return true;
 	} else {
 		if (m_file_image.valid()) {
-			m_file_sha1_hash = SHA1::from_span(m_file_image);
+			m_file_sha1_hash = SHA1::from(m_file_image);
 			blog.info("SHA1: {}", m_file_sha1_hash);
 			return true;
 		} else {

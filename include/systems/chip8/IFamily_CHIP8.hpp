@@ -295,6 +295,9 @@ protected:
 protected:
 	IFamily_CHIP8(std::size_t W, std::size_t H) noexcept;
 
+private:
+	void initialize_family() noexcept override final;
+
 public:
 	void main_system_loop() override final;
 

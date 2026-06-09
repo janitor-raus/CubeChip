@@ -194,6 +194,7 @@ protected:
 
 protected:
 	virtual void main_system_loop() = 0;
+	virtual void initialize_family() noexcept = 0;
 	virtual void initialize_system() noexcept = 0;
 
 protected:

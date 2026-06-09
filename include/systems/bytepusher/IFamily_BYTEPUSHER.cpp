@@ -21,7 +21,9 @@ IFamily_BYTEPUSHER::IFamily_BYTEPUSHER(std::size_t W, std::size_t H) noexcept
 {
 	prepare_user_interface();
 	load_preset_binds();
+}
 
+void IFamily_BYTEPUSHER::initialize_family() noexcept {
 	if (calc_file_image_sha1()) {
 		if (auto* path = add_system_path("savestate", family_name)) {
 			m_savestate_path = (fs::Path(*path) / m_file_sha1_hash).string();

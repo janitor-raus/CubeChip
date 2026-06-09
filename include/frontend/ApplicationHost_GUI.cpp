@@ -19,7 +19,7 @@
 #include "Millis.hpp"
 #include "ColorOps.hpp"
 #include "Thread.hpp"
-#include "SHA1.hpp"
+#include "SHA1_Helpers.hpp"
 
 #include <imgui.h>
 #include <filesystem>
@@ -521,7 +521,8 @@ void ApplicationHost::setup_gui_callables() noexcept {
 		if (!SystemStaging::file_image.valid()) { return; }
 
 		static bool s_render_modal = false;
-		static std::atomic_bool s_calculating_sha1{};
+
+		static SHA1_ThreadedWidget s_sha1_widget;
 
 		static CandidateList::ListState s_list_state;
 		static const CandidateList::System* chosen_system = nullptr;
@@ -531,15 +532,17 @@ void ApplicationHost::setup_gui_callables() noexcept {
 		const auto scaling = UserInterface::get_ui_total_scaling();
 
 		static auto s_close_modal = []() noexcept {
+			s_sha1_widget.reset();
+			s_render_modal = false;
 			SystemStaging::clear();
 			CloseCurrentPopup();
-			s_render_modal = false;
 		};
 
 		if (!s_render_modal) {
 			s_render_modal = true;
 			s_list_state.refresh_candidates();
 
+			s_sha1_widget.setup(SystemStaging::file_image.size());
 			s_scroll_state.set_speed(128.0f * scaling);
 
 			pending_system = s_list_state.best_match;
@@ -578,20 +581,27 @@ void ApplicationHost::setup_gui_callables() noexcept {
 			Separator();
 
 			if (SystemStaging::sha1_hash.empty()) {
-				BeginDisabled(s_calculating_sha1.load(mo::acquire));
-				if (Button("Calculate SHA1", ImVec2(scroll_area.x, 0.0f))) {
-					s_calculating_sha1.store(true, mo::release);
+				const auto sha1_button_size = ImVec2(scroll_area.x, 0.0f);
+				if (s_sha1_widget.running()) {
+					const auto progress = s_sha1_widget.progress();
+					const auto percentage = fmt::format("{:.1f}%###pc", progress * 100.0f);
 
-					// XXX - This could very well be a huge issue if attempted on large files.
-					//       Since we don't have a progress tracker or a way to stop an
-					//       ongoing hash, we could easily freeze the thread for a long time!
-					Thread([]() noexcept {
-						SystemStaging::sha1_hash = SHA1::from_span(SystemStaging::file_image);
-						blog.info("SHA1: {}", SystemStaging::sha1_hash);
-						s_calculating_sha1.store(false, mo::release);
-					}).detach();
+					constexpr static auto button_label = "Cancel";
+
+					const auto cancel_button_size = ImVec2(GetFrameWidth(button_label), 0.0f);
+					if (Button(button_label, cancel_button_size)) { s_sha1_widget.reset(); }
+					SameLine();
+					const auto progress_bar_size = ImVec2(GetContentRegionAvail().x, GetFrameHeight());
+					ProgressBar(progress, progress_bar_size, percentage.c_str());
 				}
-				EndDisabled();
+				else {
+					if (Button("Calculate SHA1", ImVec2(scroll_area.x, 0.0f))) {
+						s_sha1_widget.start(SystemStaging::file_image.data(), [](auto&& hash) noexcept {
+							SystemStaging::sha1_hash = std::move(hash);
+							blog.info("SHA1: {}", SystemStaging::sha1_hash);
+						});
+					}
+				}
 			} else {
 				AlignTextToFramePadding();
 				AddCursorPosX((scroll_area.x - CalcTextSize(
@@ -616,6 +626,11 @@ void ApplicationHost::setup_gui_callables() noexcept {
 				CalcFontHeight(half_button_font_size) + padding.y * 2.0f
 			);
 
+			if (pending_system) {
+				chosen_system = pending_system;
+				pending_system = nullptr;
+			}
+
 			for (auto& group : s_list_state.families) {
 				PushStyleVarY(ImGuiStyleVar_ItemSpacing, 0.0f);
 				// Family name
@@ -636,11 +651,6 @@ void ApplicationHost::setup_gui_callables() noexcept {
 
 				DummyY(padding.y * 2.0f);
 				PopStyleVar();
-
-				if (pending_system) {
-					chosen_system = pending_system;
-					pending_system = nullptr;
-				}
 
 				for (auto& candidate : group.systems) {
 					const bool is_expanded = chosen_system == &candidate;
