@@ -78,6 +78,7 @@ set(UTILITIES_HEADERS
 	"${PROJECT_INCLUDE_DIR}/utilities/PathGetters.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/SettingWrapper.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/SHA1.hpp"
+	"${PROJECT_INCLUDE_DIR}/utilities/SHA1_Helpers.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/SimpleFileIO.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/StringJoin.hpp"
 	"${PROJECT_INCLUDE_DIR}/utilities/ThreadAffinity.hpp"
