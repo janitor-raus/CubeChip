@@ -131,6 +131,7 @@ if(MSVC)
 
 	target_compile_options(
 		"${PROJECT_NAME}" PRIVATE
+		$<$<CXX_COMPILER_ID:MSVC>:/Zc:__cplusplus>
 		$<$<CONFIG:Release>: /W4 /MP /utf-8 /O2 /Ob2 /Oi /Ot /Zi /GT /GL>
 		$<$<CONFIG:Debug>: /W4 /MP /utf-8 /Od /Zi /RTC1>
 	)
