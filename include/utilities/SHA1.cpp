@@ -8,14 +8,26 @@
 */
 
 #include "SHA1.hpp"
-
-#include <bit>
 #include <algorithm>
 
 /*==================================================================*/
 
+#if __has_include(<bit>)
+#include <bit>
+#endif
+
+static constexpr std::uint32_t rotl(std::uint32_t value, std::uint32_t rotation) noexcept {
+#if __has_include(<bit>)
+	return std::rotl(value, rotation);
+#else
+	return (value << rotation) | (value >> (32 - rotation));
+#endif
+}
+
+/*==================================================================*/
+
 static constexpr std::uint32_t block_mix(std::uint32_t* block, std::size_t i) noexcept {
-	return std::rotl(
+	return rotl(
 		block[(i + 0xD) & 0xF] ^
 		block[(i + 0x8) & 0xF] ^
 		block[(i + 0x2) & 0xF] ^
@@ -31,8 +43,8 @@ static constexpr void R0(
 	std::uint32_t v, std::uint32_t& w, std::uint32_t x,
 	std::uint32_t y, std::uint32_t& z, std::size_t i
 ) noexcept {
-	z += ((w & (x ^ y)) ^ y) + block[i] + 0x5A827999 + std::rotl(v, 5);
-	w  = std::rotl(w, 30);
+	z += ((w & (x ^ y)) ^ y) + block[i] + 0x5A827999 + rotl(v, 5);
+	w  = rotl(w, 30);
 }
 
 static constexpr void R1(
@@ -41,8 +53,8 @@ static constexpr void R1(
 	std::uint32_t y, std::uint32_t& z, std::size_t i
 ) noexcept {
 	block[i] = block_mix(block, i);
-	z += ((w & (x ^ y)) ^ y) + block[i] + 0x5A827999 + std::rotl(v, 5);
-	w  = std::rotl(w, 30);
+	z += ((w & (x ^ y)) ^ y) + block[i] + 0x5A827999 + rotl(v, 5);
+	w  = rotl(w, 30);
 }
 
 static constexpr void R2(
@@ -51,8 +63,8 @@ static constexpr void R2(
 	std::uint32_t y, std::uint32_t& z, std::size_t i
 ) noexcept {
 	block[i] = block_mix(block, i);
-	z += (w ^ x ^ y) + block[i] + 0x6ED9EBA1 + std::rotl(v, 5);
-	w  = std::rotl(w, 30);
+	z += (w ^ x ^ y) + block[i] + 0x6ED9EBA1 + rotl(v, 5);
+	w  = rotl(w, 30);
 }
 
 static constexpr void R3(
@@ -61,8 +73,8 @@ static constexpr void R3(
 	std::uint32_t y, std::uint32_t& z, std::size_t i
 ) noexcept {
 	block[i] = block_mix(block, i);
-	z += (((w | x) & y) | (w & x)) + block[i] + 0x8F1BBCDC + std::rotl(v, 5);
-	w  = std::rotl(w, 30);
+	z += (((w | x) & y) | (w & x)) + block[i] + 0x8F1BBCDC + rotl(v, 5);
+	w  = rotl(w, 30);
 }
 
 static constexpr void R4(
@@ -71,8 +83,8 @@ static constexpr void R4(
 	std::uint32_t y, std::uint32_t& z, std::size_t i
 ) noexcept {
 	block[i] = block_mix(block, i);
-	z += (w ^ x ^ y) + block[i] + 0xCA62C1D6 + std::rotl(v, 5);
-	w  = std::rotl(w, 30);
+	z += (w ^ x ^ y) + block[i] + 0xCA62C1D6 + rotl(v, 5);
+	w  = rotl(w, 30);
 }
 
 /*==================================================================*/
@@ -118,15 +130,13 @@ constexpr void SHA1::transform(std::uint32_t* block) noexcept {
 	++m_transforms;
 }
 
-// Hash a single 512-bit block
-constexpr void SHA1::buffer_to_block(std::uint32_t* block) noexcept {
-
-	// convert the string (byte buffer) to a u32 array (MSB)
+constexpr void SHA1::bytes_to_block(std::uint32_t* block, const char* src) noexcept {
+	// read bytes as byteswapped ints
 	for (auto i = 0u; i < c_block_size; ++i) {
-		block[i] = (m_buffer[4 * i + 3] & 0xFF)
-				 | (m_buffer[4 * i + 2] & 0xFF) <<  8
-				 | (m_buffer[4 * i + 1] & 0xFF) << 16
-				 | (m_buffer[4 * i + 0] & 0xFF) << 24;
+		block[i] = (src[4 * i + 3] & 0xFF)
+				 | (src[4 * i + 2] & 0xFF) <<  8
+				 | (src[4 * i + 1] & 0xFF) << 16
+				 | (src[4 * i + 0] & 0xFF) << 24;
 	}
 }
 
@@ -137,49 +147,62 @@ void SHA1::reset() noexcept {
 	m_digest[3] = 0x10325476u;
 	m_digest[4] = 0xC3D2E1F0u;
 
-	m_buffer.fill('\0');
-	m_transforms = m_buf_offset = 0;
+	std::fill_n(m_buffer, c_buffer_size, '\x00');
+	m_transforms = m_tail_size = 0;
 }
 
 void SHA1::update(const char* data_pointer, std::size_t byte_count) noexcept {
-	while (byte_count > 0) {
+	// if the buffer is partially filled, top it up first
+	if (m_tail_size > 0) {
 		const auto chunk_size = std::uint32_t(std::min(
-			c_block_bytes - m_buf_offset, byte_count));
+			c_block_bytes - m_tail_size, byte_count));
 
 		std::copy(data_pointer, data_pointer + chunk_size,
-			m_buffer.data() + m_buf_offset);
+			m_buffer + m_tail_size);
 
-		m_buf_offset += chunk_size;
+		m_tail_size  += chunk_size;
 		data_pointer += chunk_size;
 		byte_count   -= chunk_size;
 
-		if (m_buf_offset == c_block_bytes) {
-			std::uint32_t block_array[c_block_size]{};
-			buffer_to_block(block_array);
+		if (m_tail_size == c_block_bytes) {
+			std::uint32_t block_array[c_block_size];
+			bytes_to_block(block_array, m_buffer);
 			transform(block_array);
-			m_buf_offset = 0;
+			m_tail_size = 0;
 		}
+	}
+
+	// process full blocks directly from the input — no copy
+	while (byte_count >= c_block_bytes) {
+		std::uint32_t block_array[c_block_size];
+		bytes_to_block(block_array, data_pointer);
+		transform(block_array);
+		data_pointer += c_block_bytes;
+		byte_count   -= c_block_bytes;
+	}
+
+	// stash any remaining partial block in the buffer
+	if (byte_count > 0) {
+		std::copy(data_pointer, data_pointer + byte_count, m_buffer);
+		m_tail_size = std::uint32_t(byte_count);
 	}
 }
 
 std::string SHA1::final() noexcept {
 	const auto total_hashed_bits =
-		8 * (m_transforms * c_block_bytes + m_buf_offset);
+		8 * (m_transforms * c_block_bytes + m_tail_size);
 
-	// insert message end bit, then pad with
-	// zeroes until the end of the block
-	m_buffer[m_buf_offset++] = '\x80';
-	const auto buffer_size = m_buf_offset;
+	// insert message end bit, then pad to end of block with zeroes
+	m_buffer[m_tail_size++] = '\x80';
 
-	while (m_buf_offset < c_block_bytes) {
-		m_buffer[m_buf_offset++] = '\x00';
-	}
+	std::fill(m_buffer + m_tail_size,
+		m_buffer + c_buffer_size, '\x00');
 
 	// process the final block
-	std::uint32_t block_array[c_block_size]{};
-	buffer_to_block(block_array);
+	std::uint32_t block_array[c_block_size];
+	bytes_to_block(block_array, m_buffer);
 
-	if (buffer_size > c_block_bytes - 8) {
+	if (m_tail_size > c_block_bytes - 8) {
 		transform(block_array);
 		for (auto i = 0u; i < c_block_size - 2; ++i) {
 			block_array[i] = 0;
@@ -192,9 +215,9 @@ std::string SHA1::final() noexcept {
 	transform(block_array);
 
 	// convert digest[] to a string
-	std::string result(40, '\0');
+	std::string result(40, '\x00');
 	constexpr auto c_hex = "0123456789abcdef";
-	for (auto i = 0u; i < std::size(m_digest); ++i) {
+	for (auto i = 0u; i < c_digest_size; ++i) {
 		for (auto j = 0u; j < 8; ++j) {
 			result[i * 8 + j] = c_hex[(m_digest[i] >> (28 - j * 4)) & 0xF];
 		}

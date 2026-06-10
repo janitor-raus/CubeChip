@@ -11,19 +11,25 @@
 
 #include <cstdint>
 #include <string>
-#include <array>
+
+#if __has_include(<span>)
 #include <span>
+#endif
 
 /*==================================================================*/
 
 class SHA1 {
-	std::array<char, 64> m_buffer{};
-	std::uint32_t m_digest[5]{};
-	std::uint32_t m_buf_offset = 0;
+	static constexpr auto c_buffer_size = 64u;
+	static constexpr auto c_digest_size =  5u;
+
+	char          m_buffer[c_buffer_size]{};
+	std::uint32_t m_digest[c_digest_size]{};
+
+	std::uint32_t m_tail_size  = 0;
 	std::uint64_t m_transforms = 0;
 
 	constexpr void transform(std::uint32_t* block) noexcept;
-	constexpr void buffer_to_block(std::uint32_t* block) noexcept;
+	constexpr void bytes_to_block(std::uint32_t* block, const char* src) noexcept;
 
 public:
 	static constexpr auto c_block_size  = 16u; // number of 32-bit integers per SHA1 block
@@ -44,7 +50,9 @@ public:
 		return checksum.final();
 	}
 
+#if __has_include(<span>)
 	static std::string from(std::span<const char> file_span) noexcept {
 		return from(file_span.data(), file_span.size());
 	}
+#endif
 };
