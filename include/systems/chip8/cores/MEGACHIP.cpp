@@ -820,7 +820,7 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 				// MEGACHIP preserves Y progression into hidden 192..255 space
 				// before wrapping back to 0. Drawing must continue to advance true_y
 				// even if it's out of bounds, but skip drawing until it wraps.
-				if (true_y >= c_sys_screen_H) { continue; }
+				if (true_y >= c_sys_screen_H) { ++true_y &= (c_sys_screen_W - 1); continue; }
 			}
 
 			auto* collision_row = &m_collision_map(0, true_y);
@@ -846,7 +846,7 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 				else { if (++true_x == c_sys_screen_W) { break; } }
 			}
 
-			if constexpr (wrap_sprites) { ++true_y %= c_sys_screen_H; }
+			if constexpr (wrap_sprites) { ++true_y &= (c_sys_screen_W - 1); }
 			else { if (++true_y == c_sys_screen_H) { break; } }
 		}
 	}
