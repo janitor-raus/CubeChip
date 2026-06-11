@@ -12,6 +12,30 @@
 
 /*==================================================================*/
 
+#ifdef SHA1_HW_SUPPORT
+	#if defined(_MSC_VER)
+		#include <intrin.h>   // for __cpuidex
+	#endif
+	#include <immintrin.h>
+#endif
+
+#ifdef SHA1_HW_SUPPORT
+static bool sha1_ni_supported() noexcept {
+	static const bool result = []() noexcept {
+	#if defined(_MSC_VER)
+		int info[4]{};
+		__cpuidex(info, 7, 0);
+		return bool((info[1] >> 29) & 1);
+	#else
+		return __builtin_cpu_supports("sha");
+	#endif
+	}();
+	return result;
+}
+#endif
+
+/*==================================================================*/
+
 #if __has_include(<bit>)
 #include <bit>
 #endif
@@ -32,6 +56,16 @@ static constexpr std::uint32_t block_mix(std::uint32_t* block, std::size_t i) no
 		block[(i + 0x8) & 0xF] ^
 		block[(i + 0x2) & 0xF] ^
 		block[(i + 0x0) & 0xF], 1);
+}
+
+constexpr static void bytes_to_block(std::uint32_t* block, const char* src) noexcept {
+	// read quartets of bytes as Big Endian
+	for (auto i = 0u; i < SHA1::c_block_size; ++i) {
+		block[i] = (src[4 * i + 3] & 0xFF)
+				 | (src[4 * i + 2] & 0xFF) <<  8
+				 | (src[4 * i + 1] & 0xFF) << 16
+				 | (src[4 * i + 0] & 0xFF) << 24;
+	}
 }
 
 /*------------------------------------------------------------------*/
@@ -89,8 +123,7 @@ static constexpr void R4(
 
 /*==================================================================*/
 
-constexpr void SHA1::transform(std::uint32_t* block) noexcept {
-	// copy digest[] to working vars
+void SHA1::transform_scalar(std::uint32_t* block) noexcept {
 	auto a = m_digest[0];
 	auto b = m_digest[1];
 	auto c = m_digest[2];
@@ -119,25 +152,207 @@ constexpr void SHA1::transform(std::uint32_t* block) noexcept {
 	R4(block, d, e, a, b, c,  8); R4(block, c, d, e, a, b,  9); R4(block, b, c, d, e, a, 10); R4(block, a, b, c, d, e, 11);
 	R4(block, e, a, b, c, d, 12); R4(block, d, e, a, b, c, 13); R4(block, c, d, e, a, b, 14); R4(block, b, c, d, e, a, 15);
 
-	// add the working vars back into digest[]
 	m_digest[0] += a;
 	m_digest[1] += b;
 	m_digest[2] += c;
 	m_digest[3] += d;
 	m_digest[4] += e;
 
-	// count the number of transformations
 	++m_transforms;
 }
 
-constexpr void SHA1::bytes_to_block(std::uint32_t* block, const char* src) noexcept {
-	// read bytes as byteswapped ints
-	for (auto i = 0u; i < c_block_size; ++i) {
-		block[i] = (src[4 * i + 3] & 0xFF)
-				 | (src[4 * i + 2] & 0xFF) <<  8
-				 | (src[4 * i + 1] & 0xFF) << 16
-				 | (src[4 * i + 0] & 0xFF) << 24;
+/*==================================================================*/
+
+#ifdef SHA1_HW_SUPPORT
+void SHA1::transform_ni(std::uint32_t* block) noexcept {
+	__m128i abcd, abcd_save, e0, e0_save, e1;
+	__m128i msg0, msg1, msg2, msg3;
+
+	// Load state. m_digest[] is [A,B,C,D] as uint32_t in memory order, so after loading:
+	// bits[31:0]=A ... bits[127:96]=D. SHA-NI wants A at bits[127:96], so reverse word order.
+	abcd = _mm_shuffle_epi32(_mm_loadu_si128(reinterpret_cast<const __m128i*>(m_digest)), 0x1B);
+	e0 = _mm_set_epi32(std::int32_t(m_digest[4]), 0, 0, 0);
+
+	abcd_save = abcd;
+	e0_save   = e0;
+
+	// Load message words. block[] already holds correct SHA-1 word values as uint32_t,
+	// so only a word-order reversal is needed to place W[0] at bits[127:96].
+	msg0 = _mm_shuffle_epi32(_mm_loadu_si128(reinterpret_cast<const __m128i*>(&block[ 0])), 0x1B);
+	msg1 = _mm_shuffle_epi32(_mm_loadu_si128(reinterpret_cast<const __m128i*>(&block[ 4])), 0x1B);
+	msg2 = _mm_shuffle_epi32(_mm_loadu_si128(reinterpret_cast<const __m128i*>(&block[ 8])), 0x1B);
+	msg3 = _mm_shuffle_epi32(_mm_loadu_si128(reinterpret_cast<const __m128i*>(&block[12])), 0x1B);
+
+	// Rounds 0-3
+	e0   = _mm_add_epi32(e0, msg0);
+	e1   = abcd;
+	abcd = _mm_sha1rnds4_epu32(abcd, e0,   0);
+
+	// Rounds 4-7
+	e1   = _mm_sha1nexte_epu32(e1,   msg1);
+	e0   = abcd;
+	abcd = _mm_sha1rnds4_epu32(abcd, e1,   0);
+	msg0 = _mm_sha1msg1_epu32(msg0, msg1);
+
+	// Rounds 8-11
+	e0   = _mm_sha1nexte_epu32(e0,   msg2);
+	e1   = abcd;
+	abcd = _mm_sha1rnds4_epu32(abcd, e0,   0);
+	msg1 = _mm_sha1msg1_epu32(msg1, msg2);
+	msg0 = _mm_xor_si128(msg0, msg2);
+
+	// Rounds 12-15
+	e1   = _mm_sha1nexte_epu32(e1,   msg3);
+	e0   = abcd;
+	msg0 = _mm_sha1msg2_epu32(msg0, msg3);
+	abcd = _mm_sha1rnds4_epu32(abcd, e1,   0);
+	msg2 = _mm_sha1msg1_epu32(msg2, msg3);
+	msg1 = _mm_xor_si128(msg1, msg3);
+
+	// Rounds 16-19
+	e0   = _mm_sha1nexte_epu32(e0,   msg0);
+	e1   = abcd;
+	msg1 = _mm_sha1msg2_epu32(msg1, msg0);
+	abcd = _mm_sha1rnds4_epu32(abcd, e0,   0);
+	msg3 = _mm_sha1msg1_epu32(msg3, msg0);
+	msg2 = _mm_xor_si128(msg2, msg0);
+
+	// Rounds 20-23
+	e1   = _mm_sha1nexte_epu32(e1,   msg1);
+	e0   = abcd;
+	msg2 = _mm_sha1msg2_epu32(msg2, msg1);
+	abcd = _mm_sha1rnds4_epu32(abcd, e1,   1);
+	msg0 = _mm_sha1msg1_epu32(msg0, msg1);
+	msg3 = _mm_xor_si128(msg3, msg1);
+
+	// Rounds 24-27
+	e0   = _mm_sha1nexte_epu32(e0,   msg2);
+	e1   = abcd;
+	msg3 = _mm_sha1msg2_epu32(msg3, msg2);
+	abcd = _mm_sha1rnds4_epu32(abcd, e0,   1);
+	msg1 = _mm_sha1msg1_epu32(msg1, msg2);
+	msg0 = _mm_xor_si128(msg0, msg2);
+
+	// Rounds 28-31
+	e1   = _mm_sha1nexte_epu32(e1,   msg3);
+	e0   = abcd;
+	msg0 = _mm_sha1msg2_epu32(msg0, msg3);
+	abcd = _mm_sha1rnds4_epu32(abcd, e1,   1);
+	msg2 = _mm_sha1msg1_epu32(msg2, msg3);
+	msg1 = _mm_xor_si128(msg1, msg3);
+
+	// Rounds 32-35
+	e0   = _mm_sha1nexte_epu32(e0,   msg0);
+	e1   = abcd;
+	msg1 = _mm_sha1msg2_epu32(msg1, msg0);
+	abcd = _mm_sha1rnds4_epu32(abcd, e0,   1);
+	msg3 = _mm_sha1msg1_epu32(msg3, msg0);
+	msg2 = _mm_xor_si128(msg2, msg0);
+
+	// Rounds 36-39
+	e1   = _mm_sha1nexte_epu32(e1,   msg1);
+	e0   = abcd;
+	msg2 = _mm_sha1msg2_epu32(msg2, msg1);
+	abcd = _mm_sha1rnds4_epu32(abcd, e1,   1);
+	msg0 = _mm_sha1msg1_epu32(msg0, msg1);
+	msg3 = _mm_xor_si128(msg3, msg1);
+
+	// Rounds 40-43
+	e0   = _mm_sha1nexte_epu32(e0,   msg2);
+	e1   = abcd;
+	msg3 = _mm_sha1msg2_epu32(msg3, msg2);
+	abcd = _mm_sha1rnds4_epu32(abcd, e0,   2);
+	msg1 = _mm_sha1msg1_epu32(msg1, msg2);
+	msg0 = _mm_xor_si128(msg0, msg2);
+
+	// Rounds 44-47
+	e1   = _mm_sha1nexte_epu32(e1,   msg3);
+	e0   = abcd;
+	msg0 = _mm_sha1msg2_epu32(msg0, msg3);
+	abcd = _mm_sha1rnds4_epu32(abcd, e1,   2);
+	msg2 = _mm_sha1msg1_epu32(msg2, msg3);
+	msg1 = _mm_xor_si128(msg1, msg3);
+
+	// Rounds 48-51
+	e0   = _mm_sha1nexte_epu32(e0,   msg0);
+	e1   = abcd;
+	msg1 = _mm_sha1msg2_epu32(msg1, msg0);
+	abcd = _mm_sha1rnds4_epu32(abcd, e0,   2);
+	msg3 = _mm_sha1msg1_epu32(msg3, msg0);
+	msg2 = _mm_xor_si128(msg2, msg0);
+
+	// Rounds 52-55
+	e1   = _mm_sha1nexte_epu32(e1,   msg1);
+	e0   = abcd;
+	msg2 = _mm_sha1msg2_epu32(msg2, msg1);
+	abcd = _mm_sha1rnds4_epu32(abcd, e1,   2);
+	msg0 = _mm_sha1msg1_epu32(msg0, msg1);
+	msg3 = _mm_xor_si128(msg3, msg1);
+
+	// Rounds 56-59
+	e0   = _mm_sha1nexte_epu32(e0,   msg2);
+	e1   = abcd;
+	msg3 = _mm_sha1msg2_epu32(msg3, msg2);
+	abcd = _mm_sha1rnds4_epu32(abcd, e0,   2);
+	msg1 = _mm_sha1msg1_epu32(msg1, msg2);
+	msg0 = _mm_xor_si128(msg0, msg2);
+
+	// Rounds 60-63
+	e1   = _mm_sha1nexte_epu32(e1,   msg3);
+	e0   = abcd;
+	msg0 = _mm_sha1msg2_epu32(msg0, msg3);
+	abcd = _mm_sha1rnds4_epu32(abcd, e1,   3);
+	msg2 = _mm_sha1msg1_epu32(msg2, msg3);
+	msg1 = _mm_xor_si128(msg1, msg3);
+
+	// Rounds 64-67
+	e0   = _mm_sha1nexte_epu32(e0,   msg0);
+	e1   = abcd;
+	msg1 = _mm_sha1msg2_epu32(msg1, msg0);
+	abcd = _mm_sha1rnds4_epu32(abcd, e0,   3);
+	msg3 = _mm_sha1msg1_epu32(msg3, msg0);
+	msg2 = _mm_xor_si128(msg2, msg0);
+
+	// Rounds 68-71
+	e1   = _mm_sha1nexte_epu32(e1,   msg1);
+	e0   = abcd;
+	msg2 = _mm_sha1msg2_epu32(msg2, msg1);
+	abcd = _mm_sha1rnds4_epu32(abcd, e1,   3);
+	msg3 = _mm_xor_si128(msg3, msg1);
+
+	// Rounds 72-75
+	e0   = _mm_sha1nexte_epu32(e0,   msg2);
+	e1   = abcd;
+	msg3 = _mm_sha1msg2_epu32(msg3, msg2);
+	abcd = _mm_sha1rnds4_epu32(abcd, e0,   3);
+
+	// Rounds 76-79
+	e1   = _mm_sha1nexte_epu32(e1,   msg3);
+	e0   = abcd;
+	abcd = _mm_sha1rnds4_epu32(abcd, e1,   3);
+
+	// Accumulate state
+	e0   = _mm_sha1nexte_epu32(e0, e0_save);
+	abcd = _mm_add_epi32(abcd, abcd_save);
+
+	// Store state (reverse word order back to match m_digest[] layout)
+	_mm_storeu_si128(reinterpret_cast<__m128i*>(m_digest), _mm_shuffle_epi32(abcd, 0x1B));
+	m_digest[4] = std::uint32_t(_mm_extract_epi32(e0, 3));
+
+	++m_transforms;
+}
+#endif
+
+/*==================================================================*/
+
+void SHA1::transform(std::uint32_t* block) noexcept {
+#ifdef SHA1_HW_SUPPORT
+	if (sha1_ni_supported()) {
+		transform_ni(block);
+		return;
 	}
+#endif
+	transform_scalar(block);
 }
 
 void SHA1::reset() noexcept {

@@ -16,6 +16,10 @@
 #include <span>
 #endif
 
+#if defined(__SHA__) || defined(_MSC_VER)
+	#define SHA1_HW_SUPPORT
+#endif
+
 /*==================================================================*/
 
 class SHA1 {
@@ -28,8 +32,11 @@ class SHA1 {
 	std::uint32_t m_tail_size  = 0;
 	std::uint64_t m_transforms = 0;
 
-	constexpr void transform(std::uint32_t* block) noexcept;
-	constexpr void bytes_to_block(std::uint32_t* block, const char* src) noexcept;
+	void transform(std::uint32_t* block) noexcept;
+	void transform_scalar(std::uint32_t* block) noexcept;
+#ifdef SHA1_HW_SUPPORT
+	void transform_ni(std::uint32_t* block) noexcept;
+#endif
 
 public:
 	static constexpr auto c_block_size  = 16u; // number of 32-bit integers per SHA1 block
