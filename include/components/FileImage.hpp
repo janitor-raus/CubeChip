@@ -8,7 +8,10 @@
 
 #include <memory>
 #include <string>
+
+#if __has_include(<span>)
 #include <span>
+#endif
 
 /*==================================================================*/
 
@@ -17,6 +20,8 @@ class FileImage {
 
 	std::unique_ptr<Context>
 		m_context{};
+
+	void async_unload() noexcept;
 
 public:
 	~FileImage() noexcept;
@@ -28,7 +33,10 @@ public:
 	FileImage(std::string file) noexcept;
 	FileImage(FileImage&& other) noexcept;
 
+#if __has_include(<span>)
 	auto span() const noexcept -> std::span<const char>;
+#endif
+
 	auto data() const noexcept -> const char*;
 	auto size() const noexcept -> std::size_t;
 	auto path() const noexcept -> std::string;
@@ -39,5 +47,8 @@ public:
 
 	operator bool()        const noexcept { return valid(); }
 	operator std::string() const noexcept { return path(); }
+
+#if __has_include(<span>)
 	operator std::span<const char>() const noexcept { return span(); }
+#endif
 };

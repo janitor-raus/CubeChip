@@ -5,9 +5,12 @@
 */
 
 #include <system_error>
+#include <thread>
 #include <utility>
 
 #include "FileImage.hpp"
+#include "EzMaths.hpp"
+
 #include "mio/mmap.hpp"
 
 /*==================================================================*/
@@ -26,6 +29,14 @@ struct FileImage::Context {
 	}
 };
 
+void FileImage::async_unload() noexcept {
+	static constexpr auto c_async_threshold = 32_MiB;
+	if (valid() && m_context->file_mmap.size() >= c_async_threshold) {
+		// throw-away thread to unload at its own time, doesn't block
+		std::thread([c = std::move(m_context)]() mutable {}).detach();
+	}
+}
+
 FileImage::~FileImage() noexcept = default;
 FileImage::FileImage() noexcept
 	: m_context(std::make_unique<Context>())
@@ -39,9 +50,11 @@ FileImage::FileImage(FileImage&& other) noexcept
 	: m_context(std::move(other.m_context))
 {}
 
+#if __has_include(<span>)
 auto FileImage::span() const noexcept -> std::span<const char> {
 	return std::span<const char>(data(), size());
 }
+#endif
 
 auto FileImage::data() const noexcept -> const char* {
 	return m_context ? m_context->file_mmap.data() : nullptr;
@@ -57,13 +70,14 @@ auto FileImage::path() const noexcept -> std::string {
 
 bool FileImage::load(std::string file) noexcept {
 	if (!m_context || m_context->file_path != file) {
+		async_unload();
 		m_context = std::make_unique<Context>(std::move(file));
 	}
 	return m_context->file_mmap.is_mapped();
 }
 
 void FileImage::clear() noexcept {
-	m_context = std::make_unique<Context>();
+	async_unload();
 }
 
 bool FileImage::valid() const noexcept {
