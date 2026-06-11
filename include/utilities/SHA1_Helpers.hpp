@@ -186,6 +186,7 @@ public:
 		std::invocable<float> OnStep
 	>
 	void start(const char* data, OnDone&& on_done, OnStep&& on_step) noexcept {
+		if (progress() > 1.0f) { reset(); }
 		busy.store(true, relaxed);
 
 		thread = Thread([ this, data,
