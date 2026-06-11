@@ -4,7 +4,8 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 	Adapted from public domain source code at:
-		https://github.com/vog/sha1/blob/master/sha1.hpp
+		1) https://github.com/vog/sha1/blob/master/sha1.hpp
+		2) https://github.com/noloader/SHA-Intrinsics/blob/master/sha1-x86.c
 */
 
 #include "SHA1.hpp"
@@ -24,8 +25,13 @@ static bool sha1_ni_supported() noexcept {
 	static const bool result = []() noexcept {
 	#if defined(_MSC_VER)
 		int info[4]{};
-		__cpuidex(info, 7, 0);
-		return bool((info[1] >> 29) & 1);
+		__cpuid(info, 0);
+		if (info[0] < 7) {
+			return false;
+		} else {
+			__cpuidex(info, 7, 0);
+			return bool((info[1] >> 29) & 1);
+		}
 	#else
 		return __builtin_cpu_supports("sha");
 	#endif
@@ -164,7 +170,7 @@ void SHA1::transform_scalar(std::uint32_t* block) noexcept {
 /*==================================================================*/
 
 #ifdef SHA1_HW_SUPPORT
-void SHA1::transform_ni(std::uint32_t* block) noexcept {
+void SHA1::transform_ni(const char* src) noexcept {
 	__m128i abcd, abcd_save, e0, e0_save, e1;
 	__m128i msg0, msg1, msg2, msg3;
 
@@ -176,12 +182,13 @@ void SHA1::transform_ni(std::uint32_t* block) noexcept {
 	abcd_save = abcd;
 	e0_save   = e0;
 
-	// Load message words. block[] already holds correct SHA-1 word values as uint32_t,
-	// so only a word-order reversal is needed to place W[0] at bits[127:96].
-	msg0 = _mm_shuffle_epi32(_mm_loadu_si128(reinterpret_cast<const __m128i*>(&block[ 0])), 0x1B);
-	msg1 = _mm_shuffle_epi32(_mm_loadu_si128(reinterpret_cast<const __m128i*>(&block[ 4])), 0x1B);
-	msg2 = _mm_shuffle_epi32(_mm_loadu_si128(reinterpret_cast<const __m128i*>(&block[ 8])), 0x1B);
-	msg3 = _mm_shuffle_epi32(_mm_loadu_si128(reinterpret_cast<const __m128i*>(&block[12])), 0x1B);
+	// Load message words from raw big-endian bytes. The mask performs a full 16-byte reversal:
+	// byteswap within each 32-bit word AND reverse word order, placing W[0] at bits[127:96].
+	const __m128i mask = _mm_set_epi8(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
+	msg0 = _mm_shuffle_epi8(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src +  0)), mask);
+	msg1 = _mm_shuffle_epi8(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src + 16)), mask);
+	msg2 = _mm_shuffle_epi8(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src + 32)), mask);
+	msg3 = _mm_shuffle_epi8(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src + 48)), mask);
 
 	// Rounds 0-3
 	e0   = _mm_add_epi32(e0, msg0);
@@ -345,13 +352,15 @@ void SHA1::transform_ni(std::uint32_t* block) noexcept {
 
 /*==================================================================*/
 
-void SHA1::transform(std::uint32_t* block) noexcept {
+void SHA1::transform(const char* src) noexcept {
 #ifdef SHA1_HW_SUPPORT
 	if (sha1_ni_supported()) {
-		transform_ni(block);
+		transform_ni(src);
 		return;
 	}
 #endif
+	std::uint32_t block[c_block_size];
+	bytes_to_block(block, src);
 	transform_scalar(block);
 }
 
@@ -380,18 +389,14 @@ void SHA1::update(const char* data_pointer, std::size_t byte_count) noexcept {
 		byte_count   -= chunk_size;
 
 		if (m_tail_size == c_block_bytes) {
-			std::uint32_t block_array[c_block_size];
-			bytes_to_block(block_array, m_buffer);
-			transform(block_array);
+			transform(m_buffer);
 			m_tail_size = 0;
 		}
 	}
 
 	// process full blocks directly from the input — no copy
 	while (byte_count >= c_block_bytes) {
-		std::uint32_t block_array[c_block_size];
-		bytes_to_block(block_array, data_pointer);
-		transform(block_array);
+		transform(data_pointer);
 		data_pointer += c_block_bytes;
 		byte_count   -= c_block_bytes;
 	}
@@ -413,21 +418,19 @@ std::string SHA1::final() noexcept {
 	std::fill(m_buffer + m_tail_size,
 		m_buffer + c_buffer_size, '\x00');
 
-	// process the final block
-	std::uint32_t block_array[c_block_size];
-	bytes_to_block(block_array, m_buffer);
-
 	if (m_tail_size > c_block_bytes - 8) {
-		transform(block_array);
-		for (auto i = 0u; i < c_block_size - 2; ++i) {
-			block_array[i] = 0;
-		}
+		transform(m_buffer);
+		std::fill_n(m_buffer, c_block_bytes - 8, '\x00');
 	}
 
-	// append total_hashed_bits, split this u64 into two u32
-	block_array[c_block_size - 1] = std::uint32_t(total_hashed_bits >>  0);
-	block_array[c_block_size - 2] = std::uint32_t(total_hashed_bits >> 32);
-	transform(block_array);
+	// append total_hashed_bits as a big-endian 64-bit integer at bytes [56..63]
+	const auto hi = std::uint32_t(total_hashed_bits >> 32);
+	const auto lo = std::uint32_t(total_hashed_bits >>  0);
+	m_buffer[56] = char(hi >> 24); m_buffer[57] = char(hi >> 16);
+	m_buffer[58] = char(hi >>  8); m_buffer[59] = char(hi >>  0);
+	m_buffer[60] = char(lo >> 24); m_buffer[61] = char(lo >> 16);
+	m_buffer[62] = char(lo >>  8); m_buffer[63] = char(lo >>  0);
+	transform(m_buffer);
 
 	// convert digest[] to a string
 	std::string result(40, '\x00');

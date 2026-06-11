@@ -4,7 +4,8 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 	Adapted from public domain source code at:
-		https://github.com/vog/sha1/blob/master/sha1.hpp
+		1) https://github.com/vog/sha1/blob/master/sha1.hpp
+		2) https://github.com/noloader/SHA-Intrinsics/blob/master/sha1-x86.c
 */
 
 #pragma once
@@ -16,7 +17,7 @@
 #include <span>
 #endif
 
-#if defined(__SHA__) || defined(_MSC_VER)
+#if defined(__SHA__) || (defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86)))
 	#define SHA1_HW_SUPPORT
 #endif
 
@@ -32,10 +33,10 @@ class SHA1 {
 	std::uint32_t m_tail_size  = 0;
 	std::uint64_t m_transforms = 0;
 
-	void transform(std::uint32_t* block) noexcept;
+	void transform(const char* src) noexcept;
 	void transform_scalar(std::uint32_t* block) noexcept;
 #ifdef SHA1_HW_SUPPORT
-	void transform_ni(std::uint32_t* block) noexcept;
+	void transform_ni(const char* src) noexcept;
 #endif
 
 public:
