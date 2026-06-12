@@ -38,18 +38,40 @@ void FileImage::replace_context(std::unique_ptr<Context> new_ctx) noexcept {
 	m_context = std::move(new_ctx);
 }
 
+/*==================================================================*/
+
 FileImage::~FileImage() noexcept = default;
 FileImage::FileImage() noexcept
-	: m_context(std::make_unique<Context>())
+	: m_context(nullptr)
 {}
 
 FileImage::FileImage(std::string file) noexcept
 	: m_context(std::make_unique<Context>(std::move(file)))
 {}
 
+FileImage::FileImage(const FileImage& other) noexcept
+	: m_context(std::make_unique<Context>(other.m_context->file_path))
+{}
+
+FileImage& FileImage::operator=(const FileImage& other) noexcept {
+	if (this != &other) {
+		load(other.path());
+	}
+	return *this;
+}
+
 FileImage::FileImage(FileImage&& other) noexcept
 	: m_context(std::move(other.m_context))
 {}
+
+FileImage& FileImage::operator=(FileImage&& other) noexcept {
+	if (this != &other) {
+		replace_context(std::move(other.m_context));
+	}
+	return *this;
+}
+
+/*==================================================================*/
 
 #if __has_include(<span>)
 auto FileImage::span() const noexcept -> std::span<const char> {
@@ -77,7 +99,7 @@ bool FileImage::load(std::string file) noexcept {
 }
 
 void FileImage::clear() noexcept {
-	replace_context(std::make_unique<Context>());
+	replace_context(nullptr);
 }
 
 bool FileImage::valid() const noexcept {

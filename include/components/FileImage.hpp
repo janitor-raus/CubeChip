@@ -27,11 +27,13 @@ public:
 	~FileImage() noexcept;
 	FileImage() noexcept;
 
-	FileImage(const FileImage&) = delete;
-	FileImage& operator=(const FileImage&) = delete;
-
 	FileImage(std::string file) noexcept;
+
+	FileImage(const FileImage&) noexcept;
+	FileImage& operator=(const FileImage&) noexcept;
+
 	FileImage(FileImage&& other) noexcept;
+	FileImage& operator=(FileImage&& other) noexcept;
 
 #if __has_include(<span>)
 	auto span() const noexcept -> std::span<const char>;
