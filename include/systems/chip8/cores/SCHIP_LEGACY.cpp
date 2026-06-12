@@ -464,14 +464,14 @@ void SCHIP_LEGACY::scroll_display_rt() noexcept {
 		if (!data) { return false; }
 		bool collided = false;
 
-		for (auto pos = 0u; pos < byte_w; ++pos) {
-			const auto true_x = x_begin + pos;
+		const auto cols = std::min(byte_w, c_sys_screen_W - x_begin);
+		auto* px_row = &m_display_map(x_begin, y_begin);
 
-			if (data >> (byte_w - 1 - pos) & 0x1) {
-				auto& pixel = m_display_map(true_x, y_begin);
-				if (!((pixel ^= 0x8) & 0x8)) { collided = true; }
+		for (auto col = 0u; col < cols; ++col) {
+			if (data >> (byte_w - 1 - col) & 0x1) {
+				collided |= !!(px_row[col] & 0x8);
+				px_row[col] ^= 0x8;
 			}
-			if (true_x == (c_sys_screen_W - 1)) { return collided; }
 		}
 		return collided;
 	}
@@ -480,22 +480,19 @@ void SCHIP_LEGACY::scroll_display_rt() noexcept {
 		u32 x_begin, u32 y_begin,
 		u32 byte_w,  u32 data
 	) noexcept {
-		if (!data) { return false; }
 		bool collided = false;
 
-		for (auto pos = 0u; pos < byte_w; ++pos) {
-			const auto true_x = x_begin + pos;
+		const auto cols = std::min(byte_w, c_sys_screen_W - x_begin);
+		auto* up_row = &m_display_map(x_begin, y_begin + 0);
+		auto* dn_row = &m_display_map(x_begin, y_begin + 1);
 
-			auto& up_pixel = m_display_map(true_x, y_begin + 0);
-			auto& dn_pixel = m_display_map(true_x, y_begin + 1);
-
-			if (data >> (byte_w - 1 - pos) & 0x1) {
-				collided |= !!(up_pixel & 0x8);
-				dn_pixel = up_pixel ^= 0x8;
+		for (auto col = 0u; col < cols; ++col) {
+			if (data >> (byte_w - 1 - col) & 0x1) {
+				collided |= !!(up_row[col] & 0x8);
+				dn_row[col] = up_row[col] ^= 0x8;
 			} else {
-				dn_pixel = up_pixel;
+				dn_row[col] = up_row[col];
 			}
-			if (true_x == (c_sys_screen_W - 1)) { return collided; }
 		}
 		return collided;
 	}

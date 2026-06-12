@@ -446,18 +446,19 @@ void MEGACHIP::flush_all_video_buffers(bool by_blending, bool and_advance) noexc
 
 void MEGACHIP::start_audio_track(bool repeat) noexcept {
 	if (m_audio_device) {
+		auto* track_src = &m_memory[m_register_I];
 
 		m_track.loop = repeat;
-		m_track.data = &m_memory[m_register_I + 6];
-		m_track.size = m_memory[m_register_I + 2] << 16
-					 | m_memory[m_register_I + 3] <<  8
-					 | m_memory[m_register_I + 4];
+		m_track.data = track_src + 6;
+		m_track.size = track_src[2] << 16
+					 | track_src[3] <<  8
+					 | track_src[4];
 
 		const bool oob = m_track.data + m_track.size > &m_memory.back();
 		if (!m_track.size || oob) { m_track.reset(); }
 		else {
 			m_voices[VOICE::UNIQUE].set_phase(0.0).set_step(
-				(m_memory[m_register_I + 0] << 8 | m_memory[m_register_I + 1]) \
+				(track_src[0] << 8 | track_src[1]) \
 				/ f64(m_track.size) / m_audio_device.get_freq());
 		}
 	}
@@ -571,13 +572,9 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 		::assign_cast_add(m_current_pc, 2);
 	}
 	void MEGACHIP::instruction_02NN(u32 NN) noexcept {
-		for (auto pos = 0u, byte = 0u; pos < NN; byte += 4) {
-			m_color_palette[++pos] = {
-				m_memory[m_register_I + byte + 1],
-				m_memory[m_register_I + byte + 2],
-				m_memory[m_register_I + byte + 3],
-				m_memory[m_register_I + byte + 0],
-			};
+		auto* src = &m_memory[m_register_I];
+		for (auto pos = 0u; pos < NN; src += 4) {
+			m_color_palette[++pos] = { src[1], src[2], src[3], src[0] };
 		}
 	}
 	void MEGACHIP::instruction_03NN(u32 NN) noexcept {
@@ -774,14 +771,14 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 		if (!data) { return false; }
 		bool collided = false;
 
-		for (auto pos = 0u; pos < byte_w; ++pos) {
-			const auto true_x = x_begin + pos;
+		const auto cols = std::min(byte_w, c_sys_screen_W - x_begin);
+		auto* px_row = &m_display_map(x_begin, y_begin);
 
-			if (data >> (byte_w - 1 - pos) & 0x1) {
-				auto& pixel = m_display_map(true_x, y_begin);
-				if (!((pixel ^= 0x8) & 0x8)) { collided = true; }
+		for (auto col = 0u; col < cols; ++col) {
+			if (data >> (byte_w - 1 - col) & 0x1) {
+				collided |= !!(px_row[col] & 0x8);
+				px_row[col] ^= 0x8;
 			}
-			if (true_x == (c_sys_screen_W/2 - 1)) { return collided; }
 		}
 		return collided;
 	}
@@ -790,22 +787,19 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 		u32 x_begin, u32 y_begin,
 		u32 byte_w,  u32 data
 	) noexcept {
-		if (!data) { return false; }
 		bool collided = false;
 
-		for (auto pos = 0u; pos < byte_w; ++pos) {
-			const auto true_x = x_begin + pos;
+		const auto cols = std::min(byte_w, (c_sys_screen_W/2) - x_begin);
+		auto* up_row = &m_display_map(x_begin, y_begin + 0);
+		auto* dn_row = &m_display_map(x_begin, y_begin + 1);
 
-			auto& up_pixel = m_display_map(true_x, y_begin + 0);
-			auto& dn_pixel = m_display_map(true_x, y_begin + 1);
-
-			if (data >> (byte_w - 1 - pos) & 0x1) {
-				collided |= !!(up_pixel & 0x8);
-				dn_pixel = up_pixel ^= 0x8;
+		for (auto col = 0u; col < cols; ++col) {
+			if (data >> (byte_w - 1 - col) & 0x1) {
+				collided |= !!(up_row[col] & 0x8);
+				dn_row[col] = up_row[col] ^= 0x8;
 			} else {
-				dn_pixel = up_pixel;
+				dn_row[col] = up_row[col];
 			}
-			if (true_x == (c_sys_screen_W/2 - 1)) { return collided; }
 		}
 		return collided;
 	}
