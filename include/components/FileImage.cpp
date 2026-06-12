@@ -29,12 +29,13 @@ struct FileImage::Context {
 	}
 };
 
-void FileImage::async_unload() noexcept {
+void FileImage::replace_context(std::unique_ptr<Context> new_ctx) noexcept {
 	static constexpr auto c_async_threshold = 32_MiB;
-	if (valid() && m_context->file_mmap.size() >= c_async_threshold) {
+	if (m_context && m_context->file_mmap.size() >= c_async_threshold) {
 		// throw-away thread to unload at its own time, doesn't block
 		std::thread([c = std::move(m_context)]() mutable {}).detach();
 	}
+	m_context = std::move(new_ctx);
 }
 
 FileImage::~FileImage() noexcept = default;
@@ -70,14 +71,13 @@ auto FileImage::path() const noexcept -> std::string {
 
 bool FileImage::load(std::string file) noexcept {
 	if (!m_context || m_context->file_path != file) {
-		async_unload();
-		m_context = std::make_unique<Context>(std::move(file));
+		replace_context(std::make_unique<Context>(std::move(file)));
 	}
 	return m_context->file_mmap.is_mapped();
 }
 
 void FileImage::clear() noexcept {
-	async_unload();
+	replace_context(std::make_unique<Context>());
 }
 
 bool FileImage::valid() const noexcept {

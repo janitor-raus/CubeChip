@@ -21,7 +21,7 @@ class FileImage {
 	std::unique_ptr<Context>
 		m_context{};
 
-	void async_unload() noexcept;
+	void replace_context(std::unique_ptr<Context> new_ctx) noexcept;
 
 public:
 	~FileImage() noexcept;
