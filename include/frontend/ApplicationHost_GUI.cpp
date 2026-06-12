@@ -520,7 +520,7 @@ void ApplicationHost::setup_gui_callables() noexcept {
 	[&]() noexcept {
 		if (!SystemStaging::file_image.valid()) { return; }
 
-		static bool s_render_modal = false;
+		static bool s_render_modal_open = false;
 		const auto  scaling = UserInterface::get_ui_total_scaling();
 
 		static CandidateList::ListState     s_list_state;
@@ -532,13 +532,13 @@ void ApplicationHost::setup_gui_callables() noexcept {
 
 		static auto s_close_modal = []() noexcept {
 			s_sha1_widget.reset();
-			s_render_modal = false;
+			s_render_modal_open = false;
 			SystemStaging::clear();
 			CloseCurrentPopup();
 		};
 
-		if (!s_render_modal) {
-			s_render_modal = true;
+		if (s_render_modal_open == false) {
+			s_render_modal_open = true;
 			s_list_state.refresh_candidates();
 
 			s_sha1_widget.setup(SystemStaging::file_image.size());
@@ -587,13 +587,18 @@ void ApplicationHost::setup_gui_callables() noexcept {
 					constexpr static auto button_label = "Cancel";
 
 					const auto cancel_button_size = ImVec2(GetFrameWidth(button_label), 0.0f);
-					if (Button(button_label, cancel_button_size)) { s_sha1_widget.reset(); }
+					if (Button(button_label, cancel_button_size)) {
+						blog.info("Canceling SHA1 calculation!");
+						s_sha1_widget.reset();
+					}
 					SameLine();
 					const auto progress_bar_size = ImVec2(GetContentRegionAvail().x, GetFrameHeight());
 					ProgressBar(progress, progress_bar_size, percentage.c_str());
 				}
 				else {
 					if (Button("Calculate SHA1", ImVec2(scroll_area.x, 0.0f))) {
+						blog.info("Beginning manual SHA1 calculation for file '{}'",
+							SystemStaging::file_image.path());
 						s_sha1_widget.start(SystemStaging::file_image.data(), [](auto&& hash) noexcept {
 							SystemStaging::sha1_hash = std::move(hash);
 							blog.info("SHA1: {}", SystemStaging::sha1_hash);

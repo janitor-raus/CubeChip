@@ -1,6 +1,10 @@
 # CubeChip - WORK IN PROGRESS
 
-A multi-system emulator written in C++20 and utilizing SDL3 that started as an effort to learn the language. Aiming to be as accurate as possible from an HLE standpoint, while also aiming to be fairly fast on its feet, at least as far as pure interpreters go. Input, audio and video are handled through SDL3, with the interface being (slowly) fleshed out with ImGUI. There's loads of work to be done, and there's always something to refactor to be more flexible, robust, or faster.
+A multi-system emulator frontend written in C++20 and based on SDL3 and Dear ImGui that started as an effort to learn the language. Allows for (compile-time) slotting of emulation cores.
+
+The interface is abstract enough to allow cores that are not emulation-centric. One could write a tracker for example and as long as the interface API is utilized correctly and ImGui windows/menus provided, it'll run no problem.
+
+Several variant cores in the Chip8 family are provided. There's one for BytePusher as well. Gameboy is currently an old, outdated and disabled stub, as development has entered an extended period of app-design refactoring and feature crunch.
 
 This project simultaneously stands in as an experiment bed for all sorts of different little libraries, interfaces and abstractions I write for myself. As a result, much of the source code in the Components/Utilities folders can run solo or with minimal other required includes, increasing their potential of use in other projects of mine in the future (or others). Some stuff will be deprecated as demands change, or knowledge accumulates toward better solutions.
 
@@ -8,7 +12,7 @@ This project simultaneously stands in as an experiment bed for all sorts of diff
 
 ### BytePusher
 
-Merely there for the sake of it being there, and also because it's one of the few systems with such constrained runtime requirements that helped expose certain shortcomings of my existing library designs.
+Merely there for the sake of it. Besides bored hobbyists, no one truly focuses on expanding its library with anything beyond basic demos.
 
 ### GameBoy
 
@@ -28,13 +32,13 @@ Currently supports the following major variants:
 [^3]: Also supports 4-planes rendering, and an instruction declined from the official spec.
 [^4]: Potentially officially the first emulator since Mega8 to [run the Mega8 demo properly](https://www.youtube.com/watch?v=Z215BO9Gkko).
 
-The following platform extensions/mods are available:
+The following family variants are available. Those marked on the side were present in a much older version of the codebase, but redesigns of the interface and its api surface resulted in their banishment to the archive limbo. They will be re-implemented at a later time in the future.
 
-- HIRES MPD [^5] (currently not re-implemented)
+- HIRES MPD [^5] (X)
 - CHIP-8E [^6]
 - CHIP-8X [^7]
-- HWCHIP64 [^8] (currently not re-implemented)
-- SUPERCHIP-8X [^9] (currently not re-implemented)
+- HWCHIP64 [^8] (X)
+- SUPERCHIP-8X [^9] (X)
 
 Some extension combinations aren't possible, see footnotes for now. Due to major refactoring of the codebase, many variants are currently unimplemented, their code unported and in temporary limbo.
 
