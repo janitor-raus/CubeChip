@@ -48,6 +48,14 @@
 
 /*==================================================================*/
 
+#if !defined(SHA1_X86_INTRINSICS) && !defined(SHA1_ARM_INTRINSICS)
+#  ifdef _MSC_VER
+#    pragma message("SHA1: no hardware acceleration path compiled in — scalar only, has_hardware_support() will always return false")
+#  else
+#    warning "SHA1: no hardware acceleration path compiled in — scalar only, has_hardware_support() will always return false"
+#  endif
+#endif
+
 #ifdef SHA1_X86_INTRINSICS
 static bool sha1_x86_supported() noexcept {
 	static const bool result = []() noexcept {
