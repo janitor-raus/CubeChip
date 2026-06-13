@@ -6,6 +6,7 @@
 	Adapted from public domain source code at:
 		1) https://github.com/vog/sha1/blob/master/sha1.hpp
 		2) https://github.com/noloader/SHA-Intrinsics/blob/master/sha1-x86.c
+		3) https://github.com/noloader/SHA-Intrinsics/blob/master/sha1-arm.c
 */
 
 #pragma once
@@ -14,7 +15,7 @@
 #include <string>
 
 #if __has_include(<span>)
-#include <span>
+#  include <span>
 #endif
 
 /*==================================================================*/

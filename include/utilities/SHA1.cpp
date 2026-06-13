@@ -6,6 +6,7 @@
 	Adapted from public domain source code at:
 		1) https://github.com/vog/sha1/blob/master/sha1.hpp
 		2) https://github.com/noloader/SHA-Intrinsics/blob/master/sha1-x86.c
+		3) https://github.com/noloader/SHA-Intrinsics/blob/master/sha1-arm.c
 */
 
 #include "SHA1.hpp"
@@ -13,37 +14,39 @@
 
 /*==================================================================*/
 
-#if (defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) \
- && (defined(__SHA__) || defined(_MSC_VER))
-	#define SHA1_X86_INTRINSICS
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#  define SHA1_X86_INTRINSICS
 #endif
 
 #ifdef SHA1_X86_INTRINSICS
-	#ifdef _MSC_VER
-		#include <intrin.h>
-	#endif
-	#include <immintrin.h>
+#  ifdef _MSC_VER
+#    include <intrin.h>
+#  endif
+#  include <immintrin.h>
 #endif
 
 /*==================================================================*/
 
-#if (defined(__aarch64__) || defined(_M_ARM64)) \
- && (defined(__ARM_FEATURE_CRYPTO) || defined(_MSC_VER))
-	#define SHA1_ARM_INTRINSICS
+#if defined(__aarch64__) || defined(_M_ARM64)
+#  define SHA1_ARM_INTRINSICS
 #endif
 
 #ifdef SHA1_ARM_INTRINSICS
-	#include <arm_neon.h>
+#  include <arm_neon.h>
 	// GCC (non-Apple Clang) may house the SHA crypto intrinsics in arm_acle.h
-	#if defined(__GNUC__) && !defined(__apple_build_version__)
-		#if defined(__ARM_ACLE) || defined(__ARM_FEATURE_CRYPTO)
-			#include <arm_acle.h>
-		#endif
-	#endif
-	#if !defined(__APPLE__) && !defined(_WIN32)
-		#include <sys/auxv.h>
-		#include <asm/hwcap.h>
-	#endif
+#  if defined(__GNUC__) && !defined(__apple_build_version__)
+#    ifdef __ARM_ACLE
+#      include <arm_acle.h>
+#    endif
+#  endif
+#  if defined(_WIN32)
+#    define WIN32_LEAN_AND_MEAN
+#    define NOMINMAX
+#    include <windows.h>
+#  elif !defined(__APPLE__)
+#    include <sys/auxv.h>
+#    include <asm/hwcap.h>
+#  endif
 #endif
 
 /*==================================================================*/
@@ -59,7 +62,7 @@
 #ifdef SHA1_X86_INTRINSICS
 static bool sha1_x86_supported() noexcept {
 	static const bool result = []() noexcept {
-	#ifdef _MSC_VER
+#  ifdef _MSC_VER
 		int info[4]{};
 		__cpuid(info, 0);
 		if (info[0] < 7) {
@@ -68,9 +71,9 @@ static bool sha1_x86_supported() noexcept {
 			__cpuidex(info, 7, 0);
 			return bool((info[1] >> 29) & 1);
 		}
-	#else
+#  else
 		return __builtin_cpu_supports("sha");
-	#endif
+#  endif
 	}();
 	return result;
 }
@@ -79,13 +82,13 @@ static bool sha1_x86_supported() noexcept {
 #ifdef SHA1_ARM_INTRINSICS
 static bool sha1_arm_supported() noexcept {
 	static const bool result = []() noexcept {
-	#if defined(__APPLE__)
+#  if defined(__APPLE__)
 		return true;
-	#elif defined(_WIN32)
+#  elif defined(_WIN32)
 		return bool(IsProcessorFeaturePresent(PF_ARM_V8_CRYPTO_INSTRUCTIONS_AVAILABLE));
-	#else
+#  else
 		return bool(getauxval(AT_HWCAP) & HWCAP_SHA1);
-	#endif
+#  endif
 	}();
 	return result;
 }
@@ -104,7 +107,7 @@ bool SHA1::has_hardware_support() noexcept {
 /*==================================================================*/
 
 #if __has_include(<bit>)
-#include <bit>
+#  include <bit>
 #endif
 
 static constexpr std::uint32_t rotl(std::uint32_t value, std::uint32_t rotation) noexcept {
@@ -231,6 +234,9 @@ void SHA1::transform_scalar(std::uint32_t* block) noexcept {
 /*==================================================================*/
 
 #ifdef SHA1_X86_INTRINSICS
+#  if defined(__GNUC__)
+[[gnu::target("sha,ssse3,sse4.1")]]
+#  endif
 void SHA1::transform_x86(const char* src) noexcept {
 	__m128i abcd, abcd_save, e0, e0_save, e1;
 	__m128i msg0, msg1, msg2, msg3;
@@ -412,6 +418,9 @@ void SHA1::transform_x86(const char* src) noexcept {
 #endif
 
 #ifdef SHA1_ARM_INTRINSICS
+#  if defined(__GNUC__)
+[[gnu::target("arch=armv8-a+crypto")]]
+#  endif
 void SHA1::transform_arm(const char* src) noexcept {
 	uint32x4_t abcd, abcd_save;
 	uint32x4_t tmp0, tmp1;
