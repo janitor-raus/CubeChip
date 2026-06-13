@@ -10,6 +10,7 @@
 #include "HomeDirManager.hpp"
 #include "BasicLogger.hpp"
 #include "BasicInput.hpp"
+#include "SHA1.hpp"
 
 #include "UserInterface.hpp"
 #include "BasicVideoSpec.hpp"
@@ -162,6 +163,9 @@ ApplicationHost* ApplicationHost::init_application(
 
 	blog.create_log(std::to_string(thread_affinity::get_process_id()),
 		(fs::Path(HDM->get_home_path()) / "logs").string());
+
+	blog.info("SHA1 hardware accelerated path: {}",
+		SHA1::has_hardware_support() ? "ON" : "OFF");
 
 	UserInterface::init_context(HDM->get_home_path().c_str());
 
