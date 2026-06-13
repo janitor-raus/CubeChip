@@ -17,6 +17,7 @@
 	using StopToken = std::stop_token;
 #else
 	#include <jthread.hpp>
+	#include <thread>
 
 	using Thread    = nonstd::jthread;
 	using StopToken = nonstd::stop_token;
