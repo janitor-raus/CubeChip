@@ -17,10 +17,6 @@
 #include <span>
 #endif
 
-#if defined(__SHA__) || (defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86)))
-	#define SHA1_HW_SUPPORT
-#endif
-
 /*==================================================================*/
 
 class SHA1 {
@@ -35,9 +31,8 @@ class SHA1 {
 
 	void transform(const char* src) noexcept;
 	void transform_scalar(std::uint32_t* block) noexcept;
-#ifdef SHA1_HW_SUPPORT
-	void transform_ni(const char* src) noexcept;
-#endif
+	void transform_x86(const char* src) noexcept;
+	void transform_arm(const char* src) noexcept;
 
 public:
 	static constexpr auto c_block_size  = 16u; // number of 32-bit integers per SHA1 block
@@ -45,6 +40,8 @@ public:
 
 public:
 	SHA1() noexcept { reset(); }
+
+	static bool has_hardware_support() noexcept;
 
 	void reset() noexcept;
 	void update(const char* data, std::size_t size) noexcept;

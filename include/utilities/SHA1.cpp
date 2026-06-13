@@ -13,17 +13,45 @@
 
 /*==================================================================*/
 
-#ifdef SHA1_HW_SUPPORT
-	#if defined(_MSC_VER)
-		#include <intrin.h>   // for __cpuidex
+#if (defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) \
+ && (defined(__SHA__) || defined(_MSC_VER))
+	#define SHA1_X86_INTRINSICS
+#endif
+
+#ifdef SHA1_X86_INTRINSICS
+	#ifdef _MSC_VER
+		#include <intrin.h>
 	#endif
 	#include <immintrin.h>
 #endif
 
-#ifdef SHA1_HW_SUPPORT
-static bool sha1_ni_supported() noexcept {
+/*==================================================================*/
+
+#if (defined(__aarch64__) || defined(_M_ARM64)) \
+ && (defined(__ARM_FEATURE_CRYPTO) || defined(_MSC_VER))
+	#define SHA1_ARM_INTRINSICS
+#endif
+
+#ifdef SHA1_ARM_INTRINSICS
+	#include <arm_neon.h>
+	// GCC (non-Apple Clang) may house the SHA crypto intrinsics in arm_acle.h
+	#if defined(__GNUC__) && !defined(__apple_build_version__)
+		#if defined(__ARM_ACLE) || defined(__ARM_FEATURE_CRYPTO)
+			#include <arm_acle.h>
+		#endif
+	#endif
+	#if !defined(__APPLE__) && !defined(_WIN32)
+		#include <sys/auxv.h>
+		#include <asm/hwcap.h>
+	#endif
+#endif
+
+/*==================================================================*/
+
+#ifdef SHA1_X86_INTRINSICS
+static bool sha1_x86_supported() noexcept {
 	static const bool result = []() noexcept {
-	#if defined(_MSC_VER)
+	#ifdef _MSC_VER
 		int info[4]{};
 		__cpuid(info, 0);
 		if (info[0] < 7) {
@@ -39,6 +67,31 @@ static bool sha1_ni_supported() noexcept {
 	return result;
 }
 #endif
+
+#ifdef SHA1_ARM_INTRINSICS
+static bool sha1_arm_supported() noexcept {
+	static const bool result = []() noexcept {
+	#if defined(__APPLE__)
+		return true;
+	#elif defined(_WIN32)
+		return bool(IsProcessorFeaturePresent(PF_ARM_V8_CRYPTO_INSTRUCTIONS_AVAILABLE));
+	#else
+		return bool(getauxval(AT_HWCAP) & HWCAP_SHA1);
+	#endif
+	}();
+	return result;
+}
+#endif
+
+bool SHA1::has_hardware_support() noexcept {
+#ifdef SHA1_X86_INTRINSICS
+	if (sha1_x86_supported()) { return true; }
+#endif
+#ifdef SHA1_ARM_INTRINSICS
+	if (sha1_arm_supported()) { return true; }
+#endif
+	return false;
+}
 
 /*==================================================================*/
 
@@ -169,8 +222,8 @@ void SHA1::transform_scalar(std::uint32_t* block) noexcept {
 
 /*==================================================================*/
 
-#ifdef SHA1_HW_SUPPORT
-void SHA1::transform_ni(const char* src) noexcept {
+#ifdef SHA1_X86_INTRINSICS
+void SHA1::transform_x86(const char* src) noexcept {
 	__m128i abcd, abcd_save, e0, e0_save, e1;
 	__m128i msg0, msg1, msg2, msg3;
 
@@ -350,15 +403,185 @@ void SHA1::transform_ni(const char* src) noexcept {
 }
 #endif
 
+#ifdef SHA1_ARM_INTRINSICS
+void SHA1::transform_arm(const char* src) noexcept {
+	uint32x4_t abcd, abcd_save;
+	uint32x4_t tmp0, tmp1;
+	uint32x4_t msg0, msg1, msg2, msg3;
+	std::uint32_t e0, e0_save, e1;
+
+	// Load state
+	abcd = vld1q_u32(m_digest);
+	e0   = m_digest[4];
+
+	abcd_save = abcd;
+	e0_save   = e0;
+
+	// Load message; vrev32q_u8 byte-swaps within each 32-bit lane (big-endian → little-endian).
+	// Note: per-word reversal only — word order is NOT reversed, unlike the x86 path.
+	const auto* u8src = reinterpret_cast<const std::uint8_t*>(src);
+	msg0 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(u8src +  0)));
+	msg1 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(u8src + 16)));
+	msg2 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(u8src + 32)));
+	msg3 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(u8src + 48)));
+
+	tmp0 = vaddq_u32(msg0, vdupq_n_u32(0x5A827999u));
+	tmp1 = vaddq_u32(msg1, vdupq_n_u32(0x5A827999u));
+
+	// Rounds 0-3
+	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1cq_u32(abcd, e0,  tmp0);
+	tmp0 = vaddq_u32(msg2, vdupq_n_u32(0x5A827999u));
+	msg0 = vsha1su0q_u32(msg0, msg1, msg2);
+
+	// Rounds 4-7
+	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1cq_u32(abcd, e1,  tmp1);
+	tmp1 = vaddq_u32(msg3, vdupq_n_u32(0x5A827999u));
+	msg0 = vsha1su1q_u32(msg0, msg3);
+	msg1 = vsha1su0q_u32(msg1, msg2, msg3);
+
+	// Rounds 8-11
+	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1cq_u32(abcd, e0,  tmp0);
+	tmp0 = vaddq_u32(msg0, vdupq_n_u32(0x5A827999u));
+	msg1 = vsha1su1q_u32(msg1, msg0);
+	msg2 = vsha1su0q_u32(msg2, msg3, msg0);
+
+	// Rounds 12-15
+	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1cq_u32(abcd, e1,  tmp1);
+	tmp1 = vaddq_u32(msg1, vdupq_n_u32(0x6ED9EBA1u));
+	msg2 = vsha1su1q_u32(msg2, msg1);
+	msg3 = vsha1su0q_u32(msg3, msg0, msg1);
+
+	// Rounds 16-19
+	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1cq_u32(abcd, e0,  tmp0);
+	tmp0 = vaddq_u32(msg2, vdupq_n_u32(0x6ED9EBA1u));
+	msg3 = vsha1su1q_u32(msg3, msg2);
+	msg0 = vsha1su0q_u32(msg0, msg1, msg2);
+
+	// Rounds 20-23
+	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1pq_u32(abcd, e1,  tmp1);
+	tmp1 = vaddq_u32(msg3, vdupq_n_u32(0x6ED9EBA1u));
+	msg0 = vsha1su1q_u32(msg0, msg3);
+	msg1 = vsha1su0q_u32(msg1, msg2, msg3);
+
+	// Rounds 24-27
+	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1pq_u32(abcd, e0,  tmp0);
+	tmp0 = vaddq_u32(msg0, vdupq_n_u32(0x6ED9EBA1u));
+	msg1 = vsha1su1q_u32(msg1, msg0);
+	msg2 = vsha1su0q_u32(msg2, msg3, msg0);
+
+	// Rounds 28-31
+	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1pq_u32(abcd, e1,  tmp1);
+	tmp1 = vaddq_u32(msg1, vdupq_n_u32(0x6ED9EBA1u));
+	msg2 = vsha1su1q_u32(msg2, msg1);
+	msg3 = vsha1su0q_u32(msg3, msg0, msg1);
+
+	// Rounds 32-35
+	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1pq_u32(abcd, e0,  tmp0);
+	tmp0 = vaddq_u32(msg2, vdupq_n_u32(0x8F1BBCDCu));
+	msg3 = vsha1su1q_u32(msg3, msg2);
+	msg0 = vsha1su0q_u32(msg0, msg1, msg2);
+
+	// Rounds 36-39
+	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1pq_u32(abcd, e1,  tmp1);
+	tmp1 = vaddq_u32(msg3, vdupq_n_u32(0x8F1BBCDCu));
+	msg0 = vsha1su1q_u32(msg0, msg3);
+	msg1 = vsha1su0q_u32(msg1, msg2, msg3);
+
+	// Rounds 40-43
+	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1mq_u32(abcd, e0,  tmp0);
+	tmp0 = vaddq_u32(msg0, vdupq_n_u32(0x8F1BBCDCu));
+	msg1 = vsha1su1q_u32(msg1, msg0);
+	msg2 = vsha1su0q_u32(msg2, msg3, msg0);
+
+	// Rounds 44-47
+	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1mq_u32(abcd, e1,  tmp1);
+	tmp1 = vaddq_u32(msg1, vdupq_n_u32(0x8F1BBCDCu));
+	msg2 = vsha1su1q_u32(msg2, msg1);
+	msg3 = vsha1su0q_u32(msg3, msg0, msg1);
+
+	// Rounds 48-51
+	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1mq_u32(abcd, e0,  tmp0);
+	tmp0 = vaddq_u32(msg2, vdupq_n_u32(0x8F1BBCDCu));
+	msg3 = vsha1su1q_u32(msg3, msg2);
+	msg0 = vsha1su0q_u32(msg0, msg1, msg2);
+
+	// Rounds 52-55
+	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1mq_u32(abcd, e1,  tmp1);
+	tmp1 = vaddq_u32(msg3, vdupq_n_u32(0xCA62C1D6u));
+	msg0 = vsha1su1q_u32(msg0, msg3);
+	msg1 = vsha1su0q_u32(msg1, msg2, msg3);
+
+	// Rounds 56-59
+	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1mq_u32(abcd, e0,  tmp0);
+	tmp0 = vaddq_u32(msg0, vdupq_n_u32(0xCA62C1D6u));
+	msg1 = vsha1su1q_u32(msg1, msg0);
+	msg2 = vsha1su0q_u32(msg2, msg3, msg0);
+
+	// Rounds 60-63
+	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1pq_u32(abcd, e1,  tmp1);
+	tmp1 = vaddq_u32(msg1, vdupq_n_u32(0xCA62C1D6u));
+	msg2 = vsha1su1q_u32(msg2, msg1);
+	msg3 = vsha1su0q_u32(msg3, msg0, msg1);
+
+	// Rounds 64-67
+	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1pq_u32(abcd, e0,  tmp0);
+	tmp0 = vaddq_u32(msg2, vdupq_n_u32(0xCA62C1D6u));
+	msg3 = vsha1su1q_u32(msg3, msg2);
+	msg0 = vsha1su0q_u32(msg0, msg1, msg2);
+
+	// Rounds 68-71
+	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1pq_u32(abcd, e1,  tmp1);
+	tmp1 = vaddq_u32(msg3, vdupq_n_u32(0xCA62C1D6u));
+	msg0 = vsha1su1q_u32(msg0, msg3);
+
+	// Rounds 72-75
+	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1pq_u32(abcd, e0,  tmp0);
+
+	// Rounds 76-79
+	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+	abcd = vsha1pq_u32(abcd, e1,  tmp1);
+
+	// Accumulate state
+	e0  += e0_save;
+	abcd = vaddq_u32(abcd_save, abcd);
+
+	// Store state
+	vst1q_u32(m_digest, abcd);
+	m_digest[4] = e0;
+
+	++m_transforms;
+}
+#endif
+
 /*==================================================================*/
 
 void SHA1::transform(const char* src) noexcept {
-#ifdef SHA1_HW_SUPPORT
-	if (sha1_ni_supported()) {
-		transform_ni(src);
-		return;
-	}
+#ifdef SHA1_X86_INTRINSICS
+	if (sha1_x86_supported()) { transform_x86(src); return; }
 #endif
+#ifdef SHA1_ARM_INTRINSICS
+	if (sha1_arm_supported()) { transform_arm(src); return; }
+#endif
+
 	std::uint32_t block[c_block_size];
 	bytes_to_block(block, src);
 	transform_scalar(block);
