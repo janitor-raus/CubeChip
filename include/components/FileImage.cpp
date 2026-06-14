@@ -4,12 +4,10 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include <system_error>
-#include <thread>
-#include <utility>
-
 #include "FileImage.hpp"
-#include "EzMaths.hpp"
+
+#include <utility>
+#include <thread>
 
 #include "mio/mmap.hpp"
 
@@ -30,10 +28,9 @@ struct FileImage::Context {
 };
 
 void FileImage::replace_context(std::unique_ptr<Context> new_ctx) noexcept {
-	static constexpr auto c_async_threshold = 32_MiB;
-	if (m_context && m_context->file_mmap.size() >= c_async_threshold) {
-		// throw-away thread to unload at its own time, doesn't block
-		std::thread([c = std::move(m_context)]() mutable {}).detach();
+	if (m_context && m_context->file_mmap.size() >= async_threshold) {
+		// sacrificial thread to unmap the source so we don't block
+		std::thread([ctx = std::move(m_context)]() mutable {}).detach();
 	}
 	m_context = std::move(new_ctx);
 }
@@ -73,11 +70,13 @@ FileImage& FileImage::operator=(FileImage&& other) noexcept {
 
 /*==================================================================*/
 
-#if __has_include(<span>)
+auto FileImage::page_size() noexcept -> std::size_t {
+	return mio::page_size();
+}
+
 auto FileImage::span() const noexcept -> std::span<const char> {
 	return std::span<const char>(data(), size());
 }
-#endif
 
 auto FileImage::data() const noexcept -> const char* {
 	return m_context ? m_context->file_mmap.data() : nullptr;

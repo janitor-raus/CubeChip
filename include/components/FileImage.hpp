@@ -8,10 +8,7 @@
 
 #include <memory>
 #include <string>
-
-#if __has_include(<span>)
 #include <span>
-#endif
 
 /*==================================================================*/
 
@@ -35,10 +32,13 @@ public:
 	FileImage(FileImage&& other) noexcept;
 	FileImage& operator=(FileImage&& other) noexcept;
 
-#if __has_include(<span>)
-	auto span() const noexcept -> std::span<const char>;
-#endif
+public:
+	// Threshold at which we spawn a detached thread to unmap
+	static constexpr auto async_threshold = 32ull * 1024 * 1024;
 
+	static auto page_size() noexcept -> std::size_t;
+
+	auto span() const noexcept -> std::span<const char>;
 	auto data() const noexcept -> const char*;
 	auto size() const noexcept -> std::size_t;
 	auto path() const noexcept -> std::string;
@@ -49,8 +49,4 @@ public:
 
 	operator bool()        const noexcept { return valid(); }
 	operator std::string() const noexcept { return path(); }
-
-#if __has_include(<span>)
-	operator std::span<const char>() const noexcept { return span(); }
-#endif
 };
