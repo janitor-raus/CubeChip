@@ -10,7 +10,8 @@
 */
 
 #include "SHA1.hpp"
-#include <algorithm>
+#include <cstring>
+#include <bit>
 
 /*==================================================================*/
 
@@ -59,6 +60,8 @@
 #  endif
 #endif
 
+/*==================================================================*/
+
 #ifdef SHA1_X86_INTRINSICS
 static bool sha1_x86_supported() noexcept {
 	static const bool result = []() noexcept {
@@ -106,89 +109,65 @@ bool SHA1::has_hardware_support() noexcept {
 
 /*==================================================================*/
 
-#if __has_include(<bit>)
-#  include <bit>
-#endif
-
-static constexpr std::uint32_t rotl(std::uint32_t value, std::uint32_t rotation) noexcept {
-#if __has_include(<bit>)
-	return std::rotl(value, rotation);
-#else
-	return (value << rotation) | (value >> (32 - rotation));
-#endif
-}
-
-/*==================================================================*/
-
-static constexpr std::uint32_t block_mix(std::uint32_t* block, std::size_t i) noexcept {
-	return rotl(
+static std::uint32_t block_mix(std::uint32_t* block, std::size_t i) noexcept {
+	return std::rotl(
 		block[(i + 0xD) & 0xF] ^
 		block[(i + 0x8) & 0xF] ^
 		block[(i + 0x2) & 0xF] ^
 		block[(i + 0x0) & 0xF], 1);
 }
 
-constexpr static void bytes_to_block(std::uint32_t* block, const char* src) noexcept {
-	// read quartets of bytes as Big Endian
-	for (auto i = 0u; i < SHA1::c_block_size; ++i) {
-		block[i] = (src[4 * i + 3] & 0xFF)
-				 | (src[4 * i + 2] & 0xFF) <<  8
-				 | (src[4 * i + 1] & 0xFF) << 16
-				 | (src[4 * i + 0] & 0xFF) << 24;
-	}
-}
-
 /*------------------------------------------------------------------*/
 /*  (R0+R1), R2, R3, R4 are the different operations used in SHA1   */
 /*------------------------------------------------------------------*/
 
-static constexpr void R0(
+static void R0(
 	std::uint32_t* block,
 	std::uint32_t v, std::uint32_t& w, std::uint32_t x,
 	std::uint32_t y, std::uint32_t& z, std::size_t i
 ) noexcept {
-	z += ((w & (x ^ y)) ^ y) + block[i] + 0x5A827999 + rotl(v, 5);
-	w  = rotl(w, 30);
+	z += ((w & (x ^ y)) ^ y) + block[i] + 0x5A827999 + std::rotl(v, 5);
+	w  = std::rotl(w, 30);
 }
 
-static constexpr void R1(
+static void R1(
 	std::uint32_t* block,
 	std::uint32_t v, std::uint32_t& w, std::uint32_t x,
 	std::uint32_t y, std::uint32_t& z, std::size_t i
 ) noexcept {
 	block[i] = block_mix(block, i);
-	z += ((w & (x ^ y)) ^ y) + block[i] + 0x5A827999 + rotl(v, 5);
-	w  = rotl(w, 30);
+	z += ((w & (x ^ y)) ^ y) + block[i] + 0x5A827999 + std::rotl(v, 5);
+	w  = std::rotl(w, 30);
 }
 
-static constexpr void R2(
+static void R2(
 	std::uint32_t* block,
 	std::uint32_t v, std::uint32_t& w, std::uint32_t x,
 	std::uint32_t y, std::uint32_t& z, std::size_t i
 ) noexcept {
 	block[i] = block_mix(block, i);
-	z += (w ^ x ^ y) + block[i] + 0x6ED9EBA1 + rotl(v, 5);
-	w  = rotl(w, 30);
+	z += (w ^ x ^ y) + block[i] + 0x6ED9EBA1 + std::rotl(v, 5);
+	w  = std::rotl(w, 30);
 }
 
-static constexpr void R3(
+static void R3(
 	std::uint32_t* block,
 	std::uint32_t v, std::uint32_t& w, std::uint32_t x,
 	std::uint32_t y, std::uint32_t& z, std::size_t i
 ) noexcept {
 	block[i] = block_mix(block, i);
-	z += (((w | x) & y) | (w & x)) + block[i] + 0x8F1BBCDC + rotl(v, 5);
-	w  = rotl(w, 30);
+	z += (((w | x) & y) | (w & x)) + block[i] + 0x8F1BBCDC + std::rotl(v, 5);
+	w  = std::rotl(w, 30);
 }
 
-static constexpr void R4(
+static void R4(
 	std::uint32_t* block,
 	std::uint32_t v, std::uint32_t& w, std::uint32_t x,
 	std::uint32_t y, std::uint32_t& z, std::size_t i
 ) noexcept {
 	block[i] = block_mix(block, i);
-	z += (w ^ x ^ y) + block[i] + 0xCA62C1D6 + rotl(v, 5);
-	w  = rotl(w, 30);
+	z += (w ^ x ^ y) + block[i] + 0xCA62C1D6 + std::rotl(v, 5);
+	w  = std::rotl(w, 30);
 }
 
 /*==================================================================*/
@@ -237,7 +216,7 @@ void SHA1::transform_scalar(std::uint32_t* block) noexcept {
 #  if defined(__GNUC__)
 [[gnu::target("sha,ssse3,sse4.1")]]
 #  endif
-void SHA1::transform_x86(const char* src) noexcept {
+void SHA1::transform_x86(const std::uint8_t* src) noexcept {
 	__m128i abcd, abcd_save, e0, e0_save, e1;
 	__m128i msg0, msg1, msg2, msg3;
 
@@ -421,7 +400,7 @@ void SHA1::transform_x86(const char* src) noexcept {
 #  if defined(__GNUC__)
 [[gnu::target("arch=armv8-a+crypto")]]
 #  endif
-void SHA1::transform_arm(const char* src) noexcept {
+void SHA1::transform_arm(const std::uint8_t* src) noexcept {
 	uint32x4_t abcd, abcd_save;
 	uint32x4_t tmp0, tmp1;
 	uint32x4_t msg0, msg1, msg2, msg3;
@@ -436,11 +415,10 @@ void SHA1::transform_arm(const char* src) noexcept {
 
 	// Load message; vrev32q_u8 byte-swaps within each 32-bit lane (big-endian → little-endian).
 	// Note: per-word reversal only — word order is NOT reversed, unlike the x86 path.
-	const auto* u8src = reinterpret_cast<const std::uint8_t*>(src);
-	msg0 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(u8src +  0)));
-	msg1 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(u8src + 16)));
-	msg2 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(u8src + 32)));
-	msg3 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(u8src + 48)));
+	msg0 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(src +  0)));
+	msg1 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(src + 16)));
+	msg2 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(src + 32)));
+	msg3 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(src + 48)));
 
 	tmp0 = vaddq_u32(msg0, vdupq_n_u32(0x5A827999u));
 	tmp1 = vaddq_u32(msg1, vdupq_n_u32(0x5A827999u));
@@ -591,16 +569,27 @@ void SHA1::transform_arm(const char* src) noexcept {
 
 /*==================================================================*/
 
-void SHA1::transform(const char* src) noexcept {
+void SHA1::transform(const std::uint8_t* src) noexcept {
+
 #ifdef SHA1_X86_INTRINSICS
 	if (sha1_x86_supported()) { transform_x86(src); return; }
 #endif
 #ifdef SHA1_ARM_INTRINSICS
-	if (sha1_arm_supported()) { transform_arm(src); return; }
+	if (sha1_arm_supported()) { transform_arm(data_source); return; }
 #endif
 
 	std::uint32_t block[c_block_size];
-	bytes_to_block(block, src);
+	std::memcpy(block, src, SHA1::c_block_bytes);
+	if constexpr (std::endian::native != std::endian::big) {
+		for (auto i = 0u; i < SHA1::c_block_size; ++i) {
+#ifdef _MSC_VER
+			block[i] = _byteswap_ulong(block[i]);
+#else
+			block[i] = __builtin_bswap32(block[i]);
+#endif
+		}
+	}
+
 	transform_scalar(block);
 }
 
@@ -611,22 +600,23 @@ void SHA1::reset() noexcept {
 	m_digest[3] = 0x10325476u;
 	m_digest[4] = 0xC3D2E1F0u;
 
-	std::fill_n(m_buffer, c_buffer_size, '\x00');
+	std::memset(m_buffer, 0, c_buffer_size);
 	m_transforms = m_tail_size = 0;
 }
 
-void SHA1::update(const char* data_pointer, std::size_t byte_count) noexcept {
+void SHA1::update(const char* src, std::size_t byte_count) noexcept {
+	auto data_buffer = reinterpret_cast<const std::uint8_t*>(src);
+
 	// if the buffer is partially filled, top it up first
 	if (m_tail_size > 0) {
-		const auto chunk_size = std::uint32_t(std::min(
-			c_block_bytes - m_tail_size, byte_count));
+		const auto remaining  = c_block_bytes - m_tail_size;
+		const auto chunk_size = std::uint32_t(byte_count < remaining ? byte_count : remaining);
 
-		std::copy(data_pointer, data_pointer + chunk_size,
-			m_buffer + m_tail_size);
+		std::memcpy(m_buffer + m_tail_size, data_buffer, chunk_size);
 
-		m_tail_size  += chunk_size;
-		data_pointer += chunk_size;
-		byte_count   -= chunk_size;
+		m_tail_size += chunk_size;
+		data_buffer += chunk_size;
+		byte_count  -= chunk_size;
 
 		if (m_tail_size == c_block_bytes) {
 			transform(m_buffer);
@@ -636,14 +626,14 @@ void SHA1::update(const char* data_pointer, std::size_t byte_count) noexcept {
 
 	// process full blocks directly from the input — no copy
 	while (byte_count >= c_block_bytes) {
-		transform(data_pointer);
-		data_pointer += c_block_bytes;
-		byte_count   -= c_block_bytes;
+		transform(data_buffer);
+		data_buffer += c_block_bytes;
+		byte_count  -= c_block_bytes;
 	}
 
 	// stash any remaining partial block in the buffer
 	if (byte_count > 0) {
-		std::copy(data_pointer, data_pointer + byte_count, m_buffer);
+		std::memcpy(m_buffer, data_buffer, byte_count);
 		m_tail_size = std::uint32_t(byte_count);
 	}
 }
@@ -653,23 +643,22 @@ std::string SHA1::final() noexcept {
 		8 * (m_transforms * c_block_bytes + m_tail_size);
 
 	// insert message end bit, then pad to end of block with zeroes
-	m_buffer[m_tail_size++] = '\x80';
+	m_buffer[m_tail_size++] = std::uint8_t{0x80};
 
-	std::fill(m_buffer + m_tail_size,
-		m_buffer + c_buffer_size, '\x00');
+	std::memset(m_buffer + m_tail_size, 0, c_buffer_size - m_tail_size);
 
 	if (m_tail_size > c_block_bytes - 8) {
 		transform(m_buffer);
-		std::fill_n(m_buffer, c_block_bytes - 8, '\x00');
+		std::memset(m_buffer, 0, c_block_bytes - 8);
 	}
 
 	// append total_hashed_bits as a big-endian 64-bit integer at bytes [56..63]
 	const auto hi = std::uint32_t(total_hashed_bits >> 32);
 	const auto lo = std::uint32_t(total_hashed_bits >>  0);
-	m_buffer[56] = char(hi >> 24); m_buffer[57] = char(hi >> 16);
-	m_buffer[58] = char(hi >>  8); m_buffer[59] = char(hi >>  0);
-	m_buffer[60] = char(lo >> 24); m_buffer[61] = char(lo >> 16);
-	m_buffer[62] = char(lo >>  8); m_buffer[63] = char(lo >>  0);
+	m_buffer[56] = std::uint8_t(hi >> 24); m_buffer[57] = std::uint8_t(hi >> 16);
+	m_buffer[58] = std::uint8_t(hi >>  8); m_buffer[59] = std::uint8_t(hi >>  0);
+	m_buffer[60] = std::uint8_t(lo >> 24); m_buffer[61] = std::uint8_t(lo >> 16);
+	m_buffer[62] = std::uint8_t(lo >>  8); m_buffer[63] = std::uint8_t(lo >>  0);
 	transform(m_buffer);
 
 	// convert digest[] to a string

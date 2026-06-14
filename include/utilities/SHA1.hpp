@@ -11,12 +11,10 @@
 
 #pragma once
 
+#include <type_traits>
 #include <cstdint>
 #include <string>
-
-#if __has_include(<span>)
-#  include <span>
-#endif
+#include <span>
 
 /*==================================================================*/
 
@@ -24,16 +22,16 @@ class SHA1 {
 	static constexpr auto c_buffer_size = 64u;
 	static constexpr auto c_digest_size =  5u;
 
-	char          m_buffer[c_buffer_size]{};
+	std::uint8_t  m_buffer[c_buffer_size]{};
 	std::uint32_t m_digest[c_digest_size]{};
 
 	std::uint32_t m_tail_size  = 0;
 	std::uint64_t m_transforms = 0;
 
-	void transform(const char* src) noexcept;
+	void transform(const std::uint8_t* src) noexcept;
 	void transform_scalar(std::uint32_t* block) noexcept;
-	void transform_x86(const char* src) noexcept;
-	void transform_arm(const char* src) noexcept;
+	void transform_x86(const std::uint8_t* src) noexcept;
+	void transform_arm(const std::uint8_t* src) noexcept;
 
 public:
 	static constexpr auto c_block_size  = 16u; // number of 32-bit integers per SHA1 block
@@ -45,7 +43,7 @@ public:
 	static bool has_hardware_support() noexcept;
 
 	void reset() noexcept;
-	void update(const char* data, std::size_t size) noexcept;
+	void update(const char* src, std::size_t byte_count) noexcept;
 
 	std::string final() noexcept;
 
@@ -56,9 +54,7 @@ public:
 		return checksum.final();
 	}
 
-#if __has_include(<span>)
 	static std::string from(std::span<const char> file_span) noexcept {
 		return from(file_span.data(), file_span.size());
 	}
-#endif
 };
