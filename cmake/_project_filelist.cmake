@@ -39,6 +39,7 @@ set(COMPONENTS_HEADERS
 	"${PROJECT_INCLUDE_DIR}/components/FileImage.hpp"
 	"${PROJECT_INCLUDE_DIR}/components/FrameLimiter.hpp"
 	"${PROJECT_INCLUDE_DIR}/components/FramePacket.hpp"
+	"${PROJECT_INCLUDE_DIR}/components/LazyFilePrefetcher.hpp"
 	"${PROJECT_INCLUDE_DIR}/components/SlidingRingBuffer.hpp"
 	"${PROJECT_INCLUDE_DIR}/components/SimpleMRU.hpp"
 	"${PROJECT_INCLUDE_DIR}/components/SimpleTimer.hpp"
