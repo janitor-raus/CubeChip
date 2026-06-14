@@ -9,6 +9,7 @@
 #include "SHA1.hpp"
 #include "Thread.hpp"
 
+#include <concepts>
 #include <optional>
 #include <string>
 #include <atomic>
@@ -116,37 +117,38 @@ public:
  * @brief Manages a background thread for incremental SHA1 hashing via SHA1_Stream,
  *        exposing progress and completion callbacks.
  *
- * Owns both the SHA1_Stream and the worker Thread. The thread can be cancelled at
- * any time via 'reset()', which blocks until the current 'advance()' step completes.
+ * Owns a SHA1_Stream and the worker Thread. The thread can be cancelled at any
+ * time via 'reset()', which blocks until the current 'advance()' step completes.
+ * The same applies for calls to 'setup()' and 'start()' too.
  *
  * @note Not thread-safe. All methods must be called from the owning thread.
  *       Progress can be observed indirectly via 'progress()', which delegates
  *       to SHA1_Stream's thread-safe 'progress()' method.
  */
 class SHA1_ThreadedWidget {
-	SHA1_Stream stream;
-	Thread      thread;
+	SHA1_Stream m_stream;
+	Thread      m_thread;
 
 	// Thread activity flag
-	std::atomic_bool busy = false;
+	std::atomic_bool m_busy = false;
 
 	static constexpr auto relaxed =
 		std::memory_order::relaxed;
 
 	void reset_thread() noexcept {
-		if (thread.joinable()) {
-			thread.request_stop();
-			thread.join();
+		if (m_thread.joinable()) {
+			m_thread.request_stop();
+			m_thread.join();
 		}
 	}
 
 public:
 	SHA1_ThreadedWidget(std::size_t size_in_bytes = 0) noexcept
-		: stream(size_in_bytes)
+		: m_stream(size_in_bytes)
 	{}
 
-	bool  running()  const noexcept { return busy.load(relaxed); }
-	float progress() const noexcept { return stream.progress(); }
+	bool  running()  const noexcept { return m_busy.load(relaxed); }
+	float progress() const noexcept { return m_stream.progress(); }
 
 	/**
 	 * @brief Stops the worker thread if running, and resets the stream state
@@ -156,7 +158,7 @@ public:
 	 */
 	void reset() noexcept {
 		reset_thread();
-		stream.reset();
+		m_stream.reset();
 	}
 
 	/**
@@ -168,7 +170,7 @@ public:
 	 */
 	void setup(std::size_t size) noexcept {
 		reset_thread();
-		stream.setup(size);
+		m_stream.setup(size);
 	}
 
 	/**
@@ -186,21 +188,20 @@ public:
 		std::invocable<float> OnStep
 	>
 	void start(const char* data, OnDone&& on_done, OnStep&& on_step) noexcept {
-		if (progress() > 1.0f) { reset(); }
-		busy.store(true, relaxed);
+		if (progress() > 0.0f) { reset(); }
+		m_busy.store(true, relaxed);
 
-		thread = Thread([ this, data,
+		m_thread = Thread([ this, data,
 			on_done = std::forward<OnDone>(on_done),
 			on_step = std::forward<OnStep>(on_step)
 		](StopToken token) noexcept {
 			while (!token.stop_requested()) {
-				if (auto hash = stream.advance(data)) {
-					on_done(std::move(*hash));
-					break;
+				if (auto hash = m_stream.advance(data)) {
+					on_done(std::move(*hash)); break;
 				}
-				on_step(stream.progress());
+				on_step(m_stream.progress());
 			}
-			busy.store(false, relaxed);
+			m_busy.store(false, relaxed);
 		});
 	}
 
