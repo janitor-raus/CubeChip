@@ -579,7 +579,7 @@ void SHA1::transform(const std::uint8_t* src) noexcept {
 	if (sha1_x86_supported()) { transform_x86(src); return; }
 #endif
 #ifdef SHA1_ARM_INTRINSICS
-	if (sha1_arm_supported()) { transform_arm(data_source); return; }
+	if (sha1_arm_supported()) { transform_arm(src); return; }
 #endif
 
 	std::uint32_t block[c_block_size];
