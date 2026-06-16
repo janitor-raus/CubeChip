@@ -596,13 +596,13 @@ void SHA1::transform_arm(const std::uint8_t* src, std::size_t byte_count) noexce
 /*==================================================================*/
 
 void SHA1::transform(const std::uint8_t* src, std::size_t byte_count) noexcept {
-#if defined(SHA1_X86_INTRINSICS)
-	if (sha1_x86_supported()) { transform_x86(src, byte_count); }
-#elif defined(SHA1_ARM_INTRINSICS)
-	if (sha1_arm_supported()) { transform_arm(src, byte_count); }
-#else
-	transform_scalar(src, byte_count);
+#ifdef SHA1_X86_INTRINSICS
+	if (sha1_x86_supported()) { transform_x86(src, byte_count); return; }
 #endif
+#ifdef SHA1_ARM_INTRINSICS
+	if (sha1_arm_supported()) { transform_arm(src, byte_count); return; }
+#endif
+	transform_scalar(src, byte_count);
 }
 
 void SHA1::reset() noexcept {
