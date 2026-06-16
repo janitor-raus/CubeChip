@@ -176,42 +176,57 @@ static void R4(
 
 /*==================================================================*/
 
-void SHA1::transform_scalar(std::uint32_t* block) noexcept {
+void SHA1::transform_scalar(const std::uint8_t* src, std::size_t byte_count) noexcept {
 	auto a = m_digest[0];
 	auto b = m_digest[1];
 	auto c = m_digest[2];
 	auto d = m_digest[3];
 	auto e = m_digest[4];
 
-	// 4 rounds of 20 operations each, loop unrolled
-	R0(block, a, b, c, d, e,  0); R0(block, e, a, b, c, d,  1); R0(block, d, e, a, b, c,  2); R0(block, c, d, e, a, b,  3);
-	R0(block, b, c, d, e, a,  4); R0(block, a, b, c, d, e,  5); R0(block, e, a, b, c, d,  6); R0(block, d, e, a, b, c,  7);
-	R0(block, c, d, e, a, b,  8); R0(block, b, c, d, e, a,  9); R0(block, a, b, c, d, e, 10); R0(block, e, a, b, c, d, 11);
-	R0(block, d, e, a, b, c, 12); R0(block, c, d, e, a, b, 13); R0(block, b, c, d, e, a, 14); R0(block, a, b, c, d, e, 15);
-	R1(block, e, a, b, c, d,  0); R1(block, d, e, a, b, c,  1); R1(block, c, d, e, a, b,  2); R1(block, b, c, d, e, a,  3);
-	R2(block, a, b, c, d, e,  4); R2(block, e, a, b, c, d,  5); R2(block, d, e, a, b, c,  6); R2(block, c, d, e, a, b,  7);
-	R2(block, b, c, d, e, a,  8); R2(block, a, b, c, d, e,  9); R2(block, e, a, b, c, d, 10); R2(block, d, e, a, b, c, 11);
-	R2(block, c, d, e, a, b, 12); R2(block, b, c, d, e, a, 13); R2(block, a, b, c, d, e, 14); R2(block, e, a, b, c, d, 15);
-	R2(block, d, e, a, b, c,  0); R2(block, c, d, e, a, b,  1); R2(block, b, c, d, e, a,  2); R2(block, a, b, c, d, e,  3);
-	R2(block, e, a, b, c, d,  4); R2(block, d, e, a, b, c,  5); R2(block, c, d, e, a, b,  6); R2(block, b, c, d, e, a,  7);
-	R3(block, a, b, c, d, e,  8); R3(block, e, a, b, c, d,  9); R3(block, d, e, a, b, c, 10); R3(block, c, d, e, a, b, 11);
-	R3(block, b, c, d, e, a, 12); R3(block, a, b, c, d, e, 13); R3(block, e, a, b, c, d, 14); R3(block, d, e, a, b, c, 15);
-	R3(block, c, d, e, a, b,  0); R3(block, b, c, d, e, a,  1); R3(block, a, b, c, d, e,  2); R3(block, e, a, b, c, d,  3);
-	R3(block, d, e, a, b, c,  4); R3(block, c, d, e, a, b,  5); R3(block, b, c, d, e, a,  6); R3(block, a, b, c, d, e,  7);
-	R3(block, e, a, b, c, d,  8); R3(block, d, e, a, b, c,  9); R3(block, c, d, e, a, b, 10); R3(block, b, c, d, e, a, 11);
-	R4(block, a, b, c, d, e, 12); R4(block, e, a, b, c, d, 13); R4(block, d, e, a, b, c, 14); R4(block, c, d, e, a, b, 15);
-	R4(block, b, c, d, e, a,  0); R4(block, a, b, c, d, e,  1); R4(block, e, a, b, c, d,  2); R4(block, d, e, a, b, c,  3);
-	R4(block, c, d, e, a, b,  4); R4(block, b, c, d, e, a,  5); R4(block, a, b, c, d, e,  6); R4(block, e, a, b, c, d,  7);
-	R4(block, d, e, a, b, c,  8); R4(block, c, d, e, a, b,  9); R4(block, b, c, d, e, a, 10); R4(block, a, b, c, d, e, 11);
-	R4(block, e, a, b, c, d, 12); R4(block, d, e, a, b, c, 13); R4(block, c, d, e, a, b, 14); R4(block, b, c, d, e, a, 15);
+	while (byte_count >= c_block_bytes) {
+		std::uint32_t block[c_block_size];
+		std::memcpy(block, src, c_block_bytes);
+		if constexpr (std::endian::native != std::endian::big) {
+			for (auto i = 0u; i < c_block_size; ++i) {
+#ifdef _MSC_VER
+				block[i] = _byteswap_ulong(block[i]);
+#else
+				block[i] = __builtin_bswap32(block[i]);
+#endif
+			}
+		}
+
+		// 4 rounds of 20 operations each, loop unrolled
+		R0(block, a, b, c, d, e,  0); R0(block, e, a, b, c, d,  1); R0(block, d, e, a, b, c,  2); R0(block, c, d, e, a, b,  3);
+		R0(block, b, c, d, e, a,  4); R0(block, a, b, c, d, e,  5); R0(block, e, a, b, c, d,  6); R0(block, d, e, a, b, c,  7);
+		R0(block, c, d, e, a, b,  8); R0(block, b, c, d, e, a,  9); R0(block, a, b, c, d, e, 10); R0(block, e, a, b, c, d, 11);
+		R0(block, d, e, a, b, c, 12); R0(block, c, d, e, a, b, 13); R0(block, b, c, d, e, a, 14); R0(block, a, b, c, d, e, 15);
+		R1(block, e, a, b, c, d,  0); R1(block, d, e, a, b, c,  1); R1(block, c, d, e, a, b,  2); R1(block, b, c, d, e, a,  3);
+		R2(block, a, b, c, d, e,  4); R2(block, e, a, b, c, d,  5); R2(block, d, e, a, b, c,  6); R2(block, c, d, e, a, b,  7);
+		R2(block, b, c, d, e, a,  8); R2(block, a, b, c, d, e,  9); R2(block, e, a, b, c, d, 10); R2(block, d, e, a, b, c, 11);
+		R2(block, c, d, e, a, b, 12); R2(block, b, c, d, e, a, 13); R2(block, a, b, c, d, e, 14); R2(block, e, a, b, c, d, 15);
+		R2(block, d, e, a, b, c,  0); R2(block, c, d, e, a, b,  1); R2(block, b, c, d, e, a,  2); R2(block, a, b, c, d, e,  3);
+		R2(block, e, a, b, c, d,  4); R2(block, d, e, a, b, c,  5); R2(block, c, d, e, a, b,  6); R2(block, b, c, d, e, a,  7);
+		R3(block, a, b, c, d, e,  8); R3(block, e, a, b, c, d,  9); R3(block, d, e, a, b, c, 10); R3(block, c, d, e, a, b, 11);
+		R3(block, b, c, d, e, a, 12); R3(block, a, b, c, d, e, 13); R3(block, e, a, b, c, d, 14); R3(block, d, e, a, b, c, 15);
+		R3(block, c, d, e, a, b,  0); R3(block, b, c, d, e, a,  1); R3(block, a, b, c, d, e,  2); R3(block, e, a, b, c, d,  3);
+		R3(block, d, e, a, b, c,  4); R3(block, c, d, e, a, b,  5); R3(block, b, c, d, e, a,  6); R3(block, a, b, c, d, e,  7);
+		R3(block, e, a, b, c, d,  8); R3(block, d, e, a, b, c,  9); R3(block, c, d, e, a, b, 10); R3(block, b, c, d, e, a, 11);
+		R4(block, a, b, c, d, e, 12); R4(block, e, a, b, c, d, 13); R4(block, d, e, a, b, c, 14); R4(block, c, d, e, a, b, 15);
+		R4(block, b, c, d, e, a,  0); R4(block, a, b, c, d, e,  1); R4(block, e, a, b, c, d,  2); R4(block, d, e, a, b, c,  3);
+		R4(block, c, d, e, a, b,  4); R4(block, b, c, d, e, a,  5); R4(block, a, b, c, d, e,  6); R4(block, e, a, b, c, d,  7);
+		R4(block, d, e, a, b, c,  8); R4(block, c, d, e, a, b,  9); R4(block, b, c, d, e, a, 10); R4(block, a, b, c, d, e, 11);
+		R4(block, e, a, b, c, d, 12); R4(block, d, e, a, b, c, 13); R4(block, c, d, e, a, b, 14); R4(block, b, c, d, e, a, 15);
+
+		src        += c_block_bytes;
+		byte_count -= c_block_bytes;
+	}
 
 	m_digest[0] += a;
 	m_digest[1] += b;
 	m_digest[2] += c;
 	m_digest[3] += d;
 	m_digest[4] += e;
-
-	++m_transforms;
 }
 
 /*==================================================================*/
@@ -220,7 +235,7 @@ void SHA1::transform_scalar(std::uint32_t* block) noexcept {
 #  if defined(__GNUC__)
 [[gnu::target("sha,ssse3,sse4.1")]]
 #  endif
-void SHA1::transform_x86(const std::uint8_t* src) noexcept {
+void SHA1::transform_x86(const std::uint8_t* src, std::size_t byte_count) noexcept {
 	__m128i abcd, abcd_save, e0, e0_save, e1;
 	__m128i msg0, msg1, msg2, msg3;
 
@@ -229,174 +244,178 @@ void SHA1::transform_x86(const std::uint8_t* src) noexcept {
 	abcd = _mm_shuffle_epi32(_mm_loadu_si128(reinterpret_cast<const __m128i*>(m_digest)), 0x1B);
 	e0 = _mm_set_epi32(std::int32_t(m_digest[4]), 0, 0, 0);
 
-	abcd_save = abcd;
-	e0_save   = e0;
-
 	// Load message words from raw big-endian bytes. The mask performs a full 16-byte reversal:
 	// byteswap within each 32-bit word AND reverse word order, placing W[0] at bits[127:96].
 	const __m128i mask = _mm_set_epi8(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
-	msg0 = _mm_shuffle_epi8(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src +  0)), mask);
-	msg1 = _mm_shuffle_epi8(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src + 16)), mask);
-	msg2 = _mm_shuffle_epi8(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src + 32)), mask);
-	msg3 = _mm_shuffle_epi8(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src + 48)), mask);
 
-	// Rounds 0-3
-	e0   = _mm_add_epi32(e0, msg0);
-	e1   = abcd;
-	abcd = _mm_sha1rnds4_epu32(abcd, e0,   0);
+	while (byte_count >= c_block_bytes) {
+		abcd_save = abcd;
+		e0_save   = e0;
 
-	// Rounds 4-7
-	e1   = _mm_sha1nexte_epu32(e1,   msg1);
-	e0   = abcd;
-	abcd = _mm_sha1rnds4_epu32(abcd, e1,   0);
-	msg0 = _mm_sha1msg1_epu32(msg0, msg1);
+		msg0 = _mm_shuffle_epi8(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src +  0)), mask);
+		msg1 = _mm_shuffle_epi8(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src + 16)), mask);
+		msg2 = _mm_shuffle_epi8(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src + 32)), mask);
+		msg3 = _mm_shuffle_epi8(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src + 48)), mask);
 
-	// Rounds 8-11
-	e0   = _mm_sha1nexte_epu32(e0,   msg2);
-	e1   = abcd;
-	abcd = _mm_sha1rnds4_epu32(abcd, e0,   0);
-	msg1 = _mm_sha1msg1_epu32(msg1, msg2);
-	msg0 = _mm_xor_si128(msg0, msg2);
+		// Rounds 0-3
+		e0   = _mm_add_epi32(e0, msg0);
+		e1   = abcd;
+		abcd = _mm_sha1rnds4_epu32(abcd, e0,   0);
 
-	// Rounds 12-15
-	e1   = _mm_sha1nexte_epu32(e1,   msg3);
-	e0   = abcd;
-	msg0 = _mm_sha1msg2_epu32(msg0, msg3);
-	abcd = _mm_sha1rnds4_epu32(abcd, e1,   0);
-	msg2 = _mm_sha1msg1_epu32(msg2, msg3);
-	msg1 = _mm_xor_si128(msg1, msg3);
+		// Rounds 4-7
+		e1   = _mm_sha1nexte_epu32(e1,   msg1);
+		e0   = abcd;
+		abcd = _mm_sha1rnds4_epu32(abcd, e1,   0);
+		msg0 = _mm_sha1msg1_epu32(msg0, msg1);
 
-	// Rounds 16-19
-	e0   = _mm_sha1nexte_epu32(e0,   msg0);
-	e1   = abcd;
-	msg1 = _mm_sha1msg2_epu32(msg1, msg0);
-	abcd = _mm_sha1rnds4_epu32(abcd, e0,   0);
-	msg3 = _mm_sha1msg1_epu32(msg3, msg0);
-	msg2 = _mm_xor_si128(msg2, msg0);
+		// Rounds 8-11
+		e0   = _mm_sha1nexte_epu32(e0,   msg2);
+		e1   = abcd;
+		abcd = _mm_sha1rnds4_epu32(abcd, e0,   0);
+		msg1 = _mm_sha1msg1_epu32(msg1, msg2);
+		msg0 = _mm_xor_si128(msg0, msg2);
 
-	// Rounds 20-23
-	e1   = _mm_sha1nexte_epu32(e1,   msg1);
-	e0   = abcd;
-	msg2 = _mm_sha1msg2_epu32(msg2, msg1);
-	abcd = _mm_sha1rnds4_epu32(abcd, e1,   1);
-	msg0 = _mm_sha1msg1_epu32(msg0, msg1);
-	msg3 = _mm_xor_si128(msg3, msg1);
+		// Rounds 12-15
+		e1   = _mm_sha1nexte_epu32(e1,   msg3);
+		e0   = abcd;
+		msg0 = _mm_sha1msg2_epu32(msg0, msg3);
+		abcd = _mm_sha1rnds4_epu32(abcd, e1,   0);
+		msg2 = _mm_sha1msg1_epu32(msg2, msg3);
+		msg1 = _mm_xor_si128(msg1, msg3);
 
-	// Rounds 24-27
-	e0   = _mm_sha1nexte_epu32(e0,   msg2);
-	e1   = abcd;
-	msg3 = _mm_sha1msg2_epu32(msg3, msg2);
-	abcd = _mm_sha1rnds4_epu32(abcd, e0,   1);
-	msg1 = _mm_sha1msg1_epu32(msg1, msg2);
-	msg0 = _mm_xor_si128(msg0, msg2);
+		// Rounds 16-19
+		e0   = _mm_sha1nexte_epu32(e0,   msg0);
+		e1   = abcd;
+		msg1 = _mm_sha1msg2_epu32(msg1, msg0);
+		abcd = _mm_sha1rnds4_epu32(abcd, e0,   0);
+		msg3 = _mm_sha1msg1_epu32(msg3, msg0);
+		msg2 = _mm_xor_si128(msg2, msg0);
 
-	// Rounds 28-31
-	e1   = _mm_sha1nexte_epu32(e1,   msg3);
-	e0   = abcd;
-	msg0 = _mm_sha1msg2_epu32(msg0, msg3);
-	abcd = _mm_sha1rnds4_epu32(abcd, e1,   1);
-	msg2 = _mm_sha1msg1_epu32(msg2, msg3);
-	msg1 = _mm_xor_si128(msg1, msg3);
+		// Rounds 20-23
+		e1   = _mm_sha1nexte_epu32(e1,   msg1);
+		e0   = abcd;
+		msg2 = _mm_sha1msg2_epu32(msg2, msg1);
+		abcd = _mm_sha1rnds4_epu32(abcd, e1,   1);
+		msg0 = _mm_sha1msg1_epu32(msg0, msg1);
+		msg3 = _mm_xor_si128(msg3, msg1);
 
-	// Rounds 32-35
-	e0   = _mm_sha1nexte_epu32(e0,   msg0);
-	e1   = abcd;
-	msg1 = _mm_sha1msg2_epu32(msg1, msg0);
-	abcd = _mm_sha1rnds4_epu32(abcd, e0,   1);
-	msg3 = _mm_sha1msg1_epu32(msg3, msg0);
-	msg2 = _mm_xor_si128(msg2, msg0);
+		// Rounds 24-27
+		e0   = _mm_sha1nexte_epu32(e0,   msg2);
+		e1   = abcd;
+		msg3 = _mm_sha1msg2_epu32(msg3, msg2);
+		abcd = _mm_sha1rnds4_epu32(abcd, e0,   1);
+		msg1 = _mm_sha1msg1_epu32(msg1, msg2);
+		msg0 = _mm_xor_si128(msg0, msg2);
 
-	// Rounds 36-39
-	e1   = _mm_sha1nexte_epu32(e1,   msg1);
-	e0   = abcd;
-	msg2 = _mm_sha1msg2_epu32(msg2, msg1);
-	abcd = _mm_sha1rnds4_epu32(abcd, e1,   1);
-	msg0 = _mm_sha1msg1_epu32(msg0, msg1);
-	msg3 = _mm_xor_si128(msg3, msg1);
+		// Rounds 28-31
+		e1   = _mm_sha1nexte_epu32(e1,   msg3);
+		e0   = abcd;
+		msg0 = _mm_sha1msg2_epu32(msg0, msg3);
+		abcd = _mm_sha1rnds4_epu32(abcd, e1,   1);
+		msg2 = _mm_sha1msg1_epu32(msg2, msg3);
+		msg1 = _mm_xor_si128(msg1, msg3);
 
-	// Rounds 40-43
-	e0   = _mm_sha1nexte_epu32(e0,   msg2);
-	e1   = abcd;
-	msg3 = _mm_sha1msg2_epu32(msg3, msg2);
-	abcd = _mm_sha1rnds4_epu32(abcd, e0,   2);
-	msg1 = _mm_sha1msg1_epu32(msg1, msg2);
-	msg0 = _mm_xor_si128(msg0, msg2);
+		// Rounds 32-35
+		e0   = _mm_sha1nexte_epu32(e0,   msg0);
+		e1   = abcd;
+		msg1 = _mm_sha1msg2_epu32(msg1, msg0);
+		abcd = _mm_sha1rnds4_epu32(abcd, e0,   1);
+		msg3 = _mm_sha1msg1_epu32(msg3, msg0);
+		msg2 = _mm_xor_si128(msg2, msg0);
 
-	// Rounds 44-47
-	e1   = _mm_sha1nexte_epu32(e1,   msg3);
-	e0   = abcd;
-	msg0 = _mm_sha1msg2_epu32(msg0, msg3);
-	abcd = _mm_sha1rnds4_epu32(abcd, e1,   2);
-	msg2 = _mm_sha1msg1_epu32(msg2, msg3);
-	msg1 = _mm_xor_si128(msg1, msg3);
+		// Rounds 36-39
+		e1   = _mm_sha1nexte_epu32(e1,   msg1);
+		e0   = abcd;
+		msg2 = _mm_sha1msg2_epu32(msg2, msg1);
+		abcd = _mm_sha1rnds4_epu32(abcd, e1,   1);
+		msg0 = _mm_sha1msg1_epu32(msg0, msg1);
+		msg3 = _mm_xor_si128(msg3, msg1);
 
-	// Rounds 48-51
-	e0   = _mm_sha1nexte_epu32(e0,   msg0);
-	e1   = abcd;
-	msg1 = _mm_sha1msg2_epu32(msg1, msg0);
-	abcd = _mm_sha1rnds4_epu32(abcd, e0,   2);
-	msg3 = _mm_sha1msg1_epu32(msg3, msg0);
-	msg2 = _mm_xor_si128(msg2, msg0);
+		// Rounds 40-43
+		e0   = _mm_sha1nexte_epu32(e0,   msg2);
+		e1   = abcd;
+		msg3 = _mm_sha1msg2_epu32(msg3, msg2);
+		abcd = _mm_sha1rnds4_epu32(abcd, e0,   2);
+		msg1 = _mm_sha1msg1_epu32(msg1, msg2);
+		msg0 = _mm_xor_si128(msg0, msg2);
 
-	// Rounds 52-55
-	e1   = _mm_sha1nexte_epu32(e1,   msg1);
-	e0   = abcd;
-	msg2 = _mm_sha1msg2_epu32(msg2, msg1);
-	abcd = _mm_sha1rnds4_epu32(abcd, e1,   2);
-	msg0 = _mm_sha1msg1_epu32(msg0, msg1);
-	msg3 = _mm_xor_si128(msg3, msg1);
+		// Rounds 44-47
+		e1   = _mm_sha1nexte_epu32(e1,   msg3);
+		e0   = abcd;
+		msg0 = _mm_sha1msg2_epu32(msg0, msg3);
+		abcd = _mm_sha1rnds4_epu32(abcd, e1,   2);
+		msg2 = _mm_sha1msg1_epu32(msg2, msg3);
+		msg1 = _mm_xor_si128(msg1, msg3);
 
-	// Rounds 56-59
-	e0   = _mm_sha1nexte_epu32(e0,   msg2);
-	e1   = abcd;
-	msg3 = _mm_sha1msg2_epu32(msg3, msg2);
-	abcd = _mm_sha1rnds4_epu32(abcd, e0,   2);
-	msg1 = _mm_sha1msg1_epu32(msg1, msg2);
-	msg0 = _mm_xor_si128(msg0, msg2);
+		// Rounds 48-51
+		e0   = _mm_sha1nexte_epu32(e0,   msg0);
+		e1   = abcd;
+		msg1 = _mm_sha1msg2_epu32(msg1, msg0);
+		abcd = _mm_sha1rnds4_epu32(abcd, e0,   2);
+		msg3 = _mm_sha1msg1_epu32(msg3, msg0);
+		msg2 = _mm_xor_si128(msg2, msg0);
 
-	// Rounds 60-63
-	e1   = _mm_sha1nexte_epu32(e1,   msg3);
-	e0   = abcd;
-	msg0 = _mm_sha1msg2_epu32(msg0, msg3);
-	abcd = _mm_sha1rnds4_epu32(abcd, e1,   3);
-	msg2 = _mm_sha1msg1_epu32(msg2, msg3);
-	msg1 = _mm_xor_si128(msg1, msg3);
+		// Rounds 52-55
+		e1   = _mm_sha1nexte_epu32(e1,   msg1);
+		e0   = abcd;
+		msg2 = _mm_sha1msg2_epu32(msg2, msg1);
+		abcd = _mm_sha1rnds4_epu32(abcd, e1,   2);
+		msg0 = _mm_sha1msg1_epu32(msg0, msg1);
+		msg3 = _mm_xor_si128(msg3, msg1);
 
-	// Rounds 64-67
-	e0   = _mm_sha1nexte_epu32(e0,   msg0);
-	e1   = abcd;
-	msg1 = _mm_sha1msg2_epu32(msg1, msg0);
-	abcd = _mm_sha1rnds4_epu32(abcd, e0,   3);
-	msg3 = _mm_sha1msg1_epu32(msg3, msg0);
-	msg2 = _mm_xor_si128(msg2, msg0);
+		// Rounds 56-59
+		e0   = _mm_sha1nexte_epu32(e0,   msg2);
+		e1   = abcd;
+		msg3 = _mm_sha1msg2_epu32(msg3, msg2);
+		abcd = _mm_sha1rnds4_epu32(abcd, e0,   2);
+		msg1 = _mm_sha1msg1_epu32(msg1, msg2);
+		msg0 = _mm_xor_si128(msg0, msg2);
 
-	// Rounds 68-71
-	e1   = _mm_sha1nexte_epu32(e1,   msg1);
-	e0   = abcd;
-	msg2 = _mm_sha1msg2_epu32(msg2, msg1);
-	abcd = _mm_sha1rnds4_epu32(abcd, e1,   3);
-	msg3 = _mm_xor_si128(msg3, msg1);
+		// Rounds 60-63
+		e1   = _mm_sha1nexte_epu32(e1,   msg3);
+		e0   = abcd;
+		msg0 = _mm_sha1msg2_epu32(msg0, msg3);
+		abcd = _mm_sha1rnds4_epu32(abcd, e1,   3);
+		msg2 = _mm_sha1msg1_epu32(msg2, msg3);
+		msg1 = _mm_xor_si128(msg1, msg3);
 
-	// Rounds 72-75
-	e0   = _mm_sha1nexte_epu32(e0,   msg2);
-	e1   = abcd;
-	msg3 = _mm_sha1msg2_epu32(msg3, msg2);
-	abcd = _mm_sha1rnds4_epu32(abcd, e0,   3);
+		// Rounds 64-67
+		e0   = _mm_sha1nexte_epu32(e0,   msg0);
+		e1   = abcd;
+		msg1 = _mm_sha1msg2_epu32(msg1, msg0);
+		abcd = _mm_sha1rnds4_epu32(abcd, e0,   3);
+		msg3 = _mm_sha1msg1_epu32(msg3, msg0);
+		msg2 = _mm_xor_si128(msg2, msg0);
 
-	// Rounds 76-79
-	e1   = _mm_sha1nexte_epu32(e1,   msg3);
-	e0   = abcd;
-	abcd = _mm_sha1rnds4_epu32(abcd, e1,   3);
+		// Rounds 68-71
+		e1   = _mm_sha1nexte_epu32(e1,   msg1);
+		e0   = abcd;
+		msg2 = _mm_sha1msg2_epu32(msg2, msg1);
+		abcd = _mm_sha1rnds4_epu32(abcd, e1,   3);
+		msg3 = _mm_xor_si128(msg3, msg1);
 
-	// Accumulate state
-	e0   = _mm_sha1nexte_epu32(e0, e0_save);
-	abcd = _mm_add_epi32(abcd, abcd_save);
+		// Rounds 72-75
+		e0   = _mm_sha1nexte_epu32(e0,   msg2);
+		e1   = abcd;
+		msg3 = _mm_sha1msg2_epu32(msg3, msg2);
+		abcd = _mm_sha1rnds4_epu32(abcd, e0,   3);
+
+		// Rounds 76-79
+		e1   = _mm_sha1nexte_epu32(e1,   msg3);
+		e0   = abcd;
+		abcd = _mm_sha1rnds4_epu32(abcd, e1,   3);
+
+		// Accumulate state
+		e0   = _mm_sha1nexte_epu32(e0, e0_save);
+		abcd = _mm_add_epi32(abcd, abcd_save);
+
+		src        += c_block_bytes;
+		byte_count -= c_block_bytes;
+	}
 
 	// Store state (reverse word order back to match m_digest[] layout)
 	_mm_storeu_si128(reinterpret_cast<__m128i*>(m_digest), _mm_shuffle_epi32(abcd, 0x1B));
 	m_digest[4] = std::uint32_t(_mm_extract_epi32(e0, 3));
-
-	++m_transforms;
 }
 #endif
 
@@ -404,7 +423,7 @@ void SHA1::transform_x86(const std::uint8_t* src) noexcept {
 #  if defined(__GNUC__)
 [[gnu::target("arch=armv8-a+crypto")]]
 #  endif
-void SHA1::transform_arm(const std::uint8_t* src) noexcept {
+void SHA1::transform_arm(const std::uint8_t* src, std::size_t byte_count) noexcept {
 	uint32x4_t abcd, abcd_save;
 	uint32x4_t tmp0, tmp1;
 	uint32x4_t msg0, msg1, msg2, msg3;
@@ -414,187 +433,176 @@ void SHA1::transform_arm(const std::uint8_t* src) noexcept {
 	abcd = vld1q_u32(m_digest);
 	e0   = m_digest[4];
 
-	abcd_save = abcd;
-	e0_save   = e0;
+	while (byte_count >= c_block_bytes) {
+		abcd_save = abcd;
+		e0_save   = e0;
 
-	// Load message; vrev32q_u8 byte-swaps within each 32-bit lane (big-endian → little-endian).
-	// Note: per-word reversal only — word order is NOT reversed, unlike the x86 path.
-	msg0 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(src +  0)));
-	msg1 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(src + 16)));
-	msg2 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(src + 32)));
-	msg3 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(src + 48)));
+		// Load message; vrev32q_u8 byte-swaps within each 32-bit lane (big-endian → little-endian).
+		// Note: per-word reversal only — word order is NOT reversed, unlike the x86 path.
+		msg0 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(src +  0)));
+		msg1 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(src + 16)));
+		msg2 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(src + 32)));
+		msg3 = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(src + 48)));
 
-	tmp0 = vaddq_u32(msg0, vdupq_n_u32(0x5A827999u));
-	tmp1 = vaddq_u32(msg1, vdupq_n_u32(0x5A827999u));
+		tmp0 = vaddq_u32(msg0, vdupq_n_u32(0x5A827999u));
+		tmp1 = vaddq_u32(msg1, vdupq_n_u32(0x5A827999u));
 
-	// Rounds 0-3
-	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1cq_u32(abcd, e0,  tmp0);
-	tmp0 = vaddq_u32(msg2, vdupq_n_u32(0x5A827999u));
-	msg0 = vsha1su0q_u32(msg0, msg1, msg2);
+		// Rounds 0-3
+		e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1cq_u32(abcd, e0,  tmp0);
+		tmp0 = vaddq_u32(msg2, vdupq_n_u32(0x5A827999u));
+		msg0 = vsha1su0q_u32(msg0, msg1, msg2);
 
-	// Rounds 4-7
-	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1cq_u32(abcd, e1,  tmp1);
-	tmp1 = vaddq_u32(msg3, vdupq_n_u32(0x5A827999u));
-	msg0 = vsha1su1q_u32(msg0, msg3);
-	msg1 = vsha1su0q_u32(msg1, msg2, msg3);
+		// Rounds 4-7
+		e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1cq_u32(abcd, e1,  tmp1);
+		tmp1 = vaddq_u32(msg3, vdupq_n_u32(0x5A827999u));
+		msg0 = vsha1su1q_u32(msg0, msg3);
+		msg1 = vsha1su0q_u32(msg1, msg2, msg3);
 
-	// Rounds 8-11
-	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1cq_u32(abcd, e0,  tmp0);
-	tmp0 = vaddq_u32(msg0, vdupq_n_u32(0x5A827999u));
-	msg1 = vsha1su1q_u32(msg1, msg0);
-	msg2 = vsha1su0q_u32(msg2, msg3, msg0);
+		// Rounds 8-11
+		e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1cq_u32(abcd, e0,  tmp0);
+		tmp0 = vaddq_u32(msg0, vdupq_n_u32(0x5A827999u));
+		msg1 = vsha1su1q_u32(msg1, msg0);
+		msg2 = vsha1su0q_u32(msg2, msg3, msg0);
 
-	// Rounds 12-15
-	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1cq_u32(abcd, e1,  tmp1);
-	tmp1 = vaddq_u32(msg1, vdupq_n_u32(0x6ED9EBA1u));
-	msg2 = vsha1su1q_u32(msg2, msg1);
-	msg3 = vsha1su0q_u32(msg3, msg0, msg1);
+		// Rounds 12-15
+		e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1cq_u32(abcd, e1,  tmp1);
+		tmp1 = vaddq_u32(msg1, vdupq_n_u32(0x6ED9EBA1u));
+		msg2 = vsha1su1q_u32(msg2, msg1);
+		msg3 = vsha1su0q_u32(msg3, msg0, msg1);
 
-	// Rounds 16-19
-	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1cq_u32(abcd, e0,  tmp0);
-	tmp0 = vaddq_u32(msg2, vdupq_n_u32(0x6ED9EBA1u));
-	msg3 = vsha1su1q_u32(msg3, msg2);
-	msg0 = vsha1su0q_u32(msg0, msg1, msg2);
+		// Rounds 16-19
+		e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1cq_u32(abcd, e0,  tmp0);
+		tmp0 = vaddq_u32(msg2, vdupq_n_u32(0x6ED9EBA1u));
+		msg3 = vsha1su1q_u32(msg3, msg2);
+		msg0 = vsha1su0q_u32(msg0, msg1, msg2);
 
-	// Rounds 20-23
-	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1pq_u32(abcd, e1,  tmp1);
-	tmp1 = vaddq_u32(msg3, vdupq_n_u32(0x6ED9EBA1u));
-	msg0 = vsha1su1q_u32(msg0, msg3);
-	msg1 = vsha1su0q_u32(msg1, msg2, msg3);
+		// Rounds 20-23
+		e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1pq_u32(abcd, e1,  tmp1);
+		tmp1 = vaddq_u32(msg3, vdupq_n_u32(0x6ED9EBA1u));
+		msg0 = vsha1su1q_u32(msg0, msg3);
+		msg1 = vsha1su0q_u32(msg1, msg2, msg3);
 
-	// Rounds 24-27
-	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1pq_u32(abcd, e0,  tmp0);
-	tmp0 = vaddq_u32(msg0, vdupq_n_u32(0x6ED9EBA1u));
-	msg1 = vsha1su1q_u32(msg1, msg0);
-	msg2 = vsha1su0q_u32(msg2, msg3, msg0);
+		// Rounds 24-27
+		e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1pq_u32(abcd, e0,  tmp0);
+		tmp0 = vaddq_u32(msg0, vdupq_n_u32(0x6ED9EBA1u));
+		msg1 = vsha1su1q_u32(msg1, msg0);
+		msg2 = vsha1su0q_u32(msg2, msg3, msg0);
 
-	// Rounds 28-31
-	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1pq_u32(abcd, e1,  tmp1);
-	tmp1 = vaddq_u32(msg1, vdupq_n_u32(0x6ED9EBA1u));
-	msg2 = vsha1su1q_u32(msg2, msg1);
-	msg3 = vsha1su0q_u32(msg3, msg0, msg1);
+		// Rounds 28-31
+		e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1pq_u32(abcd, e1,  tmp1);
+		tmp1 = vaddq_u32(msg1, vdupq_n_u32(0x6ED9EBA1u));
+		msg2 = vsha1su1q_u32(msg2, msg1);
+		msg3 = vsha1su0q_u32(msg3, msg0, msg1);
 
-	// Rounds 32-35
-	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1pq_u32(abcd, e0,  tmp0);
-	tmp0 = vaddq_u32(msg2, vdupq_n_u32(0x8F1BBCDCu));
-	msg3 = vsha1su1q_u32(msg3, msg2);
-	msg0 = vsha1su0q_u32(msg0, msg1, msg2);
+		// Rounds 32-35
+		e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1pq_u32(abcd, e0,  tmp0);
+		tmp0 = vaddq_u32(msg2, vdupq_n_u32(0x8F1BBCDCu));
+		msg3 = vsha1su1q_u32(msg3, msg2);
+		msg0 = vsha1su0q_u32(msg0, msg1, msg2);
 
-	// Rounds 36-39
-	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1pq_u32(abcd, e1,  tmp1);
-	tmp1 = vaddq_u32(msg3, vdupq_n_u32(0x8F1BBCDCu));
-	msg0 = vsha1su1q_u32(msg0, msg3);
-	msg1 = vsha1su0q_u32(msg1, msg2, msg3);
+		// Rounds 36-39
+		e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1pq_u32(abcd, e1,  tmp1);
+		tmp1 = vaddq_u32(msg3, vdupq_n_u32(0x8F1BBCDCu));
+		msg0 = vsha1su1q_u32(msg0, msg3);
+		msg1 = vsha1su0q_u32(msg1, msg2, msg3);
 
-	// Rounds 40-43
-	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1mq_u32(abcd, e0,  tmp0);
-	tmp0 = vaddq_u32(msg0, vdupq_n_u32(0x8F1BBCDCu));
-	msg1 = vsha1su1q_u32(msg1, msg0);
-	msg2 = vsha1su0q_u32(msg2, msg3, msg0);
+		// Rounds 40-43
+		e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1mq_u32(abcd, e0,  tmp0);
+		tmp0 = vaddq_u32(msg0, vdupq_n_u32(0x8F1BBCDCu));
+		msg1 = vsha1su1q_u32(msg1, msg0);
+		msg2 = vsha1su0q_u32(msg2, msg3, msg0);
 
-	// Rounds 44-47
-	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1mq_u32(abcd, e1,  tmp1);
-	tmp1 = vaddq_u32(msg1, vdupq_n_u32(0x8F1BBCDCu));
-	msg2 = vsha1su1q_u32(msg2, msg1);
-	msg3 = vsha1su0q_u32(msg3, msg0, msg1);
+		// Rounds 44-47
+		e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1mq_u32(abcd, e1,  tmp1);
+		tmp1 = vaddq_u32(msg1, vdupq_n_u32(0x8F1BBCDCu));
+		msg2 = vsha1su1q_u32(msg2, msg1);
+		msg3 = vsha1su0q_u32(msg3, msg0, msg1);
 
-	// Rounds 48-51
-	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1mq_u32(abcd, e0,  tmp0);
-	tmp0 = vaddq_u32(msg2, vdupq_n_u32(0x8F1BBCDCu));
-	msg3 = vsha1su1q_u32(msg3, msg2);
-	msg0 = vsha1su0q_u32(msg0, msg1, msg2);
+		// Rounds 48-51
+		e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1mq_u32(abcd, e0,  tmp0);
+		tmp0 = vaddq_u32(msg2, vdupq_n_u32(0x8F1BBCDCu));
+		msg3 = vsha1su1q_u32(msg3, msg2);
+		msg0 = vsha1su0q_u32(msg0, msg1, msg2);
 
-	// Rounds 52-55
-	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1mq_u32(abcd, e1,  tmp1);
-	tmp1 = vaddq_u32(msg3, vdupq_n_u32(0xCA62C1D6u));
-	msg0 = vsha1su1q_u32(msg0, msg3);
-	msg1 = vsha1su0q_u32(msg1, msg2, msg3);
+		// Rounds 52-55
+		e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1mq_u32(abcd, e1,  tmp1);
+		tmp1 = vaddq_u32(msg3, vdupq_n_u32(0xCA62C1D6u));
+		msg0 = vsha1su1q_u32(msg0, msg3);
+		msg1 = vsha1su0q_u32(msg1, msg2, msg3);
 
-	// Rounds 56-59
-	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1mq_u32(abcd, e0,  tmp0);
-	tmp0 = vaddq_u32(msg0, vdupq_n_u32(0xCA62C1D6u));
-	msg1 = vsha1su1q_u32(msg1, msg0);
-	msg2 = vsha1su0q_u32(msg2, msg3, msg0);
+		// Rounds 56-59
+		e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1mq_u32(abcd, e0,  tmp0);
+		tmp0 = vaddq_u32(msg0, vdupq_n_u32(0xCA62C1D6u));
+		msg1 = vsha1su1q_u32(msg1, msg0);
+		msg2 = vsha1su0q_u32(msg2, msg3, msg0);
 
-	// Rounds 60-63
-	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1pq_u32(abcd, e1,  tmp1);
-	tmp1 = vaddq_u32(msg1, vdupq_n_u32(0xCA62C1D6u));
-	msg2 = vsha1su1q_u32(msg2, msg1);
-	msg3 = vsha1su0q_u32(msg3, msg0, msg1);
+		// Rounds 60-63
+		e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1pq_u32(abcd, e1,  tmp1);
+		tmp1 = vaddq_u32(msg1, vdupq_n_u32(0xCA62C1D6u));
+		msg2 = vsha1su1q_u32(msg2, msg1);
+		msg3 = vsha1su0q_u32(msg3, msg0, msg1);
 
-	// Rounds 64-67
-	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1pq_u32(abcd, e0,  tmp0);
-	tmp0 = vaddq_u32(msg2, vdupq_n_u32(0xCA62C1D6u));
-	msg3 = vsha1su1q_u32(msg3, msg2);
-	msg0 = vsha1su0q_u32(msg0, msg1, msg2);
+		// Rounds 64-67
+		e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1pq_u32(abcd, e0,  tmp0);
+		tmp0 = vaddq_u32(msg2, vdupq_n_u32(0xCA62C1D6u));
+		msg3 = vsha1su1q_u32(msg3, msg2);
+		msg0 = vsha1su0q_u32(msg0, msg1, msg2);
 
-	// Rounds 68-71
-	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1pq_u32(abcd, e1,  tmp1);
-	tmp1 = vaddq_u32(msg3, vdupq_n_u32(0xCA62C1D6u));
-	msg0 = vsha1su1q_u32(msg0, msg3);
+		// Rounds 68-71
+		e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1pq_u32(abcd, e1,  tmp1);
+		tmp1 = vaddq_u32(msg3, vdupq_n_u32(0xCA62C1D6u));
+		msg0 = vsha1su1q_u32(msg0, msg3);
 
-	// Rounds 72-75
-	e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1pq_u32(abcd, e0,  tmp0);
+		// Rounds 72-75
+		e1   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1pq_u32(abcd, e0,  tmp0);
 
-	// Rounds 76-79
-	e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
-	abcd = vsha1pq_u32(abcd, e1,  tmp1);
+		// Rounds 76-79
+		e0   = vsha1h_u32(vgetq_lane_u32(abcd, 0));
+		abcd = vsha1pq_u32(abcd, e1,  tmp1);
 
-	// Accumulate state
-	e0  += e0_save;
-	abcd = vaddq_u32(abcd_save, abcd);
+		// Accumulate state
+		e0  += e0_save;
+		abcd = vaddq_u32(abcd_save, abcd);
+
+		src        += c_block_bytes;
+		byte_count -= c_block_bytes;
+	}
 
 	// Store state
 	vst1q_u32(m_digest, abcd);
 	m_digest[4] = e0;
-
-	++m_transforms;
 }
 #endif
 
 /*==================================================================*/
 
-void SHA1::transform(const std::uint8_t* src) noexcept {
-
-#ifdef SHA1_X86_INTRINSICS
-	if (sha1_x86_supported()) { transform_x86(src); return; }
-#endif
-#ifdef SHA1_ARM_INTRINSICS
-	if (sha1_arm_supported()) { transform_arm(src); return; }
-#endif
-
-	std::uint32_t block[c_block_size];
-	std::memcpy(block, src, SHA1::c_block_bytes);
-	if constexpr (std::endian::native != std::endian::big) {
-		for (auto i = 0u; i < SHA1::c_block_size; ++i) {
-#ifdef _MSC_VER
-			block[i] = _byteswap_ulong(block[i]);
+void SHA1::transform(const std::uint8_t* src, std::size_t byte_count) noexcept {
+#if defined(SHA1_X86_INTRINSICS)
+	if (sha1_x86_supported()) { transform_x86(src, byte_count); }
+#elif defined(SHA1_ARM_INTRINSICS)
+	if (sha1_arm_supported()) { transform_arm(src, byte_count); }
 #else
-			block[i] = __builtin_bswap32(block[i]);
+	transform_scalar(src, byte_count);
 #endif
-		}
-	}
-
-	transform_scalar(block);
 }
 
 void SHA1::reset() noexcept {
@@ -623,16 +631,19 @@ void SHA1::update(const char* src, std::size_t byte_count) noexcept {
 		byte_count  -= chunk_size;
 
 		if (m_tail_size == c_block_bytes) {
-			transform(m_buffer);
-			m_tail_size = 0;
+			transform(m_buffer, c_block_bytes);
+			m_tail_size = 0; ++m_transforms;
 		}
 	}
 
 	// process full blocks directly from the input — no copy
-	while (byte_count >= c_block_bytes) {
-		transform(data_buffer);
-		data_buffer += c_block_bytes;
-		byte_count  -= c_block_bytes;
+	if (const auto total_blocks = byte_count >> 6) {
+		const auto total_bytes = total_blocks * c_block_bytes;
+
+		transform(data_buffer, total_bytes);
+		data_buffer  += total_bytes;
+		byte_count   -= total_bytes;
+		m_transforms += total_blocks;
 	}
 
 	// stash any remaining partial block in the buffer
@@ -652,7 +663,7 @@ std::string SHA1::final() noexcept {
 	std::memset(m_buffer + m_tail_size, 0, c_buffer_size - m_tail_size);
 
 	if (m_tail_size > c_block_bytes - 8) {
-		transform(m_buffer);
+		transform(m_buffer, c_block_bytes);
 		std::memset(m_buffer, 0, c_block_bytes - 8);
 	}
 
@@ -663,7 +674,7 @@ std::string SHA1::final() noexcept {
 	const auto be_u64 = __builtin_bswap64(total_hashed_bits);
 #endif
 	std::memcpy(&m_buffer[56], &be_u64, sizeof(be_u64));
-	transform(m_buffer);
+	transform(m_buffer, c_block_bytes);
 
 	// convert digest[] to a string
 	std::string result(40, '\x00');

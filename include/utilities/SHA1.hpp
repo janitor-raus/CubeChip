@@ -28,10 +28,10 @@ class SHA1 {
 	std::uint32_t m_tail_size  = 0;
 	std::uint64_t m_transforms = 0;
 
-	void transform(const std::uint8_t* src) noexcept;
-	void transform_scalar(std::uint32_t* block) noexcept;
-	void transform_x86(const std::uint8_t* src) noexcept;
-	void transform_arm(const std::uint8_t* src) noexcept;
+	void transform(const std::uint8_t* src, std::size_t byte_count) noexcept;
+	void transform_scalar(const std::uint8_t* src, std::size_t byte_count) noexcept;
+	void transform_x86(const std::uint8_t* src, std::size_t byte_count) noexcept;
+	void transform_arm(const std::uint8_t* src, std::size_t byte_count) noexcept;
 
 public:
 	static constexpr auto c_block_size  = 16u; // number of 32-bit integers per SHA1 block

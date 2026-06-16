@@ -61,7 +61,7 @@ public:
 	 *         or std::nullopt if more data remains.
 	 */
 	[[nodiscard("The resulting SHA1 string may be lost!")]]
-	auto advance(const char* data, std::size_t block_step = 64) noexcept
+	auto advance(const char* data, std::size_t block_step = 512) noexcept
 		-> std::optional<std::string>
 	{
 		const auto processed_bytes = get_processed();
