@@ -657,12 +657,12 @@ std::string SHA1::final() noexcept {
 	}
 
 	// append total_hashed_bits as a big-endian 64-bit integer at bytes [56..63]
-	const auto hi = std::uint32_t(total_hashed_bits >> 32);
-	const auto lo = std::uint32_t(total_hashed_bits >>  0);
-	m_buffer[56] = std::uint8_t(hi >> 24); m_buffer[57] = std::uint8_t(hi >> 16);
-	m_buffer[58] = std::uint8_t(hi >>  8); m_buffer[59] = std::uint8_t(hi >>  0);
-	m_buffer[60] = std::uint8_t(lo >> 24); m_buffer[61] = std::uint8_t(lo >> 16);
-	m_buffer[62] = std::uint8_t(lo >>  8); m_buffer[63] = std::uint8_t(lo >>  0);
+#ifdef _MSC_VER
+	const auto be_u64 = _byteswap_uint64(total_hashed_bits);
+#else
+	const auto be_u64 = __builtin_bswap64(total_hashed_bits);
+#endif
+	std::memcpy(&m_buffer[56], &be_u64, sizeof(be_u64));
 	transform(m_buffer);
 
 	// convert digest[] to a string
