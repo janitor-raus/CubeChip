@@ -26,35 +26,40 @@ class SHA1 {
 	std::uint32_t m_digest[c_digest_size]{};
 
 	std::uint32_t m_tail_size  = 0;
-	std::uint64_t m_transforms = 0;
+	std::uint64_t m_hash_bytes = 0;
 
-	void transform(const std::uint8_t* src, std::size_t byte_count) noexcept;
-	void transform_scalar(const std::uint8_t* src, std::size_t byte_count) noexcept;
-	void transform_x86(const std::uint8_t* src, std::size_t byte_count) noexcept;
-	void transform_arm(const std::uint8_t* src, std::size_t byte_count) noexcept;
+private:
+	static void transform_scalar(std::uint32_t* digest, const std::uint8_t* src, std::size_t transforms) noexcept;
+	static void transform_hw_x86(std::uint32_t* digest, const std::uint8_t* src, std::size_t transforms) noexcept;
+	static void transform_hw_arm(std::uint32_t* digest, const std::uint8_t* src, std::size_t transforms) noexcept;
 
 public:
+	static void transform       (std::uint32_t* digest, const std::uint8_t* src, std::size_t transforms) noexcept;
+
 	static constexpr auto c_block_size  = 16u; // number of 32-bit integers per SHA1 block
 	static constexpr auto c_block_bytes = c_block_size * sizeof(std::uint32_t);
+
+	static bool has_hardware_support() noexcept;
 
 public:
 	SHA1() noexcept { reset(); }
 
-	static bool has_hardware_support() noexcept;
-
 	void reset() noexcept;
 	void update(const char* src, std::size_t byte_count) noexcept;
 
+	[[nodiscard]]
 	std::string final() noexcept;
 
 public:
-	static std::string from(const char* data, std::size_t size) noexcept {
+	[[nodiscard]] static
+	std::string from(const char* data, std::size_t size) noexcept {
 		SHA1 checksum;
 		checksum.update(data, size);
 		return checksum.final();
 	}
 
-	static std::string from(std::span<const char> file_span) noexcept {
+	[[nodiscard]] static
+	std::string from(std::span<const char> file_span) noexcept {
 		return from(file_span.data(), file_span.size());
 	}
 };
