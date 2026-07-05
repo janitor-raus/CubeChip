@@ -60,7 +60,7 @@ public:
 	 * @return The completed SHA1 hash string if all data has been processed,
 	 *         or std::nullopt if more data remains.
 	 */
-	[[nodiscard("The resulting SHA1 string may be lost!")]]
+	[[nodiscard("The resulting SHA1 string may be lost if not observed!")]]
 	auto advance(const char* data, std::size_t block_step = 512) noexcept
 		-> std::optional<std::string>
 	{

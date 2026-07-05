@@ -47,18 +47,18 @@ public:
 	void reset() noexcept;
 	void update(const char* src, std::size_t byte_count) noexcept;
 
-	[[nodiscard]]
+	[[nodiscard("The resulting SHA1 string will be lost if not stored!")]]
 	std::string final() noexcept;
 
 public:
-	[[nodiscard]] static
+	[[nodiscard("The resulting SHA1 string will be lost if not stored!")]] static
 	std::string from(const char* data, std::size_t size) noexcept {
 		SHA1 checksum;
 		checksum.update(data, size);
 		return checksum.final();
 	}
 
-	[[nodiscard]] static
+	[[nodiscard("The resulting SHA1 string will be lost if not stored!")]] static
 	std::string from(std::span<const char> file_span) noexcept {
 		return from(file_span.data(), file_span.size());
 	}
