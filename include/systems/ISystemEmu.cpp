@@ -35,7 +35,7 @@ ISystemEmu::ISystemEmu(std::string_view window_name) noexcept
 	prepare_user_interface();
 }
 
-void ISystemEmu::start_workers() noexcept {
+void ISystemEmu::start_worker() noexcept {
 	if (!m_system_thread.joinable()) {
 		initialize_family();
 		initialize_system();
@@ -50,6 +50,11 @@ void ISystemEmu::start_workers() noexcept {
 
 			do {
 				if (m_pacer.is_frame_ready(is_paused || !is_bench)) {
+					if (has_system_state(EmuState::RESET)) {
+						perform_instance_reset();
+						sub_system_state(EmuState::NOT_RUNNING);
+					}
+
 					m_cached_system_state = EmuState(get_system_state());
 					is_bench   = has_cached_system_state(EmuState::BENCH);
 					is_paused  = has_cached_system_state(EmuState::ANY_PAUSE);
@@ -71,7 +76,7 @@ void ISystemEmu::start_workers() noexcept {
 	}
 }
 
-void ISystemEmu::stop_workers() noexcept {
+void ISystemEmu::stop_worker() noexcept {
 	if (m_system_thread.joinable()) {
 		m_system_thread.request_stop();
 		m_system_thread.join();
@@ -80,12 +85,26 @@ void ISystemEmu::stop_workers() noexcept {
 
 /*==================================================================*/
 
-std::string ISystemEmu::make_system_id(u32 id, std::string_view identifier) noexcept {
-	return ::join_with(".", std::to_string(id), identifier);
+void ISystemEmu::perform_instance_reset() noexcept {
+	m_benched_frames = 0;
+	m_elapsed_frames = 0;
+	m_input.reset_state();
+	reset_family_data();
+	reset_system_data();
 }
+
+void ISystemEmu::request_instance_reset() noexcept {
+	add_system_state(EmuState::RESET);
+}
+
+/*==================================================================*/
 
 std::string ISystemEmu::get_system_id() const noexcept {
 	return make_system_id(instance_id, get_descriptor().family_name);
+}
+
+std::string ISystemEmu::make_system_id(u32 id, std::string_view identifier) noexcept {
+	return ::join_with(".", std::to_string(id), identifier);
 }
 
 /*==================================================================*/

@@ -63,32 +63,46 @@ protected:
 
 /*==================================================================*/
 
-private:
-	u32  m_tick_last{};
-	u32  m_tick_span{};
+protected:
+	class HexInput {
+		u32  m_tick_last{};
+		u32  m_tick_span{};
 
-	u32  m_keys_this{}; // bitfield of key states in this frame
-	u32  m_keys_last{}; // bitfield of key states in last frame
-	u32  m_keys_hide{}; // bitfield of keys excluded from input checks
-	u32  m_keys_loop{}; // bitfield of keys repeating input on Fx0A
+		u32  m_keys_this{}; // bitfield of key states in this frame
+		u32  m_keys_last{}; // bitfield of key states in last frame
+		u32  m_keys_hide{}; // bitfield of keys excluded from input checks
+		u32  m_keys_loop{}; // bitfield of keys repeating input on Fx0A
+
+		u8*  m_key_reg_ptr{};
+
+	public:
+		void reset() noexcept {
+			m_tick_last = m_tick_span = 0;
+			m_keys_this = m_keys_last = 0;
+			m_keys_hide = m_keys_loop = 0;
+			m_key_reg_ptr = nullptr;
+		}
+
+		void set_reg_ptr(u8* reg_ptr) noexcept { m_key_reg_ptr = reg_ptr; }
+		auto* get_reg_ptr() const noexcept { return m_key_reg_ptr; }
+
+		void update(BasicKeyboard& input, const SimpleKeyVec& binds) noexcept;
+		bool catch_press(u32 frame_count) noexcept;
+
+		bool is_key_held_P1(u32 key_index) const noexcept;
+		bool is_key_held_P2(u32 key_index) const noexcept;
+	} m_keypad;
 
 protected:
-	u8*  m_key_reg_ref{};
-
-protected:
-	void update_key_states() noexcept;
+	void update_keypad_data() noexcept;
 	void load_preset_binds() noexcept;
 
 	template <IsContiguousContainer T>
 		requires (SameValueTypes<T, decltype(m_custom_binds)>)
 	void load_custom_binds(const T& binds) noexcept {
 		m_custom_binds.assign(std::begin(binds), std::end(binds));
-		m_keys_last = m_keys_this = m_keys_hide = 0;
+		m_keypad.reset();
 	}
-
-	bool catch_key_press(u8* key_reg) noexcept;
-	bool is_key_held_P1(u32 key_index) const noexcept;
-	bool is_key_held_P2(u32 key_index) const noexcept;
 
 /*==================================================================*/
 
@@ -257,6 +271,8 @@ protected:
 
 		constexpr void push(u32 value) noexcept { m_data[m_head++ & 0xF] = value; }
 		constexpr u32  pop()           noexcept { return m_data[--m_head & 0xF]; }
+
+		constexpr void clear() noexcept { m_head = 0; m_data.fill(0); }
 	} m_stack;
 
 	std::array<u8, 16>
@@ -290,13 +306,14 @@ protected:
 	virtual void push_audio_data() = 0;
 	virtual void push_video_data() = 0;
 
-	void handle_cycle_loop() noexcept;
+	void execute_cycle_loop() noexcept;
 
 protected:
 	IFamily_CHIP8(std::size_t W, std::size_t H) noexcept;
 
 private:
 	void initialize_family() noexcept override final;
+	void reset_family_data() noexcept override final;
 
 public:
 	void main_system_loop() override final;

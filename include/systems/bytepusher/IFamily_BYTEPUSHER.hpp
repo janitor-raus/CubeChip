@@ -59,9 +59,10 @@ protected:
 
 private:
 	void initialize_family() noexcept override final;
+	void reset_family_data() noexcept override final {}
 
 public:
-	void main_system_loop() override;
+	void main_system_loop() override final;
 
 protected:
 	static constexpr std::array<RGBA, 256> c_bit_colors = {

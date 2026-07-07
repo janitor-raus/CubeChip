@@ -42,6 +42,11 @@ void BasicKeyboard::advance_state() noexcept {
 	std::copy_n(EXEC_POLICY(unseq) (*get_active_buffer()).data(), c_total_keys, m_buffers->m_new_buf.data());
 }
 
+void BasicKeyboard::reset_state() noexcept {
+	m_buffers->m_new_buf.fill(false);
+	m_buffers->m_old_buf.fill(false);
+}
+
 /*==================================================================*/
 
 void BasicMouse::update_states() noexcept {

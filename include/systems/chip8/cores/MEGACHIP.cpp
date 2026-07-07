@@ -24,12 +24,35 @@ void MEGACHIP::initialize_system() noexcept {
 	m_current_pc = c_sys_boot_pos;
 
 	set_display_properties(Resolution::LO);
+	init_font_sprite_colors();
 
 	m_display_device.metadata().edit([](auto& meta) noexcept {
 		meta.minimum_zoom = 2;
 		meta.inner_margin = 4;
 		meta.enabled = true;
 	});
+}
+
+void MEGACHIP::reset_system_data() noexcept {
+	m_memory.clear();
+
+	copy_file_image_to(m_memory, c_game_load_pos);
+	copy_font_data_to(m_memory, 180);
+
+	set_display_properties(Resolution::LO);
+
+	m_display_map.fill();
+	m_old_render_map.fill();
+	m_background_map.fill();
+	m_collision_map.fill();
+
+	m_color_palette.fill(0);
+
+	m_track.reset();
+	m_texture.reset();
+
+	m_current_pc = c_sys_boot_pos;
+	m_blend_mode = BlendMode::ALPHA_BLEND;
 }
 
 void MEGACHIP::instruction_loop() noexcept {
@@ -559,7 +582,6 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 		set_display_properties(Resolution::MC);
 
 		set_blend_callable(BlendMode::ALPHA_BLEND);
-		init_font_sprite_colors();
 		scrap_all_video_buffers();
 
 		m_texture.reset();
@@ -962,10 +984,10 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 	#pragma region E instruction branch
 
 	void MEGACHIP::instruction_Ex9E(u32 X) noexcept {
-		if (is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
+		if (m_keypad.is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
 	}
 	void MEGACHIP::instruction_ExA1(u32 X) noexcept {
-		if (!is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
+		if (!m_keypad.is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
 	}
 
 	#pragma endregion
@@ -978,7 +1000,7 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 		::assign_cast(m_registers_V[X], m_delay_timer);
 	}
 	void MEGACHIP::instruction_Fx0A(u32 X) noexcept {
-		m_key_reg_ref = &m_registers_V[X];
+		m_keypad.set_reg_ptr(&m_registers_V[X]);
 		trigger_interrupt(Interrupt::INPUT);
 	}
 	void MEGACHIP::instruction_Fx15(u32 X) noexcept {

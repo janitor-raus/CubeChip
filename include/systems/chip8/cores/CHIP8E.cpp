@@ -35,6 +35,16 @@ void CHIP8E::initialize_system() noexcept {
 	});
 }
 
+void CHIP8E::reset_system_data() noexcept {
+	copy_file_image_to(m_memory, c_game_load_pos);
+	copy_font_data_to(m_memory, 80);
+
+	m_display_map.fill();
+
+	m_current_pc   = c_sys_boot_pos;
+	m_standard_cpf = c_sys_speed_hi;
+}
+
 void CHIP8E::instruction_loop() noexcept {
 	const auto target_cpf = has_cached_system_state(EmuState::BENCH)
 		&& m_debugger_cpf ? m_debugger_cpf : m_standard_cpf;
@@ -528,10 +538,10 @@ void CHIP8E::push_video_data() noexcept {
 	#pragma region E instruction branch
 
 	void CHIP8E::instruction_Ex9E(u32 X) noexcept {
-		if (is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
+		if (m_keypad.is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
 	}
 	void CHIP8E::instruction_ExA1(u32 X) noexcept {
-		if (!is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
+		if (!m_keypad.is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
 	}
 
 	#pragma endregion
@@ -547,7 +557,7 @@ void CHIP8E::push_video_data() noexcept {
 		::assign_cast(m_registers_V[X], m_delay_timer);
 	}
 	void CHIP8E::instruction_Fx0A(u32 X) noexcept {
-		m_key_reg_ref = &m_registers_V[X];
+		m_keypad.set_reg_ptr(&m_registers_V[X]);
 		trigger_interrupt(Interrupt::INPUT);
 	}
 	void CHIP8E::instruction_Fx15(u32 X) noexcept {

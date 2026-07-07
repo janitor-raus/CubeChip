@@ -34,6 +34,19 @@ void SCHIP_MODERN::initialize_system() noexcept {
 	});
 }
 
+void SCHIP_MODERN::reset_system_data() noexcept {
+	m_memory.clear();
+
+	copy_file_image_to(m_memory, c_game_load_pos);
+	copy_font_data_to(m_memory, 240);
+
+	m_display_map.fill().resize(
+		c_sys_screen_W/2, c_sys_screen_H/2);
+
+	m_current_pc   = c_sys_boot_pos;
+	m_standard_cpf = c_sys_speed_lo;
+}
+
 void SCHIP_MODERN::instruction_loop() noexcept {
 	const auto target_cpf = has_cached_system_state(EmuState::BENCH)
 		&& m_debugger_cpf ? m_debugger_cpf : m_standard_cpf;
@@ -561,10 +574,10 @@ void SCHIP_MODERN::scroll_display_rt() noexcept {
 	#pragma region E instruction branch
 
 	void SCHIP_MODERN::instruction_Ex9E(u32 X) noexcept {
-		if (is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
+		if (m_keypad.is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
 	}
 	void SCHIP_MODERN::instruction_ExA1(u32 X) noexcept {
-		if (!is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
+		if (!m_keypad.is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
 	}
 
 	#pragma endregion
@@ -577,7 +590,7 @@ void SCHIP_MODERN::scroll_display_rt() noexcept {
 		::assign_cast(m_registers_V[X], m_delay_timer);
 	}
 	void SCHIP_MODERN::instruction_Fx0A(u32 X) noexcept {
-		m_key_reg_ref = &m_registers_V[X];
+		m_keypad.set_reg_ptr(&m_registers_V[X]);
 		trigger_interrupt(Interrupt::INPUT);
 	}
 	void SCHIP_MODERN::instruction_Fx15(u32 X) noexcept {

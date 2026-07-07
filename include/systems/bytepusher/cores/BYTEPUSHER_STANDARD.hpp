@@ -80,7 +80,8 @@ public:
 	{}
 
 private:
-	void initialize_system() noexcept override;
+	void initialize_system() noexcept override final;
+	void reset_system_data() noexcept override final;
 };
 
 #endif

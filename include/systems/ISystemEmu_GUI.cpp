@@ -63,6 +63,12 @@ void ISystemEmu::prepare_user_interface() noexcept {
 			}
 		}
 	));
+	m_frontend_hooks.emplace_back(UserInterface::register_menu(
+		m_workspace_host.get_window_label(), { 51, "System" },
+		[&]() noexcept {
+			if (MenuItem("Reset", "F8")) { request_instance_reset(); }
+		}
+	));
 
 	m_frontend_hooks.emplace_back(UserInterface::register_menu(
 		m_workspace_host.get_window_label(), { 59, "System" },

@@ -32,6 +32,11 @@ void BYTEPUSHER_STANDARD::initialize_system() noexcept {
 	});
 }
 
+void BYTEPUSHER_STANDARD::reset_system_data() noexcept {
+	m_memory.clear();
+	copy_file_image_to(m_memory, 0);
+}
+
 /*==================================================================*/
 
 void BYTEPUSHER_STANDARD::handle_cycle_loop() noexcept {

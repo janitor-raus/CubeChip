@@ -35,6 +35,10 @@ class SCHIP_LEGACY final : public IFamily_CHIP8 {
 		return Family::validate_program(file, c_game_load_pos, c_sys_memory_size);
 	}
 
+	u8 get_avail_quirks() const noexcept override final {
+		return X1_INC_I_REG;
+	}
+
 public:
 	static constexpr SystemDescriptor descriptor = {
 		0, Family::family_pretty_name, Family::family_name, Family::family_desc,
@@ -42,12 +46,8 @@ public:
 		c_supported_extensions, validate_program
 	};
 
-	const SystemDescriptor& get_descriptor() const noexcept override {
+	const SystemDescriptor& get_descriptor() const noexcept override final {
 		return descriptor;
-	}
-
-	u8 get_avail_quirks() const noexcept override {
-		return X1_INC_I_REG;
 	}
 
 /*==================================================================*/
@@ -69,12 +69,13 @@ public:
 	{}
 
 private:
-	void initialize_system() noexcept override;
+	void initialize_system() noexcept override final;
+	void reset_system_data() noexcept override final;
 
 	void instruction_loop() noexcept override final;
 
-	void push_audio_data() noexcept override;
-	void push_video_data() noexcept override;
+	void push_audio_data() noexcept override final;
+	void push_video_data() noexcept override final;
 
 	void scroll_display_dn(u32 N) noexcept;
 	void scroll_display_lt() noexcept;

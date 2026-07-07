@@ -17,7 +17,7 @@ void XOCHIP::initialize_system() noexcept {
 	add_quirk(WRAP_SPRITES);
 
 	copy_file_image_to(m_memory, c_game_load_pos);
-	copy_font_data_to(m_memory, 80);
+	copy_font_data_to(m_memory, 240);
 
 	m_base_system_framerate = c_sys_refresh_rate;
 
@@ -27,7 +27,6 @@ void XOCHIP::initialize_system() noexcept {
 
 	m_current_pc = c_sys_boot_pos;
 	m_standard_cpf = c_sys_speed_lo;
-	m_bit_colors = s_bit_colors;
 
 	m_display_device.metadata().edit([&](auto& meta) noexcept {
 		meta.minimum_zoom = 4;
@@ -35,6 +34,30 @@ void XOCHIP::initialize_system() noexcept {
 		meta.texture_tint = m_bit_colors[0];
 		meta.enabled = true;
 	});
+}
+
+void XOCHIP::reset_system_data() noexcept {
+	m_memory.clear();
+
+	copy_file_image_to(m_memory, c_game_load_pos);
+	copy_font_data_to(m_memory, 80);
+
+	m_display_map[P0].fill().resize(
+		c_sys_screen_W/2, c_sys_screen_H/2);
+	m_display_map[P1].fill().resize(
+		c_sys_screen_W/2, c_sys_screen_H/2);
+	m_display_map[P2].fill().resize(
+		c_sys_screen_W/2, c_sys_screen_H/2);
+	m_display_map[P3].fill().resize(
+		c_sys_screen_W/2, c_sys_screen_H/2);
+
+	m_current_pc   = c_sys_boot_pos;
+	m_standard_cpf = c_sys_speed_lo;
+	m_bit_colors   = s_bit_colors;
+	m_plane_mask   = 0x1;
+
+	set_pattern_pitch(64);
+	m_pulse_pattern_data = c_default_pattern_data;
 }
 
 void XOCHIP::instruction_loop() noexcept {
@@ -256,7 +279,7 @@ void XOCHIP::push_audio_data() noexcept {
 
 	if (has_cached_system_state(EmuState::ANY_PAUSE)) { return; }
 	m_display_device.metadata().edit([&](auto& meta) noexcept {
-		meta.set_border_color_if(!!m_voices[VOICE::BUZZER], m_bit_colors[1]);
+		meta.set_border_color_if(!!m_voices[VOICE::BUZZER], get_bit_color(1));
 	});
 }
 
@@ -295,7 +318,7 @@ void XOCHIP::push_video_data() noexcept {
 
 	m_display_device.swapchain().acquire([&](auto& frame) noexcept {
 		frame.metadata = m_display_device.metadata().copy();
-		frame.copy_from(composite_buffer, [&](auto pixel) noexcept { return m_bit_colors[pixel]; });
+		frame.copy_from(composite_buffer, [&](auto pixel) noexcept { return get_bit_color(pixel); });
 	});
 }
 
@@ -702,10 +725,10 @@ void XOCHIP::scroll_display_rt() noexcept {
 	#pragma region E instruction branch
 
 	void XOCHIP::instruction_Ex9E(u32 X) noexcept {
-		if (is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
+		if (m_keypad.is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
 	}
 	void XOCHIP::instruction_ExA1(u32 X) noexcept {
-		if (!is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
+		if (!m_keypad.is_key_held_P1(m_registers_V[X])) { skip_instruction(); }
 	}
 
 	#pragma endregion
@@ -730,7 +753,7 @@ void XOCHIP::scroll_display_rt() noexcept {
 		::assign_cast(m_registers_V[X], m_delay_timer);
 	}
 	void XOCHIP::instruction_Fx0A(u32 X) noexcept {
-		m_key_reg_ref = &m_registers_V[X];
+		m_keypad.set_reg_ptr(&m_registers_V[X]);
 		trigger_interrupt(Interrupt::INPUT);
 	}
 	void XOCHIP::instruction_Fx15(u32 X) noexcept {

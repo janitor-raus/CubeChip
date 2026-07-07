@@ -61,7 +61,7 @@ ApplicationHost::ApplicationHost() noexcept {
 
 void ApplicationHost::SystemInstance::StopSystemThread::operator()(ISystemEmu* ptr) noexcept {
 	if (ptr) {
-		ptr->stop_workers();
+		ptr->stop_worker();
 		ptr->~ISystemEmu();
 		::operator delete(ptr, std::align_val_t(HDIS));
 	}
@@ -134,7 +134,7 @@ void ApplicationHost::insert_system_instance(ISystemEmu* ptr) noexcept {
 	auto& system = m_systems[m_focus_mru.front()];
 
 	system.core.reset(ptr);
-	system->start_workers();
+	system->start_worker();
 }
 
 /*==================================================================*/
@@ -320,11 +320,12 @@ void ApplicationHost::handle_main_hotkeys() noexcept {
 				descriptor.system_pretty_name, m_focus_mru.front());
 			unload_system_instance(); return;
 		}
-		//if (s_input.is_pressed(KEY(BACKSPACE))) {
-		//	// XXX - need to perform manual system reset now
-		//	blog.info("Emulator core restarted manually.");
-		//	return;
-		//}
+		if (s_input.is_pressed(KEY(F8))) {
+			system->request_instance_reset();
+			blog.info("System '{}' ({}) restarted by hotkey.",
+				descriptor.system_pretty_name, m_focus_mru.front());
+			return;
+		}
 		if (s_input.is_pressed(KEY(F9))) {
 			if (auto paused = system->try_pause_system()) {
 				blog.info("System '{}' ({}) {} by hotkey!",

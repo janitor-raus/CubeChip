@@ -32,7 +32,7 @@ enum BIC_Button : unsigned {
 /*==================================================================*/
 
 class BasicKeyboard final {
-	static constexpr size_t c_total_keys = SDL_SCANCODE_COUNT;
+	static constexpr std::size_t c_total_keys = SDL_SCANCODE_COUNT;
 
 public:
 	using Buffer = std::array<bool, c_total_keys>;
@@ -76,6 +76,7 @@ public:
 	bool is_released(SDL_Scancode key) const noexcept;
 
 	void advance_state() noexcept;
+	void reset_state() noexcept;
 };
 
 /*==================================================================*/

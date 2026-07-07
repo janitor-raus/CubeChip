@@ -42,7 +42,7 @@ public:
 		c_supported_extensions, validate_program
 	};
 
-	const SystemDescriptor& get_descriptor() const noexcept override {
+	const SystemDescriptor& get_descriptor() const noexcept override final {
 		return descriptor;
 	}
 
@@ -64,12 +64,13 @@ public:
 	{}
 
 private:
-	void initialize_system() noexcept override;
+	void initialize_system() noexcept override final;
+	void reset_system_data() noexcept override final;
 
 	void instruction_loop() noexcept override final;
 
-	void push_audio_data() noexcept override;
-	void push_video_data() noexcept override;
+	void push_audio_data() noexcept override final;
+	void push_video_data() noexcept override final;
 
 /*==================================================================*/
 	#pragma region 0 instruction branch

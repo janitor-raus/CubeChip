@@ -35,7 +35,7 @@ class CHIP8_MODERN final : public IFamily_CHIP8 {
 		return Family::validate_program(file, c_game_load_pos, c_sys_memory_size);
 	}
 
-	u8 get_avail_quirks() const noexcept override {
+	u8 get_avail_quirks() const noexcept override final {
 		return RESET_VF_REG | SHIFT_VX_REG | NO_INC_I_REG | AWAIT_VBLANK | WRAP_SPRITES;
 	}
 
@@ -46,7 +46,7 @@ public:
 		c_supported_extensions, validate_program
 	};
 
-	const SystemDescriptor& get_descriptor() const noexcept override {
+	const SystemDescriptor& get_descriptor() const noexcept override final {
 		return descriptor;
 	}
 
@@ -66,12 +66,13 @@ public:
 	{}
 
 private:
-	void initialize_system() noexcept override;
+	void initialize_system() noexcept override final;
+	void reset_system_data() noexcept override final;
 
 	void instruction_loop() noexcept override final;
 
-	void push_audio_data() noexcept override;
-	void push_video_data() noexcept override;
+	void push_audio_data() noexcept override final;
+	void push_video_data() noexcept override final;
 
 /*==================================================================*/
 	#pragma region 0 instruction branch

@@ -56,11 +56,6 @@ void IFamily_BYTEPUSHER::prepare_user_interface() noexcept {
 		osd::simple_text_overlay(copy_statistics_string());
 	});
 
-	m_frontend_hooks.emplace_back(UserInterface::register_menu(m_workspace_host,
-	{ 9999, "Debug" }, [&]() noexcept {
-		m_display_device.render_settings_menu();
-	}));
-
 	m_memory_editor.set_preview_endianness(MemoryEditor::Endian::BE);
 	m_memview_window.edit_callbacks().window_dock =
 	[&](bool window_open, auto) noexcept {
@@ -69,8 +64,8 @@ void IFamily_BYTEPUSHER::prepare_user_interface() noexcept {
 		}
 	};
 
-	m_frontend_hooks.emplace_back(UserInterface::register_menu(m_workspace_host,
-	{ 60, "System" }, [&]() noexcept {
+	m_frontend_hooks.emplace_back(UserInterface::register_menu(
+	m_workspace_host, { 60, "System" }, [&]() noexcept {
 		if (BeginMenu("Emulation")) {
 			const auto widget_width = CalcTextSize("F").x * 28.0f;
 			const bool is_benching = has_cached_system_state(EmuState::BENCH);

@@ -33,17 +33,17 @@ enum EmuState : u8 {
 	NORMAL = 0x00, // normal operation (default state)
 	HIDDEN = 0x01, // window is hidden (unfocused or minimized)
 	PAUSED = 0x02, // paused by hotkey (explicitly a user action)
-	HALTED = 0x04, // normal end path  (system-specific, e.g. powered-off)
+	HALTED = 0x04, // normal stop path (system-specific, e.g. powered-off)
 	FATAL  = 0x08, // fatal error path (system-specific, e.g. illegal ops)
 	BENCH  = 0x10, // benchmarking mode (cpu de-limited)
 	STATS  = 0x20, // collect/display OSD stats
-	DUMMY  = 0x40, // dummy mode (no audio/video?)
+	RESET  = 0x40, // in-progress system reset
 	DEBUG  = 0x80, // debugger enabled (reserved for future use)
 
-	NOT_RUNNING  = HIDDEN | PAUSED | HALTED | FATAL, // emulation cannot progress
-	CANNOT_PAUSE = HIDDEN | HALTED | FATAL, // pause-trigger is not allowed
-	ANY_PAUSE    = HIDDEN | PAUSED, // emulation is currently paused
-	ANY_STOP     = HALTED | FATAL, // emulation is currently stopped
+	NOT_RUNNING  = HIDDEN | PAUSED | HALTED | FATAL | RESET, // emulation cannot progress
+	CANNOT_PAUSE = HIDDEN | HALTED | FATAL | RESET, // pause-trigger is not allowed
+	ANY_PAUSE    = HIDDEN | PAUSED | RESET, // emulation is currently paused
+	ANY_STOP     = HALTED | FATAL | RESET, // emulation is currently stopped
 };
 
 struct SimpleKeyMapping {
@@ -51,8 +51,8 @@ struct SimpleKeyMapping {
 	SDL_Scancode key; // primary key mapping
 	SDL_Scancode alt; // alternative key mapping
 };
+using SimpleKeyVec = std::vector<SimpleKeyMapping>;
 
-//class HomeDirManager;
 struct SystemDescriptor;
 
 /*==================================================================*/
@@ -156,9 +156,19 @@ private:
 	void prepare_user_interface() noexcept;
 
 public:
-	void start_workers() noexcept;
-	void stop_workers() noexcept;
+	void start_worker() noexcept;
+	void stop_worker() noexcept;
 
+private:
+	virtual void reset_family_data() noexcept = 0;
+	virtual void reset_system_data() noexcept = 0;
+
+	void perform_instance_reset() noexcept;
+
+public:
+	void request_instance_reset() noexcept;
+
+public:
 	virtual const SystemDescriptor& get_descriptor() const noexcept = 0;
 	static std::string make_system_id(u32 id, std::string_view identifier) noexcept;
 
@@ -185,8 +195,7 @@ protected:
 	) noexcept -> const std::string*;
 
 protected:
-	std::vector<SimpleKeyMapping>
-		m_custom_binds;
+	SimpleKeyVec m_custom_binds;
 
 protected:
 	WindowHost   m_memview_window;

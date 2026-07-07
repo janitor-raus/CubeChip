@@ -64,6 +64,9 @@ public:
 	constexpr void     set(unsigned time) noexcept { m_timer_old = std::exchange(m_timer_new, time); }
 	constexpr void     dec()              noexcept { set(m_timer_new ? m_timer_new - 1 : 0); }
 
+	// Reset the timer to zero, clearing both old and new values
+	constexpr void reset() noexcept { m_timer_old = m_timer_new = 0; }
+
 	// Check if the timer is currently rising (intro)
 	constexpr bool intro() const noexcept { return m_timer_new && !m_timer_old; }
 

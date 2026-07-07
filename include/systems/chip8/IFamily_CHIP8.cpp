@@ -44,23 +44,37 @@ void IFamily_CHIP8::initialize_family() noexcept {
 	}
 }
 
+void IFamily_CHIP8::reset_family_data() noexcept {
+	for (auto& voice : m_voices) { voice.timer.reset(); }
+	for (auto& v_reg : m_registers_V) { v_reg = 0; }
+
+	m_last_voice_index = 0;
+	m_delay_timer = 0;
+	m_register_I = 0;
+	m_interrupt = Interrupt::CLEAR;
+	m_stack.clear();
+	m_keypad.reset();
+}
+
 /*==================================================================*/
 
-void IFamily_CHIP8::update_key_states() noexcept {
-	if (!m_custom_binds.size()) { return; }
-
-	m_input.advance_state();
+void IFamily_CHIP8::HexInput::update(BasicKeyboard& input, const SimpleKeyVec& binds) noexcept {
+	input.advance_state();
 
 	m_keys_last = m_keys_this;
 	m_keys_this = 0;
 
-	for (const auto& mapping : m_custom_binds) {
-		if (m_input.is_held(mapping.key) || m_input.is_held(mapping.alt)) {
+	for (const auto& mapping : binds) {
+		if (input.is_held(mapping.key) || input.is_held(mapping.alt)) {
 			m_keys_this |= 1 << mapping.idx;
 		}
 	}
 
 	m_keys_loop &= m_keys_hide &= ~(m_keys_last ^ m_keys_this);
+}
+
+void IFamily_CHIP8::update_keypad_data() noexcept {
+	m_keypad.update(m_input, m_custom_binds);
 }
 
 void IFamily_CHIP8::load_preset_binds() noexcept {
@@ -75,10 +89,8 @@ void IFamily_CHIP8::load_preset_binds() noexcept {
 	load_custom_binds(std::span(default_key_mappings));
 }
 
-bool IFamily_CHIP8::catch_key_press(u8* key_reg) noexcept {
-	if (!m_custom_binds.size()) { return false; }
-
-	if (m_elapsed_frames >= m_tick_last + m_tick_span)
+bool IFamily_CHIP8::HexInput::catch_press(u32 frame_count) noexcept {
+	if (frame_count >= m_tick_last + m_tick_span)
 		[[unlikely]] { m_keys_last &= ~m_keys_loop; }
 
 	/**/const auto press_keys = m_keys_this & ~m_keys_last;
@@ -87,20 +99,23 @@ bool IFamily_CHIP8::catch_key_press(u8* key_reg) noexcept {
 		const auto valid_keys = press_diff ? press_diff : m_keys_loop;
 
 		m_keys_hide |= valid_keys;
-		m_tick_last  = m_elapsed_frames;
+		m_tick_last  = frame_count;
 		m_tick_span  = valid_keys != m_keys_loop ? 20 : 5;
 		m_keys_loop  = valid_keys & ~(valid_keys - 1);
-		::assign_cast(*key_reg, std::countr_zero(m_keys_loop));
+		if (m_key_reg_ptr) {
+			::assign_cast(*m_key_reg_ptr,
+				std::countr_zero(m_keys_loop));
+		}
 		//m_key_pitch = m_keys_loop ? std::min(m_key_pitch + 8, 80u) : 0;
 	}
 	return press_keys;
 }
 
-bool IFamily_CHIP8::is_key_held_P1(u32 key_index) const noexcept {
+bool IFamily_CHIP8::HexInput::is_key_held_P1(u32 key_index) const noexcept {
 	return m_keys_this & ~m_keys_hide & (0x01 << (key_index & 0xF));
 }
 
-bool IFamily_CHIP8::is_key_held_P2(u32 key_index) const noexcept {
+bool IFamily_CHIP8::HexInput::is_key_held_P2(u32 key_index) const noexcept {
 	return m_keys_this & ~m_keys_hide & (0x10 << (key_index & 0xF));
 }
 
@@ -136,7 +151,7 @@ void IFamily_CHIP8::handle_post_work_interrupts() noexcept {
 	switch (m_interrupt)
 	{
 		case Interrupt::INPUT:
-			if (catch_key_press(m_key_reg_ref)) {
+			if (m_keypad.catch_press(m_elapsed_frames)) {
 				m_interrupt = Interrupt::CLEAR;
 				start_voice_at(VOICE::BUZZER, 2);
 			}
@@ -179,7 +194,7 @@ void IFamily_CHIP8::jump_program_to(u32 next) noexcept {
 		{ trigger_interrupt(Interrupt::SOUND); }
 }
 
-void IFamily_CHIP8::handle_cycle_loop() noexcept {
+void IFamily_CHIP8::execute_cycle_loop() noexcept {
 	if (has_cached_system_state(EmuState::BENCH)) {
 		// avg time multiplier to cushion against slice jitter
 		static constexpr auto c_jitter_multiplier = 1.1f;
@@ -216,11 +231,11 @@ void IFamily_CHIP8::main_system_loop() {
 		return;
 	}
 
-	update_key_states();
+	update_keypad_data();
 
 	handle_timer_ticks();
 	handle_pre_work_interrupts();
-	handle_cycle_loop();
+	execute_cycle_loop();
 	handle_post_work_interrupts();
 
 	push_audio_data();

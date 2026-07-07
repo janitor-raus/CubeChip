@@ -35,6 +35,10 @@ class XOCHIP final : public IFamily_CHIP8 {
 		return Family::validate_program(file, c_game_load_pos, c_sys_memory_size);
 	}
 
+	u8 get_avail_quirks() const noexcept override final {
+		return RESET_VF_REG | SHIFT_VX_REG | NO_INC_I_REG | AWAIT_SCROLL | WRAP_SPRITES;
+	}
+
 public:
 	static constexpr SystemDescriptor descriptor = {
 		0, Family::family_pretty_name, Family::family_name, Family::family_desc,
@@ -42,12 +46,8 @@ public:
 		c_supported_extensions, validate_program,
 	};
 
-	const SystemDescriptor& get_descriptor() const noexcept override {
+	const SystemDescriptor& get_descriptor() const noexcept override final {
 		return descriptor;
-	}
-
-	u8 get_avail_quirks() const noexcept override {
-		return RESET_VF_REG | SHIFT_VX_REG | NO_INC_I_REG | AWAIT_SCROLL | WRAP_SPRITES;
 	}
 
 /*==================================================================*/
@@ -62,8 +62,6 @@ private:
 	Map2D<u8> m_display_map[4];
 
 /*==================================================================*/
-
-	std::array<RGBA, 16> m_bit_colors{};
 
 	// 332 RGB color mapping: SHR 5 | SHR 2 | SHR 0
 	// R/G: 0x00, 0x20, 0x40, 0x60, 0x80, 0xA0, 0xC0, 0xFF
@@ -134,6 +132,15 @@ private:
 		0xFFC00000, 0xFFC06000, 0xFFC0A000, 0xFFC0FF00,
 		0xFFFF0000, 0xFFFF6000, 0xFFFFA000, 0xFFFFFF00,
 	};
+
+	std::array<RGBA, 16> m_bit_colors{};
+
+	auto get_bit_color(u32 index) const noexcept {
+		index &= 0xF;
+		return m_bit_colors[index]
+			? m_bit_colors[index]
+			: s_bit_colors[index];
+	}
 
 /*==================================================================*/
 
@@ -212,10 +219,12 @@ private:
 	};
 
 	using PatternData = std::array<u8, 16>;
-	PatternData m_pulse_pattern_data = {
+	static constexpr PatternData c_default_pattern_data = {
 		0x0F, 0x00,	0x0F, 0x00, 0x0F, 0x00, 0x0F, 0x00,
 		0x0F, 0x00,	0x0F, 0x00, 0x0F, 0x00, 0x0F, 0x00,
 	};
+
+	PatternData m_pulse_pattern_data = c_default_pattern_data;
 
 	void set_pattern_pitch(s32 pitch) noexcept;
 
@@ -242,13 +251,15 @@ public:
 	{}
 
 private:
-	void initialize_system() noexcept override;
+	void initialize_system() noexcept override final;
+	void reset_system_data() noexcept override final;
+
 	void instruction_loop() noexcept override final;
 
-	void push_audio_data() noexcept override;
-	void push_video_data() noexcept override;
+	void push_audio_data() noexcept override final;
+	void push_video_data() noexcept override final;
 
-	void skip_instruction() noexcept override;
+	void skip_instruction() noexcept override final;
 
 	void scroll_display_up(u32 N) noexcept;
 	void scroll_display_dn(u32 N) noexcept;

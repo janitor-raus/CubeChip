@@ -137,6 +137,7 @@ public:
 		{ return mem[index & (N - 1)]; }
 
 	constexpr auto size() const noexcept { return N; }
+	constexpr auto clear() noexcept { mem.fill(T()); }
 
 	constexpr       auto* data()       noexcept { return mem.data(); }
 	constexpr const auto* data() const noexcept { return mem.data(); }
