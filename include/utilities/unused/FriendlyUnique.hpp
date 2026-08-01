@@ -29,8 +29,8 @@ public:
 	FriendlyUnique(const FriendlyUnique&) = delete;
 	FriendlyUnique& operator=(const FriendlyUnique&) = delete;
 
-	constexpr void reset(T* ptr = nullptr)   noexcept { m_ptr.reset(ptr); }
-	constexpr void replace(T* ptr = nullptr) noexcept { m_ptr.reset(); m_ptr.reset(ptr); }
+	constexpr void reset(T* ptr = nullptr)   noexcept { m_ptr.reset(ptr, D()); }
+	constexpr void replace(T* ptr = nullptr) noexcept { m_ptr.reset(); m_ptr.reset(ptr, D()); }
 
 	constexpr T* release()   noexcept { return m_ptr.release(); }
 	constexpr T* get() const noexcept { return m_ptr.get(); }

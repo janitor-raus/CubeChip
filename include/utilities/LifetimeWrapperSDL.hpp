@@ -13,20 +13,16 @@
 template <typename T>
 struct SDL_Deleter;
 
-#ifdef USE_FRIENDLY_UNIQUE
-	#include "FriendlyUnique.hpp"
+#include <memory>
 
-	// SDL_Unique is a unique pointer wrapper with SDL-specific deleters and
-	// in this case, through a FriendlyUnique wrapper for better usability.
-	template <typename T>
-	using SDL_Unique = FriendlyUnique<T, SDL_Deleter<T>>;
-#else
-	#include <memory>
+template <typename T>
+using SDL_Unique = std::unique_ptr<T, SDL_Deleter<T>>;
 
-	// SDL_Unique is a unique pointer with SDL-specific deleters.
-	template <typename T>
-	using SDL_Unique = std::unique_ptr<T, SDL_Deleter<T>>;
-#endif // USE_FRIENDLY_UNIQUE
+template <typename T>
+using SDL_Shared = std::shared_ptr<T>;
+
+template <typename T>
+using SDL_Weak = std::weak_ptr<T>;
 
 /*==================================================================*/
 
@@ -88,7 +84,10 @@ public:
 
 namespace sdl {
 	template <typename T>
-	[[nodiscard]] constexpr
-	auto make_unique(T* ptr) noexcept \
+	[[nodiscard]] auto make_unique(T* ptr) noexcept \
 		{ return SDL_Unique<T>(ptr); }
+
+	template <typename T>
+	[[nodiscard]] auto make_shared(T* ptr) noexcept \
+		{ return SDL_Shared<T>(ptr, SDL_Deleter<T>()); }
 }
