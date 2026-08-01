@@ -7,7 +7,6 @@
 #include "GAMEBOY_CLASSIC.hpp"
 #if defined(ENABLE_GAMEBOY_SYSTEM) && defined(ENABLE_GAMEBOY_CLASSIC)
 
-#include "BasicVideoSpec.hpp"
 #include "CoreRegistry.hpp"
 
 REGISTER_CORE(GAMEBOY_CLASSIC, ".gb")

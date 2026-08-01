@@ -594,12 +594,12 @@ void SHA1::transform(std::uint32_t* digest, const std::uint8_t* src, std::size_t
 }
 
 bool SHA1::has_hardware_support() noexcept {
-	#ifdef SHA1_X86_INTRINSICS
+#ifdef SHA1_X86_INTRINSICS
 	if (sha1_x86_supported()) { return true; }
-	#endif
-	#ifdef SHA1_ARM_INTRINSICS
+#endif
+#ifdef SHA1_ARM_INTRINSICS
 	if (sha1_arm_supported()) { return true; }
-	#endif
+#endif
 	return false;
 }
 
