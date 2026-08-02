@@ -105,10 +105,10 @@ static bool sha1_arm_supported() noexcept {
 
 static std::uint32_t block_mix(std::uint32_t* block, std::size_t i) noexcept {
 	return std::rotl(
-		block[(i + 0xD) & 0xF] ^
-		block[(i + 0x8) & 0xF] ^
-		block[(i + 0x2) & 0xF] ^
-		block[(i + 0x0) & 0xF], 1);
+		block[(i + 0xDu) & 0xFu] ^
+		block[(i + 0x8u) & 0xFu] ^
+		block[(i + 0x2u) & 0xFu] ^
+		block[(i + 0x0u) & 0xFu], 1);
 }
 
 /*------------------------------------------------------------------*/
@@ -120,7 +120,7 @@ static void R0(
 	std::uint32_t v, std::uint32_t& w, std::uint32_t x,
 	std::uint32_t y, std::uint32_t& z, std::size_t i
 ) noexcept {
-	z += ((w & (x ^ y)) ^ y) + block[i] + 0x5A827999 + std::rotl(v, 5);
+	z += ((w & (x ^ y)) ^ y) + block[i] + 0x5A827999u + std::rotl(v, 5);
 	w  = std::rotl(w, 30);
 }
 
@@ -130,7 +130,7 @@ static void R1(
 	std::uint32_t y, std::uint32_t& z, std::size_t i
 ) noexcept {
 	block[i] = block_mix(block, i);
-	z += ((w & (x ^ y)) ^ y) + block[i] + 0x5A827999 + std::rotl(v, 5);
+	z += ((w & (x ^ y)) ^ y) + block[i] + 0x5A827999u + std::rotl(v, 5);
 	w  = std::rotl(w, 30);
 }
 
@@ -140,7 +140,7 @@ static void R2(
 	std::uint32_t y, std::uint32_t& z, std::size_t i
 ) noexcept {
 	block[i] = block_mix(block, i);
-	z += (w ^ x ^ y) + block[i] + 0x6ED9EBA1 + std::rotl(v, 5);
+	z += (w ^ x ^ y) + block[i] + 0x6ED9EBA1u + std::rotl(v, 5);
 	w  = std::rotl(w, 30);
 }
 
@@ -150,7 +150,7 @@ static void R3(
 	std::uint32_t y, std::uint32_t& z, std::size_t i
 ) noexcept {
 	block[i] = block_mix(block, i);
-	z += (((w | x) & y) | (w & x)) + block[i] + 0x8F1BBCDC + std::rotl(v, 5);
+	z += (((w | x) & y) | (w & x)) + block[i] + 0x8F1BBCDCu + std::rotl(v, 5);
 	w  = std::rotl(w, 30);
 }
 
@@ -160,7 +160,7 @@ static void R4(
 	std::uint32_t y, std::uint32_t& z, std::size_t i
 ) noexcept {
 	block[i] = block_mix(block, i);
-	z += (w ^ x ^ y) + block[i] + 0xCA62C1D6 + std::rotl(v, 5);
+	z += (w ^ x ^ y) + block[i] + 0xCA62C1D6u + std::rotl(v, 5);
 	w  = std::rotl(w, 30);
 }
 
@@ -612,15 +612,15 @@ void SHA1::reset() noexcept {
 	m_digest[3] = 0x10325476u;
 	m_digest[4] = 0xC3D2E1F0u;
 
-	std::memset(m_buffer, 0, c_block_buffer_size);
-	m_hash_bytes = m_tail_size = 0;
+	std::memset(m_buffer, 0u, c_block_buffer_size);
+	m_hash_bytes = m_tail_size = 0u;
 }
 
 void SHA1::update(const char* src, std::size_t byte_count) noexcept {
 	auto data_buffer = reinterpret_cast<const std::uint8_t*>(src);
 
 	// if the buffer is partially filled, top it up first
-	if (m_tail_size > 0) {
+	if (m_tail_size > 0u) {
 		const auto remaining  = c_block_bytes - m_tail_size;
 		const auto chunk_size = std::uint32_t(byte_count < remaining ? byte_count : remaining);
 
@@ -631,14 +631,14 @@ void SHA1::update(const char* src, std::size_t byte_count) noexcept {
 		byte_count  -= chunk_size;
 
 		if (m_tail_size == c_block_bytes) {
-			transform(m_digest, m_buffer, 1);
-			m_tail_size   = 0;
+			transform(m_digest, m_buffer, 1u);
+			m_tail_size   = 0u;
 			m_hash_bytes += c_block_bytes;
 		}
 	}
 
 	// process full blocks directly from the input — no copy
-	if (const auto total_blocks = byte_count >> 6) {
+	if (const auto total_blocks = byte_count >> 6u) {
 		const auto total_bytes = total_blocks * c_block_bytes;
 
 		transform(m_digest, data_buffer, total_blocks);
@@ -648,7 +648,7 @@ void SHA1::update(const char* src, std::size_t byte_count) noexcept {
 	}
 
 	// stash any remaining partial block in the buffer
-	if (byte_count > 0) {
+	if (byte_count > 0u) {
 		std::memcpy(m_buffer, data_buffer, byte_count);
 		m_tail_size = std::uint32_t(byte_count);
 	}
@@ -656,16 +656,16 @@ void SHA1::update(const char* src, std::size_t byte_count) noexcept {
 
 SHA1::Digest SHA1::final() noexcept {
 	const auto total_hashed_bits =
-		8 * (m_hash_bytes + m_tail_size);
+		8u * (m_hash_bytes + m_tail_size);
 
 	// insert message end bit, then pad to end of block with zeroes
 	m_buffer[m_tail_size++] = std::uint8_t('\x80');
 
-	std::memset(m_buffer + m_tail_size, 0, c_block_buffer_size - m_tail_size);
+	std::memset(m_buffer + m_tail_size, 0u, c_block_buffer_size - m_tail_size);
 
-	if (m_tail_size > c_block_bytes - 8) {
-		transform(m_digest, m_buffer, 1);
-		std::memset(m_buffer, 0, c_block_bytes - 8);
+	if (m_tail_size > c_block_bytes - 8u) {
+		transform(m_digest, m_buffer, 1u);
+		std::memset(m_buffer, 0u, c_block_bytes - 8u);
 	}
 
 	// append total_hashed_bits as a big-endian 64-bit integer at bytes [56..63]
@@ -675,10 +675,19 @@ SHA1::Digest SHA1::final() noexcept {
 	const auto be_u64 = __builtin_bswap64(total_hashed_bits);
 #endif
 	std::memcpy(&m_buffer[56], &be_u64, sizeof(be_u64));
-	transform(m_digest, m_buffer, 1);
+	transform(m_digest, m_buffer, 1u);
 
 	Digest digest{};
-	std::memcpy(digest.raw.data(), m_digest, c_digest_total_size);
+
+	if constexpr (std::endian::native != std::endian::big) {
+		const auto* digest_src = reinterpret_cast<const std::uint8_t*>(m_digest);
+		for (auto i = 0u; auto& byte : digest.raw) {
+			// serialize digest words to BE format before copying
+			byte = digest_src[i++ ^ (c_digest_word_bytes - 1u)];
+		}
+	} else {
+		std::memcpy(digest.raw.data(), m_digest, c_digest_total_size);
+	}
 
 	reset();
 	return digest;
