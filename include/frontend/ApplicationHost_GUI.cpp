@@ -161,7 +161,7 @@ namespace CandidateList {
 		{}
 
 		auto& get_descriptor() const noexcept { return system_hook->descriptor; }
-		bool  eligible()        const noexcept { return error_message == nullptr; }
+		bool  eligible()       const noexcept { return error_message == nullptr; }
 	};
 
 	struct Family {
@@ -527,7 +527,7 @@ void ApplicationHost::setup_gui_callables() noexcept {
 		static const CandidateList::System* s_chosen_system  = nullptr;
 		static const CandidateList::System* s_pending_system = nullptr;
 
-		static SHA1_ThreadedWidget s_sha1_widget;
+		static SHA1_Async         s_sha1_widget;
 		static ScrollingTextState s_scroll_state;
 
 		static auto s_close_modal = []() noexcept {
@@ -600,7 +600,7 @@ void ApplicationHost::setup_gui_callables() noexcept {
 						blog.info("Beginning manual SHA1 calculation for file '{}'",
 							SystemStaging::file_image.path());
 						s_sha1_widget.start(SystemStaging::file_image.data(), [](auto&& hash) noexcept {
-							SystemStaging::sha1_hash = std::move(hash);
+							SystemStaging::sha1_hash = std::move(hash.hex());
 							blog.info("SHA1: {}", SystemStaging::sha1_hash);
 						});
 					}

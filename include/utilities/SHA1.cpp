@@ -612,7 +612,7 @@ void SHA1::reset() noexcept {
 	m_digest[3] = 0x10325476u;
 	m_digest[4] = 0xC3D2E1F0u;
 
-	std::memset(m_buffer, 0, c_buffer_size);
+	std::memset(m_buffer, 0, c_block_buffer_size);
 	m_hash_bytes = m_tail_size = 0;
 }
 
@@ -654,14 +654,14 @@ void SHA1::update(const char* src, std::size_t byte_count) noexcept {
 	}
 }
 
-std::string SHA1::final() noexcept {
+SHA1::Digest SHA1::final() noexcept {
 	const auto total_hashed_bits =
 		8 * (m_hash_bytes + m_tail_size);
 
 	// insert message end bit, then pad to end of block with zeroes
 	m_buffer[m_tail_size++] = std::uint8_t('\x80');
 
-	std::memset(m_buffer + m_tail_size, 0, c_buffer_size - m_tail_size);
+	std::memset(m_buffer + m_tail_size, 0, c_block_buffer_size - m_tail_size);
 
 	if (m_tail_size > c_block_bytes - 8) {
 		transform(m_digest, m_buffer, 1);
@@ -677,15 +677,9 @@ std::string SHA1::final() noexcept {
 	std::memcpy(&m_buffer[56], &be_u64, sizeof(be_u64));
 	transform(m_digest, m_buffer, 1);
 
-	// convert digest[] to a string
-	std::string result(40, '\x00');
-	constexpr auto c_hex = "0123456789abcdef";
-	for (auto i = 0u; i < c_digest_size; ++i) {
-		for (auto j = 0u; j < 8; ++j) {
-			result[i * 8 + j] = c_hex[(m_digest[i] >> (28 - j * 4)) & 0xF];
-		}
-	}
+	Digest digest{};
+	std::memcpy(digest.raw.data(), m_digest, c_digest_total_size);
 
 	reset();
-	return result;
+	return digest;
 }

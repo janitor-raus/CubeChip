@@ -20,7 +20,7 @@
  * @brief Incrementally hashes a memory buffer using SHA1, enabling controlled
  *        block-wise processing and thread-safe progress tracking.
  *
- * Unlike the one-shot 'SHA1::from()' methods, SHA1_Stream processes data in
+ * Unlike the one-shot 'SHA1::from()' methods, SHA1_Chunked processes data in
  * discrete steps via 'advance()', making it suitable for background threading
  * without blocking the calling thread for long periods.
  *
@@ -28,7 +28,7 @@
  *       methods assume exclusive access and should not be called while
  *       'advance()' is running on another thread.
  */
-class SHA1_Stream {
+class SHA1_Chunked {
 	SHA1 m_sha1;
 
 	std::size_t m_data_size;
@@ -44,7 +44,7 @@ class SHA1_Stream {
 	}
 
 public:
-	SHA1_Stream(std::size_t size_in_bytes = 0) noexcept
+	SHA1_Chunked(std::size_t size_in_bytes = 0) noexcept
 		: m_data_size(size_in_bytes)
 		, m_processed(0)
 	{}
@@ -56,13 +56,13 @@ public:
 	 *
 	 * @param data       Pointer to the start of the full data buffer.
 	 * @param block_step Number of SHA1 blocks (64 bytes each) to process per call.
-	 *                   Defaults to 64 (4KB per advance). Clamped to a minimum of 1.
+	 *                   Defaults to 512 (32KB per advance). Clamped to a minimum of 1.
 	 * @return The completed SHA1 hash string if all data has been processed,
 	 *         or std::nullopt if more data remains.
 	 */
 	[[nodiscard("The resulting SHA1 string may be lost if not observed!")]]
 	auto advance(const char* data, std::size_t block_step = 512) noexcept
-		-> std::optional<std::string>
+		-> std::optional<SHA1::Digest>
 	{
 		const auto processed_bytes = get_processed();
 		if (processed_bytes >= m_data_size) { return std::nullopt; }
@@ -125,9 +125,9 @@ public:
  *       Progress can be observed indirectly via 'progress()', which delegates
  *       to SHA1_Stream's thread-safe 'progress()' method.
  */
-class SHA1_ThreadedWidget {
-	SHA1_Stream m_stream;
-	Thread      m_thread;
+class SHA1_Async {
+	SHA1_Chunked m_stream;
+	Thread       m_thread;
 
 	// Thread activity flag
 	std::atomic_bool m_busy = false;
@@ -143,7 +143,7 @@ class SHA1_ThreadedWidget {
 	}
 
 public:
-	SHA1_ThreadedWidget(std::size_t size_in_bytes = 0) noexcept
+	SHA1_Async(std::size_t size_in_bytes = 0) noexcept
 		: m_stream(size_in_bytes)
 	{}
 
@@ -176,15 +176,16 @@ public:
 	/**
 	 * @brief Starts the background hashing thread.
 	 *
-	 * @param data     Pointer to the data buffer to hash. Must remain valid
-	 *                 for the duration of the thread.
-	 * @param on_done  Callable invoked with the completed SHA1 hash string
-	 *                 when hashing finishes. Called from the worker thread.
-	 * @param on_step  Callable invoked with the current progress [0.0, 1.0]
-	 *                 after each advance() step. Called from the worker thread.
+	 * @param data    Pointer to the data buffer to hash. Must remain valid
+	 *                for the duration of the thread.
+	 * @param on_done Callable invoked with the completed SHA1 digest object
+	 *                when hashing finishes. Called from the worker thread.
+	 *                Using 'auto&&' is recommended for perfect forwarding.
+	 * @param on_step Callable invoked with the current progress [0.0, 1.0]
+	 *                after each advance() step. Called from the worker thread.
 	 */
 	template <
-		std::invocable<std::string> OnDone,
+		std::invocable<SHA1::Digest> OnDone,
 		std::invocable<float> OnStep
 	>
 	void start(const char* data, OnDone&& on_done, OnStep&& on_step) noexcept {
@@ -210,10 +211,11 @@ public:
 	 *
 	 * @param data    Pointer to the data buffer to hash. Must remain valid
 	 *                for the duration of the thread.
-	 * @param on_done Callable invoked with the completed SHA1 hash string
+	 * @param on_done Callable invoked with the completed SHA1 digest object
 	 *                when hashing finishes. Called from the worker thread.
+	 *                Using 'auto&&' is recommended for perfect forwarding.
 	 */
-	template <std::invocable<std::string> OnDone>
+	template <std::invocable<SHA1::Digest> OnDone>
 	void start(const char* data, OnDone&& on_done) noexcept {
 		start(data, std::forward<OnDone>(on_done), [](float) {});
 	}

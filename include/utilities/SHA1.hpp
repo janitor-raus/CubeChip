@@ -14,19 +14,43 @@
 #include <type_traits>
 #include <cstdint>
 #include <string>
+#include <array>
 #include <span>
 
 /*==================================================================*/
 
-class SHA1 {
-	static constexpr auto c_buffer_size = 64u;
-	static constexpr auto c_digest_size =  5u;
+template <std::size_t N>
+struct DigestBase {
+	std::array<std::uint8_t, N> raw;
 
-	std::uint8_t  m_buffer[c_buffer_size]{};
-	std::uint32_t m_digest[c_digest_size]{};
+	[[nodiscard("The resulting string will be lost if not stored!")]]
+	std::string hex() const noexcept {
+		std::string result(N * 2, '\x00');
+		constexpr auto c_hex = "0123456789abcdef";
+
+		for (auto byte : raw) {
+			result += c_hex[byte >> 4];
+			result += c_hex[byte & 0xF];
+		}
+	}
+};
+
+/*==================================================================*/
+
+class SHA1 {
+	static constexpr auto c_block_buffer_size = 64u;
+	static constexpr auto c_digest_word_count = 5u;
+	static constexpr auto c_digest_word_bytes = sizeof(std::uint32_t);
+	static constexpr auto c_digest_total_size = c_digest_word_bytes * c_digest_word_count;
+
+	std::uint8_t  m_buffer[c_block_buffer_size]{};
+	std::uint32_t m_digest[c_digest_word_count]{};
 
 	std::uint32_t m_tail_size  = 0;
 	std::uint64_t m_hash_bytes = 0;
+
+public:
+	using Digest = DigestBase<c_digest_total_size>;
 
 private:
 	static void transform_scalar(std::uint32_t* digest, const std::uint8_t* src, std::size_t transforms) noexcept;
@@ -47,19 +71,19 @@ public:
 	void reset() noexcept;
 	void update(const char* src, std::size_t byte_count) noexcept;
 
-	[[nodiscard("The resulting SHA1 string will be lost if not stored!")]]
-	std::string final() noexcept;
+	[[nodiscard("The resulting SHA1 digest will be lost if not stored!")]]
+	Digest final() noexcept;
 
 public:
-	[[nodiscard("The resulting SHA1 string will be lost if not stored!")]] static
-	std::string from(const char* data, std::size_t size) noexcept {
+	[[nodiscard("The resulting SHA1 digest will be lost if not stored!")]] static
+	Digest from(const char* data, std::size_t size) noexcept {
 		SHA1 checksum;
 		checksum.update(data, size);
 		return checksum.final();
 	}
 
-	[[nodiscard("The resulting SHA1 string will be lost if not stored!")]] static
-	std::string from(std::span<const char> file_span) noexcept {
+	[[nodiscard("The resulting SHA1 digest will be lost if not stored!")]] static
+	Digest from(std::span<const char> file_span) noexcept {
 		return from(file_span.data(), file_span.size());
 	}
 };
