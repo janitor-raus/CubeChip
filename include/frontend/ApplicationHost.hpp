@@ -81,8 +81,9 @@ constexpr const char* c_org_name = "";
 
 class HomeDirManager;
 class GlobalAudioBase;
-class BasicVideoSpec;
 class ISystemEmu;
+
+union SDL_Event;
 
 /*==================================================================*/
 
@@ -146,9 +147,7 @@ private:
 /*==================================================================*/
 
 public:
-	static inline HomeDirManager*  HDM{};
-	static inline GlobalAudioBase* GAB{};
-	static inline BasicVideoSpec*  BVS{};
+	static inline HomeDirManager* HDM{};
 
 public:
 	struct Settings {
@@ -179,6 +178,6 @@ public:
 
 	void quit_application() noexcept;
 
-	int handle_client_events(void* event) noexcept;
+	int handle_client_events(const SDL_Event& event) noexcept;
 	int process_client_frame();
 };

@@ -17,7 +17,7 @@
 IFamily_BYTEPUSHER::IFamily_BYTEPUSHER(std::size_t W, std::size_t H) noexcept
 	: ISystemEmu(family_pretty_name)
 	, m_display_window({ "Display", make_system_id(instance_id, "display") })
-	, m_display_device(W, H, UserInterface::get_current_renderer())
+	, m_display_device(W, H)
 {
 	prepare_user_interface();
 	load_preset_binds();

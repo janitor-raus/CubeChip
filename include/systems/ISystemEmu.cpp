@@ -120,7 +120,7 @@ bool ISystemEmu::calc_file_image_sha1() noexcept {
 		return true;
 	} else {
 		if (m_file_image.valid()) {
-			m_file_sha1_hash = SHA1::from(m_file_image.span());
+			m_file_sha1_hash = SHA1::from(m_file_image.span()).hex();
 			blog.info("SHA1: {}", m_file_sha1_hash);
 			return true;
 		} else {

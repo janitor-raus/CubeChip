@@ -6,9 +6,11 @@
 
 #include "DisplayDevice.hpp"
 #include "LifetimeWrapperSDL.hpp"
-#include "BasicVideoSpec.hpp"
 
+#include <utility>
 #include <imgui.h>
+
+import GuiSession;
 
 /*==================================================================*/
 
@@ -19,35 +21,46 @@ struct DisplayDevice::DisplayContext {
 	AtomicBox<Metadata>      m_staging_data;
 	AtomSharedPtr<Callable>  m_osd_callable;
 
-	SDL_Renderer* const&     m_renderer_hook;
-	SDL_Renderer*            m_live_renderer;
+	PlatformWindow::Handle*  m_window_handle;
 	DisplayDevice::Swapchain m_swapchain;
-	SDL_Unique<SDL_Texture>  m_stream_texture;
-	SDL_Unique<SDL_Texture>  m_target_texture;
+	SDL_Weak<SDL_Texture>    m_stream_texture;
+	SDL_Weak<SDL_Texture>    m_target_texture;
 
 	ez::Frame   m_old_target_size{};
 	const bool* m_borderless_view_input = nullptr;
 
 	BoundedParam<0, 0, 3> m_screen_rotation;
+	//
+	//bool m_integer_scaling = false;
+	//bool m_borderless_view = false;
+	//bool m_shaders_enabled = false;
+	//bool m_debugger_enabled = false;
 
-	bool m_integer_scaling = false;
-	bool m_borderless_view = false;
-	bool m_shaders_enabled = false;
-	bool m_debugger_enabled = false;
-
-	auto init_stream_texture(int W, int H) const noexcept {
-		return BasicVideoSpec::create_stream_texture(m_live_renderer, W, H);
-	}
+	int m_integer_scaling  = false;
+	int m_borderless_view  = false;
+	int m_shaders_enabled  = false;
+	int m_debugger_enabled = false;
 
 public:
-	DisplayContext(std::size_t W, std::size_t H, SDL_Renderer* const& sdl_renderer_ptr) noexcept
-		: m_renderer_hook(sdl_renderer_ptr)
-		, m_live_renderer(nullptr)
+	DisplayContext(std::size_t W, std::size_t H) noexcept
+		: m_window_handle(PlatformWindow::get_live())
 		, m_swapchain(int(W), int(H))
 		, m_staging_data(std::make_shared<Metadata>(int(W), int(H)))
 	{
 		assert((m_staging_data.view()->get_base_frame().area() == (W * H))
 			&& "Display W/H sizes are beyond expected bounds, clamping!");
+	}
+
+	void set_platform_window(PlatformWindow::Handle& handle) noexcept {
+		if (m_window_handle == &handle) { return; }
+
+		if (PlatformWindow::exists(m_window_handle)) {
+			m_window_handle->destroy_textures(
+				m_stream_texture.lock().get(),
+				m_target_texture.lock().get()
+			);
+		}
+		m_window_handle = &handle;
 	}
 
 private:
@@ -100,20 +113,6 @@ private:
 		auto operator->() const noexcept { return &m_metadata_ref; }
 	};
 
-	void sync_renderer_change() noexcept {
-		if (m_renderer_hook == m_live_renderer) { return; }
-
-		if (m_renderer_hook != nullptr) {
-			const auto frame = m_staging_data.view()->get_base_frame();
-			m_stream_texture.reset(BasicVideoSpec::create_stream_texture(
-				m_live_renderer = m_renderer_hook, frame.w, frame.h));
-		} else {
-			m_stream_texture.reset();
-			m_live_renderer = nullptr;
-		}
-		m_target_texture.reset();
-	}
-
 private:
 	void render_texture_region(const DisplayLayout& layout_data) noexcept {
 		if (layout_data->enabled) {
@@ -125,14 +124,21 @@ private:
 				s32(std::ceil(layout_data.dar_viewport.h * target_AR))
 			);
 
-			if (!m_target_texture || new_target_size != m_old_target_size) {
-				m_target_texture.reset(BasicVideoSpec::create_target_texture(
-					m_live_renderer, new_target_size.w, new_target_size.h, true));
+			if (m_target_texture.expired() || new_target_size != m_old_target_size) {
+				m_target_texture = m_window_handle->create_target_texture(
+					new_target_size.w, new_target_size.h, false, true);
 				m_old_target_size = new_target_size;
 			}
 
-			BasicVideoSpec::write_stream_texture(m_live_renderer,
-				m_target_texture, m_stream_texture);
+			if (m_stream_texture.expired()) {
+				const auto frame = m_staging_data.view()->get_base_frame();
+				m_stream_texture = m_window_handle->create_stream_texture(frame.w, frame.h);
+			}
+
+			m_window_handle->render_whole_to_target(
+				m_target_texture.lock().get(),
+				m_stream_texture.lock().get()
+			);
 
 			ImGui::SetCursorPos(layout_data.origin_point + ImGui::floor(
 				(layout_data.avail_region - layout_data.margins_region) * 0.5f));
@@ -153,8 +159,10 @@ private:
 			ImGui::SetCursorPos(layout_data.origin_point + ImGui::floor(
 				(layout_data.avail_region - layout_data.texture_region) * 0.5f));
 
-			ImGui::DrawRotatedImage(m_target_texture, layout_data.texture_region, *m_screen_rotation,
-				uv0, uv1, RGBA(0xFF, 0xFF, 0xFF, layout_data->texture_tint.A).ABGR());
+			ImGui::DrawRotatedImage(m_target_texture.lock().get(),
+				layout_data.texture_region, *m_screen_rotation, uv0, uv1,
+				RGBA(0xFF, 0xFF, 0xFF, layout_data->texture_tint.A).ABGR()
+			);
 		}
 	}
 	void render_borders_region(const DisplayLayout& layout_data) const noexcept {
@@ -215,21 +223,23 @@ private:
 
 public:
 	void render_display() noexcept {
-		using namespace ImGui;
+		m_window_handle = PlatformWindow::exists(m_window_handle);
 
-		PushStyleColor(ImGuiCol_ChildBg, 0);
-		PushID(this);
-		const bool visible = BeginChild("##display_child");
-		PopStyleColor();
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, 0);
+		ImGui::PushID(this);
+		const bool visible = ImGui::BeginChild("##display_child");
+		ImGui::PopStyleColor();
 
-		if (!visible) { EndChild(); PopID(); return; }
-
-		sync_renderer_change();
+		if (!visible || !m_window_handle) {
+			ImGui::EndChild();
+			ImGui::PopID();
+			return;
+		}
 
 		m_swapchain.present([&](auto frame) noexcept {
 			if constexpr (frame.dirty) {
-				BasicVideoSpec::write_stream_texture(m_live_renderer,
-					m_stream_texture, frame.buffer.data());
+				m_window_handle->upload_stream_texture(
+					frame.buffer.data(), m_stream_texture.lock().get());
 			}
 
 			m_borderless_view = m_borderless_view_input
@@ -245,12 +255,12 @@ public:
 			render_osd_callable(layout_data);
 			render_debug_region(layout_data);
 
-			SetCursorPos(layout_data.origin_point);
-			Dummy(layout_data.avail_region); // advance layout
+			ImGui::SetCursorPos(layout_data.origin_point);
+			ImGui::Dummy(layout_data.avail_region); // advance layout
 		});
 
-		EndChild();
-		PopID();
+		ImGui::EndChild();
+		ImGui::PopID();
 	}
 	void render_settings_menu() noexcept {
 		if (!ImGui::BeginMenu("Display Settings")) { return; }
@@ -303,11 +313,8 @@ public:
 				"%.2f", ImGuiSliderFlags_AlwaysClamp
 			);
 
-			int integer_scaling = m_integer_scaling;
 			static const char* scaling_labels[] = { "Fractional", "Integer" };
-			if (ImGui::Combo("Screen Scaling", &integer_scaling, scaling_labels, 2)) {
-				m_integer_scaling = integer_scaling != 0;
-			}
+			ImGui::Combo("Screen Scaling", &m_integer_scaling, scaling_labels, 2);
 
 			static const char* rotation_labels[] = { "0 degrees", "90 degrees", "180 degrees", "270 degrees" };
 			ImGui::Combo("Screen Rotation", &*m_screen_rotation, rotation_labels, 4);
@@ -320,29 +327,17 @@ public:
 			}
 
 			ImGui::BeginDisabled(m_borderless_view_input);
-			int borderless_view = m_borderless_view ? 1 : 0;
-			if (ImGui::SliderInt("Borderless View?", &borderless_view,
-				0, 1, "", ImGuiSliderFlags_NoInput
-			)) {
-				m_borderless_view = borderless_view != 0;
-			}
+			ImGui::SliderInt("Borderless View?", &m_borderless_view,
+				0, 1, "", ImGuiSliderFlags_NoInput);
 			ImGui::EndDisabled();
 
 			ImGui::BeginDisabled(true);
-			int shaders_enabled = m_shaders_enabled;
-			if (ImGui::SliderInt("Shaders Enabled?", &shaders_enabled,
-				0, 1, "", ImGuiSliderFlags_NoInput
-			)) {
-				m_shaders_enabled = shaders_enabled != 0;
-			}
+			ImGui::SliderInt("Shaders Enabled?", &m_shaders_enabled,
+				0, 1, "", ImGuiSliderFlags_NoInput);
 			ImGui::EndDisabled();
 
-			int debugger_enabled = m_debugger_enabled ? 1 : 0;
-			if (ImGui::SliderInt("Debugger Enabled?", &debugger_enabled,
-				0, 1, "", ImGuiSliderFlags_NoInput
-			)) {
-				m_debugger_enabled = debugger_enabled != 0;
-			}
+			ImGui::SliderInt("Debugger Enabled?", &m_debugger_enabled,
+				0, 1, "", ImGuiSliderFlags_NoInput);
 
 		});
 		ImGui::EndMenu();
@@ -351,12 +346,10 @@ public:
 
 /*==================================================================*/
 
-DisplayDevice::DisplayDevice(std::size_t W, std::size_t H,
-	SDL_Renderer* const& sdl_renderer_ptr) noexcept
+DisplayDevice::DisplayDevice(std::size_t W, std::size_t H) noexcept
 	: m_context(std::make_unique<DisplayContext>(
 		std::clamp<std::size_t>(W, 1u, 8192u),
-		std::clamp<std::size_t>(H, 1u, 8192u),
-		sdl_renderer_ptr
+		std::clamp<std::size_t>(H, 1u, 8192u)
 	))
 {}
 
@@ -414,6 +407,11 @@ void DisplayDevice::set_borderless_view(bool enable) noexcept {
 void DisplayDevice::set_osd_callable(Callable callable) noexcept {
 	m_context->m_osd_callable.store(std::make_shared<Callable>(
 		std::move(callable)), std::memory_order::relaxed);
+}
+
+void DisplayDevice::set_platform_window(PlatformWindow::Handle* handle) noexcept {
+	if (!PlatformWindow::exists(handle)) { return; }
+	m_context->set_platform_window(*handle);
 }
 
 void DisplayDevice::render_display() noexcept {

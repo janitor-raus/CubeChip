@@ -13,6 +13,7 @@
 void SDL_Deleter<SDL_Window>     ::operator()(SDL_Window*      ptr) const noexcept { SDL_DestroyWindow(ptr); }
 void SDL_Deleter<SDL_Renderer>   ::operator()(SDL_Renderer*    ptr) const noexcept { SDL_DestroyRenderer(ptr); }
 void SDL_Deleter<SDL_Texture>    ::operator()(SDL_Texture*     ptr) const noexcept { SDL_DestroyTexture(ptr); }
+void SDL_Deleter<SDL_Surface>    ::operator()(SDL_Surface*     ptr) const noexcept { SDL_DestroySurface(ptr); }
 void SDL_Deleter<SDL_AudioStream>::operator()(SDL_AudioStream* ptr) const noexcept { SDL_DestroyAudioStream(ptr); }
 void SDL_Deleter<unsigned>       ::operator()(unsigned*        ptr) const noexcept { SDL_free(ptr); }
 void SDL_Deleter<char>           ::operator()(char*            ptr) const noexcept { SDL_free(ptr); }

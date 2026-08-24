@@ -72,6 +72,14 @@ constexpr auto join_with(std::string_view sep, const T&... parts) noexcept {
 
 template <typename... T> requires (
 	(std::convertible_to<T, std::string_view> && ...)
+	&& (sizeof...(T) > 1)
+)
+constexpr auto join_with(char sep, const T&... parts) noexcept {
+	return join_with(std::string_view(&sep, 1), parts...);
+}
+
+template <typename... T> requires (
+	(std::convertible_to<T, std::string_view> && ...)
 	&& (sizeof...(T) >= 1)
 )
 constexpr void join_into(std::string& src, const T&... parts) noexcept {

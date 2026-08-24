@@ -14,7 +14,7 @@
 
 /*==================================================================*/
 
-struct SDL_Renderer;
+namespace PlatformWindow { class Handle; }
 
 class DisplayDevice {
 	struct DisplayContext;
@@ -44,8 +44,7 @@ public:
 	auto metadata() const noexcept -> const AtomicBox<Metadata>&;
 
 public:
-	DisplayDevice(std::size_t W, std::size_t H,
-		SDL_Renderer* const& sdl_renderer_ptr) noexcept;
+	DisplayDevice(std::size_t W, std::size_t H) noexcept;
 
 	~DisplayDevice() noexcept;
 
@@ -67,6 +66,7 @@ public:
 	void set_borderless_view(bool enable) noexcept;
 
 	void set_osd_callable(Callable callable) noexcept;
+	void set_platform_window(PlatformWindow::Handle* handle) noexcept;
 
 	void render_display() noexcept;
 	void render_settings_menu() noexcept;

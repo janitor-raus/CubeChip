@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.28)
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
 
 if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
@@ -21,7 +21,9 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(PROJECT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
@@ -44,25 +46,32 @@ include("cmake/imgui.cmake")
 # ==================================================================================== #
 
 add_executable("${PROJECT_NAME}"
-	${FRONTEND_SOURCES}
-	${COMPONENTS_SOURCES}
-	${UTILITIES_SOURCES}
-	${SERVICES_SOURCES}
-	${SYSTEMS_SOURCES}
-	${SYSTEM_CHIP8_SOURCES}
-	${SYSTEM_BYTEPUSHER_SOURCES}
-	${SYSTEM_GAMEBOY_SOURCES}
+	${PROJECT_SOURCE_FILES}
 )
 
-target_sources("${PROJECT_NAME}" PRIVATE ${SHIMS_HEADERS})
-target_sources("${PROJECT_NAME}" PRIVATE ${FRONTEND_HEADERS}          ${FRONTEND_SOURCES})
-target_sources("${PROJECT_NAME}" PRIVATE ${COMPONENTS_HEADERS}        ${COMPONENTS_SOURCES})
-target_sources("${PROJECT_NAME}" PRIVATE ${UTILITIES_HEADERS}         ${UTILITIES_SOURCES})
-target_sources("${PROJECT_NAME}" PRIVATE ${SERVICES_HEADERS}          ${SERVICES_SOURCES})
-target_sources("${PROJECT_NAME}" PRIVATE ${SYSTEMS_HEADERS}           ${SYSTEMS_SOURCES})
-target_sources("${PROJECT_NAME}" PRIVATE ${SYSTEM_CHIP8_HEADERS}      ${SYSTEM_CHIP8_SOURCES})
-target_sources("${PROJECT_NAME}" PRIVATE ${SYSTEM_BYTEPUSHER_HEADERS} ${SYSTEM_BYTEPUSHER_SOURCES})
-target_sources("${PROJECT_NAME}" PRIVATE ${SYSTEM_GAMEBOY_HEADERS}    ${SYSTEM_GAMEBOY_SOURCES})
+target_sources("${PROJECT_NAME}" PRIVATE
+    FILE_SET project_modules TYPE CXX_MODULES
+    FILES
+		${PROJECT_MODULE_FILES}
+)
+
+get_target_property(fsets "${PROJECT_NAME}" CXX_MODULE_SETS)
+message(STATUS "module file sets on target: ${fsets}")
+get_target_property(scanflag "${PROJECT_NAME}" CXX_SCAN_FOR_MODULES)
+message(STATUS "CXX_SCAN_FOR_MODULES on target = ${scanflag}")
+
+target_sources("${PROJECT_NAME}" PRIVATE
+	${PROJECT_HEADER_FILES}
+	${PROJECT_SOURCE_FILES}
+)
+
+source_group(
+    TREE ${PROJECT_INCLUDE_DIR}
+    FILES
+        ${PROJECT_HEADER_FILES}
+        ${PROJECT_SOURCE_FILES}
+        ${PROJECT_MODULE_FILES}
+)
 
 target_compile_features("${PROJECT_NAME}" PRIVATE cxx_std_20)
 target_compile_definitions(

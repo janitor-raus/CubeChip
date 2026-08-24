@@ -24,7 +24,7 @@ void AudioDevice::init_stream(signed freq, signed channels, bool recording_devic
 		const bool new_freq = freq > 0;
 		const bool new_channels = channels >= 1 && channels <= 8;
 
-		m_stream = device_ptr;
+		m_stream.reset(device_ptr);
 		set_spec(new_freq ? freq : 0, new_channels ? channels : 0);
 	} else {
 		blog.error("Failed to open audio stream: {}", SDL_GetError());
@@ -37,9 +37,9 @@ void AudioDevice::update_cached_spec() noexcept {
 	SDL_AudioSpec actual;
 
 	if (is_playback()) {
-		SDL_GetAudioStreamFormat(m_stream, &actual, nullptr);
+		SDL_GetAudioStreamFormat(m_stream.get(), &actual, nullptr);
 	} else {
-		SDL_GetAudioStreamFormat(m_stream, nullptr, &actual);
+		SDL_GetAudioStreamFormat(m_stream.get(), nullptr, &actual);
 	}
 
 	if (actual.format == SDL_AUDIO_UNKNOWN) {
@@ -69,7 +69,7 @@ bool AudioDevice::set_spec(signed freq, signed channels) noexcept {
 	if (new_freq == m_freq && new_channels == m_channels) { return true; }
 	const SDL_AudioSpec spec{ SDL_AUDIO_F32, new_channels, new_freq };
 
-	if (SDL_SetAudioStreamFormat(m_stream, &spec, &spec)) {
+	if (SDL_SetAudioStreamFormat(m_stream.get(), &spec, &spec)) {
 		update_cached_spec(); m_accumulator = 0;
 		return true;
 	} else {
@@ -82,7 +82,7 @@ bool AudioDevice::set_spec(signed freq, signed channels) noexcept {
 
 bool AudioDevice::set_freq_ratio(float ratio) noexcept {
 	ratio = std::clamp(ratio, 0.01f, 100.0f);
-	if (SDL_SetAudioStreamFrequencyRatio(m_stream, ratio)) {
+	if (SDL_SetAudioStreamFrequencyRatio(m_stream.get(), ratio)) {
 		m_freq_ratio = ratio;
 		return true;
 	} else {
@@ -95,12 +95,12 @@ bool AudioDevice::is_paused() const noexcept {
 	// We're gating with the device's ID first, as it allows us to
 	// check for an orphaned stream (one whose device was closed)
 	// and thus implicitly report "paused" to gate other operations.
-	const auto device_id = SDL_GetAudioStreamDevice(m_stream);
+	const auto device_id = SDL_GetAudioStreamDevice(m_stream.get());
 	return device_id ? SDL_AudioDevicePaused(device_id) : true;
 }
 
 bool AudioDevice::is_playback() const noexcept {
-	return SDL_IsAudioDevicePlayback(SDL_GetAudioStreamDevice(m_stream));
+	return SDL_IsAudioDevicePlayback(SDL_GetAudioStreamDevice(m_stream.get()));
 }
 
 float AudioDevice::get_samples_per_frame(float target_framerate) const noexcept {
@@ -126,19 +126,19 @@ auto AudioDevice::next_frame_sample_count(float target_framerate) noexcept -> st
 }
 
 void AudioDevice::pause() noexcept {
-	SDL_PauseAudioStreamDevice(m_stream);
+	SDL_PauseAudioStreamDevice(m_stream.get());
 }
 
 void AudioDevice::resume() noexcept {
-	SDL_ResumeAudioStreamDevice(m_stream);
+	SDL_ResumeAudioStreamDevice(m_stream.get());
 }
 
 float AudioDevice::get_gain() const noexcept {
-	return SDL_GetAudioStreamGain(m_stream);
+	return SDL_GetAudioStreamGain(m_stream.get());
 }
 
 void AudioDevice::set_gain(float new_gain) noexcept {
-	SDL_SetAudioStreamGain(m_stream, std::clamp(new_gain, 0.0f, 2.0f));
+	SDL_SetAudioStreamGain(m_stream.get(), std::clamp(new_gain, 0.0f, 2.0f));
 }
 
 void AudioDevice::add_gain(float add_gain) noexcept {
@@ -148,8 +148,8 @@ void AudioDevice::add_gain(float add_gain) noexcept {
 void AudioDevice::push_raw_audio_data(const float* sample_data, std::size_t sample_count) noexcept {
 	if (is_paused() || sample_count == 0) { return; }
 
-	SDL_SetAudioDeviceGain(SDL_GetAudioStreamDevice(m_stream),
+	SDL_SetAudioDeviceGain(SDL_GetAudioStreamDevice(m_stream.get()),
 		GlobalAudioBase::get_final_volume());
-	SDL_PutAudioStreamData(m_stream, sample_data,
+	SDL_PutAudioStreamData(m_stream.get(), sample_data,
 		signed(sample_count * sizeof(float)));
 }

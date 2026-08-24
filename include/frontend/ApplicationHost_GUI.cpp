@@ -8,9 +8,7 @@
 #include <SDL3/SDL_misc.h>
 
 #include "ApplicationHost.hpp"
-#include "UserInterface.hpp"
 #include "HomeDirManager.hpp"
-#include "BasicVideoSpec.hpp"
 #include "GlobalAudioBase.hpp"
 #include "SystemDescriptor.hpp"
 #include "SystemStaging.hpp"
@@ -23,6 +21,8 @@
 
 #include <imgui.h>
 #include <filesystem>
+
+import GuiSession;
 
 /*==================================================================*/
 
@@ -233,7 +233,7 @@ void ApplicationHost::setup_gui_callables() noexcept {
 		if (MenuItem("Open File...")) {
 			SDL_ShowOpenFileDialog([](void*, const char* const* file_list, int) noexcept {
 				if (file_list && file_list[0]) { set_open_file_dialog_result(file_list[0]); }
-			}, nullptr, BVS->get_main_window(), nullptr, 0, nullptr, false);
+			}, nullptr, *PlatformWindow::get_main(), nullptr, 0, nullptr, false);
 		}
 	});
 
@@ -368,22 +368,23 @@ void ApplicationHost::setup_gui_callables() noexcept {
 	static auto s_menu_settings__master_vol = UserInterface::register_menu("",
 	{ 25, "Settings" }, [&]() noexcept {
 		Separator();
-		auto master_volume = int(GAB->get_master_volume() * 100);
+		auto master_volume = int(GlobalAudioBase::get_master_volume() * 100);
 		if (SliderInt("Master Volume", &master_volume, 0, 100, "%d%%"))
-			{ GAB->set_master_volume(master_volume * 0.01f); }
+			{ GlobalAudioBase::set_master_volume(master_volume * 0.01f); }
 	});
 
 	static auto s_menu_settings__focus_vol = UserInterface::register_menu("",
 	{ 25, "Settings" }, [&]() noexcept {
-		auto focus_volume = int(GAB->get_background_volume() * 100);
+		auto focus_volume = int(GlobalAudioBase::get_background_volume() * 100);
 		if (SliderInt("Background Volume", &focus_volume, 0, 100, "%d%%"))
-			{ GAB->set_background_volume(focus_volume * 0.01f); }
+			{ GlobalAudioBase::set_background_volume(focus_volume * 0.01f); }
 	});
 
 	static auto s_menu_settings__borderless_view = UserInterface::register_menu("",
 	{ 30, "Settings" }, [&]() noexcept {
 		Separator();
-		Checkbox("Borderless View Mode", &UserInterface::borderless_view_mode);
+		Checkbox("Borderless View Mode", const_cast<bool*>(
+			&UserInterface::get_borderless_view_mode_hook()));
 		if (IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
 			SetTooltip("Removes all decorations and margins from a System's "
 				"display window(s) for a flush fit.");

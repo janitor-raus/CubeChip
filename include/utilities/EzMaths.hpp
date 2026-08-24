@@ -110,11 +110,13 @@ namespace EzMaths {
 /*==================================================================*/
 
 namespace EzMaths {
-	inline constexpr auto intersect(const Rect& lhs, const Rect& rhs) noexcept {
-		auto x1 = std::max(lhs.x, rhs.x);
-		auto y1 = std::max(lhs.y, rhs.y);
-		auto x2 = std::min(lhs.x + lhs.w, rhs.x + rhs.w);
-		auto y2 = std::min(lhs.y + lhs.h, rhs.y + rhs.h);
+	// Return a Rect symbolizing the intersection of Rects A and B.
+	// If there is none, the returned Rect's values will be all 0.
+	inline constexpr auto intersection(const Rect& a, const Rect& b) noexcept {
+		auto x1 = std::max(a.x, b.x);
+		auto y1 = std::max(a.y, b.y);
+		auto x2 = std::min(a.x + a.w, b.x + b.w);
+		auto y2 = std::min(a.y + a.h, b.y + b.h);
 
 		auto w = std::max(0, x2 - x1);
 		auto h = std::max(0, y2 - y1);
@@ -124,9 +126,11 @@ namespace EzMaths {
 		return Rect(x, y, w, h);
 	}
 
-	inline constexpr auto distance(const Point& lhs, const Point& rhs) noexcept {
-		s64 dx = lhs.x - rhs.x;
-		s64 dy = lhs.y - rhs.y;
+	// Returns the squared Euclidean distance between two Points A and B.
+	// The square root calculation is intentionally omitted.
+	inline constexpr auto distance(const Point& a, const Point& b) noexcept {
+		s64 dx = b.x - a.x;
+		s64 dy = b.y - a.y;
 		return u64(dx * dx) + u64(dy * dy);
 	}
 }

@@ -20,12 +20,14 @@
 #include "FrameLimiter.hpp"
 #include "BasicInput.hpp"
 #include "Well512.hpp"
-#include "UserInterface.hpp"
 
 #include "FileImage.hpp"
 
 #include <SDL3/SDL_scancode.h>
 #include <fmt/format.h>
+
+import GuiSession;
+import PlatformWindow;
 
 /*==================================================================*/
 

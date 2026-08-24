@@ -19,11 +19,6 @@ class GlobalAudioBase final {
 	static inline float s_passive_background_volume = 0.25f;
 	static inline float s_active_background_volume = 1.0f;
 
-	static inline bool  s_has_audio_output = false;
-
-public:
-	static bool has_audio_output() noexcept { return s_has_audio_output; }
-
 public:
 	struct Settings {
 		float master_volume     = 0.7f;
@@ -34,21 +29,16 @@ public:
 	};
 
 	[[nodiscard]]
-	auto export_settings() const noexcept -> Settings;
+	static auto export_settings() noexcept -> Settings;
+	static void import_settings(const Settings& settings) noexcept;
 
 private:
 	GlobalAudioBase(const Settings& settings) noexcept;
-	~GlobalAudioBase() noexcept;
 
 	GlobalAudioBase(const GlobalAudioBase&) = delete;
 	GlobalAudioBase& operator=(const GlobalAudioBase&) = delete;
 
 public:
-	static auto* initialize(const Settings& settings) noexcept {
-		static GlobalAudioBase self(settings);
-		return &self;
-	}
-
 	static void toggle_background_volume(bool enable) noexcept {
 		s_active_background_volume = enable
 			? s_passive_background_volume : 1.0f;

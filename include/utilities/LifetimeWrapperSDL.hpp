@@ -8,7 +8,7 @@
 
 /*==================================================================*/
 
-#define USE_FRIENDLY_UNIQUE
+union SDL_Event;
 
 template <typename T>
 struct SDL_Deleter;
@@ -38,11 +38,16 @@ struct SDL_Texture;
 template <> struct SDL_Deleter<SDL_Texture>
 	{ void operator()(SDL_Texture*) const noexcept; };
 
+struct SDL_Surface;
+template <> struct SDL_Deleter<SDL_Surface>
+	{ void operator()(SDL_Surface*) const noexcept; };
+
 struct SDL_AudioStream;
 template <> struct SDL_Deleter<SDL_AudioStream>
 	{ void operator()(SDL_AudioStream*) const noexcept; };
 
 using SDL_DisplayID     = unsigned;
+using SDL_WindowID      = unsigned;
 using SDL_AudioDeviceID = unsigned;
 using SDL_JoystickID    = unsigned;
 template <> struct SDL_Deleter<unsigned>

@@ -25,7 +25,7 @@ void ISystemEmu::prepare_user_interface() noexcept {
 					 |  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings
 					 |  ImGuiWindowFlags_MenuBar;
 
-		DockNextWindowTo(UserInterface::get_main_dockspace_id(), true);
+		UserInterface::dock_next_window_to(0, true);
 
 		pusher.push_style_var(ImGuiStyleVar_WindowPadding, ImVec2());
 	};

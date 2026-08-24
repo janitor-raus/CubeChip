@@ -6,9 +6,10 @@
 
 #include "WindowHost.hpp"
 #include "AtomSharedPtr.hpp"
-#include "UserInterface.hpp"
 
 #include <imgui.h>
+
+import GuiSession;
 
 /*==================================================================*/
 

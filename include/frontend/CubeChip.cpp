@@ -28,6 +28,10 @@
 		#define NOMINMAX
 	#endif
 	#include <windows.h>
+// XXX - test narrow includes?
+//#include <locale.h>
+//#include <consoleapi2.h>
+//#include <processthreadsapi.h>
 #endif
 
 /*==================================================================*/
@@ -36,7 +40,7 @@ BasicLogger& blog = *BasicLogger::initialize();
 
 /*==================================================================*/
 
-SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
+SDL_AppResult SDL_AppInit(void **host, int argc, char *argv[]) {
 	static_assert(std::endian::native == std::endian::little,
 		"Only little-endian systems are supported!");
 
@@ -109,36 +113,36 @@ SDL_AppResult SDL_AppInit(void **Host, int argc, char *argv[]) {
 	const auto* HDM = HomeDirManager::get_instance();
 	if (!HDM || HDM->get_home_path().empty()) { return SDL_APP_FAILURE; }
 
-	*Host = ApplicationHost::init_application(
+	*host = ApplicationHost::init_application(
 		result["program" ].as_optional<std::string>().value_or(""),
 		result["headless"].as_optional<bool>().value_or(false)
 	);
 
-	return *Host ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
+	return *host ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
 }
 
 /*==================================================================*/
 
-SDL_AppResult SDL_AppIterate(void *pHost) {
-	auto* Host = static_cast<ApplicationHost*>(pHost);
+SDL_AppResult SDL_AppIterate(void* host_ptr) {
+	auto* host = static_cast<ApplicationHost*>(host_ptr);
 
 	BasicKeyboard::poll_global_state();
-	return SDL_AppResult(Host->process_client_frame());
+	return SDL_AppResult(host->process_client_frame());
 }
 
 /*==================================================================*/
 
-SDL_AppResult SDL_AppEvent(void *pHost, SDL_Event *event) {
-	auto* Host = static_cast<ApplicationHost*>(pHost);
+SDL_AppResult SDL_AppEvent(void* host_ptr, SDL_Event* event) {
+	auto* host = static_cast<ApplicationHost*>(host_ptr);
 
-	return SDL_AppResult(Host->handle_client_events(event));
+	return SDL_AppResult(host->handle_client_events(*event));
 }
 
 /*==================================================================*/
 
-void SDL_AppQuit(void* pHost, SDL_AppResult) {
-	auto* Host = static_cast<ApplicationHost*>(pHost);
+void SDL_AppQuit(void* host_ptr, SDL_AppResult) {
+	auto* host = static_cast<ApplicationHost*>(host_ptr);
 
-	Host->quit_application();
+	host->quit_application();
 	blog.shutdown();
 }

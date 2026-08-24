@@ -12,8 +12,6 @@
 #include "BasicInput.hpp"
 #include "SHA1.hpp"
 
-#include "UserInterface.hpp"
-#include "BasicVideoSpec.hpp"
 #include "GlobalAudioBase.hpp"
 #include "HDIS_HCIS.hpp"
 #include "ThreadAffinity.hpp"
@@ -24,6 +22,8 @@
 #include "ApplicationHost.hpp"
 #include "ISystemEmu.hpp"
 #include "CoreRegistry.hpp"
+
+import GuiSession;
 
 /*==================================================================*/
 
@@ -50,10 +50,15 @@ void ApplicationHost::set_open_file_dialog_result(std::string_view file) noexcep
 
 /*==================================================================*/
 
-static bool s_application_minimized{};
+static bool s_application_minimized = false;
+static bool s_application_headless  = false;
 
 ApplicationHost::ApplicationHost() noexcept {
-	BVS->set_window_title(c_app_name);
+	if (!s_application_headless) {
+		PlatformWindow::get_main()->raise(); // bring main window to front!
+	}
+
+	PlatformWindow::get_main()->set_title(c_app_name);
 	CoreRegistry::load_game_database();
 
 	setup_gui_callables();
@@ -124,7 +129,9 @@ void ApplicationHost::unload_system_instance(SystemID system_id) noexcept {
 
 void ApplicationHost::insert_system_instance(ISystemEmu* ptr) noexcept {
 	if (!ptr) { return; }
-	BVS->raise_window(); // bring main window to front!
+	if (!s_application_headless) {
+		PlatformWindow::get_main()->raise(); // bring main window to front!
+	}
 
 	blog.info("Starting up '{}' ({}) system instance.",
 		ptr->get_descriptor().system_pretty_name, ptr->instance_id);
@@ -159,41 +166,67 @@ ApplicationHost* ApplicationHost::init_application(
 	static ApplicationHost* self = nullptr;
 	if (self) { return self; }
 
+	s_application_headless = headless;
+
 	HDM = HomeDirManager::get_instance();
 
-	blog.create_log(std::to_string(thread_affinity::get_process_id()),
-		(fs::Path(HDM->get_home_path()) / "logs").string());
+	blog.create_log(
+		std::to_string(thread_affinity::get_process_id()),
+		(fs::Path(HDM->get_home_path()) / "logs").string()
+	);
 
-	blog.info("SHA1 hardware accelerated path: {}",
-		SHA1::has_hardware_support() ? "ON" : "OFF");
-
-	UserInterface::init_context(HDM->get_home_path().c_str());
+	GuiSession::set_file_path(HDM->get_home_path().c_str());
 
 	GlobalAudioBase::Settings GAB_settings;
-	BasicVideoSpec ::Settings BVS_settings;
 	ApplicationHost::Settings AUI_settings;
 
 	HDM->parse_app_config_file(
 		GAB_settings.map(),
-		BVS_settings.map(),
 		AUI_settings.map()
 	);
 
-	GAB = GlobalAudioBase::initialize(GAB_settings);
-	if (!GAB->has_audio_output()) {
-		blog.warn("Audio Subsystem is not available!");
+	if (!s_application_headless) {
+		if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) {
+			blog.fatal("SDL Video subsystem is not available!");
+			return nullptr;
+		} else {
+			auto& app_window = PlatformWindow::create("main", nullptr, 0, 0,
+				SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+
+			if (!app_window.is_ready()) {
+				blog.fatal("Failed to prepare main application window, aborting!");
+				return nullptr;
+			} else {
+				PlatformWindow::set_main(app_window);
+				app_window.set_min_size(960, 780);
+				app_window.show();
+				app_window.raise();
+			}
+
+			auto& gui_window = GuiSession::attach(app_window);
+
+			if (!gui_window.is_ready()) {
+				blog.fatal("Failed to attach ImGui to main application window, aborting!");
+				return nullptr;
+			}
+
+			UserInterface::set_ui_zoom_scaling(AUI_settings.ui_zoom_scale);
+			UserInterface::set_ui_text_scaling(AUI_settings.ui_text_scale);
+			UserInterface::set_borderless_view_mode(AUI_settings.borderless_view_mode);
+		}
+
+		if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
+			blog.warn("SDL Audio subsystem is not available!");
+		} else {
+			// XXX - nothing here, maybe important down the line
+		}
+		GlobalAudioBase::import_settings(GAB_settings);
 	}
 
-	BVS = BasicVideoSpec::initialize(BVS_settings);
-	if (!BVS) { return nullptr; }
-
-	UserInterface::init_video(BVS->get_main_window(), BVS->get_main_renderer());
-	UserInterface::set_ui_zoom_scaling(AUI_settings.ui_zoom_scale);
-	UserInterface::set_ui_text_scaling(AUI_settings.ui_text_scale);
-	UserInterface::set_borderless_view_mode(AUI_settings.borderless_view_mode);
+	blog.info("SHA1 hardware acceleration: {}",
+		SHA1::has_hardware_support() ? "ON" : "OFF");
 
 	ApplicationHost::import_mru(AUI_settings.file_mru_cache);
-
 	::append_pending_file_drops(game_file_path);
 	thread_affinity::set_affinity(0b11ull);
 
@@ -202,59 +235,59 @@ ApplicationHost* ApplicationHost::init_application(
 }
 
 void ApplicationHost::quit_application() noexcept {
-	UserInterface::quit_video();
-	UserInterface::quit_context();
-
 	m_systems.clear(); // terminate all systems before quitting
 
 	HDM->write_app_config_file(
-		GAB->export_settings().map(),
-		BVS->export_settings().map(),
-		/***/export_settings().map()
+		GlobalAudioBase::export_settings().map(),
+		ApplicationHost::export_settings().map()
 	);
+
+	PlatformWindow::clear_registry();
+
+	SDL_QuitSubSystem(SDL_INIT_AUDIO);
+	SDL_QuitSubSystem(SDL_INIT_VIDEO);
 }
 
 /*==================================================================*/
 
-int ApplicationHost::handle_client_events(void* event) noexcept {
-	UserInterface::process_event(event);
+int ApplicationHost::handle_client_events(const SDL_Event& event) noexcept {
+	if (event.type == SDL_EVENT_QUIT) { return SDL_APP_SUCCESS; }
 
-	auto sdl_event = reinterpret_cast<SDL_Event*>(event);
+	auto* main_window = PlatformWindow::get_main();
+	if (!main_window) { return SDL_APP_SUCCESS; }
 
-	if (BVS->is_main_window_id(sdl_event->window.windowID)) {
-		switch (sdl_event->type) {
-			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-				return SDL_APP_SUCCESS;
-
-			case SDL_EVENT_DROP_FILE:
-				::append_pending_file_drops(sdl_event->drop.data);
-				break;
-
-			case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
-				BVS->notify_display_change();
-				break;
-
-			case SDL_EVENT_WINDOW_FOCUS_GAINED:
-				GAB->toggle_background_volume(false);
-				break;
-
-			case SDL_EVENT_WINDOW_FOCUS_LOST:
-				GAB->toggle_background_volume(true);
-				break;
-
-			case SDL_EVENT_WINDOW_MINIMIZED:
-				s_application_minimized = true;
-				break;
-
-			case SDL_EVENT_WINDOW_RESTORED:
-				s_application_minimized = false;
-				break;
+	if (event.window.windowID != main_window->get_id()) {
+		for (const auto& window : PlatformWindow::registry()) {
+			if (&window.second == main_window) { continue; }
+			auto success = (*window.second)->on_event(event);
+			if (success) { return SDL_APP_SUCCESS; }
 		}
 	} else {
-		switch (sdl_event->type) {
-			case SDL_EVENT_QUIT:
-				return SDL_APP_SUCCESS;
-		}
+		auto success = (*main_window)->on_event(event, [](auto& event) noexcept -> bool {
+			switch (event.type) {
+				case SDL_EVENT_DROP_FILE:
+					::append_pending_file_drops(event.drop.data);
+					break;
+
+				case SDL_EVENT_WINDOW_FOCUS_GAINED:
+					GlobalAudioBase::toggle_background_volume(false);
+					break;
+
+				case SDL_EVENT_WINDOW_FOCUS_LOST:
+					GlobalAudioBase::toggle_background_volume(true);
+					break;
+
+				case SDL_EVENT_WINDOW_MINIMIZED:
+					s_application_minimized = true;
+					break;
+
+				case SDL_EVENT_WINDOW_RESTORED:
+					s_application_minimized = false;
+					break;
+			}
+			return SDL_APP_CONTINUE;
+		});
+		if (success) { return SDL_APP_SUCCESS; }
 	}
 
 	return SDL_APP_CONTINUE;
@@ -265,17 +298,12 @@ int ApplicationHost::handle_client_events(void* event) noexcept {
 int ApplicationHost::process_client_frame() {
 	handle_main_hotkeys();
 
-	static auto toggle_system_runtime = [](SystemInstance& system, bool state) noexcept {
-		if (state) {
+	for (auto& [id, system] : m_systems) {
+		if (id == m_focus_mru.front() ? s_application_minimized : true) {
 			if (system) { system->add_system_state(EmuState::HIDDEN); }
 		} else {
 			if (system) { system->sub_system_state(EmuState::HIDDEN); }
 		}
-	};
-
-	for (auto& [id, system] : m_systems) {
-		toggle_system_runtime(system, id == m_focus_mru.front()
-			? s_application_minimized : true);
 	}
 
 	const auto dialog_result = ::get_open_file_dialog_result();
@@ -287,26 +315,27 @@ int ApplicationHost::process_client_frame() {
 		s_pending_file_drops.clear();
 	}
 
-	return BVS->render_present([&]() {
-		UserInterface::begin_new_frame();
-		UserInterface::render_frame();
+	auto result = s_application_headless
+		|| PlatformWindow::render_present();
 
-		prune_terminated_systems();
-		find_last_focused_system();
-	}) ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
+	prune_terminated_systems();
+	find_last_focused_system();
+
+	return result ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
 }
 
 void ApplicationHost::handle_main_hotkeys() noexcept {
 	static BasicKeyboard s_input;
 	s_input.advance_state();
 
+	if (s_application_headless) { return; }
+
 	if (s_input.is_pressed(KEY(F8))) {
 		CoreRegistry::load_game_database();
 	}
 
 	if (s_input.is_pressed(KEY(F1))) {
-		static bool s_fullscreen = false;
-		s_fullscreen ^= BVS->set_fullscreen(!s_fullscreen);
+		PlatformWindow::get_main()->toggle_fullscreen();
 	}
 
 	if (!m_focus_mru.empty()) {
