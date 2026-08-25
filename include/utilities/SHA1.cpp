@@ -686,7 +686,7 @@ SHA1::Digest SHA1::final() noexcept {
 			byte = digest_src[i++ ^ (c_digest_word_bytes - 1u)];
 		}
 	} else {
-		std::memcpy(digest.raw.data(), m_digest, c_digest_total_size);
+		std::memcpy(digest.raw, m_digest, c_digest_total_size);
 	}
 
 	reset();

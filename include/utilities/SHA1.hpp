@@ -11,27 +11,27 @@
 
 #pragma once
 
-#include <type_traits>
 #include <cstdint>
 #include <string>
-#include <array>
 #include <span>
 
 /*==================================================================*/
 
 template <std::size_t N>
 struct DigestBase {
-	std::array<std::uint8_t, N> raw;
+	static constexpr std::size_t size = N;
+	std::uint8_t raw[N];
 
 	[[nodiscard("The resulting string will be lost if not stored!")]]
 	std::string hex() const noexcept {
-		std::string result(N * 2, '\x00');
+		std::string result(size * 2, '\x00');
 		constexpr auto c_hex = "0123456789abcdef";
 
-		for (auto byte : raw) {
-			result += c_hex[byte >> 4];
-			result += c_hex[byte & 0xF];
+		for (auto i = 0u; i < size; ++i) {
+			result[i * 2 + 0] = c_hex[raw[i] >> 4];
+			result[i * 2 + 1] = c_hex[raw[i] & 0xF];
 		}
+		return result;
 	}
 };
 
