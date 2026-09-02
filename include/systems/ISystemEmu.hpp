@@ -9,6 +9,7 @@
 #include <optional>
 #include <utility>
 #include <span>
+#include <mutex>
 
 #include "EzMaths.hpp"
 #include "AtomSharedPtr.hpp"
@@ -27,7 +28,9 @@
 #include <fmt/format.h>
 
 import GuiSession;
-import PlatformWindow;
+#ifdef __INTELLISENSE__
+# include "GuiSession.cppm"
+#endif
 
 /*==================================================================*/
 

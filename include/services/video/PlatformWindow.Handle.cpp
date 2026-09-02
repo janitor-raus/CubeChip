@@ -6,14 +6,14 @@
 
 module;
 
-#include "BasicLogger.hpp"
+#include <vector>
+#include <memory>
+#include "LifetimeWrapperSDL.hpp"
+#include "SettingWrapper.hpp"
 #include "EzMaths.hpp"
+#include "BasicLogger.hpp"
 #include "StringJoin.hpp"
-
 #include <SDL3/SDL_render.h>
-
-
-module PlatformWindow;
 
 /*==================================================================*/
 
@@ -39,6 +39,13 @@ module PlatformWindow;
 
 /*==================================================================*/
 
+module PlatformWindow;
+#ifdef __INTELLISENSE__
+# include "PlatformWindow.cppm"
+#endif
+
+/*==================================================================*/
+
 static void log_warn(unsigned line, const char* function) noexcept {
 	ScopedLogSource source("platform_window");
 	blog.warn("L{} : {}(): {}", line, function, SDL_GetError());
@@ -49,12 +56,10 @@ static void log_error(unsigned line, const char* function) noexcept {
 	blog.error("L{} : {}(): {}", line, function, SDL_GetError());
 }
 
-static SDL_Texture* create_texture(
+static auto create_texture(
 	SDL_Renderer* renderer, int w, int h, SDL_PixelFormat format,
 	SDL_TextureAccess access, SDL_ScaleMode scale_mode
 ) noexcept {
-	if (!renderer) { return nullptr; }
-
 	auto* texture = SDL_CreateTexture(renderer, format, access, w, h);
 	if (!texture) { log_error(__LINE__ - 1, __func__); }
 	else {
@@ -66,7 +71,7 @@ static SDL_Texture* create_texture(
 		}
 	}
 
-	return texture;
+	return sdl::make_shared(texture);
 }
 
 static void normalize_to_display(PlatformWindow::Handle& handle) noexcept {
@@ -144,11 +149,11 @@ static void adjust_window_corners(PlatformWindow::Handle& handle) noexcept {
 	static constexpr auto NTDDI_MAJOR = ((NTDDI_VERSION >> 24) & 0x00FF);
 	static constexpr auto NTDDI_MINOR = ((NTDDI_VERSION >> 16) & 0x00FF);
 	static constexpr auto NTDDI_BUILD = ( NTDDI_VERSION        & 0xFFFF);
-	blog.debug("Unable to adjust PlatformWindow corner style, "
-		"Windows SDK is too old: {}.{}.{}", NTDDI_MAJOR, NTDDI_MINOR, NTDDI_BUILD);
+	blog.debug("Unable to adjust PlatformWindow with key '{}' corner style, "
+		"Windows SDK is too old: {}.{}.{}", handle.handle_key.data, NTDDI_MAJOR, NTDDI_MINOR, NTDDI_BUILD);
   #else
 	if (const auto window_handle = SDL_GetPointerProperty(
-		SDL_GetWindowProperties(*this),
+		SDL_GetWindowProperties(handle),
 		SDL_PROP_WINDOW_WIN32_HWND_POINTER,
 		nullptr
 	)) {
@@ -161,28 +166,33 @@ static void adjust_window_corners(PlatformWindow::Handle& handle) noexcept {
 	}
   #endif
 #endif
+	(void)handle;
 }
 
 /*==================================================================*/
 
 PlatformWindow::Handle::Handle(
-	unsigned int handle_id, ShortKey key, const char* title, int w, int h,
+	CreatorKey&&, ShortKey key, const char* title, int w, int h,
 	GVB_WindowFlags window_flags, const char* rendering_driver_name
 ) noexcept
 	: handle_key(key)
-	, handle_id(handle_id)
 {
+	m_sync_node = PWi::s_auto_sync_window_mru.end();
 	create_window(title, w, h, window_flags);
 	create_renderer(rendering_driver_name);
-	PlatformWindow::set_live(*this);
 }
 
 PlatformWindow::Handle::~Handle() noexcept {
-	PlatformWindow::internal::retarget_main(this, nullptr);
-	PlatformWindow::internal::retarget_sync(this, PlatformWindow::get_main());
-	PlatformWindow::internal::retarget_live(this, PlatformWindow::get_main());
+	blog.debug("Platform Window '{}' with ID {} destroyed.",
+		handle_key.data, get_id());
 
-	this->drop_linked(DESTROY_LINKED);
+	PWi::erase_id_from_map(this);
+	PWi::erase_sync_from_mru(this);
+	PWi::retarget_main(this);
+	PWi::retarget_sync(this);
+	PWi::retarget_live(this);
+
+	drop_linked(DESTROY_LINKED);
 	m_texture_list.clear();
 	m_renderer_ptr.reset();
 	m_window_ptr.reset();
@@ -191,57 +201,62 @@ PlatformWindow::Handle::~Handle() noexcept {
 /*==================================================================*/
 
 void PlatformWindow::Handle::drop_linked(LinkAction action) noexcept {
-	auto* owner_ptr = std::exchange(m_owner_ptr, nullptr);
-	if (action == DESTROY_LINKED && owner_ptr) {
-		owner_ptr->drop_linked(DESTROY_LINKED);
+	auto* link_ptr = std::exchange(m_link_ptr, nullptr);
+	if (action == DESTROY_LINKED && link_ptr) {
+		link_ptr->drop_linked(DESTROY_LINKED);
 	}
 }
 
 void PlatformWindow::Handle::notify_link(LinkNotify action) noexcept {
-	if (!m_owner_ptr) { return; }
-	m_owner_ptr->notify_link(action);
+	if (!m_link_ptr) { return; }
+	m_link_ptr->notify_link(action);
 }
 
 void PlatformWindow::Handle::on_present() noexcept {
 	if (is_inert() || !is_ready()) { return; }
 
-	int vsync = this == PlatformWindow::get_sync();
-	if (!SDL_SetRenderVSync(*this, vsync)) {
-		log_warn(__LINE__ - 1, __func__);
-	}
+	if (m_link_ptr) { m_link_ptr->on_present(); }
 
-	if (!SDL_RenderPresent(*this)) {
-		log_error(__LINE__ - 1, __func__);
-	}
+	int vsync = this == PlatformWindow::get_sync_handle();
+	if (!SDL_SetRenderVSync(*this, vsync)) { log_warn (__LINE__, __func__); }
+	if (!SDL_RenderPresent (*this       )) { log_error(__LINE__, __func__); }
 }
 
-auto PlatformWindow::Handle::on_event(const SDL_Event& event, EventCallback callback) noexcept -> EventStatus {
-	if (is_inert() || !get_window() || event.window.windowID != get_id()) { return EVENT_OKAY; }
-	if (callback && callback(event) == EVENT_EXIT) { return EVENT_EXIT; }
+auto PlatformWindow::Handle::on_event(const SDL_Event& event, EventCallback callback) noexcept -> EventResult {
+	if (is_inert() || !get_window() || event.window.windowID != get_id()) { return EVENT_CONTINUE; }
+	if (callback) {
+		auto result = callback(event);
+		if (result != EVENT_CONTINUE) { return result; }
+	}
 
-	switch (event.type) {
-		case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-			PlatformWindow::destroy(handle_key);
-			return EVENT_EXIT;
+	if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
+		PlatformWindow::destroy(handle_key);
+		return EVENT_SUCCESS;
+	}
 
-		case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-			if (get_renderer()) {
+	if (get_renderer()) {
+		switch (event.type) {
+			case SDL_EVENT_WINDOW_FOCUS_GAINED:
+				PWi::insert_sync_to_mru(this);
+				break;
+
+			case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
 				if (auto pixel_scale = get_pixel_density()) {
 					set_render_scale(pixel_scale, pixel_scale);
 				}
-			}
-			return EVENT_OKAY;
+				break;
 
-		case SDL_EVENT_RENDER_DEVICE_RESET:
-		case SDL_EVENT_RENDER_DEVICE_LOST:
-			if (get_renderer()) {
+			case SDL_EVENT_RENDER_DEVICE_RESET:
+			case SDL_EVENT_RENDER_DEVICE_LOST:
 				create_renderer(get_renderer_name());
-			}
-			return EVENT_OKAY;
+				break;
 
-		default:
-			return EVENT_OKAY;
+			default: break;
+		}
 	}
+
+	return !m_link_ptr ? EVENT_CONTINUE
+		: m_link_ptr->on_event(event);
 }
 
 /*==================================================================*/
@@ -252,26 +267,32 @@ bool PlatformWindow::Handle::create_window(const char* title, int w, int h, GVB_
 	if (get_window()) {
 		if (get_renderer()) {
 			notify_link(TEARDOWN_PHASE);
+			PWi::erase_sync_from_mru(this);
 			m_texture_list.clear();
 			m_renderer_ptr.reset();
 		}
 
-		export_settings();
+		(void)export_settings();
+		PWi::erase_id_from_map(this);
 		m_window_ptr.reset();
 	}
 
 	if (auto* window = SDL_CreateWindow(title, w, h, window_flags)) {
 		m_window_ptr.reset(window);
+		PWi::insert_id_to_map(this);
 		import_settings();
 		::adjust_window_corners(*this);
 		::normalize_to_display(*this);
+		blog.debug("Platform Window '{}' with ID {} created.",
+			handle_key.data, get_id());
 	} else {
-		log_error(__LINE__ - 6, __func__);
-		PlatformWindow::internal::retarget_main(this, nullptr);
+		log_error(__LINE__ - 7, __func__);
+		PWi::retarget_main(this);
 	}
 
-	// without a renderer, "live" is not valid
-	PlatformWindow::internal::retarget_live(this, nullptr);
+	// no renderer, invalidate
+	PWi::retarget_sync(this);
+	PWi::retarget_live(this);
 
 	return get_window();
 }
@@ -281,17 +302,19 @@ bool PlatformWindow::Handle::create_renderer(const char* driver) noexcept {
 
 	if (get_renderer()) {
 		notify_link(TEARDOWN_PHASE);
+		PWi::erase_sync_from_mru(this);
 		m_texture_list.clear();
 		m_renderer_ptr.reset();
 	}
 
 	if (auto* renderer = SDL_CreateRenderer(*this, driver)) {
 		m_renderer_ptr.reset(renderer);
+		PWi::insert_sync_to_mru(this);
 		notify_link(REBUILD_PHASE);
 	} else {
-		log_error(__LINE__ - 4, __func__);
-		PlatformWindow::internal::retarget_sync(this, get_main());
-		PlatformWindow::internal::retarget_live(this, get_main());
+		log_error(__LINE__ - 5, __func__);
+		PWi::retarget_sync(this);
+		PWi::retarget_live(this);
 	}
 
 	return get_renderer();
@@ -590,7 +613,7 @@ const char* PlatformWindow::Handle::get_renderer_name() const noexcept {
 	return renderer_name;
 }
 
-unsigned int PlatformWindow::Handle::get_display() const noexcept {
+unsigned PlatformWindow::Handle::get_display() const noexcept {
 	auto display_id = SDL_GetDisplayForWindow(*this);
 	if (!display_id) { log_warn(__LINE__ - 1, __func__); }
 	return display_id;
@@ -640,7 +663,7 @@ bool PlatformWindow::Handle::show() noexcept {
 	return success;
 }
 
-unsigned int PlatformWindow::Handle::get_id() const noexcept {
+unsigned PlatformWindow::Handle::get_id() const noexcept {
 	auto window_id = SDL_GetWindowID(*this);
 	if (!window_id) { log_warn(__LINE__ - 1, __func__); }
 	return window_id;

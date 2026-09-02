@@ -4,23 +4,26 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#pragma once
+module;
 
 #include <cstddef>
 #include <cstring>
 #include <string_view>
 
+export module WindowNode;
+
 /*==================================================================*/
 
-union SDL_Event;
+export union SDL_Event;
 
-struct WindowNode {
-	using EventStatus = bool;
-	using EventCallback = EventStatus(*)(const SDL_Event&) noexcept;
+export struct WindowNode {
+	using EventResult = int;
+	using EventCallback = EventResult(*)(const SDL_Event&) noexcept;
 
-	enum : bool {
-		EVENT_EXIT = false, // signal to stop event parsing
-		EVENT_OKAY = true,  // signal to continue parsing
+	enum EventResultType {
+		EVENT_CONTINUE,
+		EVENT_SUCCESS,
+		EVENT_FAILURE,
 	};
 
 	enum LinkAction : bool {
@@ -80,5 +83,13 @@ public:
 	// If the return value is EVENT_EXIT, the WindowNode instance this was called on
 	// must be treated as destroyed -- do not access it or any of its state afterward.
 	// At present (and by default), only SDL_EVENT_WINDOW_CLOSE_REQUESTED triggers this.
-	virtual EventStatus on_event(const SDL_Event&, EventCallback = nullptr) noexcept = 0;
+	virtual EventResult on_event(const SDL_Event&, EventCallback = nullptr) noexcept = 0;
+
+protected:
+	WindowNode* m_link_ptr{};
+	struct LinkToken {};
+
+public:
+	WindowNode* get_link() const noexcept { return m_link_ptr; }
+	void set_link(WindowNode* ptr, LinkToken&&) noexcept { m_link_ptr = ptr; }
 };

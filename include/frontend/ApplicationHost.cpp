@@ -5,6 +5,7 @@
 */
 
 #include <SDL3/SDL_init.h>
+#include <SDL3/SDL_hints.h>
 #include <SDL3/SDL_events.h>
 
 #include "HomeDirManager.hpp"
@@ -24,6 +25,9 @@
 #include "CoreRegistry.hpp"
 
 import GuiSession;
+#ifdef __INTELLISENSE__
+# include "GuiSession.cppm"
+#endif
 
 /*==================================================================*/
 
@@ -54,13 +58,7 @@ static bool s_application_minimized = false;
 static bool s_application_headless  = false;
 
 ApplicationHost::ApplicationHost() noexcept {
-	if (!s_application_headless) {
-		PlatformWindow::get_main()->raise(); // bring main window to front!
-	}
-
-	PlatformWindow::get_main()->set_title(c_app_name);
 	CoreRegistry::load_game_database();
-
 	setup_gui_callables();
 }
 
@@ -108,15 +106,25 @@ void ApplicationHost::prune_terminated_systems() noexcept {
 }
 
 void ApplicationHost::find_last_focused_system() noexcept {
-	bool found_focused_system = false;
+	SystemID found_focused_system = 0;
 	for (const auto& id : *m_focus_mru) {
 		const bool is_focused = m_systems[id]->force_viewport_focused(false);
 
-		if (!found_focused_system && is_focused && m_focus_mru.front() != id) {
+		if (found_focused_system != 0) { continue; }
+		if (is_focused && m_focus_mru.front() != id) {
 			blog.debug("Focused system instance is now {}.", id);
 			m_focus_mru.insert(id);
-			found_focused_system = true;
+			found_focused_system = id;
 		}
+	}
+
+	const bool allow_screensaver = found_focused_system != 0
+		&& !s_application_minimized && !s_application_headless;
+
+	if (allow_screensaver) {
+		SDL_DisableScreenSaver();
+	} else {
+		SDL_EnableScreenSaver();
 	}
 }
 
@@ -129,9 +137,6 @@ void ApplicationHost::unload_system_instance(SystemID system_id) noexcept {
 
 void ApplicationHost::insert_system_instance(ISystemEmu* ptr) noexcept {
 	if (!ptr) { return; }
-	if (!s_application_headless) {
-		PlatformWindow::get_main()->raise(); // bring main window to front!
-	}
 
 	blog.info("Starting up '{}' ({}) system instance.",
 		ptr->get_descriptor().system_pretty_name, ptr->instance_id);
@@ -168,6 +173,11 @@ ApplicationHost* ApplicationHost::init_application(
 
 	s_application_headless = headless;
 
+	SDL_SetHint(SDL_HINT_APP_NAME, c_app_name);
+	SDL_SetHint(SDL_HINT_MAIN_CALLBACK_RATE, headless ? "waitevent" : nullptr);
+	SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
+	SDL_SetAppMetadata(c_app_name, c_app_ver.with_hash, nullptr);
+
 	HDM = HomeDirManager::get_instance();
 
 	blog.create_log(
@@ -197,8 +207,9 @@ ApplicationHost* ApplicationHost::init_application(
 				blog.fatal("Failed to prepare main application window, aborting!");
 				return nullptr;
 			} else {
-				PlatformWindow::set_main(app_window);
+				PlatformWindow::set_main_handle(app_window);
 				app_window.set_min_size(960, 780);
+				app_window.set_title(c_app_name);
 				app_window.show();
 				app_window.raise();
 			}
@@ -250,47 +261,53 @@ void ApplicationHost::quit_application() noexcept {
 
 /*==================================================================*/
 
+static int handle_main_window_events(const SDL_Event& event) noexcept {
+	if (s_application_headless) { return SDL_APP_CONTINUE; }
+	switch (event.type) {
+		case SDL_EVENT_DROP_FILE:
+			::append_pending_file_drops(event.drop.data);
+			PlatformWindow::get_main_handle()->raise(); // bring main window to front!
+			break;
+
+		case SDL_EVENT_WINDOW_FOCUS_GAINED:
+			GlobalAudioBase::toggle_background_volume(false);
+			break;
+
+		case SDL_EVENT_WINDOW_FOCUS_LOST:
+			GlobalAudioBase::toggle_background_volume(true);
+			break;
+
+		case SDL_EVENT_WINDOW_MINIMIZED:
+			s_application_minimized = true;
+			break;
+
+		case SDL_EVENT_WINDOW_RESTORED:
+			s_application_minimized = false;
+			break;
+	}
+	return SDL_APP_CONTINUE;
+}
+
 int ApplicationHost::handle_client_events(const SDL_Event& event) noexcept {
 	if (event.type == SDL_EVENT_QUIT) { return SDL_APP_SUCCESS; }
 
-	auto* main_window = PlatformWindow::get_main();
-	if (!main_window) { return SDL_APP_SUCCESS; }
+	auto* matched_window = PlatformWindow::find_by_id(event.window.windowID);
 
-	if (event.window.windowID != main_window->get_id()) {
-		for (const auto& window : PlatformWindow::registry()) {
-			if (&window.second == main_window) { continue; }
-			auto success = (*window.second)->on_event(event);
-			if (success) { return SDL_APP_SUCCESS; }
-		}
-	} else {
-		auto success = (*main_window)->on_event(event, [](auto& event) noexcept -> bool {
-			switch (event.type) {
-				case SDL_EVENT_DROP_FILE:
-					::append_pending_file_drops(event.drop.data);
-					break;
-
-				case SDL_EVENT_WINDOW_FOCUS_GAINED:
-					GlobalAudioBase::toggle_background_volume(false);
-					break;
-
-				case SDL_EVENT_WINDOW_FOCUS_LOST:
-					GlobalAudioBase::toggle_background_volume(true);
-					break;
-
-				case SDL_EVENT_WINDOW_MINIMIZED:
-					s_application_minimized = true;
-					break;
-
-				case SDL_EVENT_WINDOW_RESTORED:
-					s_application_minimized = false;
-					break;
-			}
-			return SDL_APP_CONTINUE;
-		});
-		if (success) { return SDL_APP_SUCCESS; }
+	if (matched_window == nullptr) {
+		//ScopedLogSource guard("events");
+		//std::string description(512, '\0');
+		//SDL_GetEventDescription(&event, description.data(), 512);
+		//blog.debug("Window-less event caught: {}", description);
+		return SDL_APP_CONTINUE;
 	}
+	const bool is_main_window = matched_window
+		== PlatformWindow::get_main_handle();
 
-	return SDL_APP_CONTINUE;
+	if (!is_main_window) {
+		(void) (*matched_window)->on_event(event); return SDL_APP_CONTINUE;
+	} else {
+		return (*matched_window)->on_event(event, handle_main_window_events);
+	}
 }
 
 /*==================================================================*/
@@ -315,27 +332,29 @@ int ApplicationHost::process_client_frame() {
 		s_pending_file_drops.clear();
 	}
 
-	auto result = s_application_headless
-		|| PlatformWindow::render_present();
+	if (!s_application_headless) {
+		PlatformWindow::render_present();
+	}
 
 	prune_terminated_systems();
 	find_last_focused_system();
 
-	return result ? SDL_APP_CONTINUE : SDL_APP_FAILURE;
+	return SDL_APP_CONTINUE;
 }
 
 void ApplicationHost::handle_main_hotkeys() noexcept {
 	static BasicKeyboard s_input;
 	s_input.advance_state();
 
-	if (s_application_headless) { return; }
+	if (s_application_headless || PlatformWindow::get_sync_handle()
+		!= PlatformWindow::get_main_handle()) { return; }
 
 	if (s_input.is_pressed(KEY(F8))) {
 		CoreRegistry::load_game_database();
 	}
 
 	if (s_input.is_pressed(KEY(F1))) {
-		PlatformWindow::get_main()->toggle_fullscreen();
+		PlatformWindow::get_main_handle()->toggle_fullscreen();
 	}
 
 	if (!m_focus_mru.empty()) {

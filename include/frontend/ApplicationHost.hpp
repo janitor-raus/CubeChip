@@ -80,7 +80,6 @@ constexpr const char* c_org_name = "";
 /*==================================================================*/
 
 class HomeDirManager;
-class GlobalAudioBase;
 class ISystemEmu;
 
 union SDL_Event;

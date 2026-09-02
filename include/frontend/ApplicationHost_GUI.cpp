@@ -23,6 +23,9 @@
 #include <filesystem>
 
 import GuiSession;
+#ifdef __INTELLISENSE__
+# include "GuiSession.cppm"
+#endif
 
 /*==================================================================*/
 
@@ -39,9 +42,7 @@ namespace {
 	static bool  s_dragging = false;
 }
 
-static void ShowTearingTest(bool* p_open = nullptr) {
-	if (p_open && !*p_open) return;
-
+static void ShowTearingTest(bool syncing) {
 	ImGuiIO& io = ImGui::GetIO();
 	const float dt = s_paused ? 0.f : io.DeltaTime;
 	const float scr_w = io.DisplaySize.x;
@@ -128,12 +129,15 @@ static void ShowTearingTest(bool* p_open = nullptr) {
 	// -----------------------------------------------------------------------
 	ImGui::SetNextWindowSize({ 340, 0 });
 	ImGui::SetNextWindowBgAlpha(0.70f);
-	ImGui::Begin("Tear Test", p_open,
+	ImGui::Begin("Configure", nullptr,
 		ImGuiWindowFlags_NoResize |
 		ImGuiWindowFlags_NoSavedSettings |
 		ImGuiWindowFlags_NoDocking
 	);
 
+	ImGui::TextUnformatted("Has sync focus: ");
+	ImGui::SameLine();
+	ImGui::TextUnformatted(syncing ? "YES" : "NO");
 	char buf[64];
 	std::snprintf(buf, sizeof(buf), "%.3f FPS  (%.3f ms)",
 		io.Framerate, 1000.f / io.Framerate);
@@ -233,7 +237,7 @@ void ApplicationHost::setup_gui_callables() noexcept {
 		if (MenuItem("Open File...")) {
 			SDL_ShowOpenFileDialog([](void*, const char* const* file_list, int) noexcept {
 				if (file_list && file_list[0]) { set_open_file_dialog_result(file_list[0]); }
-			}, nullptr, *PlatformWindow::get_main(), nullptr, 0, nullptr, false);
+			}, nullptr, *PlatformWindow::get_main_handle(), nullptr, 0, nullptr, false);
 		}
 	});
 
@@ -288,11 +292,41 @@ void ApplicationHost::setup_gui_callables() noexcept {
 		}
 	});
 
-	static bool s_show_tearing_demo{};
+	static PlatformWindow::Handle* s_show_tearing_demo{};
+	static auto create_tearing_test_window = []() noexcept {
+		PlatformWindow::LiveGuard guard;
+		auto& test_window = PlatformWindow::create("tearing_test", nullptr, 0, 0,
+			SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+
+		if (test_window.is_inert() || !test_window.is_ready()) {
+			blog.debug("Failed to prepare tearing test window!");
+			return;
+		}
+
+		s_show_tearing_demo = &test_window;
+		test_window.set_min_size(640, 480);
+		test_window.set_title("Tearing Test");
+		test_window.set_parent(PlatformWindow::get_main_handle());
+
+		auto& test_gui = GuiSession::attach(test_window);
+		test_gui.allow_main_menubar(false);
+
+		static auto s_window_none__tearing_demo =
+		UserInterface::register_window([&]() noexcept {
+			ShowTearingTest(PlatformWindow::get_sync_handle() == s_show_tearing_demo);
+		});
+	};
+
 	static auto s_menu_debug__tearing_demo = UserInterface::register_menu("",
 	{ 10, "Debug" }, [&]() noexcept {
+		s_show_tearing_demo = PlatformWindow::exists(s_show_tearing_demo);
 		if (MenuItem("Tearing Demo...", nullptr, s_show_tearing_demo)) {
-			s_show_tearing_demo = !s_show_tearing_demo;
+			if (s_show_tearing_demo) {
+				PlatformWindow::destroy(*s_show_tearing_demo);
+				s_show_tearing_demo = nullptr;
+			} else {
+				create_tearing_test_window();
+			}
 		}
 	});
 
@@ -397,12 +431,6 @@ void ApplicationHost::setup_gui_callables() noexcept {
 	[&]() noexcept {
 		if (!s_show_window_demo) { return; }
 		ShowDemoWindow(&s_show_window_demo);
-	});
-
-	static auto s_window_none__tearing_demo = UserInterface::register_window(
-	[&]() noexcept {
-		if (!s_show_tearing_demo) { return; }
-		ShowTearingTest(&s_show_tearing_demo);
 	});
 
 	static auto s_window_none__log_viewer = UserInterface::register_window(

@@ -15,8 +15,6 @@
 
 #define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL_main.h>
-#include <SDL3/SDL_hints.h>
-#include <SDL3/SDL_version.h>
 
 #ifdef _WIN32
 	#pragma warning(push)
@@ -51,11 +49,7 @@ SDL_AppResult SDL_AppInit(void **host, int argc, char *argv[]) {
 	SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
 #endif
 
-	SDL_SetHint(SDL_HINT_APP_NAME, c_app_name);
-	SDL_SetAppMetadata(c_app_name, c_app_ver.with_hash, nullptr);
-
 	cxxopts::Options options(c_app_name, "Cross-platform multi-system emulator");
-
 	{
 		options.add_options("Runtime")
 			("program",  "Force application to load a program on startup.",

@@ -10,6 +10,9 @@
 #include <imgui.h>
 
 import GuiSession;
+#ifdef __INTELLISENSE__
+# include "GuiSession.cppm"
+#endif
 
 /*==================================================================*/
 

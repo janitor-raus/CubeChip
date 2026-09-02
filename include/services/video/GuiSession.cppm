@@ -6,7 +6,6 @@
 
 module;
 
-#include "WindowNode.hpp"
 #include "LifetimeWrapperSDL.hpp"
 #include "WindowHost.hpp"
 #include "ImLabel.hpp"
@@ -18,9 +17,12 @@ module;
 #include <mutex>
 #include <functional>
 
-
-export import PlatformWindow;
 export module GuiSession;
+export import PlatformWindow;
+
+#ifdef __INTELLISENSE__
+# include "PlatformWindow.cppm"
+#endif
 
 /*==================================================================*/
 
@@ -82,11 +84,7 @@ public:
 	 * Nesting is allowed, but lifetime of the nested hook is not extended automatically.
 	 */
 	template <VoidInvocable Fn> [[nodiscard]]
-	static Hook register_window(Fn&& fn) noexcept {
-		auto* live_session = GuiSession::internal::get_live();
-		if (!live_session) { return Hook(); }
-		return live_session->register_window(std::forward<Fn>(fn));
-	}
+	static Hook register_window(Fn&& fn) noexcept;
 
 	/**
 	 * @brief Registers a nothrow callable to be invoked during the main menu rendering phase.
@@ -95,12 +93,8 @@ public:
 	 * Nesting is allowed, but lifetime of the nested hook is not extended automatically.
 	 */
 	template <VoidInvocable Fn> [[nodiscard]]
-	static Hook register_menu(LabelKey window_tag, OrderKey menu_title, Fn&& fn) noexcept {
-		auto* live_session = GuiSession::internal::get_live();
-		if (!live_session) { return Hook(); }
-		return live_session->register_menu(std::move(window_tag),
-			std::move(menu_title), std::forward<Fn>(fn));
-	}
+	static Hook register_menu(LabelKey window_tag, OrderKey menu_title, Fn&& fn) noexcept;
+
 	/**
 	 * @brief Registers a nothrow callable to be invoked during the main menu rendering phase.
 	 * Returns a Hook (shared_ptr) that is used to manage lifetime of the registration.
@@ -149,18 +143,19 @@ export namespace GuiSession {
 		unsigned    m_main_dock_id = 0;
 		unsigned    m_style_generation = 0;
 		bool        m_live_renderer = false;
+		bool        m_main_menubar = true;
 		std::string m_ini_file{};
 
-		friend Handle& attach(PlatformWindow::Handle&, ImFontAtlas*) noexcept;
+		struct CreatorKey {};
 
-	protected:
-		explicit Handle(
-			PlatformWindow::Handle& window_handle,
-			RegistryAggregate& hooks_aggregate,
-			ImFontAtlas* font_atlas
-		) noexcept;
+		friend Handle& attach(PlatformWindow::Handle&) noexcept;
 
 	public:
+		explicit Handle(
+			CreatorKey&&,
+			PlatformWindow::Handle& window_handle,
+			RegistryAggregate& hooks_aggregate
+		) noexcept;
 		~Handle() noexcept;
 
 		Handle(const Handle&) = delete;
@@ -176,8 +171,8 @@ export namespace GuiSession {
 		void notify_link(LinkNotify action) noexcept override;
 
 		void on_present() noexcept override;
-		auto on_event(const SDL_Event& event, EventCallback callback)
-			noexcept -> EventStatus override;
+		auto on_event(const SDL_Event& event, EventCallback = nullptr)
+			noexcept -> EventResult override;
 
 	public:
 		// Direct mutable access to linked PlatformWindow.
@@ -211,6 +206,7 @@ export namespace GuiSession {
 		operator bool() const noexcept { return is_ready(); }
 
 		auto get_dockspace_id() const noexcept { return m_main_dock_id; }
+		void allow_main_menubar(bool enabled) noexcept { m_main_menubar = enabled; }
 
 		// Direct access to the ImGui context this GuiSession owns. Caller is
 		// responsible for calling ImGui::SetCurrentContext(...) before any
@@ -279,7 +275,7 @@ namespace GuiSession {
 		// Registry of all GuiSession handles, keyed by their unique user-provided string.
 		// Handles in this registry are not guaranteed to be "live" -- they may be
 		// lacking a valid window/renderer pair or ImGui initialization.
-		inline GuiSession::Registry s_gui_session_registry;
+		GuiSession::Registry s_gui_session_registry;
 	}
 }
 
@@ -296,10 +292,7 @@ export namespace GuiSession {
 	// Create (and register) a new GuiSession from an existing PlatformWindow.
 	// If the PlatformWindow already has a GuiSession owner, the existing GuiSession
 	// is returned from the registry.
-	[[nodiscard]] Handle& attach(
-		PlatformWindow::Handle& window_handle,
-		ImFontAtlas* font_atlas = nullptr
-	) noexcept;
+	[[nodiscard]] Handle& attach(PlatformWindow::Handle& window_handle) noexcept;
 
 	// Search the registry for a GuiSession with a given key. If a match is
 	// found, its pointer is returned. If the key is null/empty, the method will
@@ -318,9 +311,9 @@ export namespace GuiSession {
 	// Delegates to 'PlatformWindow::destroy()' for consistency.
 	void destroy(const char* key) noexcept { PlatformWindow::destroy(key); }
 
-	Handle* get_main() noexcept;
-	Handle* get_sync() noexcept;
-	Handle* get_live() noexcept;
+	Handle* get_main_handle() noexcept;
+	Handle* get_sync_handle() noexcept;
+	Handle* get_live_handle() noexcept;
 }
 
 /*==================================================================*/
@@ -335,3 +328,20 @@ public:
 	ScopedGuiContext(const ScopedGuiContext&) = delete;
 	ScopedGuiContext& operator=(const ScopedGuiContext&) = delete;
 };
+
+/*==================================================================*/
+
+template<VoidInvocable Fn>
+UserInterface::Hook UserInterface::register_window(Fn&& fn) noexcept {
+	auto* live_session = GuiSession::get_live_handle();
+	if (!live_session) { return Hook(); }
+	return live_session->register_window(std::forward<Fn>(fn));
+}
+
+template<VoidInvocable Fn>
+UserInterface::Hook UserInterface::register_menu(LabelKey window_tag, OrderKey menu_title, Fn&& fn) noexcept {
+	auto* live_session = GuiSession::get_live_handle();
+	if (!live_session) { return Hook(); }
+	return live_session->register_menu(std::move(window_tag),
+		std::move(menu_title), std::forward<Fn>(fn));
+}

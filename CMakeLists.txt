@@ -55,11 +55,6 @@ target_sources("${PROJECT_NAME}" PRIVATE
 		${PROJECT_MODULE_FILES}
 )
 
-get_target_property(fsets "${PROJECT_NAME}" CXX_MODULE_SETS)
-message(STATUS "module file sets on target: ${fsets}")
-get_target_property(scanflag "${PROJECT_NAME}" CXX_SCAN_FOR_MODULES)
-message(STATUS "CXX_SCAN_FOR_MODULES on target = ${scanflag}")
-
 target_sources("${PROJECT_NAME}" PRIVATE
 	${PROJECT_HEADER_FILES}
 	${PROJECT_SOURCE_FILES}
@@ -92,6 +87,8 @@ target_include_directories(
 	"${PROJECT_INCLUDE_DIR}/utilities"
 	"${PROJECT_INCLUDE_DIR}/components"
 	"${PROJECT_INCLUDE_DIR}/services"
+	"${PROJECT_INCLUDE_DIR}/services/audio"
+	"${PROJECT_INCLUDE_DIR}/services/video"
 	"${PROJECT_INCLUDE_DIR}/systems"
 	"${PROJECT_INCLUDE_DIR}/frontend"
 	"${PROJECT_INCLUDE_DIR}/vendor/jthread" # hardcoded

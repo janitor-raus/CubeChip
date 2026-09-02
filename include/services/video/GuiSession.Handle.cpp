@@ -4,7 +4,7 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-module GuiSession;
+module;
 
 #include "BasicLogger.hpp"
 
@@ -12,19 +12,24 @@ module GuiSession;
 #include <backends/imgui_impl_sdl3.h>
 #include <backends/imgui_impl_sdlrenderer3.h>
 
+module GuiSession;
+#ifdef __INTELLISENSE__
+# include "GuiSession.cppm"
+#endif
+
 /*==================================================================*/
 
 GuiSession::Handle::Handle(
+	CreatorKey&&,
 	PlatformWindow::Handle& window_handle,
-	RegistryAggregate& hooks_aggregate,
-	ImFontAtlas* font_atlas
+	RegistryAggregate& hooks_aggregate
 ) noexcept
 	: m_window_handle(window_handle)
-	, m_ctx(ImGui::CreateContext(font_atlas))
+	, m_ctx(ImGui::CreateContext())
 	, m_session_hooks(hooks_aggregate)
 {
 	init_context();
-	handle().internal_set_owner(this);
+	handle()->set_link(this, LinkToken());
 	if (handle().is_ready()) {
 		notify_link(REBUILD_PHASE);
 	}
@@ -73,7 +78,7 @@ void GuiSession::Handle::notify_link(LinkNotify action) noexcept {
 }
 
 void GuiSession::Handle::on_present() noexcept {
-	if (!handle().is_ready()) { return; }
+	if (!is_ready()) { return; }
 	ScopedGuiContext guard(*this);
 
 	update_style();
@@ -82,7 +87,7 @@ void GuiSession::Handle::on_present() noexcept {
 	ImGui_ImplSDL3_NewFrame();
 	ImGui::NewFrame();
 
-	if (ImGui::BeginMainMenuBar()) {
+	if (m_main_menubar && ImGui::BeginMainMenuBar()) {
 		invoke_registered_menus("");
 		ImGui::EndMainMenuBar();
 	}
@@ -94,22 +99,15 @@ void GuiSession::Handle::on_present() noexcept {
 
 	ImGui::Render();
 	ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), *this);
-
-	handle()->on_present();
 }
 
-auto GuiSession::Handle::on_event(const SDL_Event& event, EventCallback callback) noexcept -> EventStatus {
-	if (handle()->on_event(event, callback) == EVENT_EXIT) { return EVENT_EXIT; }
-
-	// Only reachable if the PlatformWindow's on_event() call did not return an EVENT_EXIT.
-	// If it did, we have to assume that it encountered SDL_EVENT_WINDOW_CLOSE_REQUESTED
-	// and thus the very same GuiSession we're executing inside of has now been destroyed.
+auto GuiSession::Handle::on_event(const SDL_Event& event, EventCallback) noexcept -> EventResult {
 	if (is_ready()) {
 		ScopedGuiContext guard(*this);
 		ImGui_ImplSDL3_ProcessEvent(&event);
 	}
 
-	return EVENT_OKAY;
+	return EVENT_CONTINUE;
 }
 
 /*==================================================================*/

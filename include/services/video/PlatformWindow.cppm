@@ -6,9 +6,9 @@
 
 module;
 
-#include "WindowNode.hpp"
 #include "LifetimeWrapperSDL.hpp"
 
+#include <list>
 #include <forward_list>
 #include <unordered_map>
 
@@ -16,6 +16,11 @@ module;
 #include "EzMaths.hpp"
 
 export module PlatformWindow;
+export import WindowNode;
+
+#if __INTELLISENSE__
+#  include "WindowNode.cppm"
+#endif
 
 /*==================================================================*/
 
@@ -91,39 +96,76 @@ export enum GVB_ScaleMode {
 
 /*==================================================================*/
 
+namespace PlatformWindow {
+	export class Handle;
+
+	using ShortKey = WindowNode::ShortKey;
+	using SyncMRU  = std::list<Handle*>;
+	using SyncNode = SyncMRU::iterator;
+
+	namespace internal {
+		// Association map of WindowIDs to each ShortKey. Used for efficient handle
+		// lookups, particularly when dispatching SDL events based on the WindowID.
+		using IDMap = std::unordered_map<unsigned, ShortKey>;
+		IDMap s_platform_window_id_map;
+
+		void insert_id_to_map(Handle* handle) noexcept;
+		void erase_id_from_map(Handle* handle) noexcept;
+
+		/*==================================================================*/
+
+		// Automatically managed MRU of windows handles used for automatic sync.
+		PlatformWindow::SyncMRU s_auto_sync_window_mru;
+		std::size_t s_sync_window_mru_generation = 0;
+
+		SyncNode& get_handle_node(Handle* handle) noexcept;
+		void clear_node(SyncNode& node) noexcept;
+
+		void insert_sync_to_mru(Handle* handle) noexcept;
+		void erase_sync_from_mru(Handle* handle) noexcept;
+
+		// Sync platform window: This reflects the platform window that is used to
+		// drive renderer vsync. Should the underlying window be destroyed, defaults
+		// to the main platform window.
+		PlatformWindow::SyncNode s_explicit_sync_mru_node = s_auto_sync_window_mru.end();
+		void retarget_sync(Handle* handle) noexcept;
+
+		void apply_explicit_sync_node() noexcept;
+	}
+}
+
 export namespace PlatformWindow {
 	constexpr inline auto maximum_allowed = 64ull;
+
+	namespace PWi = PlatformWindow::internal;
 
 	class Handle : public WindowNode {
 		SDL_Unique<SDL_Window>   m_window_ptr;
 		SDL_Unique<SDL_Renderer> m_renderer_ptr;
-
-		WindowNode* m_owner_ptr = nullptr;
+		PlatformWindow::SyncNode m_sync_node{};
 
 		std::forward_list<SDL_Shared<SDL_Texture>>
 			m_texture_list;
 
+		struct CreatorKey {};
+
 		friend Handle& create(const char*, const char*,
 			int, int, GVB_WindowFlags, const char*) noexcept;
+
+		friend SyncNode& PWi::get_handle_node(Handle* handle) noexcept;
 
 	public:
 		// Immutable after construction. User-created handles can never have an empty key.
 		// An empty key is reserved exclusively for creation of inert handles.
 		const ShortKey handle_key;
-		const unsigned int handle_id;
 
 		bool is_inert() const noexcept { return handle_key[0] == '\0'; }
 
-		void internal_set_owner(WindowNode* owner) noexcept { m_owner_ptr = owner; }
-		auto internal_get_owner() const noexcept { return m_owner_ptr; }
-
-	protected:
+	public:
 		Handle(
-			unsigned int handle_id, ShortKey key, const char* title, int w, int h,
+			CreatorKey&&, ShortKey key, const char* title, int w, int h,
 			GVB_WindowFlags window_flags, const char* rendering_driver_name
 		) noexcept;
-
-	public:
 		~Handle() noexcept;
 
 		Handle(Handle&&) = delete;
@@ -137,7 +179,7 @@ export namespace PlatformWindow {
 
 		void on_present() noexcept override;
 		auto on_event(const SDL_Event& event, EventCallback callback)
-			noexcept -> EventStatus override;
+			noexcept -> EventResult override;
 
 	public:
 		auto get_window()   const noexcept { return m_window_ptr.get(); }
@@ -243,7 +285,7 @@ export namespace PlatformWindow {
 
 	public:
 		const char* get_renderer_name() const noexcept;
-		unsigned int get_display() const noexcept;
+		unsigned get_display() const noexcept;
 		float get_pixel_density() const noexcept;
 
 	public:
@@ -254,7 +296,7 @@ export namespace PlatformWindow {
 		bool hide() noexcept;
 		bool show() noexcept;
 
-		unsigned int get_id() const noexcept;
+		unsigned get_id() const noexcept;
 		bool has_persistent_geometry() const noexcept;
 
 	public:
@@ -309,40 +351,32 @@ export namespace PlatformWindow {
 /*==================================================================*/
 
 namespace PlatformWindow {
-	using ShortKey = WindowNode::ShortKey;
 	using Registry = std::unordered_map<ShortKey,
 		PlatformWindow::Handle, ShortKey::Hash>;
 
 	namespace internal {
-		// Registry of all PlatformWindow handles, keyed by their unique user-provided string.
-		// Handles in this registry are not guaranteed to be "live" -- they may be
-		// lacking a valid window/renderer pair.
-		inline PlatformWindow::Registry s_platform_window_registry;
+		// Registry of all PlatformWindow handles, each keyed with a unique ShortKey.
+		PlatformWindow::Registry s_platform_window_registry;
 
 		// Main platform window: If null, the applicaton is to be presumed to be
 		// waiting for shutdown, unless the user explicitly set a different platform
 		// window to be the "main" one, or the application runs in "headless" mode.
-		inline PlatformWindow::Handle* s_main_platform_window_ptr = nullptr;
-
-		// Sync platform window: This reflects the platform window that is used to
-		// drive renderer vsync. Should the underlying window be destroyed, defaults
-		// to the main platform window.
-		inline PlatformWindow::Handle* s_sync_platform_window_ptr = nullptr;
+		PlatformWindow::Handle* s_main_window_ptr = nullptr;
+		void retarget_main(Handle* handle) noexcept;
 
 		// Live platform window: This reflects the platform window that is targeted
-		// by default for various windowing operations, unless another handle is
-		// explicitly used for targeting. If null, automatic targeting will fail.
-		inline PlatformWindow::Handle* s_live_platform_window_ptr = nullptr;
-
-		void retarget_main(Handle* cur_handle, Handle* new_handle) noexcept;
-		void retarget_sync(Handle* cur_handle, Handle* new_handle) noexcept;
-		void retarget_live(Handle* cur_handle, Handle* new_handle) noexcept;
+		// by default for various windowing operations, unless some handle is
+		// directly used for targeting. If null, automatic targeting will fail.
+		PlatformWindow::Handle* s_live_window_ptr = nullptr;
+		void retarget_live(Handle* handle) noexcept;
 	}
 }
 
 /*==================================================================*/
 
 export namespace PlatformWindow {
+	void render_present() noexcept;
+
 	// Returns a const view of the PlatformWindow registry.
 	// Useful for iterating through and accessing state.
 	// Use the * operator if you wish to modify items.
@@ -359,15 +393,6 @@ export namespace PlatformWindow {
 		const char* rendering_driver_name = nullptr
 	) noexcept;
 
-	// Search the registry for a PlatformWindow handle with a given key. If a match
-	// is found, its pointer is returned. If the key is null/empty, the method will
-	// return the PlatformWindow that was declared as "main", if one is available.
-	Handle* find(const char* key = nullptr) noexcept;
-
-	// Search the registry using a PlatformWindow handle pointer. If it exists, the
-	// same pointer will be returned, otherwise a 'nullptr' will be returned.
-	Handle* exists(Handle* handle) noexcept;
-
 	// De-register and destroy a given PlatformWindow handle. If the handle is owned by
 	// another object, it will be unlinked and signaled to be destroyed as well.
 	void destroy(Handle& handle) noexcept;
@@ -376,21 +401,68 @@ export namespace PlatformWindow {
 	// another object, it will be unlinked and signaled to be destroyed as well.
 	void destroy(const char* key) noexcept;
 
+	/*==================================================================*/
+
+	// Search the registry for a PlatformWindow handle with a given key.
+	// If a match is found, its pointer will be returned.
+	Handle* find_by_key(const ShortKey& key) noexcept;
+
+	// Search the registry for a PlatformWindow handle with a given key.
+	// If a match is found, its pointer will be returned.
+	Handle* find_by_key(const char* key) noexcept;
+
+	// Search the ID map for a PlatformWindow handle with a given ID.
+	// If a match is found, its pointer will be returned.
+	Handle* find_by_id(unsigned id) noexcept;
+
+	// Search the registry using a PlatformWindow handle pointer. If it exists, the
+	// same pointer will be returned, otherwise a 'nullptr' will be returned.
+	Handle* exists(Handle* handle) noexcept;
+
+	/*==================================================================*/
+
 	// Declare a given PlatformWindow handle as "main". If destroyed, the application
 	// is expected to prepare for and proceed with termination.
-	bool set_main(const Handle& handle) noexcept;
-	Handle* get_main() noexcept;
+	bool set_main_handle(const Handle& handle) noexcept;
+	void clear_main_handle() noexcept;
+	Handle* get_main_handle() noexcept;
 
 	// Declare a given PlatformWindow handle as "sync". This is used to track
 	// which platform window will be targeted to drive renderer vsync.
-	bool set_sync(const Handle& handle) noexcept;
-	Handle* get_sync() noexcept;
+	bool set_sync_handle(const Handle& handle) noexcept;
+	void clear_sync_handle() noexcept;
+	Handle* get_sync_handle() noexcept;
 
 	// Declare a given PlatformWindow handle as "live". This is used to track
 	// which platform window will be targeted by operations that don't explicitly
 	// take a handle argument for targeting.
-	bool set_live(const Handle& handle) noexcept;
-	Handle* get_live() noexcept;
+	bool set_live_handle(const Handle& handle) noexcept;
+	void clear_live_handle() noexcept;
+	Handle* get_live_handle() noexcept;
 
-	bool render_present() noexcept;
+	/*==================================================================*/
+
+	class LiveGuard {
+		Handle* m_previous{};
+
+	public:
+		explicit LiveGuard(Handle& window) noexcept
+			: m_previous(get_live_handle())
+		{
+			set_live_handle(window);
+		}
+
+		LiveGuard() noexcept
+			: m_previous(get_live_handle())
+		{}
+
+		~LiveGuard() noexcept {
+			if (m_previous && exists(m_previous)) {
+				set_live_handle(*m_previous);
+			}
+		}
+
+		LiveGuard(const LiveGuard&) = delete;
+		LiveGuard& operator=(const LiveGuard&) = delete;
+	};
 }

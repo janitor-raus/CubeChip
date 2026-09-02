@@ -11,6 +11,9 @@
 #include <imgui.h>
 
 import GuiSession;
+#ifdef __INTELLISENSE__
+# include "GuiSession.cppm"
+#endif
 
 /*==================================================================*/
 
@@ -30,11 +33,6 @@ struct DisplayDevice::DisplayContext {
 	const bool* m_borderless_view_input = nullptr;
 
 	BoundedParam<0, 0, 3> m_screen_rotation;
-	//
-	//bool m_integer_scaling = false;
-	//bool m_borderless_view = false;
-	//bool m_shaders_enabled = false;
-	//bool m_debugger_enabled = false;
 
 	int m_integer_scaling  = false;
 	int m_borderless_view  = false;
@@ -43,7 +41,7 @@ struct DisplayDevice::DisplayContext {
 
 public:
 	DisplayContext(std::size_t W, std::size_t H) noexcept
-		: m_window_handle(PlatformWindow::get_live())
+		: m_window_handle(PlatformWindow::get_live_handle())
 		, m_swapchain(int(W), int(H))
 		, m_staging_data(std::make_shared<Metadata>(int(W), int(H)))
 	{
@@ -125,6 +123,7 @@ private:
 			);
 
 			if (m_target_texture.expired() || new_target_size != m_old_target_size) {
+				m_window_handle->destroy_textures(m_target_texture.lock().get());
 				m_target_texture = m_window_handle->create_target_texture(
 					new_target_size.w, new_target_size.h, false, true);
 				m_old_target_size = new_target_size;
@@ -136,8 +135,8 @@ private:
 			}
 
 			m_window_handle->render_whole_to_target(
-				m_target_texture.lock().get(),
-				m_stream_texture.lock().get()
+				m_stream_texture.lock().get(),
+				m_target_texture.lock().get()
 			);
 
 			ImGui::SetCursorPos(layout_data.origin_point + ImGui::floor(
