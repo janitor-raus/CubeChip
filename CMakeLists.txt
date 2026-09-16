@@ -23,6 +23,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(PROJECT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
@@ -61,11 +62,11 @@ add_custom_target(generate_embedded_assets
 )
 add_dependencies("${PROJECT_NAME}" generate_embedded_assets)
 
-target_sources("${PROJECT_NAME}" PRIVATE
-    FILE_SET project_modules TYPE CXX_MODULES
-    FILES
-		${PROJECT_MODULE_FILES}
-)
+#target_sources("${PROJECT_NAME}" PRIVATE
+#    FILE_SET project_modules TYPE CXX_MODULES
+#    FILES
+#		${PROJECT_MODULE_FILES}
+#)
 
 target_sources("${PROJECT_NAME}" PRIVATE
 	${PROJECT_HEADER_FILES}

@@ -17,6 +17,13 @@ class GlobalAudioBase final {
 	inline static float s_passive_background_volume = 0.25f;
 	inline static float s_active_background_volume  = 1.00f;
 
+	struct Settings {
+		float master_volume     = 0.7f;
+		float background_volume = 1.0f;
+		bool  all_audio_muted   = false;
+	};
+	static Settings s_settings;
+
 public:
 	static void export_settings() noexcept;
 	static void import_settings() noexcept;

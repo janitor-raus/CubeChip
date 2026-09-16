@@ -205,7 +205,7 @@ GuiSession::Handle& GuiSession::attach(PlatformWindow::Handle& window_handle) no
 	}
 
 	// emplace a new RegistryAggregate if missing, otherwise reuse existing
-	auto& aggregate = UserInterface::s_gui_session_user_hooks
+	auto& aggregate = Handle::s_gui_session_user_hooks
 		.try_emplace(cur_key).first->second;
 
 	return internal::s_gui_session_registry.try_emplace(cur_key,

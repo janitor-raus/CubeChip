@@ -46,7 +46,7 @@ void BYTEPUSHER_STANDARD::handle_cycle_loop() noexcept {
 	::assign_cast(m_memory[0], input_states >> 0x8);
 	::assign_cast(m_memory[1], input_states & 0xFF);
 
-	for (auto cycle_count = 0; cycle_count < c_sys_standard_cpf; ++cycle_count) {
+	for (auto cycle_count = 0u; cycle_count < c_sys_standard_cpf; ++cycle_count) {
 		m_memory[read_data<ByteSpan::TRIPLE>(prog_pointer + 3)] =
 		m_memory[read_data<ByteSpan::TRIPLE>(prog_pointer + 0)];
 		prog_pointer = read_data<ByteSpan::TRIPLE>(prog_pointer + 6);

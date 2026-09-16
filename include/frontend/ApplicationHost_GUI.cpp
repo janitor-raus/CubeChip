@@ -35,7 +35,6 @@ namespace {
 	static float s_scroll_spd = 120.f;
 	static bool  s_paused = false;
 	static float s_bar_y = -1.f;
-	static bool  s_dragging = false;
 }
 
 static void ShowTearingTest(bool syncing) {

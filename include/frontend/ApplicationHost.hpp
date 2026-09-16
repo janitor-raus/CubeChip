@@ -114,7 +114,7 @@ class ApplicationHost final {
 		bool  borderless_view_mode = false;
 		std::string file_mru_cache[s_mru_limit];
 	};
-	inline static Settings s_settings;
+	static Settings s_settings;
 
 /*==================================================================*/
 

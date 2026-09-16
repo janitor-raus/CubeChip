@@ -137,7 +137,7 @@ namespace GuiSession {
 		unsigned    m_style_generation = 0;
 		bool        m_live_renderer = false;
 		bool        m_main_menubar = true;
-		bool : 64; // reserved for future use
+		std::size_t : 64; // reserved for future use
 		std::string m_ini_file{};
 		std::string m_log_file{};
 

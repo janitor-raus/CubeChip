@@ -37,9 +37,9 @@ struct DisplayDevice::DisplayContext {
 
 public:
 	DisplayContext(std::size_t W, std::size_t H) noexcept
-		: m_window_handle(PlatformWindow::get_live_handle())
+		: m_staging_data(std::make_shared<Metadata>(int(W), int(H)))
+		, m_window_handle(PlatformWindow::get_live_handle())
 		, m_swapchain(int(W), int(H))
-		, m_staging_data(std::make_shared<Metadata>(int(W), int(H)))
 	{
 		assert((m_staging_data.view()->get_base_frame().area() == (W * H))
 			&& "Display W/H sizes are beyond expected bounds, clamping!");

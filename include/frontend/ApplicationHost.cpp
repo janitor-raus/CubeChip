@@ -51,12 +51,15 @@ void ApplicationHost::set_open_file_dialog_result(std::string_view file) noexcep
 
 /*==================================================================*/
 
+#ifndef WIN32
 static constexpr u8 c_app_logo_data[] = {
 	#include "app_logo.data"
 };
+#endif
 
 /*==================================================================*/
 
+ApplicationHost::Settings ApplicationHost::s_settings;
 static SettingsMap s_settings_map;
 
 static bool s_application_minimized = false;
@@ -250,7 +253,7 @@ void ApplicationHost::quit_application() noexcept {
 
 	PlatformWindow::clear_registry();
 
-	if (auto error = SettingsMap::write_config_file(s_config_path.c_str())) {
+	if (SettingsMap::write_config_file(s_config_path.c_str())) {
 		blog.error("[TOML] Failed to write App Config! Expected to"
 			"write file at the following location: '{}'", s_config_path);
 	} else {

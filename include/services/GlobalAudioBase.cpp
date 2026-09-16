@@ -14,13 +14,7 @@
 
 /*==================================================================*/
 
-struct Settings {
-	float master_volume = 0.7f;
-	float background_volume = 1.0f;
-	bool  all_audio_muted = false;
-};
-
-static Settings    s_settings;
+GlobalAudioBase::Settings GlobalAudioBase::s_settings;
 static SettingsMap s_settings_map;
 
 /*==================================================================*/

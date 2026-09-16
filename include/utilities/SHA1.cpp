@@ -222,7 +222,7 @@ void SHA1::transform_scalar(std::uint32_t* digest, const std::uint8_t* src, std:
 /*==================================================================*/
 
 #ifdef SHA1_X86_INTRINSICS
-#  if defined(__GNUC__)
+#  if defined(__clang__) || defined(__GNUC__)
 [[gnu::target("sha,ssse3,sse4.1")]]
 #  endif
 void SHA1::transform_hw_x86(std::uint32_t* digest, const std::uint8_t* src, std::size_t transforms) noexcept {
@@ -409,7 +409,7 @@ void SHA1::transform_hw_x86(std::uint32_t* digest, const std::uint8_t* src, std:
 #endif
 
 #ifdef SHA1_ARM_INTRINSICS
-#  if defined(__GNUC__)
+#  if defined(__clang__) || defined(__GNUC__)
 [[gnu::target("arch=armv8-a+crypto")]]
 #  endif
 void SHA1::transform_hw_arm(std::uint32_t* digest, const std::uint8_t* src, std::size_t transforms) noexcept {
