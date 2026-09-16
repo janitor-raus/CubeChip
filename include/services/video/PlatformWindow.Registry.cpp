@@ -4,26 +4,18 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-module;
-
-#include "BasicLogger.hpp"
-
 #include <cstdio>
 #include <utility>
 #include <SDL3/SDL_render.h>
 
-module PlatformWindow;
-#ifdef __INTELLISENSE__
-# include "PlatformWindow.cppm"
-#endif
+#include "BasicLogger.hpp"
+#include "PlatformWindow.hpp"
 
 /*==================================================================*/
 
 void PlatformWindow::render_present() noexcept {
-	using namespace internal;
-
 	static std::vector<ShortKey> s_presented_keys(maximum_allowed);
-	static const auto& mru = s_auto_sync_window_mru;
+	static const auto& mru = PWi::s_auto_sync_window_mru;
 	if (mru.empty()) { return; }
 
 	s_presented_keys.clear();
@@ -37,7 +29,7 @@ void PlatformWindow::render_present() noexcept {
 			s_presented_keys.end(), window->handle_key);
 
 		if (it_find != s_presented_keys.end()) { ++it; continue; }
-		cached_mru_gen = s_sync_window_mru_generation;
+		cached_mru_gen = PWi::s_sync_window_mru_generation;
 
 		s_presented_keys.push_back(window->handle_key);
 		bool vsync = std::next(it) == mru.rend();
@@ -47,7 +39,7 @@ void PlatformWindow::render_present() noexcept {
 		(*window)->on_present();
 		if (vsync) { break; }
 
-		if (cached_mru_gen < s_sync_window_mru_generation) {
+		if (cached_mru_gen < PWi::s_sync_window_mru_generation) {
 			if (++restarts_count >= 16) {
 				blog.error("MRU permutations exceeded 16 iterations "
 					"in a single render_present() call! This may be "
@@ -86,10 +78,6 @@ void PlatformWindow::internal::retarget_live(Handle* handle) noexcept {
 
 PlatformWindow::SyncNode& PlatformWindow::internal::get_handle_node(Handle* handle) noexcept {
 	return handle->m_sync_node;
-}
-
-void PlatformWindow::internal::clear_node(SyncNode& node) noexcept {
-	node = s_auto_sync_window_mru.end();
 }
 
 /*==================================================================*/
@@ -169,6 +157,10 @@ PlatformWindow::Handle* PlatformWindow::exists(Handle* handle) noexcept {
 		if (handle == &handle_entry.second) { return handle; }
 	}
 	return nullptr;
+}
+
+PlatformWindow::Handle* PlatformWindow::has_exec_context() noexcept {
+	return internal::s_exec_context_ptr;
 }
 
 /*==================================================================*/

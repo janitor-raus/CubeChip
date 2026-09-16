@@ -8,34 +8,32 @@
 
 #include "GlobalAudioBase.hpp"
 #include "LifetimeWrapperSDL.hpp"
+
+#include "SettingWrapper.hpp"
 #include <SDL3/SDL_audio.h>
 
 /*==================================================================*/
 
-SettingsMap GlobalAudioBase::Settings::map() noexcept {
-	return {
-		::make_setting_link("Audio.Global.Volume",   &master_volume),
-		::make_setting_link("Audio.Global.BgVolume", &background_volume),
-		::make_setting_link("Audio.Global.Muted",    &all_audio_muted),
-	};
+static SettingsMap s_settings_map;
+
+void GlobalAudioBase::export_settings() noexcept {
+	s_settings.master_volume     = s_master_volume.load(std::memory_order::relaxed);
+	s_settings.all_audio_muted   = s_all_audio_muted.load(std::memory_order::relaxed);
+	s_settings.background_volume = s_passive_background_volume;
+
+	s_settings_map.push_into(SettingsMap::main_table);
 }
 
-auto GlobalAudioBase::export_settings() noexcept -> Settings {
-	Settings out;
+void GlobalAudioBase::import_settings() noexcept {
+	s_settings_map
+		.add_setting("Audio.Global.Volume",   &s_settings.master_volume)
+		.add_setting("Audio.Global.BgVolume", &s_settings.background_volume)
+		.add_setting("Audio.Global.Muted",    &s_settings.all_audio_muted);
+	s_settings_map.pull_from(SettingsMap::main_table);
 
-	out.master_volume     = s_master_volume.load(std::memory_order::relaxed);
-	out.all_audio_muted   = s_all_audio_muted.load(std::memory_order::relaxed);
-	out.background_volume = s_passive_background_volume;
-
-	return out;
-}
-
-/*==================================================================*/
-
-void GlobalAudioBase::import_settings(const Settings& settings) noexcept {
-	set_master_volume(settings.master_volume);
-	set_background_volume(settings.background_volume);
-	is_muted(settings.all_audio_muted);
+	set_master_volume(s_settings.master_volume);
+	set_background_volume(s_settings.background_volume);
+	is_muted(s_settings.all_audio_muted);
 }
 
 /*==================================================================*/

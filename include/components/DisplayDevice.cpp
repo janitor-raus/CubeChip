@@ -4,16 +4,12 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "DisplayDevice.hpp"
-#include "LifetimeWrapperSDL.hpp"
-
 #include <utility>
 #include <imgui.h>
 
-import GuiSession;
-#ifdef __INTELLISENSE__
-# include "GuiSession.cppm"
-#endif
+#include "DisplayDevice.hpp"
+#include "LifetimeWrapperSDL.hpp"
+#include "PlatformWindow.hpp"
 
 /*==================================================================*/
 

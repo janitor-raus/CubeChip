@@ -63,8 +63,8 @@ public:
 private:
 	static void insert_new_registration(const LiveHook& entry) noexcept;
 
-	[[nodiscard]] static
-	auto get_available_core_span() noexcept -> std::span<const WeakHook>;
+	[[nodiscard]]
+	static auto get_available_core_span() noexcept -> std::span<const WeakHook>;
 
 	template <typename Core, typename... Args> [[nodiscard]]
 	static ISystemEmu* construct_core_instance(Args&&... args)

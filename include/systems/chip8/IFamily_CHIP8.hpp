@@ -134,7 +134,7 @@ protected:
 		requires ((IsSampleGenerator<Generator> && ...))
 	void mix_audio_data(Generator&&... generators) noexcept {
 		if (m_audio_device) {
-			m_audio_device.set_freq_ratio(m_framerate_multiplier);
+			m_audio_device.set_freq_ratio(framerate_multiplier);
 
 			auto buffer = allocate_n<f32>(
 				m_audio_device.next_frame_sample_count(get_real_system_framerate())

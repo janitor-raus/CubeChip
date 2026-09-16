@@ -17,7 +17,7 @@ void SCHIP_MODERN::initialize_system() noexcept {
 	copy_file_image_to(m_memory, c_game_load_pos);
 	copy_font_data_to(m_memory, 240);
 
-	m_base_system_framerate = c_sys_refresh_rate;
+	base_system_framerate = c_sys_refresh_rate;
 
 	m_memory_editor.set_memory_range(m_memory.data(), m_memory.size());
 
@@ -490,7 +490,7 @@ void SCHIP_MODERN::scroll_display_rt() noexcept {
 	#pragma region C instruction branch
 
 	void SCHIP_MODERN::instruction_CxNN(u32 X, u32 NN) noexcept {
-		::assign_cast(m_registers_V[X], m_rng->next() & NN);
+		::assign_cast(m_registers_V[X], m_rng.next() & NN);
 	}
 
 	#pragma endregion

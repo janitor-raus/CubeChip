@@ -11,6 +11,7 @@
 #include "BasicLogger.hpp"
 #include "PathGetters.hpp"
 #include "SimpleFileIO.hpp"
+#include "StringJoin.hpp"
 #include "CoreRegistry.hpp"
 #include "SystemDescriptor.hpp"
 
@@ -28,21 +29,23 @@ static bool load_json_from_file(std::string_view json_file_path, Json& output) n
 			return true;
 		} catch (const Json::parse_error& e) {
 			blog.error("Exception triggered trying to parse JSON file:"
-				" \"{}\" [{}]", json_file_path, e.what());
+				" '{}': {}", json_file_path, e.what());
 		}
 	}
 	return false;
 }
 
+/*==================================================================*/
+
 void CoreRegistry::load_game_database(std::string_view db_file_path) noexcept {
-	static const auto default_db_path = (::get_base_path() / fs::Path("programDB.json")).string();
+	static const auto default_db_path = ::get_base_path() + "programDB.json";
 	std::string_view normalized_path = db_file_path.empty() ? default_db_path : db_file_path;
 
 	if (!load_json_from_file(normalized_path, s_game_database)) {
 		s_game_database.clear();
-		blog.warn("Failed to load ProgramDB: \"{}\"", normalized_path);
+		blog.warn("Failed to load ProgramDB from '{}'", normalized_path);
 	} else {
-		blog.info("Successfully loaded ProgramDB: \"{}\"", normalized_path);
+		blog.info("Successfully loaded ProgramDB from '{}'", normalized_path);
 	}
 }
 

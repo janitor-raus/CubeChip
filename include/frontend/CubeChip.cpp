@@ -4,9 +4,11 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "HomeDirManager.hpp"
+#include "HomeDir.hpp"
+#include "ThreadAffinity.hpp"
 #include "BasicLogger.hpp"
 #include "BasicInput.hpp"
+#include "StringJoin.hpp"
 #include "AttachConsole.hpp"
 
 #include <cxxopts.hpp>
@@ -17,19 +19,15 @@
 #include <SDL3/SDL_main.h>
 
 #ifdef _WIN32
-	#pragma warning(push)
-	#pragma warning(disable : 5039)
-		#include <mbctype.h>
-	#pragma warning(pop)
+#  pragma warning(push)
+#  pragma warning(disable : 5039)
+#    include <mbctype.h>
+#  pragma warning(pop)
 
-	#ifndef NOMINMAX
-		#define NOMINMAX
-	#endif
-	#include <windows.h>
-// XXX - test narrow includes?
-//#include <locale.h>
-//#include <consoleapi2.h>
-//#include <processthreadsapi.h>
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  include <windows.h>
 #endif
 
 /*==================================================================*/
@@ -43,6 +41,8 @@ SDL_AppResult SDL_AppInit(void **host, int argc, char *argv[]) {
 		"Only little-endian systems are supported!");
 
 #ifdef _WIN32
+	// Set the app locale and output code page to UTF-8,
+	// so that we can handle Unicode paths and filenames.
 	_setmbcp(CP_UTF8);
 	setlocale(LC_CTYPE, ".UTF-8");
 	SetConsoleOutputCP(CP_UTF8);
@@ -97,17 +97,21 @@ SDL_AppResult SDL_AppInit(void **host, int argc, char *argv[]) {
 		return SDL_APP_SUCCESS;
 	}
 
-	HomeDirManager::initialize(
+	HomeDir::init(
 		result["homedir" ].as_optional<std::string>().value_or(""),
-		result["config"  ].as_optional<std::string>().value_or(""),
 		result["portable"].as_optional<bool>().value_or(false),
 		c_org_name, c_app_name
 	);
 
-	const auto* HDM = HomeDirManager::get_instance();
-	if (!HDM || HDM->get_home_path().empty()) { return SDL_APP_FAILURE; }
+	if (HomeDir::path().empty()) { return SDL_APP_FAILURE; }
+
+	blog.create_log(std::to_string(
+		thread_affinity::get_process_id()),
+		HomeDir::path() + "logs"
+	);
 
 	*host = ApplicationHost::init_application(
+		result["config"  ].as_optional<std::string>().value_or("settings.toml"),
 		result["program" ].as_optional<std::string>().value_or(""),
 		result["headless"].as_optional<bool>().value_or(false)
 	);

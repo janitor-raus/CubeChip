@@ -4,11 +4,7 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-module;
-
-#include "LifetimeWrapperSDL.hpp"
-#include "WindowHost.hpp"
-#include "ImLabel.hpp"
+#pragma once
 
 #include <map>
 #include <utility>
@@ -17,12 +13,9 @@ module;
 #include <mutex>
 #include <functional>
 
-export module GuiSession;
-export import PlatformWindow;
-
-#ifdef __INTELLISENSE__
-# include "PlatformWindow.cppm"
-#endif
+#include "ImLabel.hpp"
+#include "WindowHost.hpp"
+#include "PlatformWindow.hpp"
 
 /*==================================================================*/
 
@@ -32,7 +25,7 @@ struct ImFontAtlas;
 template <typename Fn>
 concept VoidInvocable = std::is_nothrow_invocable_r_v<void, Fn>;
 
-export struct UserInterface {
+struct UserInterface {
 	using Func = std::function<void()>;
 	using Hook = std::shared_ptr<Func>;
 
@@ -128,7 +121,7 @@ public:
 	static void call_autohide_menubar(const char* window_name, bool& hidden) noexcept;
 };
 
-export namespace GuiSession {
+namespace GuiSession {
 	// IMPORTANT! Call before creating any GuiSession handles if you
 	// want to save/load imgui settings. Does not work retroactively!
 	// If you explicitly do not want storage, call and pass 'nullptr'!
@@ -144,7 +137,9 @@ export namespace GuiSession {
 		unsigned    m_style_generation = 0;
 		bool        m_live_renderer = false;
 		bool        m_main_menubar = true;
+		bool : 64; // reserved for future use
 		std::string m_ini_file{};
+		std::string m_log_file{};
 
 		struct CreatorKey {};
 
@@ -275,11 +270,9 @@ namespace GuiSession {
 		// Registry of all GuiSession handles, keyed by their unique user-provided string.
 		// Handles in this registry are not guaranteed to be "live" -- they may be
 		// lacking a valid window/renderer pair or ImGui initialization.
-		GuiSession::Registry s_gui_session_registry;
+		inline GuiSession::Registry s_gui_session_registry;
 	}
-}
 
-export namespace GuiSession {
 	// Returns a const view of the GuiSession registry.
 	// Useful for iterating through and accessing state.
 	// Use the * operator if you wish to modify items.
@@ -305,11 +298,11 @@ export namespace GuiSession {
 
 	// De-register and destroy a given GuiSession.
 	// Delegates to 'PlatformWindow::destroy()' for consistency.
-	void destroy(Handle& handle) noexcept { PlatformWindow::destroy(handle); }
+	inline void destroy(Handle& handle) noexcept { PlatformWindow::destroy(handle); }
 
 	// De-register and destroy a given GuiSession via key.
 	// Delegates to 'PlatformWindow::destroy()' for consistency.
-	void destroy(const char* key) noexcept { PlatformWindow::destroy(key); }
+	inline void destroy(const char* key) noexcept { PlatformWindow::destroy(key); }
 
 	Handle* get_main_handle() noexcept;
 	Handle* get_sync_handle() noexcept;
@@ -318,7 +311,7 @@ export namespace GuiSession {
 
 /*==================================================================*/
 
-export class ScopedGuiContext {
+class ScopedGuiContext {
 	ImGuiContext* m_prev;
 
 public:

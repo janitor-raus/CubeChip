@@ -4,16 +4,15 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-module;
-
 #include <vector>
 #include <memory>
-#include "LifetimeWrapperSDL.hpp"
-#include "SettingWrapper.hpp"
+
+#include <SDL3/SDL_render.h>
+
 #include "EzMaths.hpp"
 #include "BasicLogger.hpp"
 #include "StringJoin.hpp"
-#include <SDL3/SDL_render.h>
+#include "PlatformWindow.hpp"
 
 /*==================================================================*/
 
@@ -35,13 +34,6 @@ module;
     #include <dwmapi.h>
     #pragma comment(lib, "Dwmapi")
   #pragma warning(pop)
-#endif
-
-/*==================================================================*/
-
-module PlatformWindow;
-#ifdef __INTELLISENSE__
-# include "PlatformWindow.cppm"
 #endif
 
 /*==================================================================*/
@@ -143,8 +135,8 @@ static void normalize_to_display(PlatformWindow::Handle& handle) noexcept {
 	handle.set_position(rect.x, rect.y);
 }
 
-static void adjust_window_corners(PlatformWindow::Handle& handle) noexcept {
 #if defined(_WIN32) && defined(WINDOWS_NO_ROUNDED_CORNERS)
+static void adjust_window_corners(PlatformWindow::Handle& handle) noexcept {
   #ifdef OLD_WINDOWS_SDK
 	static constexpr auto NTDDI_MAJOR = ((NTDDI_VERSION >> 24) & 0x00FF);
 	static constexpr auto NTDDI_MINOR = ((NTDDI_VERSION >> 16) & 0x00FF);
@@ -165,9 +157,10 @@ static void adjust_window_corners(PlatformWindow::Handle& handle) noexcept {
 		);
 	}
   #endif
-#endif
-	(void)handle;
 }
+#else
+static void adjust_window_corners(PlatformWindow::Handle&) noexcept {}
+#endif
 
 /*==================================================================*/
 
@@ -215,6 +208,7 @@ void PlatformWindow::Handle::notify_link(LinkNotify action) noexcept {
 void PlatformWindow::Handle::on_present() noexcept {
 	if (is_inert() || !is_ready()) { return; }
 
+	const auto guard = PWi::ExecContextGuard(this);
 	if (m_link_ptr) { m_link_ptr->on_present(); }
 
 	int vsync = this == PlatformWindow::get_sync_handle();
@@ -223,9 +217,12 @@ void PlatformWindow::Handle::on_present() noexcept {
 }
 
 auto PlatformWindow::Handle::on_event(const SDL_Event& event, EventCallback callback) noexcept -> EventResult {
-	if (is_inert() || !get_window() || event.window.windowID != get_id()) { return EVENT_CONTINUE; }
+	if (is_inert() || !get_window())       { return EVENT_CONTINUE; }
+	if (event.window.windowID != get_id()) { return EVENT_CONTINUE; }
+
+	const auto guard = PWi::ExecContextGuard(this);
 	if (callback) {
-		auto result = callback(event);
+		const auto result = callback(event);
 		if (result != EVENT_CONTINUE) { return result; }
 	}
 
@@ -272,11 +269,12 @@ bool PlatformWindow::Handle::create_window(const char* title, int w, int h, GVB_
 			m_renderer_ptr.reset();
 		}
 
-		(void)export_settings();
+		export_settings();
 		PWi::erase_id_from_map(this);
 		m_window_ptr.reset();
 	}
 
+	static constexpr auto c_err_line = __LINE__ + 1;
 	if (auto* window = SDL_CreateWindow(title, w, h, window_flags)) {
 		m_window_ptr.reset(window);
 		PWi::insert_id_to_map(this);
@@ -286,11 +284,10 @@ bool PlatformWindow::Handle::create_window(const char* title, int w, int h, GVB_
 		blog.debug("Platform Window '{}' with ID {} created.",
 			handle_key.data, get_id());
 	} else {
-		log_error(__LINE__ - 7, __func__);
+		log_error(c_err_line, __func__);
 		PWi::retarget_main(this);
 	}
 
-	// no renderer, invalidate
 	PWi::retarget_sync(this);
 	PWi::retarget_live(this);
 
@@ -307,12 +304,13 @@ bool PlatformWindow::Handle::create_renderer(const char* driver) noexcept {
 		m_renderer_ptr.reset();
 	}
 
+	static constexpr auto c_err_line = __LINE__ + 1;
 	if (auto* renderer = SDL_CreateRenderer(*this, driver)) {
 		m_renderer_ptr.reset(renderer);
 		PWi::insert_sync_to_mru(this);
 		notify_link(REBUILD_PHASE);
 	} else {
-		log_error(__LINE__ - 5, __func__);
+		log_error(c_err_line, __func__);
 		PWi::retarget_sync(this);
 		PWi::retarget_live(this);
 	}
@@ -407,8 +405,30 @@ bool PlatformWindow::Handle::get_render_scale(float* w, float* h) const noexcept
 /*==================================================================*/
 
 bool PlatformWindow::Handle::set_bmp_icon(const char* icon_path) noexcept {
-	if (!icon_path || icon_path[0] == '\0') { return false; }
 	auto icon_surface = sdl::make_unique(SDL_LoadBMP(icon_path));
+	bool success = SDL_SetWindowIcon(*this, icon_surface.get());
+	if (!success) { log_warn(__LINE__ - 1, __func__); }
+	return success;
+}
+
+bool PlatformWindow::Handle::set_png_icon(const char* icon_path) noexcept {
+	auto icon_surface = sdl::make_unique(SDL_LoadPNG(icon_path));
+	bool success = SDL_SetWindowIcon(*this, icon_surface.get());
+	if (!success) { log_warn(__LINE__ - 1, __func__); }
+	return success;
+}
+
+bool PlatformWindow::Handle::set_bmp_icon(const void* icon_data, std::size_t data_size) noexcept {
+	auto* io = SDL_IOFromConstMem(icon_data, data_size);
+	auto icon_surface = sdl::make_unique(SDL_LoadBMP_IO(io, true));
+	bool success = SDL_SetWindowIcon(*this, icon_surface.get());
+	if (!success) { log_warn(__LINE__ - 1, __func__); }
+	return success;
+}
+
+bool PlatformWindow::Handle::set_png_icon(const void* icon_data, std::size_t data_size) noexcept {
+	auto* io = SDL_IOFromConstMem(icon_data, data_size);
+	auto icon_surface = sdl::make_unique(SDL_LoadPNG_IO(io, true));
 	bool success = SDL_SetWindowIcon(*this, icon_surface.get());
 	if (!success) { log_warn(__LINE__ - 1, __func__); }
 	return success;
@@ -762,33 +782,43 @@ void PlatformWindow::Handle::render_whole_to_target(
 
 /*==================================================================*/
 
-SettingsMap PlatformWindow::Handle::Settings::map(const Handle& handle) noexcept {
-	return {
-		::make_setting_link(::join("Window.", handle.handle_key.data, ".Pos.X"), &window.x),
-		::make_setting_link(::join("Window.", handle.handle_key.data, ".Pos.Y"), &window.y),
-		::make_setting_link(::join("Window.", handle.handle_key.data, ".Size.W"), &window.w),
-		::make_setting_link(::join("Window.", handle.handle_key.data, ".Size.H"), &window.h),
+struct Settings {
+	static constexpr ez::Rect defaults = {
+		SDL_WINDOWPOS_CENTERED,
+		SDL_WINDOWPOS_CENTERED,
+		640, 480
 	};
-}
+	ez::Rect window = defaults;
 
-// XXX -- per-window, but we need to fix the toml modeller
-auto PlatformWindow::Handle::export_settings() const noexcept -> Settings {
-	Settings out;
-	if (!has_persistent_geometry() || !get_window()) { return out; }
+	void reset() noexcept { window = defaults; }
+};
+static Settings s_settings;
+
+void PlatformWindow::Handle::export_settings() noexcept {
+	if (is_inert() || !get_window()) { return; }
+	if (!has_persistent_geometry())  { return; }
 
 	if (is_maximized()) {
-		// const-cast here
-		(**this).restore();
-		(**this).sync();
+		restore(); sync();
 	}
-	get_position(&out.window.x, &out.window.y);
-	get_size(&out.window.w, &out.window.h);
 
-	return out;
+	get_position(&s_settings.window.x, &s_settings.window.y);
+	get_size(&s_settings.window.w, &s_settings.window.h);
+	m_settings_map.push_into(SettingsMap::main_table);
 }
 
-// XXX - not actually importing lol -- fixxxxxxx
 void PlatformWindow::Handle::import_settings() noexcept {
-	if (!has_persistent_geometry()) { return; }
+	if (is_inert() || !get_window()) { return; }
+	if (!has_persistent_geometry())  { return; }
 
+	s_settings.reset();
+	m_settings_map
+		.add_setting(::join_with('.', "Windows", handle_key.data, "X"), &s_settings.window.x)
+		.add_setting(::join_with('.', "Windows", handle_key.data, "Y"), &s_settings.window.y)
+		.add_setting(::join_with('.', "Windows", handle_key.data, "W"), &s_settings.window.w)
+		.add_setting(::join_with('.', "Windows", handle_key.data, "H"), &s_settings.window.h)
+		.pull_from(SettingsMap::main_table);
+
+	set_position(s_settings.window.x, s_settings.window.y);
+	set_size(s_settings.window.w, s_settings.window.h);
 }

@@ -12,7 +12,6 @@
 
 #include "SimpleMRU.hpp"
 #include "FileItem.hpp"
-#include "SettingWrapper.hpp"
 
 /*==================================================================*/
 
@@ -56,32 +55,30 @@
 /*==================================================================*/
 
 struct ProjectVersion {
-	constexpr static inline auto major_i = PROJECT_VERSION_MAJOR_I;
-	constexpr static inline auto minor_i = PROJECT_VERSION_MINOR_I;
-	constexpr static inline auto patch_i = PROJECT_VERSION_PATCH_I;
-	constexpr static inline auto tweak_i = PROJECT_VERSION_TWEAK_I;
+	inline static constexpr auto major_i = PROJECT_VERSION_MAJOR_I;
+	inline static constexpr auto minor_i = PROJECT_VERSION_MINOR_I;
+	inline static constexpr auto patch_i = PROJECT_VERSION_PATCH_I;
+	inline static constexpr auto tweak_i = PROJECT_VERSION_TWEAK_I;
 
-	constexpr static inline const char* major = PROJECT_VERSION_MAJOR;
-	constexpr static inline const char* minor = PROJECT_VERSION_MINOR;
-	constexpr static inline const char* patch = PROJECT_VERSION_PATCH;
-	constexpr static inline const char* tweak = PROJECT_VERSION_TWEAK;
+	inline static constexpr const char* major = PROJECT_VERSION_MAJOR;
+	inline static constexpr const char* minor = PROJECT_VERSION_MINOR;
+	inline static constexpr const char* patch = PROJECT_VERSION_PATCH;
+	inline static constexpr const char* tweak = PROJECT_VERSION_TWEAK;
 
-	constexpr static inline const char* ghash = PROJECT_VERSION_GHASH;
+	inline static constexpr const char* ghash = PROJECT_VERSION_GHASH;
 
-	constexpr static inline const char* with_date = PROJECT_VERSION_WITH_DATE;
-	constexpr static inline const char* with_hash = PROJECT_VERSION_WITH_HASH;
+	inline static constexpr const char* with_date = PROJECT_VERSION_WITH_DATE;
+	inline static constexpr const char* with_hash = PROJECT_VERSION_WITH_HASH;
 };
 
-constexpr static inline ProjectVersion c_app_ver{};
+inline static constexpr ProjectVersion c_app_ver{};
 
 constexpr const char* c_app_name = PROJECT_NAME;
 constexpr const char* c_org_name = "";
 
 /*==================================================================*/
 
-class HomeDirManager;
 class ISystemEmu;
-
 union SDL_Event;
 
 /*==================================================================*/
@@ -95,7 +92,7 @@ class ApplicationHost final {
 	static void set_open_file_dialog_result(std::string_view file) noexcept;
 
 	static constexpr std::size_t s_mru_limit = 10;
-	static inline SimpleMRU<FileItem> s_file_mru = s_mru_limit;
+	inline static SimpleMRU<FileItem> s_file_mru = s_mru_limit;
 
 	static void import_mru(std::string* src) noexcept {
 		for (std::size_t i = 0; i < s_mru_limit; ++i) {
@@ -110,6 +107,14 @@ class ApplicationHost final {
 			dst[i] = s_file_mru[i]->string();
 		}
 	}
+
+	struct Settings {
+		float ui_zoom_scale = 1.0f;
+		float ui_text_scale = 1.0f;
+		bool  borderless_view_mode = false;
+		std::string file_mru_cache[s_mru_limit];
+	};
+	inline static Settings s_settings;
 
 /*==================================================================*/
 
@@ -143,24 +148,7 @@ private:
 	void unload_system_instance(SystemID system_id = 0) noexcept;
 	void insert_system_instance(ISystemEmu* system) noexcept;
 
-/*==================================================================*/
-
-public:
-	static inline HomeDirManager* HDM{};
-
-public:
-	struct Settings {
-		float ui_zoom_scale = 1.0f;
-		float ui_text_scale = 1.0f;
-		bool  borderless_view_mode = false;
-
-		std::string file_mru_cache[s_mru_limit];
-
-		SettingsMap map() noexcept;
-	};
-
-private:
-	auto export_settings() const noexcept -> Settings;
+	static inline std::string s_config_path{};
 
 /*==================================================================*/
 
@@ -173,7 +161,10 @@ private:
 
 public:
 	static ApplicationHost* init_application(
-		std::string_view game_file_path, bool headless = false) noexcept;
+		std::string_view config_name,
+		std::string_view game_file_path,
+		bool headless = false
+	) noexcept;
 
 	void quit_application() noexcept;
 

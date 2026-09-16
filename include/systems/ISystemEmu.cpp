@@ -4,7 +4,7 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "HomeDirManager.hpp"
+#include "HomeDir.hpp"
 #include "ThreadAffinity.hpp"
 #include "FrameLimiter.hpp"
 #include "StringJoin.hpp"
@@ -20,15 +20,16 @@
 /*==================================================================*/
 
 ISystemEmu::ISystemEmu(std::string_view window_name) noexcept
-	: instance_id([]() noexcept {
+	: m_rng(Millis::initial())
+	, instance_id([]() noexcept {
 		static std::atomic<u32> instance_counter = 1u;
 		return instance_counter.fetch_add(1, mo::relaxed);
 	}())
 	, m_statistics_data(std::make_shared<std::string>())
-	, m_rng(std::make_unique<Well512>(Millis::initial()))
 	, m_workspace_host({ window_name, make_system_id(instance_id, "system")})
 	, m_file_image(std::move(SystemStaging::file_image))
 	, m_memview_window({ "Memory Editor", make_system_id(instance_id, "mem_edit") })
+
 {
 	m_statistics_work_buffer.reserve(1_KiB);
 
@@ -60,7 +61,7 @@ void ISystemEmu::start_worker() noexcept {
 					is_paused  = has_cached_system_state(EmuState::ANY_PAUSE);
 
 					if (has_cached_system_state(EmuState::ANY_STOP)) [[unlikely]] { continue; }
-					m_cached_real_framerate = m_base_system_framerate * m_framerate_multiplier;
+					m_cached_real_framerate = base_system_framerate * framerate_multiplier;
 					if (!is_paused) { m_pacer.set_limiter_props(get_real_system_framerate()); }
 
 					main_system_loop();
@@ -104,7 +105,7 @@ std::string ISystemEmu::get_system_id() const noexcept {
 }
 
 std::string ISystemEmu::make_system_id(u32 id, std::string_view identifier) noexcept {
-	return ::join_with(".", std::to_string(id), identifier);
+	return ::join_with('.', std::to_string(id), identifier);
 }
 
 /*==================================================================*/
@@ -137,8 +138,7 @@ auto ISystemEmu::add_system_path(
 ) noexcept -> const std::string* {
 	if (dir_name.empty()) { return nullptr; }
 
-	const auto new_dir_path = fs::Path(HomeDirManager \
-		::get_instance()->get_home_path()) / family_name / dir_name;
+	const auto new_dir_path = HomeDir::path() + (family_name / dir_name);
 
 	const auto it = std::find(m_system_paths.begin(),
 		m_system_paths.end(), new_dir_path);
@@ -146,10 +146,10 @@ auto ISystemEmu::add_system_path(
 	if (it != m_system_paths.end()) { return &(*it); }
 
 	if (const auto dir_created = fs::create_directories(new_dir_path)) {
-		return &m_system_paths.emplace_back(new_dir_path.string());
+		return &m_system_paths.emplace_back(new_dir_path);
 	} else {
 		blog.error("Unable to create directory '{}': {}",
-			new_dir_path.string(), dir_created.error().message());
+			new_dir_path, dir_created.error().message());
 		return nullptr;
 	}
 }

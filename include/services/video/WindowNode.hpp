@@ -4,19 +4,14 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-module;
-
-#include <cstddef>
 #include <cstring>
 #include <string_view>
 
-export module WindowNode;
-
 /*==================================================================*/
 
-export union SDL_Event;
+union SDL_Event;
 
-export struct WindowNode {
+struct WindowNode {
 	using EventResult = int;
 	using EventCallback = EventResult(*)(const SDL_Event&) noexcept;
 
@@ -55,6 +50,8 @@ export struct WindowNode {
 
 		constexpr operator /***/ char* () /***/ noexcept { return data; }
 		constexpr operator const char* () const noexcept { return data; }
+
+		constexpr const char* c_str() const noexcept { return data; }
 
 		bool operator==(const ShortKey& other) const noexcept {
 			return std::strcmp(data, other.data) == 0;

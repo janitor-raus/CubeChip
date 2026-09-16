@@ -8,7 +8,8 @@
 #include <SDL3/SDL_hints.h>
 #include <SDL3/SDL_events.h>
 
-#include "HomeDirManager.hpp"
+#include "HomeDir.hpp"
+#include "SettingWrapper.hpp"
 #include "BasicLogger.hpp"
 #include "BasicInput.hpp"
 #include "SHA1.hpp"
@@ -23,11 +24,7 @@
 #include "ApplicationHost.hpp"
 #include "ISystemEmu.hpp"
 #include "CoreRegistry.hpp"
-
-import GuiSession;
-#ifdef __INTELLISENSE__
-# include "GuiSession.cppm"
-#endif
+#include "GuiSession.hpp"
 
 /*==================================================================*/
 
@@ -54,6 +51,14 @@ void ApplicationHost::set_open_file_dialog_result(std::string_view file) noexcep
 
 /*==================================================================*/
 
+static constexpr u8 c_app_logo_data[] = {
+	#include "app_logo.data"
+};
+
+/*==================================================================*/
+
+static SettingsMap s_settings_map;
+
 static bool s_application_minimized = false;
 static bool s_application_headless  = false;
 
@@ -66,28 +71,8 @@ void ApplicationHost::SystemInstance::StopSystemThread::operator()(ISystemEmu* p
 	if (ptr) {
 		ptr->stop_worker();
 		ptr->~ISystemEmu();
-		::operator delete(ptr, std::align_val_t(HDIS));
+		::operator delete(ptr,std::align_val_t(::HDIS));
 	}
-}
-
-SettingsMap ApplicationHost::Settings::map() noexcept {
-	return {
-		::make_setting_link("Frontend.Interface.Scale.Zoom", &ui_zoom_scale),
-		::make_setting_link("Frontend.Interface.Scale.Text", &ui_text_scale),
-		::make_setting_link("Frontend.Display.BorderlessView", &borderless_view_mode),
-		::make_setting_link("Frontend.Interface.FileMRU", file_mru_cache, s_mru_limit),
-	};
-}
-
-auto ApplicationHost::export_settings() const noexcept -> Settings {
-	Settings out;
-
-	out.ui_zoom_scale = UserInterface::get_ui_zoom_scaling();
-	out.ui_text_scale = UserInterface::get_ui_text_scaling();
-	out.borderless_view_mode = UserInterface::get_borderless_view_mode();
-	ApplicationHost::export_mru(out.file_mru_cache);
-
-	return out;
 }
 
 /*==================================================================*/
@@ -166,47 +151,60 @@ void ApplicationHost::load_file_from_disk(std::string_view file_path) noexcept {
 }
 
 ApplicationHost* ApplicationHost::init_application(
+	std::string_view config_name,
 	std::string_view game_file_path, bool headless
 ) noexcept {
 	static ApplicationHost* self = nullptr;
 	if (self) { return self; }
-
-	s_application_headless = headless;
 
 	SDL_SetHint(SDL_HINT_APP_NAME, c_app_name);
 	SDL_SetHint(SDL_HINT_MAIN_CALLBACK_RATE, headless ? "waitevent" : nullptr);
 	SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
 	SDL_SetAppMetadata(c_app_name, c_app_ver.with_hash, nullptr);
 
-	HDM = HomeDirManager::get_instance();
+	s_application_headless = headless;
+	s_config_path = HomeDir::path() + config_name;
 
-	blog.create_log(
-		std::to_string(thread_affinity::get_process_id()),
-		(fs::Path(HDM->get_home_path()) / "logs").string()
-	);
+	GuiSession::set_file_path(HomeDir::path().data());
 
-	GuiSession::set_file_path(HDM->get_home_path().c_str());
+	if (auto error = SettingsMap::parse_config_file(s_config_path.data())) {
+		blog.warn("[TOML] Failed to parse App Config: {}", error);
+	} else {
+		blog.info("[TOML] App Config found and successfully loaded!");
+	}
 
-	GlobalAudioBase::Settings GAB_settings;
-	ApplicationHost::Settings AUI_settings;
+	s_settings_map
+		.add_setting("Frontend.Interface.Scale.Zoom",
+			&s_settings.ui_zoom_scale)
+		.add_setting("Frontend.Interface.Scale.Text",
+			&s_settings.ui_text_scale)
+		.add_setting("Frontend.Interface.FileMRU",
+			s_settings.file_mru_cache, s_mru_limit)
+		.add_setting("Frontend.Interface.Display.BorderlessView",
+			&s_settings.borderless_view_mode)
+		.pull_from(SettingsMap::main_table);
 
-	HDM->parse_app_config_file(
-		GAB_settings.map(),
-		AUI_settings.map()
-	);
+	UserInterface::set_ui_zoom_scaling(s_settings.ui_zoom_scale);
+	UserInterface::set_ui_text_scaling(s_settings.ui_text_scale);
+	UserInterface::set_borderless_view_mode(s_settings.borderless_view_mode);
+	ApplicationHost::import_mru(s_settings.file_mru_cache);
 
 	if (!s_application_headless) {
 		if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) {
 			blog.fatal("SDL Video subsystem is not available!");
 			return nullptr;
 		} else {
-			auto& app_window = PlatformWindow::create("main", nullptr, 0, 0,
+			auto& app_window = PlatformWindow::create("main", nullptr, 960, 780,
 				SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
 
 			if (!app_window.is_ready()) {
 				blog.fatal("Failed to prepare main application window, aborting!");
 				return nullptr;
 			} else {
+#ifndef WIN32
+				app_window.set_png_icon(c_app_logo_data,
+					std::size(c_app_logo_data));
+#endif
 				PlatformWindow::set_main_handle(app_window);
 				app_window.set_min_size(960, 780);
 				app_window.set_title(c_app_name);
@@ -220,10 +218,6 @@ ApplicationHost* ApplicationHost::init_application(
 				blog.fatal("Failed to attach ImGui to main application window, aborting!");
 				return nullptr;
 			}
-
-			UserInterface::set_ui_zoom_scaling(AUI_settings.ui_zoom_scale);
-			UserInterface::set_ui_text_scaling(AUI_settings.ui_text_scale);
-			UserInterface::set_borderless_view_mode(AUI_settings.borderless_view_mode);
 		}
 
 		if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
@@ -231,15 +225,14 @@ ApplicationHost* ApplicationHost::init_application(
 		} else {
 			// XXX - nothing here, maybe important down the line
 		}
-		GlobalAudioBase::import_settings(GAB_settings);
+		GlobalAudioBase::import_settings();
 	}
 
 	blog.info("SHA1 hardware acceleration: {}",
 		SHA1::has_hardware_support() ? "ON" : "OFF");
 
-	ApplicationHost::import_mru(AUI_settings.file_mru_cache);
-	::append_pending_file_drops(game_file_path);
 	thread_affinity::set_affinity(0b11ull);
+	::append_pending_file_drops(game_file_path);
 
 	static ApplicationHost instance;
 	return self = &instance;
@@ -248,12 +241,21 @@ ApplicationHost* ApplicationHost::init_application(
 void ApplicationHost::quit_application() noexcept {
 	m_systems.clear(); // terminate all systems before quitting
 
-	HDM->write_app_config_file(
-		GlobalAudioBase::export_settings().map(),
-		ApplicationHost::export_settings().map()
-	);
+	GlobalAudioBase::export_settings();
+	ApplicationHost::export_mru(s_settings.file_mru_cache);
+	s_settings.ui_zoom_scale        = UserInterface::get_ui_zoom_scaling();
+	s_settings.ui_text_scale        = UserInterface::get_ui_text_scaling();
+	s_settings.borderless_view_mode = UserInterface::get_borderless_view_mode();
+	s_settings_map.push_into(SettingsMap::main_table);
 
 	PlatformWindow::clear_registry();
+
+	if (auto error = SettingsMap::write_config_file(s_config_path.c_str())) {
+		blog.error("[TOML] Failed to write App Config! Expected to"
+			"write file at the following location: '{}'", s_config_path);
+	} else {
+		blog.info("[TOML] App Config written to file successfully!");
+	}
 
 	SDL_QuitSubSystem(SDL_INIT_AUDIO);
 	SDL_QuitSubSystem(SDL_INIT_VIDEO);
@@ -266,7 +268,7 @@ static int handle_main_window_events(const SDL_Event& event) noexcept {
 	switch (event.type) {
 		case SDL_EVENT_DROP_FILE:
 			::append_pending_file_drops(event.drop.data);
-			PlatformWindow::get_main_handle()->raise(); // bring main window to front!
+			PlatformWindow::has_exec_context()->raise(); // bring main window to front!
 			break;
 
 		case SDL_EVENT_WINDOW_FOCUS_GAINED:
@@ -346,7 +348,7 @@ void ApplicationHost::handle_main_hotkeys() noexcept {
 	static BasicKeyboard s_input;
 	s_input.advance_state();
 
-	if (s_application_headless || PlatformWindow::get_sync_handle()
+	if (s_application_headless || PlatformWindow::get_live_handle()
 		!= PlatformWindow::get_main_handle()) { return; }
 
 	if (s_input.is_pressed(KEY(F8))) {
@@ -354,7 +356,7 @@ void ApplicationHost::handle_main_hotkeys() noexcept {
 	}
 
 	if (s_input.is_pressed(KEY(F1))) {
-		PlatformWindow::get_main_handle()->toggle_fullscreen();
+		PlatformWindow::get_live_handle()->toggle_fullscreen();
 	}
 
 	if (!m_focus_mru.empty()) {

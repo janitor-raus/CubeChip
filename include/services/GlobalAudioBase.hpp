@@ -8,32 +8,28 @@
 
 #include <atomic>
 
-#include "SettingWrapper.hpp"
-
 /*==================================================================*/
 
 class GlobalAudioBase final {
-	static inline std::atomic<float> s_master_volume = 1.0f;
-	static inline std::atomic<bool>  s_all_audio_muted = false;
+	inline static std::atomic<float> s_master_volume   = 1.0f;
+	inline static std::atomic<bool>  s_all_audio_muted = false;
 
-	static inline float s_passive_background_volume = 0.25f;
-	static inline float s_active_background_volume = 1.0f;
+	inline static float s_passive_background_volume = 0.25f;
+	inline static float s_active_background_volume  = 1.00f;
 
-public:
 	struct Settings {
 		float master_volume     = 0.7f;
 		float background_volume = 1.0f;
 		bool  all_audio_muted   = false;
-
-		SettingsMap map() noexcept;
 	};
+	inline static Settings s_settings;
 
-	[[nodiscard]]
-	static auto export_settings() noexcept -> Settings;
-	static void import_settings(const Settings& settings) noexcept;
+public:
+	static void export_settings() noexcept;
+	static void import_settings() noexcept;
 
 private:
-	GlobalAudioBase(const Settings& settings) noexcept;
+	GlobalAudioBase() noexcept = default;
 
 	GlobalAudioBase(const GlobalAudioBase&) = delete;
 	GlobalAudioBase& operator=(const GlobalAudioBase&) = delete;

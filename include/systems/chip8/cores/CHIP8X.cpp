@@ -15,12 +15,12 @@ REGISTER_SYSTEM_CORE(CHIP8X)
 
 void CHIP8X::initialize_system() noexcept {
 	::generate_n(m_memory, 0, c_sys_memory_size,
-		[&]() noexcept { return u8(m_rng->next()); });
+		[&]() noexcept { return u8(m_rng.next()); });
 
 	copy_file_image_to(m_memory, c_game_load_pos);
 	copy_font_data_to(m_memory, 80);
 
-	m_base_system_framerate = c_sys_refresh_rate;
+	base_system_framerate = c_sys_refresh_rate;
 
 	m_memory_editor.set_memory_range(m_memory.data(), m_memory.size(), 0x8000);
 
@@ -489,7 +489,7 @@ void CHIP8X::color_hires_zone(u32 X, u32 Y, u32 idx, u32 N) noexcept {
 	#pragma region C instruction branch
 
 	void CHIP8X::instruction_CxNN(u32 X, u32 NN) noexcept {
-		::assign_cast(m_registers_V[X], m_rng->next() & NN);
+		::assign_cast(m_registers_V[X], m_rng.next() & NN);
 	}
 
 	#pragma endregion

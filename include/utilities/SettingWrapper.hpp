@@ -15,6 +15,8 @@
 #include <type_traits>
 #include <unordered_map>
 
+#include "DefaultConfig.hpp"
+
 /*==================================================================*/
 
 template <typename... T>
@@ -80,12 +82,73 @@ public:
 
 /*==================================================================*/
 
-using SettingsMap = std::unordered_map<std::string, SettingWrapper>;
-
 template<typename T, typename Variant>
 concept VariantCompatible = requires { Variant(std::in_place_type<T>); };
 
-template <typename T> requires (VariantCompatible<T*, SettingVariant>)
-inline auto make_setting_link(const std::string& key, T* const ptr, std::size_t elem_count = 1) noexcept {
-	return std::pair(key, SettingWrapper(ptr, elem_count));
-}
+class SettingsMap {
+	std::unordered_map<std::string, SettingWrapper> m_map;
+
+public:
+	using Table = toml::table;
+	static inline Table main_table;
+
+	using ErrorText = const char*;
+	using ErrorBool = bool;
+
+	// Parse a TOML configuration file and populate the provided table or the main_table.
+	// Returns nullptr on success, or a pointer to an error message on failure.
+	static ErrorText parse_config_file(const char* path, Table* table = nullptr) noexcept {
+		static std::string error_message;
+
+		if (auto result = TomlConfig::parse_from_file(path)) {
+			(table ? *table : main_table) = std::move(result.table());
+			return nullptr;
+		} else {
+			error_message = result.error().description();
+			return error_message.c_str();
+		}
+	}
+
+	// Write the provided table or the main_table to a TOML configuration file.
+	// Returns false if successful, true if a write error occurred.
+	static ErrorBool write_config_file(const char* path, const Table* table = nullptr) noexcept {
+		return TomlConfig::write_into_file(table ? *table : main_table, path);
+	}
+
+public:
+	/***/ auto& operator*() /***/ noexcept { return m_map; }
+	const auto& operator*() const noexcept { return m_map; }
+
+	/***/ auto* operator->() /***/ noexcept { return &m_map; }
+	const auto* operator->() const noexcept { return &m_map; }
+
+	operator bool() const noexcept { return !m_map.empty(); }
+
+public:
+	template <typename T> requires (VariantCompatible<T*, SettingVariant>)
+	SettingsMap& add_setting(std::string key, T* ptr, std::size_t elem_count = 1) noexcept {
+		m_map.insert_or_assign(std::move(key), SettingWrapper(ptr, elem_count));
+		return *this;
+	}
+
+public:
+	void pull_from(const toml::table& src) const noexcept {
+		for (const auto& [key, setting] : m_map) {
+			setting.visit([&](auto* ptr) noexcept {
+				// don't override the current values if the key doesn't exist
+				// in the source table, as they might have a default already
+				TomlConfig::try_get(src, key, ptr, setting.elem_count());
+			});
+		}
+	}
+
+	void push_into(toml::table& dst) const noexcept {
+		for (const auto& [key, setting] : m_map) {
+			setting.visit([&](auto* ptr) noexcept {
+				// we always want to write the current values into the
+				// destination table here, unlike when we pull from it
+				TomlConfig::set(dst, key, ptr, setting.elem_count());
+			});
+		}
+	}
+};

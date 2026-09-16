@@ -17,7 +17,7 @@ REGISTER_SYSTEM_CORE(BYTEPUSHER_STANDARD)
 void BYTEPUSHER_STANDARD::initialize_system() noexcept {
 	copy_file_image_to(m_memory, 0);
 
-	m_base_system_framerate = c_sys_refresh_rate;
+	base_system_framerate = c_sys_refresh_rate;
 
 	m_audio_device.init_stream(s32(c_sys_refresh_rate * c_sys_audio_sample_total), 1);
 	m_audio_device.resume();
@@ -55,7 +55,7 @@ void BYTEPUSHER_STANDARD::handle_cycle_loop() noexcept {
 
 void BYTEPUSHER_STANDARD::push_audio_data() noexcept {
 	if (m_audio_device) {
-		m_audio_device.set_freq_ratio(m_framerate_multiplier);
+		m_audio_device.set_freq_ratio(framerate_multiplier);
 
 		float buffer[c_sys_audio_sample_total]{};
 

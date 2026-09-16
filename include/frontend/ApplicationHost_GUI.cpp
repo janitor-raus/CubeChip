@@ -4,11 +4,14 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
+#include <imgui.h>
+#include <filesystem>
+
 #include <SDL3/SDL_dialog.h>
 #include <SDL3/SDL_misc.h>
 
 #include "ApplicationHost.hpp"
-#include "HomeDirManager.hpp"
+#include "HomeDir.hpp"
 #include "GlobalAudioBase.hpp"
 #include "SystemDescriptor.hpp"
 #include "SystemStaging.hpp"
@@ -18,14 +21,7 @@
 #include "ColorOps.hpp"
 #include "Thread.hpp"
 #include "SHA1_Helpers.hpp"
-
-#include <imgui.h>
-#include <filesystem>
-
-import GuiSession;
-#ifdef __INTELLISENSE__
-# include "GuiSession.cppm"
-#endif
+#include "GuiSession.hpp"
 
 /*==================================================================*/
 
@@ -229,22 +225,29 @@ namespace CandidateList {
 	};
 }
 
+/*==================================================================*/
+
 void ApplicationHost::setup_gui_callables() noexcept {
 	using namespace ImGui;
 
-	static auto s_menu_file__open_file = UserInterface::register_menu("",
+	static std::vector<UserInterface::Hook>
+		s_frontend_hooks;
+
+	// Main Menu (FILE): Open File
+	s_frontend_hooks.emplace_back(UserInterface::register_menu("",
 	{ 0, "File" }, [&]() noexcept {
 		if (MenuItem("Open File...")) {
 			SDL_ShowOpenFileDialog([](void*, const char* const* file_list, int) noexcept {
 				if (file_list && file_list[0]) { set_open_file_dialog_result(file_list[0]); }
-			}, nullptr, *PlatformWindow::get_main_handle(), nullptr, 0, nullptr, false);
+			}, nullptr, *PlatformWindow::has_exec_context(), nullptr, 0, nullptr, false);
 		}
-	});
+	}));
 
-	static auto s_menu_file__data_folder = UserInterface::register_menu("",
+	// Main Menu (FILE): Open Data Folder
+	s_frontend_hooks.emplace_back(UserInterface::register_menu("",
 	{ 0, "File" }, [&]() noexcept {
-		static std::atomic<bool> s_opening_url{};
-		static auto s_home_url = "file:///" + HDM->get_home_path();
+		static std::atomic<bool> s_opening_url = false;
+		static auto s_home_url = "file:///" + HomeDir::path();
 
 		BeginDisabled(s_opening_url.load(mo::acquire));
 		if (MenuItem("Open Data Folder...", nullptr, nullptr, !s_opening_url.load(mo::acquire))) {
@@ -258,9 +261,10 @@ void ApplicationHost::setup_gui_callables() noexcept {
 			}).detach();
 		}
 		EndDisabled();
-	});
+	}));
 
-	static auto s_menu_file__recent_files = UserInterface::register_menu("",
+	// Main Menu (FILE): Recent Files (MRU)
+	s_frontend_hooks.emplace_back(UserInterface::register_menu("",
 	{ 5, "File" }, [&]() noexcept {
 		if (!s_file_mru.size()) { return; }
 		Separator();
@@ -280,23 +284,26 @@ void ApplicationHost::setup_gui_callables() noexcept {
 				load_file_from_disk(entry->string());
 			}
 		}
-	});
+	}));
 
 /*==================================================================*/
 
-	static bool s_show_window_demo{};
-	static auto s_menu_debug__imgui_demo = UserInterface::register_menu("",
+	static bool s_show_window_demo = false;
+
+	// Main Menu (DEBUG): ImGUI Demo
+	s_frontend_hooks.emplace_back(UserInterface::register_menu("",
 	{ 10, "Debug" }, [&]() noexcept {
 		if (MenuItem("ImGUI Demo...", nullptr, s_show_window_demo)) {
 			s_show_window_demo = !s_show_window_demo;
 		}
-	});
+	}));
 
-	static PlatformWindow::Handle* s_show_tearing_demo{};
+	static PlatformWindow::Handle* s_show_tearing_demo = nullptr;
+
 	static auto create_tearing_test_window = []() noexcept {
 		PlatformWindow::LiveGuard guard;
-		auto& test_window = PlatformWindow::create("tearing_test", nullptr, 0, 0,
-			SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+		auto& test_window = PlatformWindow::create("tearing_test", nullptr,
+			640, 480, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
 
 		if (test_window.is_inert() || !test_window.is_ready()) {
 			blog.debug("Failed to prepare tearing test window!");
@@ -306,7 +313,7 @@ void ApplicationHost::setup_gui_callables() noexcept {
 		s_show_tearing_demo = &test_window;
 		test_window.set_min_size(640, 480);
 		test_window.set_title("Tearing Test");
-		test_window.set_parent(PlatformWindow::get_main_handle());
+		test_window.set_parent(PlatformWindow::has_exec_context());
 
 		auto& test_gui = GuiSession::attach(test_window);
 		test_gui.allow_main_menubar(false);
@@ -317,7 +324,8 @@ void ApplicationHost::setup_gui_callables() noexcept {
 		});
 	};
 
-	static auto s_menu_debug__tearing_demo = UserInterface::register_menu("",
+	// Main Menu (DEBUG): Tearing Demo
+	s_frontend_hooks.emplace_back(UserInterface::register_menu("",
 	{ 10, "Debug" }, [&]() noexcept {
 		s_show_tearing_demo = PlatformWindow::exists(s_show_tearing_demo);
 		if (MenuItem("Tearing Demo...", nullptr, s_show_tearing_demo)) {
@@ -328,17 +336,20 @@ void ApplicationHost::setup_gui_callables() noexcept {
 				create_tearing_test_window();
 			}
 		}
-	});
+	}));
 
-	static bool s_show_window_logger{};
-	static auto s_menu_debug__show_logs = UserInterface::register_menu("",
+	static bool s_show_window_logger = false;
+
+	// Main Menu (DEBUG): Log Viewer
+	s_frontend_hooks.emplace_back(UserInterface::register_menu("",
 	{ 10, "Debug" }, [&]() noexcept {
 		if (MenuItem("Show Logs...", nullptr, s_show_window_logger)) {
 			s_show_window_logger = !s_show_window_logger;
 		}
-	});
+	}));
 
-	static auto s_menu_debug__about_app = UserInterface::register_menu("",
+	// Main Menu (DEBUG): About App
+	s_frontend_hooks.emplace_back(UserInterface::register_menu("",
 	{ 10, "Debug" }, [&]() noexcept {
 		if (BeginMenu("About...")) {
 			PushFont(nullptr, 21.0f);
@@ -367,14 +378,15 @@ void ApplicationHost::setup_gui_callables() noexcept {
 
 			EndMenu();
 		}
-	});
+	}));
 
 /*==================================================================*/
 
-	static auto s_menu_settings__zoom_scale = UserInterface::register_menu("",
+	// Main Menu (SETTINGS): UI Zoom Scale
+	s_frontend_hooks.emplace_back(UserInterface::register_menu("",
 	{ 20, "Settings" }, [&]() noexcept {
-		static int  s_scale_factor{};
-		static bool s_click_active{};
+		static int  s_scale_factor = 0;
+		static bool s_click_active = false;
 
 		if (!s_click_active) { s_scale_factor = int(UserInterface::get_ui_zoom_scaling() * 100); }
 		SliderInt("UI Zoom Scale", &s_scale_factor, 100, 200, "%d%%");
@@ -383,9 +395,10 @@ void ApplicationHost::setup_gui_callables() noexcept {
 		if (IsItemDeactivatedAfterEdit()) {
 			UserInterface::set_ui_zoom_scaling(s_scale_factor * 0.01f);
 		}
-	});
+	}));
 
-	static auto s_menu_settings__text_scale = UserInterface::register_menu("",
+	// Main Menu (SETTINGS): UI Text Scale
+	s_frontend_hooks.emplace_back(UserInterface::register_menu("",
 	{ 20, "Settings" }, [&]() noexcept {
 		static int  s_scale_factor{};
 		static bool s_click_active{};
@@ -397,24 +410,27 @@ void ApplicationHost::setup_gui_callables() noexcept {
 		if (IsItemDeactivatedAfterEdit()) {
 			UserInterface::set_ui_text_scaling(s_scale_factor * 0.01f);
 		}
-	});
+	}));
 
-	static auto s_menu_settings__master_vol = UserInterface::register_menu("",
+	// Main Menu (SETTINGS): Master Volume
+	s_frontend_hooks.emplace_back(UserInterface::register_menu("",
 	{ 25, "Settings" }, [&]() noexcept {
 		Separator();
 		auto master_volume = int(GlobalAudioBase::get_master_volume() * 100);
 		if (SliderInt("Master Volume", &master_volume, 0, 100, "%d%%"))
 			{ GlobalAudioBase::set_master_volume(master_volume * 0.01f); }
-	});
+	}));
 
-	static auto s_menu_settings__focus_vol = UserInterface::register_menu("",
+	// Main Menu (SETTINGS): Background Volume
+	s_frontend_hooks.emplace_back(UserInterface::register_menu("",
 	{ 25, "Settings" }, [&]() noexcept {
 		auto focus_volume = int(GlobalAudioBase::get_background_volume() * 100);
 		if (SliderInt("Background Volume", &focus_volume, 0, 100, "%d%%"))
 			{ GlobalAudioBase::set_background_volume(focus_volume * 0.01f); }
-	});
+	}));
 
-	static auto s_menu_settings__borderless_view = UserInterface::register_menu("",
+	// Main Menu (SETTINGS): Borderless View Mode
+	s_frontend_hooks.emplace_back(UserInterface::register_menu("",
 	{ 30, "Settings" }, [&]() noexcept {
 		Separator();
 		Checkbox("Borderless View Mode", const_cast<bool*>(
@@ -423,17 +439,19 @@ void ApplicationHost::setup_gui_callables() noexcept {
 			SetTooltip("Removes all decorations and margins from a System's "
 				"display window(s) for a flush fit.");
 		}
-	});
+	}));
 
 /*==================================================================*/
 
-	static auto s_window_none__imgui_demo = UserInterface::register_window(
+	// Main Dockspace: ImGUI Demo
+	s_frontend_hooks.emplace_back(UserInterface::register_window(
 	[&]() noexcept {
 		if (!s_show_window_demo) { return; }
 		ShowDemoWindow(&s_show_window_demo);
-	});
+	}));
 
-	static auto s_window_none__log_viewer = UserInterface::register_window(
+	// Main Dockspace: Log Viewer
+	s_frontend_hooks.emplace_back(UserInterface::register_window(
 	[&]() noexcept {
 		if (!s_show_window_logger) { return; }
 
@@ -543,9 +561,10 @@ void ApplicationHost::setup_gui_callables() noexcept {
 			}
 		}
 		End();
-	});
+	}));
 
-	static auto s_window_none__load_image = UserInterface::register_window(
+	// Main Dockspace: File Image Modal
+	s_frontend_hooks.emplace_back(UserInterface::register_window(
 	[&]() noexcept {
 		if (!SystemStaging::file_image.valid()) { return; }
 
@@ -783,5 +802,5 @@ void ApplicationHost::setup_gui_callables() noexcept {
 
 			EndPopup();
 		}
-	});
+	}));
 }

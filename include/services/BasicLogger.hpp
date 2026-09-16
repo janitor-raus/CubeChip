@@ -136,19 +136,19 @@ private:
 	void push_entry(BLOG::LEVEL level, std::string&& message) noexcept;
 
 public:
-	#if !defined(NDEBUG) || defined(DEBUG) // only push these in debug builds
+#if !defined(NDEBUG) || defined(DEBUG) // only push these in debug builds
 	template <typename... Args>
 	void debug(fmt::format_string<Args...> fmt, Args&&... args) noexcept {
 		push_entry(BLOG::DBG, fmt::format(fmt, std::forward<Args>(args)...));
 	}
 	void debug(std::string&& message) noexcept { push_entry(BLOG::DBG, std::move(message)); }
 	void debug(const char* message) noexcept { push_entry(BLOG::DBG, std::string(message)); }
-	#else
+#else
 	template <typename... Args>
 	void debug(fmt::format_string<Args...>, Args&&...) noexcept {}
 	void debug(std::string&&) noexcept {}
 	void debug(const char*) noexcept {}
-	#endif
+#endif
 
 	template <typename... Args>
 	void info(fmt::format_string<Args...> fmt, Args&&... args) noexcept {

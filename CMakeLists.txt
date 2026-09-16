@@ -14,7 +14,7 @@ endif()
 # ==================================================================================== #
 
 project("CubeChip" LANGUAGES CXX)
-option(WINDOWS_NO_ROUNDED_CORNERS "Windows only: disable rounded window corners (requires Windows 11 22H2 / Build 22621 or newer to take effect)" OFF)
+option(CUBECHIP_WINDOWS_NO_ROUNDED_CORNERS "Windows only: disable rounded window corners (requires Windows 11 22H2 / Build 22621 or newer to take effect)" OFF)
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -27,11 +27,14 @@ set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(PROJECT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
+set(PROJECT_RESOURCE_DIR "${PROJECT_SOURCE_DIR}/resource")
 set(PROJECT_VENDOR_DIR "${CMAKE_BINARY_DIR}/include/vendor")
+set(PROJECT_EMBED_DIR "${CMAKE_BINARY_DIR}/embed")
 
 include("cmake/_project_filelist.cmake")
 include("cmake/_vendor_utils.cmake")
 include("cmake/_versioning.cmake")
+include("cmake/_generate_embed.cmake")
 
 include("cmake/atomic_queue.cmake")
 include("cmake/tl-expected.cmake")
@@ -49,6 +52,16 @@ add_executable("${PROJECT_NAME}"
 	${PROJECT_SOURCE_FILES}
 )
 
+embed_binary_file(
+	"${PROJECT_RESOURCE_DIR}/app_logo.png"
+	"${PROJECT_EMBED_DIR}/app_logo.data"
+	"${CMAKE_SOURCE_DIR}/cmake/_hexdump.cmake"
+)
+add_custom_target(generate_embedded_assets
+    DEPENDS "${PROJECT_EMBED_DIR}/app_logo.data"
+)
+add_dependencies("${PROJECT_NAME}" generate_embedded_assets)
+
 target_sources("${PROJECT_NAME}" PRIVATE
     FILE_SET project_modules TYPE CXX_MODULES
     FILES
@@ -59,6 +72,13 @@ target_sources("${PROJECT_NAME}" PRIVATE
 	${PROJECT_HEADER_FILES}
 	${PROJECT_SOURCE_FILES}
 )
+
+if(WIN32)
+    target_sources("${PROJECT_NAME}" PRIVATE
+        "${PROJECT_RESOURCE_DIR}/app.rc"
+        #"${PROJECT_RESOURCE_DIR}/app.ico"
+    )
+endif()
 
 source_group(
     TREE ${PROJECT_INCLUDE_DIR}
@@ -72,9 +92,10 @@ target_compile_features("${PROJECT_NAME}" PRIVATE cxx_std_20)
 target_compile_definitions(
 	"${PROJECT_NAME}" PRIVATE
 	FMT_HEADER_ONLY
+	TOML_EXCEPTIONS=0
 	PROJECT_NAME="${PROJECT_NAME}"
 )
-if(WIN32 AND WINDOWS_NO_ROUNDED_CORNERS)
+if(WIN32 AND CUBECHIP_WINDOWS_NO_ROUNDED_CORNERS)
     target_compile_definitions(
 		${PROJECT_NAME} PRIVATE
 		WINDOWS_NO_ROUNDED_CORNERS
@@ -83,6 +104,7 @@ endif()
 
 target_include_directories(
 	"${PROJECT_NAME}" PRIVATE
+	"${PROJECT_EMBED_DIR}"
 	"${PROJECT_INCLUDE_DIR}/shims"
 	"${PROJECT_INCLUDE_DIR}/utilities"
 	"${PROJECT_INCLUDE_DIR}/components"
@@ -119,7 +141,7 @@ if(UNIX AND NOT APPLE)
         )
     endif()
 
-    target_link_libraries(CubeChip PRIVATE TBB::tbb)
+    target_link_libraries("${PROJECT_NAME}" PRIVATE TBB::tbb)
 endif()
 
 # ==================================================================================== #

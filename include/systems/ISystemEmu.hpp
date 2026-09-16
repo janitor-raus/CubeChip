@@ -9,28 +9,22 @@
 #include <optional>
 #include <utility>
 #include <span>
-#include <mutex>
 
+#include <SDL3/SDL_scancode.h>
+#include <fmt/format.h>
+
+#include "HDIS_HCIS.hpp"
 #include "EzMaths.hpp"
 #include "AtomSharedPtr.hpp"
 #include "Thread.hpp"
-
 #include "MemoryEditor.hpp"
 #include "WindowHost.hpp"
 #include "Parameter.hpp"
 #include "FrameLimiter.hpp"
 #include "BasicInput.hpp"
 #include "Well512.hpp"
-
 #include "FileImage.hpp"
-
-#include <SDL3/SDL_scancode.h>
-#include <fmt/format.h>
-
-import GuiSession;
-#ifdef __INTELLISENSE__
-# include "GuiSession.cppm"
-#endif
+#include "GuiSession.hpp"
 
 /*==================================================================*/
 
@@ -46,9 +40,9 @@ enum EmuState : u8 {
 	DEBUG  = 0x80, // debugger enabled (reserved for future use)
 
 	NOT_RUNNING  = HIDDEN | PAUSED | HALTED | FATAL | RESET, // emulation cannot progress
-	CANNOT_PAUSE = HIDDEN | HALTED | FATAL | RESET, // pause-trigger is not allowed
+	CANNOT_PAUSE = HIDDEN | HALTED | FATAL  | RESET, // pause-trigger is not allowed
 	ANY_PAUSE    = HIDDEN | PAUSED | RESET, // emulation is currently paused
-	ANY_STOP     = HALTED | FATAL | RESET, // emulation is currently stopped
+	ANY_STOP     = HALTED | FATAL  | RESET, // emulation is currently stopped
 };
 
 struct SimpleKeyMapping {
@@ -62,10 +56,36 @@ struct SystemDescriptor;
 
 /*==================================================================*/
 
-class ISystemEmu {
+#pragma warning(push)
+#  pragma warning(disable : 4324)
 
+class alignas(HDIS) ISystemEmu {
+
+private:
 	Thread m_system_thread;
 
+public:
+	void start_worker() noexcept;
+	void stop_worker() noexcept;
+
+protected:
+	Well512 m_rng;
+
+	bool m_is_viewport_visible = true;
+	bool m_is_viewport_focused = true;
+
+public:
+	bool is_viewport_visible() const noexcept { return m_is_viewport_visible; }
+	bool is_viewport_focused() const noexcept { return m_is_viewport_focused; }
+
+	bool force_viewport_visible(bool state) noexcept {
+		return std::exchange(m_is_viewport_visible, state);
+	}
+	bool force_viewport_focused(bool state) noexcept {
+		return std::exchange(m_is_viewport_focused, state);
+	}
+
+private:
 	std::atomic<u8> m_system_state = EmuState::NORMAL;
 	EmuState m_cached_system_state = EmuState::NORMAL;
 
@@ -103,30 +123,14 @@ public:
 		return get_system_state() == m_cached_system_state;
 	}
 
-protected:
-	bool m_is_viewport_visible = true;
-	bool m_is_viewport_focused = true;
-
-public:
-	bool is_viewport_visible() const noexcept { return m_is_viewport_visible; }
-	bool is_viewport_focused() const noexcept { return m_is_viewport_focused; }
-
-	bool force_viewport_visible(bool state) noexcept {
-		return std::exchange(m_is_viewport_visible, state);
-	}
-	bool force_viewport_focused(bool state) noexcept {
-		return std::exchange(m_is_viewport_focused, state);
-	}
-
-private:
-	u32 : 32; // reserved for future use
-
 public:
 	const u32 instance_id;
 
-public:
-	BoundedParam<60.0f, 24.0f, 100.0f> m_base_system_framerate;
-	BoundedParam< 1.0f,  0.1f,  10.0f> m_framerate_multiplier;
+	static std::string make_system_id(u32 id, std::string_view identifier) noexcept;
+	/****/ std::string get_system_id() const noexcept;
+
+	BoundedParam<60.0f, 24.0f, 100.0f> base_system_framerate;
+	BoundedParam< 1.0f,  0.1f,  10.0f> framerate_multiplier;
 
 protected:
 	f32 m_cached_real_framerate = 0.0f;
@@ -140,16 +144,17 @@ protected:
 	u32 m_elapsed_frames = 0;
 
 protected:
-	FrameLimiter m_pacer{};
+	FrameLimiter m_pacer;
 
 private:
-	std::string m_statistics_work_buffer{};
+	std::string m_statistics_work_buffer;
 	AtomSharedPtr<std::string>
-		m_statistics_data{};
+		m_statistics_data;
 
 protected:
-	std::unique_ptr<Well512> m_rng;
 	BasicKeyboard m_input;
+
+/*==================================================================*/
 
 protected:
 	ISystemEmu(std::string_view window_name) noexcept;
@@ -157,28 +162,26 @@ protected:
 public:
 	virtual ~ISystemEmu() noexcept = default;
 
-private:
-	void prepare_user_interface() noexcept;
+protected:
+	virtual void main_system_loop() = 0;
+	virtual void initialize_family() noexcept = 0;
+	virtual void initialize_system() noexcept = 0;
 
 public:
-	void start_worker() noexcept;
-	void stop_worker() noexcept;
+	virtual auto get_descriptor() const noexcept
+		-> const SystemDescriptor & = 0;
 
 private:
 	virtual void reset_family_data() noexcept = 0;
 	virtual void reset_system_data() noexcept = 0;
 
+	void prepare_user_interface() noexcept;
 	void perform_instance_reset() noexcept;
 
 public:
 	void request_instance_reset() noexcept;
 
-public:
-	virtual const SystemDescriptor& get_descriptor() const noexcept = 0;
-	static std::string make_system_id(u32 id, std::string_view identifier) noexcept;
-
-public:
-	std::string get_system_id() const noexcept;
+/*==================================================================*/
 
 protected:
 	WindowHost m_workspace_host;
@@ -187,13 +190,13 @@ protected:
 		m_frontend_hooks;
 
 protected:
-	std::string m_file_sha1_hash{};
+	std::string m_file_sha1_hash;
 	bool calc_file_image_sha1() noexcept;
 
-	FileImage m_file_image{};
+	FileImage m_file_image;
 	void copy_file_image_to(std::span<u8> dest, std::size_t offset) noexcept;
 
-	std::vector<std::string> m_system_paths{};
+	std::vector<std::string> m_system_paths;
 	auto add_system_path(
 		std::string_view dir_name,
 		std::string_view family_name
@@ -205,11 +208,6 @@ protected:
 protected:
 	WindowHost   m_memview_window;
 	MemoryEditor m_memory_editor;
-
-protected:
-	virtual void main_system_loop() = 0;
-	virtual void initialize_family() noexcept = 0;
-	virtual void initialize_system() noexcept = 0;
 
 protected:
 	template <typename... Args>
@@ -233,6 +231,8 @@ protected:
 	/*****/ void create_statistics_data() noexcept;
 	std::string  copy_statistics_string() const noexcept;
 };
+
+#pragma warning(pop)
 
 /*==================================================================*/
 

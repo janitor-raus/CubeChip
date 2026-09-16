@@ -4,33 +4,25 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-module;
-
-#include "LifetimeWrapperSDL.hpp"
+#pragma once
 
 #include <list>
 #include <forward_list>
 #include <unordered_map>
 
+#include "LifetimeWrapperSDL.hpp"
 #include "SettingWrapper.hpp"
-#include "EzMaths.hpp"
-
-export module PlatformWindow;
-export import WindowNode;
-
-#if __INTELLISENSE__
-#  include "WindowNode.cppm"
-#endif
+#include "WindowNode.hpp"
 
 /*==================================================================*/
 
-export enum GVB_SystemTheme {
+enum GVB_SystemTheme {
 	GVB_SYSTEM_THEME_UNKNOWN,   /**< Unknown system theme */
 	GVB_SYSTEM_THEME_LIGHT,     /**< Light colored system theme */
 	GVB_SYSTEM_THEME_DARK       /**< Dark colored system theme */
 };
 
-export enum GVB_DisplayOrientation {
+enum GVB_DisplayOrientation {
 	GVB_ORIENTATION_UNKNOWN,            /**< The display orientation can't be determined */
 	GVB_ORIENTATION_LANDSCAPE,          /**< The display is in landscape mode, with the right side up, relative to portrait mode */
 	GVB_ORIENTATION_LANDSCAPE_FLIPPED,  /**< The display is in landscape mode, with the left side up, relative to portrait mode */
@@ -40,9 +32,9 @@ export enum GVB_DisplayOrientation {
 
 /*==================================================================*/
 
-export using GVB_WindowFlags = unsigned long long;
+using GVB_WindowFlags = unsigned long long;
 
-export enum GVB_WindowFlags_ : GVB_WindowFlags {
+enum GVB_WindowFlags_ : GVB_WindowFlags {
 	GVB_WINDOW_DEFAULT              = 0x0000000000000000ull, /**< no flags set */
 	GVB_WINDOW_FULLSCREEN           = 0x0000000000000001ull, /**< window is in fullscreen mode */
 	GVB_WINDOW_OPENGL               = 0x0000000000000002ull, /**< window usable with OpenGL context */
@@ -72,13 +64,13 @@ export enum GVB_WindowFlags_ : GVB_WindowFlags {
 	GVB_WINDOW_NOT_FOCUSABLE        = 0x0000000080000000ull, /**< window should not be focusable */
 };
 
-export enum GVB_FlashOperation {
+enum GVB_FlashOperation {
 	GVB_FLASH_CANCEL,        /**< Cancel any window flash state */
 	GVB_FLASH_BRIEFLY,       /**< Flash the window briefly to get attention */
 	GVB_FLASH_UNTIL_FOCUSED, /**< Flash the window until it gets focus */
 };
 
-export enum GVB_ProgressState {
+enum GVB_ProgressState {
 	GVB_PROGRESS_STATE_INVALID = -1,  /**< An invalid progress state indicating an error; check SDL_GetError() */
 	GVB_PROGRESS_STATE_NONE,          /**< No progress bar is shown */
 	GVB_PROGRESS_STATE_INDETERMINATE, /**< The progress bar is shown in a indeterminate state */
@@ -87,7 +79,7 @@ export enum GVB_ProgressState {
 	GVB_PROGRESS_STATE_ERROR,         /**< The progress bar is shown in a state indicating the application had an error */
 };
 
-export enum GVB_ScaleMode {
+enum GVB_ScaleMode {
 	GVB_SCALEMODE_INVALID = -1,
 	GVB_SCALEMODE_NEAREST,  /**< nearest pixel sampling */
 	GVB_SCALEMODE_LINEAR,   /**< linear filtering */
@@ -97,17 +89,21 @@ export enum GVB_ScaleMode {
 /*==================================================================*/
 
 namespace PlatformWindow {
-	export class Handle;
+	constexpr inline auto maximum_allowed = 64ull;
+
+	class Handle;
 
 	using ShortKey = WindowNode::ShortKey;
 	using SyncMRU  = std::list<Handle*>;
 	using SyncNode = SyncMRU::iterator;
 
+	// Internal implementation members and methods. Highly recommended
+	// to avoid using these directly unless you know what you're doing.
 	namespace internal {
+		using IDMap = std::unordered_map<unsigned, ShortKey>;
 		// Association map of WindowIDs to each ShortKey. Used for efficient handle
 		// lookups, particularly when dispatching SDL events based on the WindowID.
-		using IDMap = std::unordered_map<unsigned, ShortKey>;
-		IDMap s_platform_window_id_map;
+		inline IDMap s_platform_window_id_map;
 
 		void insert_id_to_map(Handle* handle) noexcept;
 		void erase_id_from_map(Handle* handle) noexcept;
@@ -115,11 +111,10 @@ namespace PlatformWindow {
 		/*==================================================================*/
 
 		// Automatically managed MRU of windows handles used for automatic sync.
-		PlatformWindow::SyncMRU s_auto_sync_window_mru;
-		std::size_t s_sync_window_mru_generation = 0;
+		inline PlatformWindow::SyncMRU s_auto_sync_window_mru;
+		inline std::size_t s_sync_window_mru_generation = 0;
 
 		SyncNode& get_handle_node(Handle* handle) noexcept;
-		void clear_node(SyncNode& node) noexcept;
 
 		void insert_sync_to_mru(Handle* handle) noexcept;
 		void erase_sync_from_mru(Handle* handle) noexcept;
@@ -127,15 +122,11 @@ namespace PlatformWindow {
 		// Sync platform window: This reflects the platform window that is used to
 		// drive renderer vsync. Should the underlying window be destroyed, defaults
 		// to the main platform window.
-		PlatformWindow::SyncNode s_explicit_sync_mru_node = s_auto_sync_window_mru.end();
+		inline PlatformWindow::SyncNode s_explicit_sync_mru_node = s_auto_sync_window_mru.end();
 		void retarget_sync(Handle* handle) noexcept;
 
 		void apply_explicit_sync_node() noexcept;
 	}
-}
-
-export namespace PlatformWindow {
-	constexpr inline auto maximum_allowed = 64ull;
 
 	namespace PWi = PlatformWindow::internal;
 
@@ -160,6 +151,9 @@ export namespace PlatformWindow {
 		const ShortKey handle_key;
 
 		bool is_inert() const noexcept { return handle_key[0] == '\0'; }
+
+	private:
+		SettingsMap m_settings_map;
 
 	public:
 		Handle(
@@ -233,6 +227,11 @@ export namespace PlatformWindow {
 		bool get_render_scale(float* w, float* h) const noexcept;
 
 		bool set_bmp_icon(const char* icon_path) noexcept;
+		bool set_png_icon(const char* icon_path) noexcept;
+
+		bool set_bmp_icon(const void* icon_data, std::size_t data_size) noexcept;
+		bool set_png_icon(const void* icon_data, std::size_t data_size) noexcept;
+
 		bool set_parent(Handle* parent) noexcept;
 
 	public:
@@ -332,18 +331,8 @@ export namespace PlatformWindow {
 			SDL_Texture* src_texture, SDL_Texture* dst_texture = nullptr
 		) noexcept;
 
-	public:
-		struct Settings {
-			static constexpr ez::Rect
-				defaults = { 0, 0, 640, 480 };
-			ez::Rect window = defaults;
-
-			SettingsMap map(const Handle& handle) noexcept;
-		};
-
 	private:
-		[[nodiscard]]
-		auto export_settings() const noexcept -> Settings;
+		void export_settings() noexcept;
 		void import_settings() noexcept;
 	};
 }
@@ -352,29 +341,49 @@ export namespace PlatformWindow {
 
 namespace PlatformWindow {
 	using Registry = std::unordered_map<ShortKey,
-		PlatformWindow::Handle, ShortKey::Hash>;
+	PlatformWindow::Handle, ShortKey::Hash>;
 
 	namespace internal {
 		// Registry of all PlatformWindow handles, each keyed with a unique ShortKey.
-		PlatformWindow::Registry s_platform_window_registry;
+		inline PlatformWindow::Registry s_platform_window_registry;
 
 		// Main platform window: If null, the applicaton is to be presumed to be
 		// waiting for shutdown, unless the user explicitly set a different platform
 		// window to be the "main" one, or the application runs in "headless" mode.
-		PlatformWindow::Handle* s_main_window_ptr = nullptr;
+		inline PlatformWindow::Handle* s_main_window_ptr = nullptr;
 		void retarget_main(Handle* handle) noexcept;
 
 		// Live platform window: This reflects the platform window that is targeted
 		// by default for various windowing operations, unless some handle is
 		// directly used for targeting. If null, automatic targeting will fail.
-		PlatformWindow::Handle* s_live_window_ptr = nullptr;
+		inline PlatformWindow::Handle* s_live_window_ptr = nullptr;
 		void retarget_live(Handle* handle) noexcept;
+
+		/*==================================================================*/
+
+		inline PlatformWindow::Handle* s_exec_context_ptr = nullptr;
+
+		class ExecContextGuard {
+			PlatformWindow::Handle* m_previous{};
+
+		public:
+			explicit ExecContextGuard(PlatformWindow::Handle* handle) noexcept
+				: m_previous(s_exec_context_ptr)
+			{ s_exec_context_ptr = handle; }
+
+			~ExecContextGuard() noexcept {
+				s_exec_context_ptr = m_previous;
+			}
+
+			ExecContextGuard(const ExecContextGuard&) = delete;
+			ExecContextGuard& operator=(const ExecContextGuard&) = delete;
+		};
 	}
-}
 
-/*==================================================================*/
-
-export namespace PlatformWindow {
+	// Does the heavy lifting of presenting each window's renderer in inverse SyncMRU order.
+	// It also handles the case where the SyncMRU is mutated during the present process by
+	// means of a PlatformWindow handle being created or destroyed through the render invocation.
+	// The front entry of the SyncMRU is always used to drive renderer vsync.
 	void render_present() noexcept;
 
 	// Returns a const view of the PlatformWindow registry.
@@ -418,6 +427,11 @@ export namespace PlatformWindow {
 	// Search the registry using a PlatformWindow handle pointer. If it exists, the
 	// same pointer will be returned, otherwise a 'nullptr' will be returned.
 	Handle* exists(Handle* handle) noexcept;
+
+	// Returns the window handle associated with the currently executing window
+	// action (presenting or handling events), allowing code invoked within that
+	// action to identify its owning window without need for external tracking.
+	Handle* has_exec_context() noexcept;
 
 	/*==================================================================*/
 

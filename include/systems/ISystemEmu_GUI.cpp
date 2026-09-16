@@ -114,6 +114,7 @@ void ISystemEmu::prepare_user_interface() noexcept {
 /*==================================================================*/
 
 namespace widgets {
+	[[maybe_unused]]
 	static void simple_memory_viewer(
 		const void* memory, std::size_t size,
 		std::optional<std::size_t> active = std::nullopt

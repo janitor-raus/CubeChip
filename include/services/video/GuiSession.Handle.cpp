@@ -4,18 +4,12 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-module;
-
-#include "BasicLogger.hpp"
-
 #include <imgui.h>
 #include <backends/imgui_impl_sdl3.h>
 #include <backends/imgui_impl_sdlrenderer3.h>
 
-module GuiSession;
-#ifdef __INTELLISENSE__
-# include "GuiSession.cppm"
-#endif
+#include "BasicLogger.hpp"
+#include "GuiSession.hpp"
 
 /*==================================================================*/
 

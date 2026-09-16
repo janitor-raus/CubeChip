@@ -4,15 +4,11 @@
 	file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#include "WindowHost.hpp"
-#include "AtomSharedPtr.hpp"
-
 #include <imgui.h>
 
-import GuiSession;
-#ifdef __INTELLISENSE__
-# include "GuiSession.cppm"
-#endif
+#include "WindowHost.hpp"
+#include "AtomSharedPtr.hpp"
+#include "GuiSession.hpp"
 
 /*==================================================================*/
 
