@@ -11,6 +11,18 @@
 
 /*==================================================================*/
 
+enum Channels : signed {
+	SAME, // current stream channels
+	C1_0, // mono
+	C2_0, // stereo
+	C2_1, // stereo + sub
+	C4_0, // quad
+	C4_1, // quad + sub
+	C5_1, // 5.1 surround
+	C6_1, // 6.1 surround
+	C7_1, // 7.1 surround
+};
+
 class AudioDevice {
 	SDL_Unique<SDL_AudioStream> m_stream;
 	signed m_freq = 0, m_channels = 0;
@@ -18,22 +30,20 @@ class AudioDevice {
 	float m_freq_ratio = 1.0f;
 	unsigned long long m_accumulator = 0;
 
-	void update_cached_spec() noexcept;
-
 public:
-	// Sets the stream's audio spec. Zero/invalid values fall back to the physical
-	// device's default respectively. If a change in spec was applied, the internal
+	// Sets the stream's audio spec. Zero/invalid values fall back to the stream's
+	// current value respectively. If a change in freq was applied, the internal
 	// accumulator for next_frame_sample_count() will be reset to prevent drift.
-	bool set_spec(signed frequency = 0, signed channels = 0) noexcept;
+	bool set_spec(Channels channels = SAME, signed freq = 0) noexcept;
 
 	auto get_freq()      const noexcept { return m_freq; }
-	bool set_freq(signed freq) noexcept { return set_spec(freq, m_channels); }
+	bool set_freq(signed freq) noexcept { return set_spec(SAME, freq); }
 
 	auto get_freq_ratio() const noexcept { return m_freq_ratio; }
 	bool set_freq_ratio(float ratio) noexcept;
 
-	auto get_channels()          const noexcept { return m_channels; }
-	bool set_channels(signed channels) noexcept { return set_spec(m_freq, channels); }
+	auto get_channels()            const noexcept { return m_channels; }
+	bool set_channels(Channels channels) noexcept { return set_spec(channels, 0); }
 
 	bool is_paused()   const noexcept;
 	bool is_playback() const noexcept;
@@ -104,6 +114,6 @@ public:
 	AudioDevice& operator=(AudioDevice&&) = delete;
 
 public:
-	void init_stream(signed freq = 0, signed channels = 0,
+	void init_stream(Channels channels = SAME, signed freq = 0,
 		bool recording_device = false) noexcept;
 };

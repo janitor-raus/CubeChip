@@ -19,7 +19,8 @@ void BYTEPUSHER_STANDARD::initialize_system() noexcept {
 
 	base_system_framerate = c_sys_refresh_rate;
 
-	m_audio_device.init_stream(s32(c_sys_refresh_rate * c_sys_audio_sample_total), 1);
+	auto out_freq = c_sys_refresh_rate * c_sys_audio_sample_total;
+	m_audio_device.init_stream(C1_0, s32(out_freq));
 	m_audio_device.resume();
 
 	m_memory_editor.set_memory_range(m_memory.data(), m_memory.size());

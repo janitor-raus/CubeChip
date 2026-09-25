@@ -22,7 +22,7 @@ IFamily_CHIP8::IFamily_CHIP8(std::size_t W, std::size_t H) noexcept
 	prepare_user_interface();
 	load_preset_binds();
 
-	m_audio_device.init_stream(0, 1);
+	m_audio_device.init_stream(C1_0);
 	m_audio_device.resume();
 }
 

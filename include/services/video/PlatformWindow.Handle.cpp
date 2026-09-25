@@ -17,23 +17,21 @@
 /*==================================================================*/
 
 #ifdef _WIN32
-  #ifdef WINDOWS_NO_ROUNDED_CORNERS
-    #include <sdkddkver.h>
-
-    #if (NTDDI_VERSION < NTDDI_WIN10_CO)
-      #define OLD_WINDOWS_SDK
-    #else
-      #ifndef NOMINMAX
-        #define NOMINMAX
-      #endif
-    #endif
-  #endif
-
-  #pragma warning(push)
-  #pragma warning(disable : 5039)
-    #include <dwmapi.h>
-    #pragma comment(lib, "Dwmapi")
-  #pragma warning(pop)
+#  ifdef WINDOWS_NO_ROUNDED_CORNERS
+#    include <sdkddkver.h>
+#    if (NTDDI_VERSION < NTDDI_WIN10_CO)
+#      define OLD_WINDOWS_SDK
+#    else
+#      ifndef NOMINMAX
+#        define NOMINMAX
+#      endif
+#    endif
+#  endif
+#  pragma warning(push)
+#  pragma warning(disable : 5039)
+#    include <dwmapi.h>
+#    pragma comment(lib, "Dwmapi")
+#  pragma warning(pop)
 #endif
 
 /*==================================================================*/

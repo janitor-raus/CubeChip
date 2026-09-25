@@ -15,17 +15,14 @@
 
 /*==================================================================*/
 
-void AudioDevice::init_stream(signed freq, signed channels, bool recording_device) noexcept {
+void AudioDevice::init_stream(Channels channels, signed freq, bool recording_device) noexcept {
 	if (auto* device_ptr = SDL_OpenAudioDeviceStream(recording_device
 		? SDL_AUDIO_DEVICE_DEFAULT_RECORDING
 		: SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,
 		nullptr, nullptr, nullptr
 	)) {
-		const bool new_freq = freq > 0;
-		const bool new_channels = channels >= 1 && channels <= 8;
-
 		m_stream.reset(device_ptr);
-		set_spec(new_freq ? freq : 0, new_channels ? channels : 0);
+		set_spec(channels, freq);
 	} else {
 		blog.error("Failed to open audio stream: {}", SDL_GetError());
 	}
@@ -33,49 +30,45 @@ void AudioDevice::init_stream(signed freq, signed channels, bool recording_devic
 
 /*==================================================================*/
 
-void AudioDevice::update_cached_spec() noexcept {
-	SDL_AudioSpec actual;
-
-	if (is_playback()) {
-		SDL_GetAudioStreamFormat(m_stream.get(), &actual, nullptr);
+static bool get_current_spec(SDL_AudioStream* stream, SDL_AudioSpec& current) noexcept {
+	if (SDL_IsAudioDevicePlayback(SDL_GetAudioStreamDevice(stream))) {
+		SDL_GetAudioStreamFormat(stream, &current, nullptr);
 	} else {
-		SDL_GetAudioStreamFormat(m_stream.get(), nullptr, &actual);
+		SDL_GetAudioStreamFormat(stream, nullptr, &current);
 	}
 
-	if (actual.format == SDL_AUDIO_UNKNOWN) {
-		// If the stream fails to provide a valid spec, all fields are zeroed
-		// and this allows us to know implicitly that something went wrong.
+	if (current.format == SDL_AUDIO_UNKNOWN) {
 		blog.warn("Failed to fetch audio stream spec (the device might "
 			"have been lost, consider re-creating it): {}", SDL_GetError());
-		m_stream = nullptr; actual.freq = 0; actual.channels = 0;
+		current.freq = 0; current.channels = 0;
 	}
 
-	m_freq = actual.freq; m_channels = actual.channels;
+	return current.format != SDL_AUDIO_UNKNOWN;
 }
 
-bool AudioDevice::set_spec(signed freq, signed channels) noexcept {
-	const bool needs_default_freq = freq <= 0;
-	const bool needs_default_channels = channels < 1 || channels > 8;
-
-	signed new_freq = freq, new_channels = channels;
-
-	if (needs_default_freq || needs_default_channels) {
-		update_cached_spec();
-		if (needs_default_freq)     { new_freq = m_freq; }
-		if (needs_default_channels) { new_channels = m_channels; }
+bool AudioDevice::set_spec(Channels channels, signed freq) noexcept {
+	SDL_AudioSpec spec;
+	if (::get_current_spec(m_stream.get(), spec)) {
+		spec.format   = SDL_AUDIO_F32;
+		spec.channels = channels != SAME ? channels : spec.channels;
+		spec.freq     = freq > 0         ? freq     : spec.freq;
+	} else {
+		m_stream.reset();
+		m_channels = m_freq = 0;
+		return false;
 	}
 
-	// return early if spec is unchanged, avoid needless calls and accumulator reset
-	if (new_freq == m_freq && new_channels == m_channels) { return true; }
-	const SDL_AudioSpec spec{ SDL_AUDIO_F32, new_channels, new_freq };
-
 	if (SDL_SetAudioStreamFormat(m_stream.get(), &spec, &spec)) {
-		update_cached_spec(); m_accumulator = 0;
+		// reset accumulator if frequency changed
+		m_accumulator *= spec.freq == m_freq;
+		m_channels = spec.channels;
+		m_freq     = spec.freq;
 		return true;
 	} else {
 		blog.warn("Failed to update audio stream spec (the device might "
 			"have been lost, consider re-creating it): {}", SDL_GetError());
-		m_stream = nullptr; m_freq = 0; m_channels = 0;
+		m_stream.reset();
+		m_channels = m_freq = 0;
 		return false;
 	}
 }
