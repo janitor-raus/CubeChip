@@ -15,15 +15,18 @@
 /*==================================================================*/
 
 struct Phase {
-	using Byte_T  = u8;
 	using Float_T = f64;
 
 private:
 	Float_T m_phase{};
 
 public:
-	template <std::integral Any_Int>
-	constexpr Phase(Any_Int phase) noexcept : m_phase(Byte_T(phase) * (1.0 / 255.0)) {}
+	template <std::unsigned_integral Uint>
+	static constexpr Phase from_uint(Uint phase, Uint limit) noexcept {
+		assert(limit > Uint(0) && "Phase::from_uint: limit must be positive");
+		return Phase(Float_T(phase) / Float_T(limit));
+	}
+
 	constexpr Phase(Float_T phase) noexcept {
 		assert(ez::isfinite(phase) && "Phase: non-finite input");
 		assert(phase < 0x1p32 && "Phase: input too large (32-bit overflow)");
@@ -40,7 +43,6 @@ public:
 
 class WaveForms {
 	using Millis  = u32;
-	using Byte_T  = Phase::Byte_T;
 	using Float_T = Phase::Float_T;
 
 	static constexpr Float_T calc_period(Millis p, Millis t) noexcept {
@@ -53,11 +55,6 @@ public:
 
 	public:
 		constexpr Bipolar(Float_T phase) noexcept : m_phase(phase) {}
-
-		// cast phase value to a 0..255 value and return
-		constexpr Byte_T as_byte() const noexcept {
-			return Byte_T(m_phase * 127.5 + 128.0);
-		}
 
 		// cast phase value to a 0..1 range and return
 		constexpr Float_T as_unipolar() const noexcept {
