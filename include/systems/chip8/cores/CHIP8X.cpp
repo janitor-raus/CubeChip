@@ -33,8 +33,7 @@ void CHIP8X::initialize_system() noexcept {
 	m_display_device.metadata().edit([&](auto& meta) noexcept {
 		meta.minimum_zoom = 8;
 		meta.inner_margin = 4;
-		meta.texture_tint = c_back_colors[m_background_color];
-		meta.enabled = true;
+		meta.texture_tint = c_back_colors[0];
 	});
 }
 
@@ -51,6 +50,10 @@ void CHIP8X::reset_system_data() noexcept {
 
 	m_current_pc   = c_sys_boot_pos;
 	m_standard_cpf = c_sys_speed_hi;
+
+	m_display_device.metadata().edit([&](auto& meta) noexcept {
+		meta.texture_tint = c_back_colors[0];
+	});
 }
 
 void CHIP8X::instruction_loop() noexcept {

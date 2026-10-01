@@ -42,6 +42,11 @@ void IFamily_CHIP8::initialize_family() noexcept {
 				"permanent register storage will be unavailable!", family_pretty_name);
 		}
 	}
+
+	m_display_device.metadata().edit([&](auto& meta) noexcept {
+		meta.texture_tint = s_bit_colors[0];
+		meta.enabled = true;
+	});
 }
 
 void IFamily_CHIP8::reset_family_data() noexcept {
@@ -50,10 +55,15 @@ void IFamily_CHIP8::reset_family_data() noexcept {
 
 	m_last_voice_index = 0;
 	m_delay_timer = 0;
-	m_register_I = 0;
-	m_interrupt = Interrupt::CLEAR;
+	m_register_I  = 0;
+	m_interrupt   = Interrupt::CLEAR;
 	m_stack.clear();
 	m_keypad.reset();
+
+	m_display_device.metadata().edit([&](auto& meta) noexcept {
+		meta.texture_tint = s_bit_colors[0];
+		meta.enabled = true;
+	});
 }
 
 /*==================================================================*/

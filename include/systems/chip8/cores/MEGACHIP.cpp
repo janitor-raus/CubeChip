@@ -29,7 +29,6 @@ void MEGACHIP::initialize_system() noexcept {
 	m_display_device.metadata().edit([](auto& meta) noexcept {
 		meta.minimum_zoom = 2;
 		meta.inner_margin = 4;
-		meta.enabled = true;
 	});
 }
 

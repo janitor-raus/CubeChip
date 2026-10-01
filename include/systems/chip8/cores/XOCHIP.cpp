@@ -25,14 +25,12 @@ void XOCHIP::initialize_system() noexcept {
 
 	set_pattern_pitch(64);
 
-	m_current_pc = c_sys_boot_pos;
+	m_current_pc   = c_sys_boot_pos;
 	m_standard_cpf = c_sys_speed_lo;
 
 	m_display_device.metadata().edit([&](auto& meta) noexcept {
 		meta.minimum_zoom = 4;
 		meta.inner_margin = 4;
-		meta.texture_tint = m_bit_colors[0];
-		meta.enabled = true;
 	});
 }
 

@@ -28,8 +28,6 @@ void BYTEPUSHER_STANDARD::initialize_system() noexcept {
 	m_display_device.metadata().edit([](auto& meta) noexcept {
 		meta.minimum_zoom = 2;
 		meta.inner_margin = 4;
-		meta.texture_tint = c_bit_colors[0];
-		meta.enabled = true;
 	});
 }
 

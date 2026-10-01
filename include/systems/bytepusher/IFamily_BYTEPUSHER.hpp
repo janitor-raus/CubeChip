@@ -59,7 +59,7 @@ protected:
 
 private:
 	void initialize_family() noexcept override final;
-	void reset_family_data() noexcept override final {}
+	void reset_family_data() noexcept override final;
 
 public:
 	void main_system_loop() override final;

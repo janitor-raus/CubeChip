@@ -29,8 +29,6 @@ void SCHIP_MODERN::initialize_system() noexcept {
 	m_display_device.metadata().edit([](auto& meta) noexcept {
 		meta.minimum_zoom = 4;
 		meta.inner_margin = 4;
-		meta.texture_tint = s_bit_colors[0];
-		meta.enabled = true;
 	});
 }
 

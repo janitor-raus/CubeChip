@@ -32,6 +32,18 @@ void IFamily_BYTEPUSHER::initialize_family() noexcept {
 				"savestates will be unavailable!", family_pretty_name);
 		}
 	}
+
+	m_display_device.metadata().edit([&](auto& meta) noexcept {
+		meta.texture_tint = c_bit_colors[0];
+		meta.enabled = true;
+	});
+}
+
+void IFamily_BYTEPUSHER::reset_family_data() noexcept {
+	m_display_device.metadata().edit([&](auto& meta) noexcept {
+		meta.texture_tint = c_bit_colors[0];
+		meta.enabled = true;
+	});
 }
 
 /*==================================================================*/
