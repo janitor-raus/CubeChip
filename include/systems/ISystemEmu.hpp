@@ -56,8 +56,10 @@ struct SystemDescriptor;
 
 /*==================================================================*/
 
-#pragma warning(push)
-#  pragma warning(disable : 4324)
+#ifdef _MSC_VER
+#  pragma warning(push)
+#  pragma warning(disable: 4324)
+#endif
 
 class alignas(HDIS) ISystemEmu {
 
@@ -232,7 +234,9 @@ protected:
 	std::string  copy_statistics_string() const noexcept;
 };
 
-#pragma warning(pop)
+#ifdef _MSC_VER
+#  pragma warning(pop)
+#endif
 
 /*==================================================================*/
 

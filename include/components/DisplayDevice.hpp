@@ -10,7 +10,7 @@
 
 #include "AtomicBox.hpp"
 #include "FramePacket.hpp"
-#include "TripleBuffer.hpp"
+#include "Mailbox.hpp"
 
 /*==================================================================*/
 
@@ -22,12 +22,12 @@ class DisplayDevice {
 
 public:
 	using Callable  = std::function<void()>;
-	using Swapchain = TripleBuffer<FramePacket>;
+	using Swapchain = Mailbox<FramePacket>;
 	using Metadata  = FramePacket::Metadata;
 
 public:
 	/**
-	 * @brief TripleBuffer swapchain with a fixed-size buffer of T and
+	 * @brief Mailbox-based swapchain with a fixed-size buffer of T and
 	 * an instance of metadata to propagate both data and state. Refer
 	 * to the 'acquire()' and 'present()' member methods for use info.
 	 */

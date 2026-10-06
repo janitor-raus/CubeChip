@@ -14,27 +14,27 @@
 #include "HDIS_HCIS.hpp"
 
 #ifdef _MSC_VER
-	#pragma warning(push)
-	#pragma warning(disable: 4324)
+#  pragma warning(push)
+#  pragma warning(disable: 4324)
 #endif
 
-#ifdef TRIPLE_BUFFER_ENFORCE_SPSC
-	#include <mutex>
+#ifdef MAILBOX_ENFORCE_SPSC
+#  include <mutex>
 #endif
 
 /*==================================================================*/
 
 /**
- * @brief A thread-safe, flexible, Mailbox-style triple-buffer implementation.
+ * @brief A thread-safe, flexible, triple-buffered implementation.
  *
- * TripleBuffer maintains three instances of a given Buffer type:
+ * Mailbox maintains three instances of a given Buffer type:
  *   - A reader Buffer (for consumers)
  *   - A writer Buffer (for producers)
  *   - A middle Buffer (for atomic swap & publish)
  *
  * The class provides single-shot access methods:
  *   - present(Fn&&) - accesses the reader Buffer and invokes a callable with an
- *     'auto' argument exposing const access to the Buffer and a compile-time dirty flag.
+ *     'auto' argument exposing const access to the Buffer and a constexpr dirty flag.
  *   - acquire(Fn&&) - accesses the writer Buffer, invokes a callable with a
  *     mutable 'auto&' argument, and publishes the Buffer atomically after completion.
  *
@@ -45,7 +45,7 @@
  *
  * @note This implementation assumes the developer will respect SPSC usage patterns.
  *       If stricter enforcement is required, define the compile-time
- *       'TRIPLE_BUFFER_ENFORCE_SPSC' macro before including this header. This enables
+ *       'MAILBOX_ENFORCE_SPSC' macro before including this header. This enables
  *       mutual exclusion on each access path. Without it, misuse may only be detected
  *       in debug builds via runtime guards.
  *
@@ -55,25 +55,25 @@
  *          not handled internally. See documentation of methods for exact effects.
  */
 template <class Buffer>
-class TripleBuffer {
-	struct alignas(HDIS) TripleBufferContext {
+class Mailbox {
+	struct alignas(HDIS) MailboxContext {
 		using AtomBuf = std::atomic<Buffer*>;
 
 		alignas(HDIS) Buffer m_writer_buffer;
 		alignas(HDIS) Buffer m_reader_buffer;
 		alignas(HDIS) Buffer m_middle_buffer;
 
-#ifdef TRIPLE_BUFFER_ENFORCE_SPSC
+#ifdef MAILBOX_ENFORCE_SPSC
 		alignas(HDIS) mutable std::mutex m_reader_lock;
 		mutable std::atomic_size_t m_present_count{};
 		alignas(HDIS) /*****/ std::mutex m_writer_lock;
 		/*****/ std::atomic_size_t m_acquire_count{};
 #else
 		alignas(HDIS)
-	#if !defined(NDEBUG) || defined(DEBUG)
+#  if !defined(NDEBUG) || defined(DEBUG)
 		mutable std::atomic_flag m_reader_used{};
 		/*****/ std::atomic_flag m_writer_used{};
-	#endif
+#  endif
 		mutable std::atomic_size_t m_present_count{};
 		/*****/ std::atomic_size_t m_acquire_count{};
 #endif
@@ -128,14 +128,14 @@ class TripleBuffer {
 		alignas(HDIS) mutable AtomBuf m_swap_ptr = &m_middle_buffer;
 
 		template <typename... Args>
-		TripleBufferContext(Args&&... args) noexcept(std::is_nothrow_constructible_v<Buffer, Args...>)
+		MailboxContext(Args&&... args) noexcept(std::is_nothrow_constructible_v<Buffer, Args...>)
 			: m_writer_buffer(std::forward<Args>(args)...)
 			, m_reader_buffer(std::forward<Args>(args)...)
 			, m_middle_buffer(std::forward<Args>(args)...)
 		{}
 	};
 
-	std::unique_ptr<TripleBufferContext>
+	std::unique_ptr<MailboxContext>
 		m_context;
 
 
@@ -143,7 +143,7 @@ private:
 	static constexpr std::uintptr_t s_dirty_flag = 1;
 
 	static_assert((alignof(Buffer) & s_dirty_flag) == 0,
-		"TripleBuffer: Buffer alignment must permit pointer tagging (LSB == 0).");
+		"Mailbox: Buffer alignment must permit pointer tagging (LSB == 0).");
 
 	static constexpr bool get_dirty(Buffer* ptr) noexcept {
 		return reinterpret_cast<std::uintptr_t>(ptr) & s_dirty_flag;
@@ -163,8 +163,8 @@ private:
 public:
 	template <typename... Args>
 		requires std::constructible_from<Buffer, Args...>
-	TripleBuffer(Args&&... args) noexcept(std::is_nothrow_constructible_v<Buffer, Args...>)
-		: m_context(std::make_unique<TripleBufferContext>(std::forward<Args>(args)...))
+	Mailbox(Args&&... args) noexcept(std::is_nothrow_constructible_v<Buffer, Args...>)
+		: m_context(std::make_unique<MailboxContext>(std::forward<Args>(args)...))
 	{}
 
 	auto get_present_count() const noexcept { return m_context->m_present_count.load(std::memory_order::relaxed); }
@@ -227,7 +227,7 @@ public:
 		std::is_nothrow_invocable_v<Fn, BufferView<true>> &&
 		std::is_nothrow_invocable_v<Fn, BufferView<false>>
 	) {
-#ifdef TRIPLE_BUFFER_ENFORCE_SPSC
+#ifdef MAILBOX_ENFORCE_SPSC
 		std::scoped_lock lock(m_context->m_reader_lock);
 #elif !defined(NDEBUG) || defined(DEBUG)
 		ActiveGuard guard(m_context->m_reader_used);
@@ -269,7 +269,7 @@ public:
 	decltype(auto) acquire(Fn&& callable) noexcept(
 		std::is_nothrow_invocable_v<Fn, Buffer&>
 	) {
-#ifdef TRIPLE_BUFFER_ENFORCE_SPSC
+#ifdef MAILBOX_ENFORCE_SPSC
 		std::scoped_lock lock(m_context->m_writer_lock);
 #elif !defined(NDEBUG) || defined(DEBUG)
 		ActiveGuard guard(m_context->m_writer_used);
@@ -291,5 +291,5 @@ public:
 };
 
 #ifdef _MSC_VER
-	#pragma warning(pop)
+#  pragma warning(pop)
 #endif
