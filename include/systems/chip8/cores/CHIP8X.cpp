@@ -238,16 +238,18 @@ void CHIP8X::instruction_loop() noexcept {
 }
 
 void CHIP8X::push_audio_data() noexcept {
-	mix_audio_data(
-		[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::UNIQUE]); },
-		[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::BUZZER]); }
+	m_audio_mixer.mix_tracks(
+		has_cached_system_state(EmuState::ANY_PAUSE),
+		{ *base_system_framerate, *framerate_multiplier },
+		VoiceTrack{ VOICE::UNIQUE, make_pulse_wave },
+		VoiceTrack{ VOICE::BUZZER, make_pulse_wave }
 	);
 
 	static constexpr u32 idx[]{ 2, 7, 4, 1 };
 
 	if (has_cached_system_state(EmuState::ANY_PAUSE)) { return; }
 	m_display_device.metadata().edit([&](auto& meta) noexcept {
-		meta.set_border_color_if(!!::accumulate(m_voices, 0),
+		meta.set_border_color_if(!!::accumulate(m_audio_mixer.voices, 0),
 			c_fore_colors[idx[m_background_color]]);
 	});
 }
@@ -292,10 +294,10 @@ void CHIP8X::push_video_data() noexcept {
 }
 
 void CHIP8X::set_pulse_pitch(u32 pitch) noexcept {
-	if (m_audio_device) {
-		m_voices[VOICE::UNIQUE].set_step((c_tonal_offset + (
+	if (m_audio_mixer.device) {
+		m_audio_mixer.voices[VOICE::UNIQUE].set_step((c_tonal_offset + (
 			(0xFF - (pitch ? pitch : 0x80)) >> 3 << 4)
-		) / m_audio_device.get_freq());
+		) / m_audio_mixer.device.get_freq());
 	}
 }
 
@@ -590,7 +592,8 @@ void CHIP8X::color_hires_zone(u32 X, u32 Y, u32 idx, u32 N) noexcept {
 		::assign_cast(m_delay_timer, m_registers_V[X]);
 	}
 	void CHIP8X::instruction_Fx18(u32 X) noexcept {
-		m_voices[VOICE::UNIQUE].timer.set(m_registers_V[X] + (m_registers_V[X] == 1));
+		m_audio_mixer.voices[VOICE::UNIQUE].timer.set(
+			m_registers_V[X] + (m_registers_V[X] == 1));
 	}
 	void CHIP8X::instruction_Fx1E(u32 X) noexcept {
 		::assign_cast_add(m_register_I, m_registers_V[X]);

@@ -270,14 +270,18 @@ void XOCHIP::instruction_loop() noexcept {
 }
 
 void XOCHIP::push_audio_data() noexcept {
-	mix_audio_data(
-		[&](auto buffer) noexcept { make_pattern_wave(buffer, m_voices[VOICE::UNIQUE], m_pulse_pattern_data); },
-		[&](auto buffer) noexcept { make_pulse_wave  (buffer, m_voices[VOICE::BUZZER]); }
+	m_audio_mixer.mix_tracks(
+		has_cached_system_state(EmuState::ANY_PAUSE),
+		{ *base_system_framerate, *framerate_multiplier },
+		VoiceTrack{ VOICE::BUZZER, make_pulse_wave },
+		VoiceTrack{ VOICE::UNIQUE, [&](auto buffer, auto& voice) noexcept {
+			make_pattern_wave(buffer, voice, m_pulse_pattern_data); }
+		}
 	);
 
 	if (has_cached_system_state(EmuState::ANY_PAUSE)) { return; }
 	m_display_device.metadata().edit([&](auto& meta) noexcept {
-		meta.set_border_color_if(!!m_voices[VOICE::BUZZER], get_bit_color(1));
+		meta.set_border_color_if(!!m_audio_mixer.voices[VOICE::BUZZER], get_bit_color(1));
 	});
 }
 
@@ -321,9 +325,9 @@ void XOCHIP::push_video_data() noexcept {
 }
 
 void XOCHIP::set_pattern_pitch(s32 pitch) noexcept {
-	if (m_audio_device) {
-		m_voices[VOICE::UNIQUE].set_step(std::bit_cast<f32>(
-			c_pitch_frequency_lut[pitch]) / m_audio_device.get_freq());
+	if (m_audio_mixer.device) {
+		m_audio_mixer.voices[VOICE::UNIQUE].set_step(std::bit_cast<f32>(
+			c_pitch_frequency_lut[pitch]) / m_audio_mixer.device.get_freq());
 	}
 }
 
@@ -758,7 +762,8 @@ void XOCHIP::scroll_display_rt() noexcept {
 		::assign_cast(m_delay_timer, m_registers_V[X]);
 	}
 	void XOCHIP::instruction_Fx18(u32 X) noexcept {
-		m_voices[VOICE::UNIQUE].timer.set(m_registers_V[X] + (m_registers_V[X] == 1));
+		m_audio_mixer.voices[VOICE::UNIQUE].timer.set(
+			m_registers_V[X] + (m_registers_V[X] == 1));
 	}
 	void XOCHIP::instruction_Fx1E(u32 X) noexcept {
 		::assign_cast_add(m_register_I, m_registers_V[X]);

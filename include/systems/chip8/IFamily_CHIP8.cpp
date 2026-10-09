@@ -22,8 +22,8 @@ IFamily_CHIP8::IFamily_CHIP8(std::size_t W, std::size_t H) noexcept
 	prepare_user_interface();
 	load_preset_binds();
 
-	m_audio_device.init_stream(C1_0);
-	m_audio_device.resume();
+	m_audio_mixer.device.init_stream(C1_0);
+	m_audio_mixer.device.resume();
 }
 
 void IFamily_CHIP8::initialize_family() noexcept {
@@ -50,7 +50,7 @@ void IFamily_CHIP8::initialize_family() noexcept {
 }
 
 void IFamily_CHIP8::reset_family_data() noexcept {
-	for (auto& voice : m_voices) { voice.timer.reset(); }
+	for (auto& voice : m_audio_mixer.voices) { voice.timer.reset(); }
 	for (auto& v_reg : m_registers_V) { v_reg = 0; }
 
 	m_last_voice_index = 0;
@@ -139,7 +139,7 @@ void IFamily_CHIP8::handle_pre_work_interrupts() noexcept {
 			return;
 
 		case Interrupt::SOUND:
-			for (auto& voice : m_voices) {
+			for (auto& voice : m_audio_mixer.voices) {
 				if (voice.timer.get()) { return; }
 			}
 			m_interrupt = Interrupt::WAIT1;
@@ -189,7 +189,7 @@ void IFamily_CHIP8::handle_post_work_interrupts() noexcept {
 void IFamily_CHIP8::handle_timer_ticks() noexcept {
 	if (m_delay_timer) { --m_delay_timer; }
 
-	for (auto& voice : m_voices)
+	for (auto& voice : m_audio_mixer.voices)
 		{ voice.timer.dec(); }
 }
 
@@ -275,11 +275,11 @@ void IFamily_CHIP8::start_voice(u32 duration) noexcept {
 }
 
 void IFamily_CHIP8::start_voice_at(u32 voice_index, u32 duration) noexcept {
-	m_voices[voice_index].timer.set(duration);
-	if (m_audio_device) {
-		m_voices[voice_index].set_step((c_tonal_offset + 8 *
+	m_audio_mixer.voices[voice_index].timer.set(duration);
+	if (m_audio_mixer.device) {
+		m_audio_mixer.voices[voice_index].set_step((c_tonal_offset + 8 *
 			(((m_current_pc >> 1) + m_stack.head() + 1) & 0x3E)
-		) / m_audio_device.get_freq());
+		) / m_audio_mixer.device.get_freq());
 	}
 }
 

@@ -241,16 +241,18 @@ void CHIP8E::instruction_loop() noexcept {
 }
 
 void CHIP8E::push_audio_data() noexcept {
-	mix_audio_data(
-		[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::ID_0]); },
-		[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::ID_1]); },
-		[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::ID_2]); },
-		[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::BUZZER]); }
+	m_audio_mixer.mix_tracks(
+		has_cached_system_state(EmuState::ANY_PAUSE),
+		{ *base_system_framerate, *framerate_multiplier },
+		VoiceTrack{ VOICE::ID_0,   make_pulse_wave },
+		VoiceTrack{ VOICE::ID_1,   make_pulse_wave },
+		VoiceTrack{ VOICE::ID_2,   make_pulse_wave },
+		VoiceTrack{ VOICE::BUZZER, make_pulse_wave }
 	);
 
 	if (has_cached_system_state(EmuState::ANY_PAUSE)) { return; }
 	m_display_device.metadata().edit([&](auto& meta) noexcept {
-		meta.set_border_color_if(!!::accumulate(m_voices, 0), s_bit_colors[1]);
+		meta.set_border_color_if(!!::accumulate(m_audio_mixer.voices, 0), s_bit_colors[1]);
 	});
 }
 

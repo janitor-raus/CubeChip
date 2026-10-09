@@ -308,27 +308,33 @@ void MEGACHIP::instruction_loop() noexcept {
 
 void MEGACHIP::push_audio_data() noexcept {
 	if (use_manual_vsync()) {
-		mix_audio_data(
-			[&](auto buffer) noexcept { make_stream_wave(buffer, m_voices[VOICE::UNIQUE], m_track); },
-			[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::BUZZER]); }
+		m_audio_mixer.mix_tracks(
+			has_cached_system_state(EmuState::ANY_PAUSE),
+			{ *base_system_framerate, *framerate_multiplier },
+			VoiceTrack{ VOICE::BUZZER, make_pulse_wave },
+			VoiceTrack{ VOICE::UNIQUE, [&](auto buffer, auto& voice) noexcept {
+				make_stream_wave(buffer, voice, m_track); }
+			}
 		);
 
 		if (has_cached_system_state(EmuState::ANY_PAUSE)) { return; }
 		m_display_device.metadata().edit([&](auto& meta) noexcept {
-			meta.set_border_color_if(!!m_voices[VOICE::BUZZER].timer, s_bit_colors[1]);
+			meta.set_border_color_if(!!m_audio_mixer.voices[VOICE::BUZZER].timer, s_bit_colors[1]);
 		});
 	}
 	else {
-		mix_audio_data(
-			[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::ID_0]); },
-			[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::ID_1]); },
-			[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::ID_2]); },
-			[&](auto buffer) noexcept { make_pulse_wave(buffer, m_voices[VOICE::BUZZER]); }
+		m_audio_mixer.mix_tracks(
+			has_cached_system_state(EmuState::ANY_PAUSE),
+			{ *base_system_framerate, *framerate_multiplier },
+			VoiceTrack{ VOICE::ID_0,   make_pulse_wave },
+			VoiceTrack{ VOICE::ID_1,   make_pulse_wave },
+			VoiceTrack{ VOICE::ID_2,   make_pulse_wave },
+			VoiceTrack{ VOICE::BUZZER, make_pulse_wave }
 		);
 
 		if (has_cached_system_state(EmuState::ANY_PAUSE)) { return; }
 		m_display_device.metadata().edit([&](auto& meta) noexcept {
-			meta.set_border_color_if(!!::accumulate(m_voices, 0), s_bit_colors[1]);
+			meta.set_border_color_if(!!::accumulate(m_audio_mixer.voices, 0), s_bit_colors[1]);
 		});
 	}
 }
@@ -467,7 +473,7 @@ void MEGACHIP::flush_all_video_buffers(bool by_blending, bool and_advance) noexc
 }
 
 void MEGACHIP::start_audio_track(bool repeat) noexcept {
-	if (m_audio_device) {
+	if (m_audio_mixer.device) {
 		auto* track_src = &m_memory[m_register_I];
 
 		m_track.loop = repeat;
@@ -479,9 +485,9 @@ void MEGACHIP::start_audio_track(bool repeat) noexcept {
 		const bool oob = m_track.data + m_track.size > &m_memory.back();
 		if (!m_track.size || oob) { m_track.reset(); }
 		else {
-			m_voices[VOICE::UNIQUE].set_phase(0.0).set_step(
-				(track_src[0] << 8 | track_src[1]) \
-				/ f64(m_track.size) / m_audio_device.get_freq());
+			m_audio_mixer.voices[VOICE::UNIQUE].set_phase(0.0).set_step(
+				(track_src[0] << 8 | track_src[1]) / f64(m_track.size)
+				/ m_audio_mixer.device.get_freq());
 		}
 	}
 }

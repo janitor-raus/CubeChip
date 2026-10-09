@@ -148,11 +148,3 @@ public:
 		return envelope.calculate(sample_idx, fade_step) * get_volume() * get_master_gain();
 	}
 };
-
-/*==================================================================*/
-
-#include <span>
-using SampleBuffer = std::span<float>;
-
-template <typename T>
-concept IsSampleGenerator = std::is_nothrow_invocable_r_v<void, T, SampleBuffer>;

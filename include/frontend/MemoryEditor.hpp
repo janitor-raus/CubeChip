@@ -142,19 +142,19 @@ public:
 
 	struct Settings {
 		bool window_visible_out = false; // Can be used externally to toggle window visibility, has no effect on rendering the widget itself.
-		bool show_options_menu = true;  // Enable options button/context menu. When disabled, options will be locked unless you provide your own UI for them.
-		bool show_data_preview = false; // Enable a footer area previewing the decimal/binary/hex/float representation of the currently selected bytes.
+		bool show_options_menu  = true;  // Enable options button/context menu. When disabled, options will be locked unless you provide your own UI for them.
+		bool show_data_preview  = false; // Enable a footer area previewing the decimal/binary/hex/float representation of the currently selected bytes.
 
-		bool toggle_const_view = false; // Prevent editing of the memory contents, ensuring constness.
-		bool toggle_hexii_view = false; // Display values in HexII representation instead of regular hexadecimal: hide null/zero bytes, ascii values as ".X".
-		bool toggle_ascii_view = true;  // Display ASCII representation on the right side of the Memory Viewer.
+		bool toggle_const_view  = false; // Prevent editing of the memory contents, ensuring constness.
+		bool toggle_hexii_view  = false; // Display values in HexII representation instead of regular hexadecimal: hide null/zero bytes, ascii values as ".X".
+		bool toggle_ascii_view  = true;  // Display ASCII representation on the right side of the Memory Viewer.
 		bool toggle_grey_zeroes = true;  // Grey-out null/zero bytes using the TextDisabled color.
 		bool toggle_capital_hex = false; // Present hexadecimal values as "FF" instead of "ff".
 
 		BoundedParam<u32(8), 4, 32> column_count;      // Number of columns to display.
 		BoundedParam<u32(8), 0, 16> column_group_size; // Insert spacing between N columns to separate groups. Use 0 to disable.
 		u32  address_digit_count = 0;                  // Maximum number of address digits to display (minimum enforced automatically to cover memory range).
-		f32  footer_area_height = 0.0f;               // Space in px to reserve at the bottom of the widget to add custom widgets.
+		f32  footer_area_height = 0.0f;                // Space in px to reserve at the bottom of the widget to add custom widgets.
 		RGBA cell_emphasis_color = RGBA();             // Background color of highlighted bytes.
 	} settings;
 

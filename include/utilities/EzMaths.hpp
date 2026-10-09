@@ -240,6 +240,7 @@ namespace EzMaths {
 
 PRECISE_FP_BEGIN
 namespace EzMaths{
+	// Basic Exponential Moving Average (EMA) class for smoothing values over time.
 	class EMA {
 		f32 alpha{};
 		f32 value{};

@@ -15,16 +15,13 @@
 
 #include "AssignCast.hpp"
 #include "AudioDevice.hpp"
-#include "Voice.hpp"
+#include "AudioMixer.hpp"
 #include "DisplayDevice.hpp"
 
 /*==================================================================*/
 
 class IFamily_CHIP8 : public ISystemEmu {
 	void prepare_user_interface() noexcept;
-
-private:
-	ez::EMA m_mips_ema;
 
 protected:
 	static constexpr std::string_view family_pretty_name = "CHIP-8";
@@ -118,10 +115,10 @@ protected:
 		BUZZER = ID_3, UNIQUE = ID_0,
 	};
 
-	AudioDevice m_audio_device;
+	AudioMixer<VOICE::COUNT> m_audio_mixer;
 
-	std::array<Voice, VOICE::COUNT>
-		m_voices{};
+private:
+	ez::EMA m_mips_ema;
 
 private:
 	u8 m_last_voice_index = 0;
@@ -129,25 +126,6 @@ private:
 protected:
 	void start_voice(u32 duration) noexcept;
 	void start_voice_at(u32 voice_index, u32 duration) noexcept;
-
-	template <typename... Generator>
-		requires ((IsSampleGenerator<Generator> && ...))
-	void mix_audio_data(Generator&&... generators) noexcept {
-		if (m_audio_device) {
-			m_audio_device.set_freq_ratio(framerate_multiplier);
-
-			auto buffer = allocate_n<f32>(
-				m_audio_device.next_frame_sample_count(get_real_system_framerate())
-			).as_value().release_as_container();
-
-			if (!has_cached_system_state(EmuState::ANY_PAUSE)) {
-				(std::forward<Generator>(generators)(buffer.span()), ...);
-				for (auto& sample : buffer) { sample = ez::fast_tanh(sample); }
-			}
-
-			m_audio_device.push_audio_data(buffer);
-		}
-	}
 
 	static void make_pulse_wave(SampleBuffer buffer, Voice& voice) noexcept;
 
