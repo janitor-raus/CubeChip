@@ -20,8 +20,8 @@ void BYTEPUSHER_STANDARD::initialize_system() noexcept {
 	base_system_framerate = c_sys_refresh_rate;
 
 	auto out_freq = c_sys_refresh_rate * c_sys_audio_sample_total;
-	m_audio_device.init_stream(C1_0, s32(out_freq));
-	m_audio_device.resume();
+	m_audio_mixer.device.init_stream(C1_0, s32(out_freq));
+	m_audio_mixer.device.resume();
 
 	m_memory_editor.set_memory_range(m_memory.data(), m_memory.size());
 
@@ -53,27 +53,24 @@ void BYTEPUSHER_STANDARD::handle_cycle_loop() noexcept {
 }
 
 void BYTEPUSHER_STANDARD::push_audio_data() noexcept {
-	if (m_audio_device) {
-		m_audio_device.set_freq_ratio(framerate_multiplier);
+	m_audio_mixer.mix_tracks(
+		has_cached_system_state(EmuState::ANY_PAUSE),
+		{ *base_system_framerate, *framerate_multiplier },
+		VoiceTrack(VOICE::ID_0, [&](auto buffer, auto&) noexcept {
+			const auto* data_start = m_memory.data()
+				+ (read_data<ByteSpan::DOUBLE>(6) << 8);
 
-		float buffer[c_sys_audio_sample_total]{};
-
-		if (!has_cached_system_state(EmuState::ANY_PAUSE)) {
-			static constexpr auto c_master_gain = 0.5f;
-
-			const auto samples = std::span(m_memory.data()
-				+ (read_data<ByteSpan::DOUBLE>(6) << 8), 256);
+			const auto* data_end = data_start
+				+ c_sys_audio_sample_total;
 
 			std::transform(EXEC_POLICY(unseq)
-				samples.begin(), samples.end(), buffer,
+				data_start, data_end, buffer.begin(),
 				[](const auto sample) noexcept {
-					return s8(sample) * (c_master_gain / 127.0f);
+					return s8(sample) * (0.5f / 127.0f);
 				}
 			);
-		}
-
-		m_audio_device.push_audio_data(buffer);
-	}
+		}, WaveType::Sine)
+	);
 }
 
 void BYTEPUSHER_STANDARD::push_video_data() noexcept {

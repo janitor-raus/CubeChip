@@ -241,8 +241,8 @@ void CHIP8X::push_audio_data() noexcept {
 	m_audio_mixer.mix_tracks(
 		has_cached_system_state(EmuState::ANY_PAUSE),
 		{ *base_system_framerate, *framerate_multiplier },
-		VoiceTrack{ VOICE::UNIQUE, make_pulse_wave },
-		VoiceTrack{ VOICE::BUZZER, make_pulse_wave }
+		VoiceTrack(VOICE::UNIQUE, make_pulse_wave, WaveType::Pulse),
+		VoiceTrack(VOICE::BUZZER, make_pulse_wave, WaveType::Pulse)
 	);
 
 	static constexpr u32 idx[]{ 2, 7, 4, 1 };

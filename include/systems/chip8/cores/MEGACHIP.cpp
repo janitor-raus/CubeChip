@@ -311,10 +311,10 @@ void MEGACHIP::push_audio_data() noexcept {
 		m_audio_mixer.mix_tracks(
 			has_cached_system_state(EmuState::ANY_PAUSE),
 			{ *base_system_framerate, *framerate_multiplier },
-			VoiceTrack{ VOICE::BUZZER, make_pulse_wave },
-			VoiceTrack{ VOICE::UNIQUE, [&](auto buffer, auto& voice) noexcept {
-				make_stream_wave(buffer, voice, m_track); }
-			}
+			VoiceTrack(VOICE::BUZZER, make_pulse_wave, WaveType::Pulse),
+			VoiceTrack(VOICE::UNIQUE, [&](auto buffer, auto& voice) noexcept {
+				make_stream_wave(buffer, voice, m_track);
+			}, WaveType::Sine)
 		);
 
 		if (has_cached_system_state(EmuState::ANY_PAUSE)) { return; }
@@ -326,10 +326,10 @@ void MEGACHIP::push_audio_data() noexcept {
 		m_audio_mixer.mix_tracks(
 			has_cached_system_state(EmuState::ANY_PAUSE),
 			{ *base_system_framerate, *framerate_multiplier },
-			VoiceTrack{ VOICE::ID_0,   make_pulse_wave },
-			VoiceTrack{ VOICE::ID_1,   make_pulse_wave },
-			VoiceTrack{ VOICE::ID_2,   make_pulse_wave },
-			VoiceTrack{ VOICE::BUZZER, make_pulse_wave }
+			VoiceTrack(VOICE::ID_0,   make_pulse_wave, WaveType::Pulse),
+			VoiceTrack(VOICE::ID_1,   make_pulse_wave, WaveType::Pulse),
+			VoiceTrack(VOICE::ID_2,   make_pulse_wave, WaveType::Pulse),
+			VoiceTrack(VOICE::BUZZER, make_pulse_wave, WaveType::Pulse)
 		);
 
 		if (has_cached_system_state(EmuState::ANY_PAUSE)) { return; }

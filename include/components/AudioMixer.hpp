@@ -8,7 +8,6 @@
 
 #include "AudioDevice.hpp"
 #include "Voice.hpp"
-#include "Aligned.hpp"
 #include "Mailbox.hpp"
 
 #include <algorithm>
@@ -26,20 +25,36 @@ template <typename T>
 concept IsSampleGenerator = std::is_nothrow_invocable_r_v
 	<void, T, SampleBuffer, Voice&>;
 
+enum WaveType {
+	None,    // no waveform, absence of a voice track
+	Unknown, // General-purpose sampled waveform
+	Sine,
+	Triangle,
+	Pulse,
+	Sawtooth,
+};
+
 template <typename Fn> requires (IsSampleGenerator<Fn>)
 struct VoiceTrack {
-	const std::size_t      track_id;
-	const std::decay_t<Fn> generate;
+	using Decay_Fn = std::decay_t<Fn>;
+
+	const WaveType wave_type;
+	const unsigned track_id;
+	const Decay_Fn generate;
 
 	VoiceTrack() = delete;
-	VoiceTrack(std::size_t track_id, Fn&& fn) noexcept
+	VoiceTrack(
+		unsigned track_id, Fn&& fn,
+		WaveType wave_type = WaveType::Unknown
+	) noexcept
 		: track_id(track_id)
+		, wave_type(wave_type)
 		, generate(std::forward<Fn>(fn))
 	{}
 };
 
 struct Timing {
-	float base_framerate = 0.0f;
+	float base_framerate  = 0.0f;
 	float rate_multiplier = 0.0f;
 
 	constexpr operator bool() const noexcept {
@@ -66,33 +81,28 @@ class AudioMixer {
 	}
 
 	class Snapshot {
-		static constexpr auto c_rows = Voices + 1; // one per track, plus the final mix
+		friend class AudioMixer;
+		 // One per track, plus the final mix result
+		using VoiceWaveTypes = std::array<WaveType, Voices>;
+		static constexpr auto c_rows = Voices + 1;
 
-		SamplesVec  m_track_samples;
-		VoicesGroup m_cached_voices;
+		SamplesVec     m_track_samples;
+		VoicesGroup    m_cached_voices;
+		VoiceWaveTypes m_cached_wave_types;
 
 		static auto row_span(auto& samples, std::size_t row) noexcept {
 			const auto len = samples.size() / c_rows;
 			return std::span(samples.data() + row * len, len);
 		}
 
-	public:
 		auto& reset(std::size_t length, const VoicesGroup& voices) {
 			m_cached_voices = voices;
 			m_track_samples.assign(length * c_rows, c_untouched);
+			m_cached_wave_types.fill(WaveType::None);
 			return *this;
 		}
 
-		const auto& get_voice(std::size_t i) const noexcept {
-			assert(i < Voices);
-			return m_cached_voices[i];
-		}
-
 		auto get_track(std::size_t i) /***/ noexcept {
-			assert(i < Voices);
-			return row_span(m_track_samples, i);
-		}
-		auto get_track(std::size_t i) const noexcept {
 			assert(i < Voices);
 			return row_span(m_track_samples, i);
 		}
@@ -100,6 +110,23 @@ class AudioMixer {
 		auto get_mixed() /***/ noexcept {
 			return row_span(m_track_samples, Voices);
 		}
+
+	public:
+		const auto& get_voice(std::size_t i) const noexcept {
+			assert(i < Voices);
+			return m_cached_voices[i];
+		}
+
+		const auto& get_wave_type(std::size_t i) const noexcept {
+			assert(i < Voices);
+			return m_cached_wave_types[i];
+		}
+
+		auto get_track(std::size_t i) const noexcept {
+			assert(i < Voices);
+			return row_span(m_track_samples, i);
+		}
+
 		auto get_mixed() const noexcept {
 			return row_span(m_track_samples, Voices);
 		}
@@ -151,6 +178,8 @@ public:
 					if (track.empty() || is_untouched(track[0])) { continue; }
 					mix_track(scratch_span, std::move(track));
 				}
+
+				((snapshot.m_cached_wave_types[tracks.track_id] = tracks.wave_type), ...);
 
 				for (auto& sample : m_scratch) { sample = ez::fast_tanh(sample); }
 				// Copy-add the scratch buffer to the (empty) mixed track span

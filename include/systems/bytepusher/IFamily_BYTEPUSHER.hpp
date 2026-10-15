@@ -13,7 +13,7 @@
 
 #include "../ISystemEmu.hpp"
 
-#include "AudioDevice.hpp"
+#include "AudioMixer.hpp"
 #include "DisplayDevice.hpp"
 
 /*==================================================================*/
@@ -37,7 +37,7 @@ protected:
 	WindowHost    m_display_window;
 	DisplayDevice m_display_device;
 
-	AudioDevice   m_audio_device;
+	AudioMixer<VOICE::COUNT> m_audio_mixer;
 
 protected:
 	u32  get_key_states() noexcept;

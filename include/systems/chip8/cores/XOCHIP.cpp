@@ -273,10 +273,10 @@ void XOCHIP::push_audio_data() noexcept {
 	m_audio_mixer.mix_tracks(
 		has_cached_system_state(EmuState::ANY_PAUSE),
 		{ *base_system_framerate, *framerate_multiplier },
-		VoiceTrack{ VOICE::BUZZER, make_pulse_wave },
-		VoiceTrack{ VOICE::UNIQUE, [&](auto buffer, auto& voice) noexcept {
-			make_pattern_wave(buffer, voice, m_pulse_pattern_data); }
-		}
+		VoiceTrack(VOICE::BUZZER, make_pulse_wave, WaveType::Pulse),
+		VoiceTrack(VOICE::UNIQUE, [&](auto buffer, auto& voice) noexcept {
+			make_pattern_wave(buffer, voice, m_pulse_pattern_data);
+		}, WaveType::Pulse)
 	);
 
 	if (has_cached_system_state(EmuState::ANY_PAUSE)) { return; }
