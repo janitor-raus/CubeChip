@@ -11,6 +11,7 @@
 #include "Mailbox.hpp"
 
 #include <algorithm>
+#include <string>
 #include <atomic>
 #include <vector>
 #include <array>
@@ -38,6 +39,7 @@ template <typename Fn> requires (IsSampleGenerator<Fn>)
 struct VoiceTrack {
 	using Decay_Fn = std::decay_t<Fn>;
 
+	const std::string description;
 	const WaveType wave_type;
 	const unsigned track_id;
 	const Decay_Fn generate;
@@ -45,9 +47,11 @@ struct VoiceTrack {
 	VoiceTrack() = delete;
 	VoiceTrack(
 		unsigned track_id, Fn&& fn,
-		WaveType wave_type = WaveType::Unknown
+		WaveType wave_type = WaveType::Unknown,
+		std::string description = ""
 	) noexcept
-		: track_id(track_id)
+		: description(std::move(description))
+		, track_id(track_id)
 		, wave_type(wave_type)
 		, generate(std::forward<Fn>(fn))
 	{}
