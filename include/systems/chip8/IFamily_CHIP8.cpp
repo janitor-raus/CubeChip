@@ -53,7 +53,7 @@ void IFamily_CHIP8::reset_family_data() noexcept {
 	for (auto& voice : m_audio_mixer.voices) { voice.timer.reset(); }
 	for (auto& v_reg : m_registers_V) { v_reg = 0; }
 
-	m_last_voice_index = 0;
+	m_next_voice_index = 0;
 	m_delay_timer = 0;
 	m_register_I  = 0;
 	m_interrupt   = Interrupt::CLEAR;
@@ -270,13 +270,13 @@ void IFamily_CHIP8::append_statistics_data() noexcept {
 /*==================================================================*/
 
 void IFamily_CHIP8::start_voice(u32 duration) noexcept {
-	start_voice_at(m_last_voice_index, duration);
-	if (duration) { ++m_last_voice_index %= VOICE::COUNT - 1; }
+	start_voice_at(m_next_voice_index, duration);
+	if (duration) { ++m_next_voice_index %= VOICE::COUNT - 1; }
 }
 
 void IFamily_CHIP8::start_voice_at(u32 voice_index, u32 duration) noexcept {
 	m_audio_mixer.voices[voice_index].timer.set(duration);
-	if (m_audio_mixer.device) {
+	if (duration && m_audio_mixer.device) {
 		m_audio_mixer.voices[voice_index].set_step((c_tonal_offset + 8 *
 			(((m_current_pc >> 1) + m_stack.head() + 1) & 0x3E)
 		) / m_audio_mixer.device.get_freq());

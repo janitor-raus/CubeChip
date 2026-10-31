@@ -28,6 +28,7 @@ class MEGACHIP final : public IFamily_CHIP8 {
 
 	static constexpr u32 c_sys_speed_hi = 45;
 	static constexpr u32 c_sys_speed_lo = 32;
+	static constexpr u32 c_sys_speed_mc = 5000;
 
 	static constexpr std::string_view c_supported_extensions[] = { ".ch8", ".mc8" };
 
@@ -114,7 +115,9 @@ public:
 
 		constexpr auto pos(Phase head) const noexcept
 			{ return data[u32(head * size)] - 128; }
-	} m_track;
+	};
+
+	TrackData m_tracks[3];
 
 	void start_audio_track(bool repeat) noexcept;
 

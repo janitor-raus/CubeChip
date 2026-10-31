@@ -47,7 +47,9 @@ void MEGACHIP::reset_system_data() noexcept {
 
 	m_color_palette.fill(0);
 
-	m_track.reset();
+	m_tracks[ID_0].reset();
+	m_tracks[ID_1].reset();
+	m_tracks[ID_2].reset();
 	m_texture.reset();
 
 	m_current_pc = c_sys_boot_pos;
@@ -311,10 +313,16 @@ void MEGACHIP::push_audio_data() noexcept {
 		m_audio_mixer.mix_tracks(
 			has_cached_system_state(EmuState::ANY_PAUSE),
 			{ *base_system_framerate, *framerate_multiplier },
-			VoiceTrack(VOICE::BUZZER, make_pulse_wave, WaveType::Pulse),
-			VoiceTrack(VOICE::UNIQUE, [&](auto buffer, auto& voice) noexcept {
-				make_stream_wave(buffer, voice, m_track);
-			}, WaveType::Sine)
+			VoiceTrack(VOICE::ID_0, [&](auto buffer, auto& voice) noexcept {
+				make_stream_wave(buffer, voice, m_tracks[0]);
+			}, WaveType::Sine),
+			VoiceTrack(VOICE::ID_1, [&](auto buffer, auto& voice) noexcept {
+				make_stream_wave(buffer, voice, m_tracks[1]);
+			}, WaveType::Sine),
+			VoiceTrack(VOICE::ID_2, [&](auto buffer, auto& voice) noexcept {
+				make_stream_wave(buffer, voice, m_tracks[2]);
+			}, WaveType::Sine),
+			VoiceTrack(VOICE::BUZZER, make_pulse_wave, WaveType::Pulse)
 		);
 
 		if (has_cached_system_state(EmuState::ANY_PAUSE)) { return; }
@@ -377,7 +385,7 @@ void MEGACHIP::set_display_properties(Resolution mode) noexcept {
 			meta.texture_tint = RGBA::Black;
 
 			sub_quirk(AWAIT_VBLANK);
-			m_standard_cpf = c_sys_speed_lo * 100;
+			m_standard_cpf = c_sys_speed_mc;
 		}
 		else {
 			meta.set_viewport(c_sys_screen_W, c_sys_screen_W/2);
@@ -474,20 +482,23 @@ void MEGACHIP::flush_all_video_buffers(bool by_blending, bool and_advance) noexc
 
 void MEGACHIP::start_audio_track(bool repeat) noexcept {
 	if (m_audio_mixer.device) {
+		auto& index = m_next_voice_index;
+		auto& track = m_tracks[index];
 		auto* track_src = &m_memory[m_register_I];
 
-		m_track.loop = repeat;
-		m_track.data = track_src + 6;
-		m_track.size = track_src[2] << 16
-					 | track_src[3] <<  8
-					 | track_src[4];
+		track.loop = repeat;
+		track.data = track_src + 6;
+		track.size = track_src[2] << 16
+				   | track_src[3] <<  8
+				   | track_src[4];
 
-		const bool oob = m_track.data + m_track.size > &m_memory.back();
-		if (!m_track.size || oob) { m_track.reset(); }
+		const bool oob = track.data + track.size > &m_memory.back();
+		if (!track.size || oob) { track.reset(); }
 		else {
-			m_audio_mixer.voices[VOICE::UNIQUE].set_phase(0.0).set_step(
-				(track_src[0] << 8 | track_src[1]) / f64(m_track.size)
+			m_audio_mixer.voices[index].set_phase(0.0).set_step(
+				(track_src[0] << 8 | track_src[1]) / f64(track.size)
 				/ m_audio_mixer.device.get_freq());
+			++index %= VOICE::COUNT - 1;
 		}
 	}
 }
@@ -590,7 +601,9 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 		scrap_all_video_buffers();
 
 		m_texture.reset();
-		m_track.reset();
+		m_tracks[ID_0].reset();
+		m_tracks[ID_1].reset();
+		m_tracks[ID_2].reset();
 
 		trigger_interrupt(Interrupt::FRAME);
 	}
@@ -619,7 +632,9 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 		start_audio_track(N == 0u);
 	}
 	void MEGACHIP::instruction_0700() noexcept {
-		m_track.reset();
+		m_tracks[ID_0].reset();
+		m_tracks[ID_1].reset();
+		m_tracks[ID_2].reset();
 	}
 	void MEGACHIP::instruction_080N(u32 N) noexcept {
 		static constexpr u8 opacity[]{ 0xFF, 0x3F, 0x7F, 0xBF };

@@ -120,10 +120,9 @@ protected:
 private:
 	ez::EMA m_mips_ema;
 
-private:
-	u8 m_last_voice_index = 0;
-
 protected:
+	u8 m_next_voice_index = 0;
+
 	void start_voice(u32 duration) noexcept;
 	void start_voice_at(u32 voice_index, u32 duration) noexcept;
 
