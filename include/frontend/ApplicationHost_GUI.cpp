@@ -277,11 +277,13 @@ void ApplicationHost::setup_gui_callables() noexcept {
 		bool clicked = UserInterface::was_menu_clicked();
 
 		for (auto& entry : s_file_mru.span()) {
+			PushID(&entry);
 			if (MenuItem(("• " + entry->filename().string()).c_str(),
 				nullptr, nullptr, clicked ? entry.exists() : entry))
 			{
 				load_file_from_disk(entry->string());
 			}
+			PopID();
 		}
 	}));
 
