@@ -56,6 +56,8 @@ void XOCHIP::reset_system_data() noexcept {
 
 	set_pattern_pitch(64);
 	m_pulse_pattern_data = c_default_pattern_data;
+
+	use_hires_screen(false);
 }
 
 void XOCHIP::instruction_loop() noexcept {

@@ -145,7 +145,7 @@ protected:
 		JUMP_WITH_VX = 0x02,
 		SHIFT_VX_REG = 0x04,
 		NO_INC_I_REG = 0x08,
-		X1_INC_I_REG = 0x10,
+		SCHIP_VER_10 = 0x10,
 		AWAIT_VBLANK = 0x20,
 		AWAIT_SCROLL = 0x40,
 		WRAP_SPRITES = 0x80,
@@ -158,7 +158,7 @@ protected:
 			case JUMP_WITH_VX: return "Jump Quirk";
 			case SHIFT_VX_REG: return "Shift Quirk";
 			case NO_INC_I_REG: return "Memory Quirk";
-			case X1_INC_I_REG: return "Old Memory Quirk";
+			case SCHIP_VER_10: return "Superchip 1.0";
 			case AWAIT_VBLANK: return "Await Vblank";
 			case AWAIT_SCROLL: return "Await Scroll";
 			case WRAP_SPRITES: return "Wrap Sprites";
@@ -168,14 +168,22 @@ protected:
 
 	static constexpr const char* get_quirk_desc(QuirkFlag flag) noexcept {
 		switch (flag) {
-			case RESET_VF_REG: return "Affects: 8xy1, 8xy2, 8xy3\nInstructions reset the VF register after the operation.";
-			case JUMP_WITH_VX: return "Affects: Bnnn\nInstruction jumps by adding VX to NNN instead of V0.";
-			case SHIFT_VX_REG: return "Affects: 8xy6, 8xyE\nInstructions shift VX in-place instead of VY.";
-			case NO_INC_I_REG: return "Affects: Fn55, Fn65\nInstructions do not increment the I register.";
-			case X1_INC_I_REG: return "Affects: Fn55, Fn65\nInstructions increment the I register by X only instead of X+1.";
-			case AWAIT_VBLANK: return "Affects: 00E0, Dxyn/?\nStaggers instruction execution to once per vblank.";
-			case AWAIT_SCROLL: return "Affects: 00FB, 00FC, 00Bn, 00Cn, 00Dn\nStaggers instruction execution to once per vblank.";
-			case WRAP_SPRITES: return "Affects: Dxy0, Dxyn\nSprite draws wrap around the screen edges instead of being clipped.";
+			case RESET_VF_REG: return "Affects: 8xy1, 8xy2, 8xy3\n"
+				"Instructions reset the VF register after the operation.";
+			case JUMP_WITH_VX: return "Affects: Bnnn\n"
+				"Instruction jumps by adding V[X] to NNN instead of V[0].";
+			case SHIFT_VX_REG: return "Affects: 8xy6, 8xyE\n"
+				"Instructions shift VX in-place instead of VY.";
+			case NO_INC_I_REG: return "Affects: Fn55, Fn65\n"
+				"Instructions do not increment the I register, instead of X+1.";
+			case SCHIP_VER_10: return "Affects: Dxy0, Dxyn, Fn55, Fn65\n"
+				"Modifies instruction behavior to match the Superchip 1.0 spec.";
+			case AWAIT_VBLANK: return "Affects: 00E0, Dxy0, Dxyn/?\n"
+				"Staggers draw instruction execution to once per vblank.";
+			case AWAIT_SCROLL: return "Affects: 00FB, 00FC, 00Bn, 00Cn, 00Dn\n"
+				"Staggers scroll instruction execution to once per vblank.";
+			case WRAP_SPRITES: return "Affects: Dxy0, Dxyn\n"
+				"Sprite draws wrap around the screen edges instead of being clipped.";
 			default:           return "INVALID";
 		}
 	}

@@ -43,6 +43,8 @@ void SCHIP_MODERN::reset_system_data() noexcept {
 
 	m_current_pc   = c_sys_boot_pos;
 	m_standard_cpf = c_sys_speed_lo;
+
+	use_hires_screen(false);
 }
 
 void SCHIP_MODERN::instruction_loop() noexcept {

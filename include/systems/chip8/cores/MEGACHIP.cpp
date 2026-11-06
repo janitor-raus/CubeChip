@@ -314,13 +314,13 @@ void MEGACHIP::push_audio_data() noexcept {
 			has_cached_system_state(EmuState::ANY_PAUSE),
 			{ *base_system_framerate, *framerate_multiplier },
 			VoiceTrack(VOICE::ID_0, [&](auto buffer, auto& voice) noexcept {
-				make_stream_wave(buffer, voice, m_tracks[0]);
+				make_stream_wave(buffer, voice, m_tracks[VOICE::ID_0]);
 			}, WaveType::Sine),
 			VoiceTrack(VOICE::ID_1, [&](auto buffer, auto& voice) noexcept {
-				make_stream_wave(buffer, voice, m_tracks[1]);
+				make_stream_wave(buffer, voice, m_tracks[VOICE::ID_1]);
 			}, WaveType::Sine),
 			VoiceTrack(VOICE::ID_2, [&](auto buffer, auto& voice) noexcept {
-				make_stream_wave(buffer, voice, m_tracks[2]);
+				make_stream_wave(buffer, voice, m_tracks[VOICE::ID_2]);
 			}, WaveType::Sine),
 			VoiceTrack(VOICE::BUZZER, make_pulse_wave, WaveType::Pulse)
 		);
@@ -601,9 +601,9 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 		scrap_all_video_buffers();
 
 		m_texture.reset();
-		m_tracks[ID_0].reset();
-		m_tracks[ID_1].reset();
-		m_tracks[ID_2].reset();
+		m_tracks[VOICE::ID_0].reset();
+		m_tracks[VOICE::ID_1].reset();
+		m_tracks[VOICE::ID_2].reset();
 
 		trigger_interrupt(Interrupt::FRAME);
 	}
@@ -612,9 +612,9 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 		::assign_cast_add(m_current_pc, 2);
 	}
 	void MEGACHIP::instruction_02NN(u32 NN) noexcept {
-		auto* src = &m_memory[m_register_I];
+		const auto* src = &m_memory[m_register_I];
 		for (auto pos = 0u; pos < NN; src += 4) {
-			m_color_palette[++pos] = { src[1], src[2], src[3], src[0] };
+			m_color_palette[++pos] = RGBA(src[1], src[2], src[3], src[0]);
 		}
 	}
 	void MEGACHIP::instruction_03NN(u32 NN) noexcept {
@@ -632,9 +632,9 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 		start_audio_track(N == 0u);
 	}
 	void MEGACHIP::instruction_0700() noexcept {
-		m_tracks[ID_0].reset();
-		m_tracks[ID_1].reset();
-		m_tracks[ID_2].reset();
+		m_tracks[VOICE::ID_0].reset();
+		m_tracks[VOICE::ID_1].reset();
+		m_tracks[VOICE::ID_2].reset();
 	}
 	void MEGACHIP::instruction_080N(u32 N) noexcept {
 		static constexpr u8 opacity[]{ 0xFF, 0x3F, 0x7F, 0xBF };
@@ -964,14 +964,18 @@ void MEGACHIP::scroll_buffers_rt() noexcept {
 							m_memory[m_register_I + 2 * row + 1] << 0
 						) << x_shift);
 
-						if (++true_y == (c_sys_screen_H/3)) { break; }
+						if (++true_y == (c_sys_screen_H/3)) {
+							collisions += 16u - row - 1; break;
+						}
 					}
 				} else {
 					for (auto row = 0u, true_y = y_begin; row < N; ++row) {
 						collisions += draw_single_byte(x_begin, true_y, x_shift ? 16 : 8,
 							m_memory[m_register_I + row] << x_shift);
 
-						if (++true_y == (c_sys_screen_H/3)) { break; }
+						if (++true_y == (c_sys_screen_H/3)) {
+							collisions += N - row - 1; break;
+						}
 					}
 				}
 				::assign_cast(m_registers_V[0xF], collisions);

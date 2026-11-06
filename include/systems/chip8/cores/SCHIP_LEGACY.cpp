@@ -43,6 +43,9 @@ void SCHIP_LEGACY::reset_system_data() noexcept {
 
 	m_current_pc   = c_sys_boot_pos;
 	m_standard_cpf = c_sys_speed_hi;
+
+	use_hires_screen(false);
+	add_quirk(AWAIT_VBLANK);
 }
 
 void SCHIP_LEGACY::instruction_loop() noexcept {
@@ -64,7 +67,11 @@ void SCHIP_LEGACY::instruction_loop() noexcept {
 			case 0x00:
 				switch (LO) {
 					CASE_xNF0(0xC0):
-						instruction_00CN(_N);
+						if (has_quirk(SCHIP_VER_10)) {
+							instruction_error(HI, LO);
+						} else {
+							instruction_00CN(_N);
+						}
 						break;
 					case 0x00E0:
 						instruction_00E0();
@@ -73,10 +80,18 @@ void SCHIP_LEGACY::instruction_loop() noexcept {
 						instruction_00EE();
 						break;
 					case 0x00FB:
-						instruction_00FB();
+						if (has_quirk(SCHIP_VER_10)) {
+							instruction_error(HI, LO);
+						} else {
+							instruction_00FB();
+						}
 						break;
 					case 0x00FC:
-						instruction_00FC();
+						if (has_quirk(SCHIP_VER_10)) {
+							instruction_error(HI, LO);
+						} else {
+							instruction_00FC();
+						}
 						break;
 					case 0x00FD:
 						instruction_00FD();
@@ -522,17 +537,28 @@ void SCHIP_LEGACY::scroll_display_rt() noexcept {
 						m_memory[m_register_I + 2 * row + 1] << 0
 					) << x_shift);
 
-					if (++true_y == c_sys_screen_H) { break; }
+					if (++true_y == c_sys_screen_H) {
+						if (!has_quirk(SCHIP_VER_10)) {
+							collisions += 16u - row - 1;
+						}
+						break;
+					}
 				}
 			} else {
 				for (auto row = 0u, true_y = y_begin; row < N; ++row) {
 					collisions += draw_single_byte(x_begin, true_y, x_shift ? 16 : 8,
 						m_memory[m_register_I + row] << x_shift);
 
-					if (++true_y == c_sys_screen_H) { break; }
+					if (++true_y == c_sys_screen_H) {
+						if (!has_quirk(SCHIP_VER_10)) {
+							collisions += N - row - 1;
+						}
+						break;
+					}
 				}
 			}
-			::assign_cast(m_registers_V[0xF], collisions);
+			::assign_cast(m_registers_V[0xF], has_quirk(SCHIP_VER_10)
+				? collisions != 0 : collisions);
 		}
 		else {
 			const auto x_shift = 16 - 2 * (m_registers_V[X] & 0x07u);
@@ -604,11 +630,11 @@ void SCHIP_LEGACY::scroll_display_rt() noexcept {
 	}
 	void SCHIP_LEGACY::instruction_FN55(u32 N) noexcept {
 		for (auto i = 0u; i <= N; ++i) { m_memory[m_register_I + i] = m_registers_V[i]; }
-		if (has_quirk(X1_INC_I_REG)) [[likely]] { ::assign_cast_add(m_register_I, N); }
+		if (has_quirk(SCHIP_VER_10)) [[likely]] { ::assign_cast_add(m_register_I, N); }
 	}
 	void SCHIP_LEGACY::instruction_FN65(u32 N) noexcept {
 		for (auto i = 0u; i <= N; ++i) { m_registers_V[i] = m_memory[m_register_I + i]; }
-		if (has_quirk(X1_INC_I_REG)) [[likely]] { ::assign_cast_add(m_register_I, N); }
+		if (has_quirk(SCHIP_VER_10)) [[likely]] { ::assign_cast_add(m_register_I, N); }
 	}
 	void SCHIP_LEGACY::instruction_FN75(u32 N) noexcept {
 		set_permaregs(std::min(N, 7u) + 1);

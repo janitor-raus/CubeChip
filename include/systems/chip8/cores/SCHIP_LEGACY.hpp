@@ -36,7 +36,7 @@ class SCHIP_LEGACY final : public IFamily_CHIP8 {
 	}
 
 	u8 get_avail_quirks() const noexcept override final {
-		return X1_INC_I_REG;
+		return SCHIP_VER_10;
 	}
 
 public:
