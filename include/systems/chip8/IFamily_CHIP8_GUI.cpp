@@ -61,8 +61,8 @@ void IFamily_CHIP8::prepare_user_interface() noexcept {
 		osd::simple_text_overlay(copy_statistics_string());
 	});
 
-	m_frontend_hooks.emplace_back(UserInterface::register_menu(m_workspace_host,
-	{ 9999, "Debug" }, [&]() noexcept {
+	m_frontend_hooks.emplace_back(UserInterface::register_menu(
+	m_workspace_host, { 9999, "Debug" }, [&]() noexcept {
 		m_display_device.render_settings_menu();
 	}));
 
@@ -74,8 +74,8 @@ void IFamily_CHIP8::prepare_user_interface() noexcept {
 		}
 	};
 
-	m_frontend_hooks.emplace_back(UserInterface::register_menu(m_workspace_host,
-	{ 60, "System" }, [&]() noexcept {
+	m_frontend_hooks.emplace_back(UserInterface::register_menu(
+	m_workspace_host, { 60, "System" }, [&]() noexcept {
 		if (BeginMenu("Emulation")) {
 			const auto widget_width = CalcTextSize("F").x * 28.0f;
 			const bool is_benching = has_cached_system_state(EmuState::BENCH);
@@ -106,8 +106,8 @@ void IFamily_CHIP8::prepare_user_interface() noexcept {
 		}
 	}));
 
-	m_frontend_hooks.emplace_back(UserInterface::register_menu(m_workspace_host,
-	{ 50, "System" }, [&]() noexcept {
+	m_frontend_hooks.emplace_back(UserInterface::register_menu(
+	m_workspace_host, { 50, "System" }, [&]() noexcept {
 		if (BeginMenu("Quirks", get_avail_quirks())) {
 			const auto& padding = GetStyle().WindowPadding;
 			const auto button_width = CalcTextSize("_").x * 38.0f;

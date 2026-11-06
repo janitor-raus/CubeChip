@@ -75,8 +75,8 @@ public:
 
 	constexpr operator unsigned() const noexcept { return m_timer_new; }
 
-	constexpr operator FadeEnvelope () const noexcept {
-		return FadeEnvelope{ intro(), outro(), !!m_timer_new };
+	constexpr operator FadeEnvelope() const noexcept {
+		return FadeEnvelope(intro(), outro(), !!m_timer_new);
 	}
 };
 
