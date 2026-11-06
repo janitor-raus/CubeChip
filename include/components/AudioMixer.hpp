@@ -7,6 +7,7 @@
 #pragma once
 
 #include "AudioDevice.hpp"
+#include "ShortKey.hpp"
 #include "Voice.hpp"
 #include "Mailbox.hpp"
 
@@ -39,7 +40,7 @@ template <typename Fn> requires (IsSampleGenerator<Fn>)
 struct VoiceTrack {
 	using Decay_Fn = std::decay_t<Fn>;
 
-	const std::string description;
+	const ShortKey descriptor;
 	const WaveType wave_type;
 	const unsigned track_id;
 	const Decay_Fn generate;
@@ -48,9 +49,9 @@ struct VoiceTrack {
 	VoiceTrack(
 		unsigned track_id, Fn&& fn,
 		WaveType wave_type = WaveType::Unknown,
-		std::string description = ""
+		ShortKey descriptor = {}
 	) noexcept
-		: description(std::move(description))
+		: descriptor(std::move(descriptor))
 		, track_id(track_id)
 		, wave_type(wave_type)
 		, generate(std::forward<Fn>(fn))
@@ -87,12 +88,15 @@ class AudioMixer {
 	class Snapshot {
 		friend class AudioMixer;
 		 // One per track, plus the final mix result
-		using VoiceWaveTypes = std::array<WaveType, Voices>;
+		using VoiceWaveTypes   = std::array<WaveType, Voices>;
+		using VoiceDescriptors = std::array<ShortKey, Voices>;
 		static constexpr auto c_rows = Voices + 1;
 
-		SamplesVec     m_track_samples;
-		VoicesGroup    m_cached_voices;
-		VoiceWaveTypes m_cached_wave_types;
+		SamplesVec  m_track_samples;
+		VoicesGroup m_cached_voices;
+
+		VoiceWaveTypes   m_cached_wave_types;
+		VoiceDescriptors m_cached_descriptors;
 
 		static auto row_span(auto& samples, std::size_t row) noexcept {
 			const auto len = samples.size() / c_rows;
@@ -104,6 +108,11 @@ class AudioMixer {
 			m_track_samples.assign(length * c_rows, c_untouched);
 			m_cached_wave_types.fill(WaveType::None);
 			return *this;
+		}
+
+		auto get_descriptor(std::size_t i) noexcept {
+			assert(i < Voices);
+			return m_cached_descriptors[i];
 		}
 
 		auto get_track(std::size_t i) /***/ noexcept {

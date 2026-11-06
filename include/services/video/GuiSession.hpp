@@ -63,8 +63,8 @@ protected:
 		RegistryBox<HookRegistryMenuMap> menus{};
 	};
 
-	using GuiWindowUserHooks = std::unordered_map<WindowNode::ShortKey,
-		RegistryAggregate, WindowNode::ShortKey::Hash>;
+	using GuiWindowUserHooks = std::unordered_map<ShortKey,
+		RegistryAggregate, ShortKey::Hash>;
 
 	static inline GuiWindowUserHooks  s_gui_session_user_hooks;
 	static inline HookRegistry<Func>* s_active_menu = nullptr;
@@ -262,7 +262,6 @@ namespace GuiSession {
 /*==================================================================*/
 
 namespace GuiSession {
-	using ShortKey = WindowNode::ShortKey;
 	using Registry = std::unordered_map<ShortKey,
 		GuiSession::Handle, ShortKey::Hash>;
 

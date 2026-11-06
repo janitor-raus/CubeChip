@@ -13,6 +13,7 @@
 #include "LifetimeWrapperSDL.hpp"
 #include "SettingWrapper.hpp"
 #include "WindowNode.hpp"
+#include "ShortKey.hpp"
 
 /*==================================================================*/
 
@@ -93,7 +94,6 @@ namespace PlatformWindow {
 
 	class Handle;
 
-	using ShortKey = WindowNode::ShortKey;
 	using SyncMRU  = std::list<Handle*>;
 	using SyncNode = SyncMRU::iterator;
 
